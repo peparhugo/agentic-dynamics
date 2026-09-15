@@ -229,6 +229,38 @@ class TestCapsuleComposition:
         assert observed["control_packet"]["unknowns"]["projection_lag_null"] == ["chroma"]
         assert observed["control_packet"]["degraded"] == ["failed_runs"]
 
+    def test_capsule_reports_the_capacity_derived_budget(self, tmp_path):
+        """The v2 budget report rides into the capsule whole: resolved model, effective/hard
+        limits, response headroom, remaining tokens, and the measurement provenance — and the
+        rendered tail names the model and the effective limit, not only a verdict."""
+        budget = {
+            "verdict": "OK", "turns": 38, "context_tokens": 189_594,
+            "usage_incomplete": True, "reason": "usage incomplete — last completed sample used",
+            "model": {"provider_id": "deepseek", "model_id": "deepseek-v4-flash",
+                      "variant": "max", "source": "session.model"},
+            "capacity": {"effective_limit": 968_000, "hard_limit": 1_000_000,
+                         "context_limit": 1_000_000, "input_limit": None,
+                         "output_limit": 384_000, "response_headroom_tokens": 32_000,
+                         "compaction_reserved_tokens": 15_000, "warn_fraction": 0.8,
+                         "compaction_enabled": True},
+            "remaining_tokens": 778_406,
+            "provenance": {"formula": "opencode@1.18.15:SessionCompaction.isOverflow"},
+        }
+        capsule = self._capsule(tmp_path, _binding(), budget=budget)
+        section = capsule["session_budget"]
+        assert section["model"]["model_id"] == "deepseek-v4-flash"
+        assert section["capacity"]["effective_limit"] == 968_000
+        assert section["capacity"]["response_headroom_tokens"] == 32_000
+        assert section["remaining_tokens"] == 778_406
+        assert "opencode@1.18.15" in section["provenance"]["formula"]
+        text = capsule["text"]
+        assert "session budget: OK — deepseek/deepseek-v4-flash" in text
+        assert "968000" in text and "headroom 32000" in text
+
+        at_boundary = dict(budget, verdict="COMPACT", context_tokens=970_000)
+        rendered = self._capsule(tmp_path, _binding(), budget=at_boundary)["text"]
+        assert "session budget: COMPACT" in rendered
+
     def test_next_action_precedence(self, tmp_path):
         _close("bound-predecessor", date="2026-09-10", artifact_dir=tmp_path)
         explicit = self._capsule(tmp_path, _binding(next_action="ship it"))

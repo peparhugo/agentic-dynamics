@@ -908,21 +908,30 @@ def _aio_command(**overrides) -> dict:
     return command
 
 
-def _healthy_opencode_db(path) -> None:
+def _healthy_opencode_db(path, monkeypatch) -> None:
+    """A canonical session db whose ACTIVE model resolves capacity (hermetic catalog)."""
     import json as _json
     import sqlite3
 
+    catalog = path.parent / "models.json"
+    catalog.write_text(_json.dumps({
+        "deepseek": {"models": {"deepseek-v4-flash": {"limit": {"context": 1_000_000, "output": 384_000}}}}
+    }), encoding="utf-8")
+    monkeypatch.setenv("FINOPS_OPENCODE_MODELS_CACHE", str(catalog))
+    (path.parent / "config-home").mkdir(exist_ok=True)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(path.parent / "config-home"))
     con = sqlite3.connect(path)
-    con.execute("CREATE TABLE session (id TEXT, time_updated INTEGER)")
+    con.execute(
+        "CREATE TABLE session (id TEXT, time_updated INTEGER, model TEXT, version TEXT, directory TEXT)"
+    )
     con.execute("CREATE TABLE message (session_id TEXT, time_created INTEGER, data TEXT)")
-    con.execute("INSERT INTO session VALUES ('ses_aio', 200)")
+    con.execute(
+        "INSERT INTO session VALUES ('ses_aio', 200, ?, '1.18.15', '/nonexistent/project')",
+        (_json.dumps({"providerID": "deepseek", "id": "deepseek-v4-flash"}),),
+    )
     con.execute(
         "INSERT INTO message VALUES ('ses_aio', 1, ?)",
-        (
-            _json.dumps(
-                {"role": "assistant", "tokens": {"input": 10, "cache": {"read": 10, "write": 0}}}
-            ),
-        ),
+        (_json.dumps({"role": "assistant", "tokens": {"total": 20, "input": 10}}),),
     )
     con.commit()
     con.close()
@@ -966,7 +975,7 @@ def test_a_bound_aio_submit_still_reaches_the_compose_call(tmp_path, monkeypatch
     )
     assert written.status == si.BINDING_STATUS_CREATED
     monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(store))
-    _healthy_opencode_db(tmp_path / "opencode.db")
+    _healthy_opencode_db(tmp_path / "opencode.db", monkeypatch)
     monkeypatch.setenv("FINOPS_OPENCODE_DB", str(tmp_path / "opencode.db"))
     monkeypatch.setattr(launch_broker, "admission_required", lambda: False)
     # The deployment probe is a DIFFERENT gate (its own tests cover it) — stub it to isolate.
@@ -1058,7 +1067,7 @@ def test_the_complete_submission_path_host_shape(tmp_path, monkeypatch):
         publish=False,
     )
     monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(store))
-    _healthy_opencode_db(tmp_path / "opencode.db")
+    _healthy_opencode_db(tmp_path / "opencode.db", monkeypatch)
     monkeypatch.setenv("FINOPS_OPENCODE_DB", str(tmp_path / "opencode.db"))
     monkeypatch.setattr(launch_broker, "admission_required", lambda: False)
     monkeypatch.setattr(launch_broker, "deployment_probe", lambda *a, **k: [])
