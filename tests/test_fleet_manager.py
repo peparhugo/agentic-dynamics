@@ -62,15 +62,21 @@ class _FakeRedis:
     def eval(self, script: str, numkeys: int, *keys_and_args) -> list[str]:
         """Emulate the request-keyed submit script (single-threaded fake => atomic here).
 
-        The script's contract: reconcile when the key exists, otherwise claim + queue +
-        record, returning ``[job_id, record_json]``.
+        Contract: reconcile when the key exists, otherwise claim + queue + record, returning
+        ``[first, record_json]`` — the NEW job id on the claim path, the EXISTING entry JSON
+        on the reconcile path.
         """
         requests_key, commands_key, jobs_key = keys_and_args[0:3]
-        request_key, job_id, command_raw, record_raw = keys_and_args[3:7]
+        request_key, job_id, command_raw, record_raw, entry_raw = keys_and_args[3:8]
         existing = self._hashes.get(requests_key, {}).get(request_key)
         if existing:
-            return [existing, self._hashes.get(jobs_key, {}).get(existing, "")]
-        self._hashes.setdefault(requests_key, {})[request_key] = str(job_id)
+            try:
+                entry = json.loads(existing)
+                existing_job = str((entry or {}).get("job_id") or "")
+            except (TypeError, ValueError):
+                existing_job = ""
+            return [existing, self._hashes.get(jobs_key, {}).get(existing_job, "")]
+        self._hashes.setdefault(requests_key, {})[request_key] = str(entry_raw)
         self._lists.setdefault(commands_key, []).append(str(command_raw))
         self._hashes.setdefault(jobs_key, {})[str(job_id)] = str(record_raw)
         return [str(job_id), str(record_raw)]
@@ -353,73 +359,135 @@ def test_submit_cli_dispatches_the_aio_identity_flags(monkeypatch):
 
 # ── The caller-stable request key (2026-09-16 delivery simplification, Unit 2) ──
 
+_REQ_SPEC = "workflows/repository/fleet_job_submission.yaml"
+
+
+def _keyed_submit(fm, r, *, request_key="req-A", retry_safe=False, **overrides):
+    """One keyed submit with the default request inputs (overridable per case)."""
+    kwargs = dict(spec=_REQ_SPEC, goal="g", model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x")
+    kwargs.update(overrides)
+    return fm._send_submit_command(r, request_key=request_key, retry_safe=retry_safe, **kwargs)
+
 
 def test_a_keyed_retry_reconciles_to_the_existing_job_and_queues_nothing():
-    """The lost-response repair: a retry with the SAME request key returns the EXISTING job
-    identity (with its board status) and never queues a second command."""
+    """The lost-response repair: a retry with the SAME key and inputs returns the EXISTING
+    job identity (with its board status) and never queues a second command."""
     fm = _fleet_manager()
     r = _FakeRedis()
-    first = fm._send_submit_command(
-        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
-        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x", request_key="req-A",
-    )
+    first = _keyed_submit(fm, r)
     assert first.get("reconciled") is None
     assert len(r._lists[fm.COMMANDS_KEY]) == 1
 
-    retry = fm._send_submit_command(
-        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
-        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x", request_key="req-A",
-    )
+    retry = _keyed_submit(fm, r)
     assert retry["job_id"] == first["job_id"]
     assert retry["reconciled"] is True
     assert retry["status"] == "launching"
+    assert retry["request_key"] == "req-A"
     assert len(r._lists[fm.COMMANDS_KEY]) == 1  # no second command
 
 
-def test_the_request_key_rides_the_command_and_the_board_record():
+def test_the_request_key_rides_the_command_the_record_and_the_fingerprint_index():
     fm = _fleet_manager()
     r = _FakeRedis()
-    cmd = fm._send_submit_command(
-        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
-        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x", request_key="req-A",
-    )
+    cmd = _keyed_submit(fm, r)
     assert cmd["request_key"] == "req-A"
     record = json.loads(r._hashes[fm.JOBS_KEY][cmd["job_id"]])
-    assert record["request_key"] == "req-A"
-    assert record["status"] == "launching"
-    assert r._hashes[fm.REQUESTS_KEY]["req-A"] == cmd["job_id"]
+    assert record["request_key"] == "req-A" and record["status"] == "launching"
+    entry = json.loads(r._hashes[fm.REQUESTS_KEY]["req-A"])
+    assert entry["job_id"] == cmd["job_id"]
+    assert len(entry["fingerprint"]) == 64  # the reconcile evidence is retained
 
 
-def test_a_key_reused_for_a_different_spec_refuses_loudly():
-    """A key identifies ONE submission: reconciling it to a job for a different spec would
-    silently drop the new request — the conflict refuses instead."""
+def test_a_key_reused_for_any_changed_execution_input_refuses():
+    """Reviewer finding (2026-09-16): reconciliation compares the FULL execution-relevant
+    fingerprint — the spec filename alone is not the request. Every changed input refuses."""
     fm = _fleet_manager()
     r = _FakeRedis()
-    fm._send_submit_command(
-        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
-        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x", request_key="req-A",
-    )
-    with pytest.raises(fm.RequestKeyConflictError, match="different request needs a new key"):
-        fm._send_submit_command(
-            r, spec="workflows/repository/control_room_new_ui.yaml", goal="g",
-            model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x", request_key="req-A",
-        )
-    assert len(r._lists[fm.COMMANDS_KEY]) == 1  # the refused submit queued nothing
+    _keyed_submit(fm, r)
+    changed_cases = [
+        # The same spec path with a DIFFERENT digest (an edited workflow) — the case a
+        # filename-only comparison silently discarded.
+        {"spec_sha256": "a" * 64},
+        {"goal": "a different goal"},
+        {"model": "deepseek/deepseek-v4-flash"},
+        {"workdir": "/tmp/wt_other"},
+        {"resume": True, "parent_run_id": "run-2"},
+        {"admission": {"required": True, "campaign_budget_usd": 5.0}},
+        {"execution": {"backend": "opencode"}},
+    ]
+    for overrides in changed_cases:
+        with pytest.raises(fm.RequestKeyConflictError, match="DIFFERENT request"):
+            _keyed_submit(fm, r, **overrides)
+    assert len(r._lists[fm.COMMANDS_KEY]) == 1  # nothing after the original submission
 
 
-def test_without_a_key_an_identical_submit_is_an_independent_new_run():
+def test_a_missing_board_record_reconciles_the_identity_with_an_unknown_status():
+    """Same request + missing board record: the identity is still proven by the retained
+    fingerprint — reconcile it and report the lifecycle as unknown, never fabricate one. A
+    CHANGED request with the record missing must still refuse (the reviewer's observation:
+    the record is not the evidence)."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    first = _keyed_submit(fm, r)
+    del r._hashes[fm.JOBS_KEY][first["job_id"]]
+    retry = _keyed_submit(fm, r)
+    assert retry["job_id"] == first["job_id"] and retry["reconciled"] is True
+    assert retry["status"] == "unknown" and retry["board_record"] == "missing"
+    with pytest.raises(fm.RequestKeyConflictError, match="DIFFERENT request"):
+        _keyed_submit(fm, r, goal="changed while the board record is missing")
+    # The reviewer's exact repro: with the record missing, a DIFFERENT spec filename must
+    # still refuse — the fingerprint index, not the board record, is the evidence.
+    with pytest.raises(fm.RequestKeyConflictError, match="DIFFERENT request"):
+        _keyed_submit(fm, r, spec="workflows/repository/control_room_new_ui.yaml")
+    assert len(r._lists[fm.COMMANDS_KEY]) == 1
+
+
+def test_missing_or_corrupt_stored_evidence_is_an_explicit_unresolved_state():
+    """Missing evidence must NOT silently reconcile (or silently re-queue): a stored entry
+    without a fingerprint, and an unparseable entry, each refuse as UNRESOLVED."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    first = _keyed_submit(fm, r)
+    r._hashes[fm.REQUESTS_KEY]["req-A"] = json.dumps({"job_id": first["job_id"]})
+    with pytest.raises(fm.RequestKeyUnresolvedError, match="missing evidence"):
+        _keyed_submit(fm, r)
+    r._hashes[fm.REQUESTS_KEY]["req-A"] = "not-json"
+    with pytest.raises(fm.RequestKeyUnresolvedError, match="unreadable stored identity"):
+        _keyed_submit(fm, r)
+    assert len(r._lists[fm.COMMANDS_KEY]) == 1
+
+
+def test_retry_safe_derives_a_stable_key_and_reconciles():
+    """The ordinary path retains its OWN identity before sending: with retry_safe and no
+    explicit key, an identical retry reconciles automatically. A CHANGED input derives a
+    different key — it becomes a NEW independent request, never a silent reconcile to the
+    old job (the reviewer's silent-discard failure cannot occur on this path)."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    first = _keyed_submit(fm, r, request_key=None, retry_safe=True)
+    assert str(first["request_key"]).startswith("auto:")
+    retry = _keyed_submit(fm, r, request_key=None, retry_safe=True)
+    assert retry["job_id"] == first["job_id"] and retry["reconciled"] is True
+    changed = _keyed_submit(fm, r, request_key=None, retry_safe=True, goal="changed")
+    assert changed.get("reconciled") is None and changed["job_id"] != first["job_id"]
+    assert len(r._lists[fm.COMMANDS_KEY]) == 2
+
+
+def test_an_explicit_key_wins_over_retry_safe():
+    """An explicit key is how a caller FORCES an independent run (or names its own retry)."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    cmd = _keyed_submit(fm, r, request_key="req-explicit", retry_safe=True)
+    assert cmd["request_key"] == "req-explicit"
+
+
+def test_without_a_key_or_retry_safe_an_identical_submit_is_an_independent_new_run():
     """No key = an independent submission: identical parameters mint a SECOND job — an
     intentional repeat is a new run, never content deduplication."""
     fm = _fleet_manager()
     r = _FakeRedis()
-    a = fm._send_submit_command(
-        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
-        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x",
-    )
-    b = fm._send_submit_command(
-        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
-        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x",
-    )
+    a = _keyed_submit(fm, r, request_key=None)
+    b = _keyed_submit(fm, r, request_key=None)
     assert a["job_id"] != b["job_id"]
     assert len(r._lists[fm.COMMANDS_KEY]) == 2
 

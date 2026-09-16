@@ -40,6 +40,7 @@ the visibility the bare ``setsid nohup`` workers never had.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -211,23 +212,100 @@ def record_job_launch(client: redis.Redis, command: dict) -> dict:
 class RequestKeyConflictError(ValueError):
     """A caller-stable request key was reused for a DIFFERENT submission.
 
-    A request key identifies exactly ONE submission; reconciling a keyed retry to a job for a
-    different spec would silently drop the new request, so the conflict refuses loudly.
+    Reconciliation compares the FULL execution-relevant fingerprint (spec path AND digest,
+    goal, model, worktree, continuation, admission/execution settings) — a key reused with
+    any changed input is a different request and refuses loudly (reviewer finding,
+    2026-09-16: comparing the spec filename alone silently discarded edited requests).
     """
+
+
+class RequestKeyUnresolvedError(ValueError):
+    """A stored request identity cannot be verified — the evidence is missing/corrupt.
+
+    When the retained entry carries no fingerprint (missing evidence), the retry is neither
+    reconciled nor re-queued: an explicit unresolved state refuses loudly, naming the key.
+    """
+
+
+def request_fingerprint(
+    *,
+    spec: str,
+    goal: str,
+    model: str,
+    workdir: str,
+    image: str | None = None,
+    spec_sha256: str | None = None,
+    resume: bool = False,
+    parent_run_id: str | None = None,
+    admission: dict | None = None,
+    execution: dict | None = None,
+) -> str:
+    """The canonical fingerprint of a submission's EXECUTION-RELEVANT inputs.
+
+    Retained alongside the request identity at claim time and compared at reconcile time: a
+    retry reconciles only when every execution-relevant input matches; any change is a
+    different request. The AIO binding identity is deliberately NOT part of the fingerprint —
+    a legitimate retry after re-binding/compaction carries a newer task revision and must
+    still reconcile. Declared inputs only (the tool always supplies ``spec_sha256``; a caller
+    that omits it cannot see a same-path edit — the digest is what catches that).
+    """
+    payload = {
+        "spec": str(spec or ""),
+        "goal": str(goal or ""),
+        "model": str(model or ""),
+        "workdir": str(workdir or ""),
+        "image": str(image or ""),
+        "spec_sha256": str(spec_sha256 or ""),
+        "resume": bool(resume),
+        "parent_run_id": str(parent_run_id or ""),
+        "admission": admission or {},
+        "execution": execution or {},
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _parse_request_entry(raw: str, key: str) -> dict:
+    """Parse a stored request entry ``{job_id, fingerprint}``; missing evidence refuses.
+
+    An unparseable entry or one without a fingerprint is the explicit UNRESOLVED state — the
+    retry cannot be verified against anything, and silently reconciling it (or silently
+    re-queueing it) would be exactly the ambiguity the request key exists to remove.
+    """
+    try:
+        entry = json.loads(raw)
+    except (TypeError, ValueError) as exc:
+        raise RequestKeyUnresolvedError(
+            f"request key {key!r} has an unreadable stored identity ({exc}) — cannot verify "
+            "this retry; resolve it from the board or mint a new key"
+        ) from exc
+    if not isinstance(entry, dict) or not entry.get("job_id") or not entry.get("fingerprint"):
+        raise RequestKeyUnresolvedError(
+            f"request key {key!r} carries no stored fingerprint (missing evidence) — cannot "
+            "verify this retry; resolve it from the board or mint a new key"
+        )
+    return entry
 
 
 #: The request-keyed submit, ATOMICALLY (one server-side script): the request->job
 #: association, the command LPUSH, and the board record commit together — a key is either
 #: fully claimed-and-queued, or not claimed at all. A concurrent same-key submitter observes
-#: the winner's job and reconciles; a retry can never double-queue. Returns
-#: ``{job_id, record_json}``: the NEW job on the claim path, the EXISTING job's record on the
-#: reconcile path (empty string when the record is missing/unreadable).
+#: the winner's identity and reconciles; a retry can never double-queue. Keys[1] stores the
+#: JSON entry ``{job_id, fingerprint}`` (the fingerprint is the reconcile evidence — it must
+#: survive even when the board record does not). Returns ``{first, record_json}``: the NEW
+#: job id on the claim path; the EXISTING entry JSON on the reconcile path (the record follows
+#: separately, empty when the board record is missing/unreadable).
 _SUBMIT_LUA = """
 local existing = redis.call('HGET', KEYS[1], ARGV[1])
 if existing then
-  return {existing, redis.call('HGET', KEYS[3], existing) or ''}
+  local ok, entry = pcall(cjson.decode, existing)
+  if ok and type(entry) == 'table' and entry['job_id'] then
+    return {existing, redis.call('HGET', KEYS[3], tostring(entry['job_id'])) or ''}
+  end
+  -- Corrupt/legacy evidence rides back raw; the caller refuses it as UNRESOLVED.
+  return {existing, ''}
 end
-redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
+redis.call('HSET', KEYS[1], ARGV[1], ARGV[5])
 redis.call('LPUSH', KEYS[2], ARGV[3])
 redis.call('HSET', KEYS[3], ARGV[2], ARGV[4])
 return {ARGV[2], ARGV[4]}
@@ -337,7 +415,8 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
                          admission: dict | None = None,
                          execution: dict | None = None,
                          aio: dict | None = None,
-                         request_key: str | None = None) -> dict:
+                         request_key: str | None = None,
+                         retry_safe: bool = False) -> dict:
     """LPUSH a submit command onto ``fleet:commands`` and record its "launching" board entry.
 
     The fleet-manager mints the ``job_id`` (the board's join key) but does NOT validate the
@@ -349,10 +428,16 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
 
     ``request_key`` (2026-09-16, Unit 2) is the caller-stable retry identity: when supplied,
     the association + LPUSH + board record commit ATOMICALLY (one server-side script). A
-    retry with the SAME key returns the EXISTING job (``reconciled: true``) and queues
-    nothing; reusing a key for a different spec refuses (:class:`RequestKeyConflictError`). No
-    key = the caller wants an independent submission (identical goal text may be an
-    intentional new run — this is not content deduplication).
+    retry with the SAME key reconciles ONLY when the FULL execution-relevant fingerprint
+    matches — any changed input (spec digest, goal, model, worktree, continuation,
+    admission/execution settings) refuses (:class:`RequestKeyConflictError`), and a stored
+    entry without a fingerprint is an explicit unresolved state
+    (:class:`RequestKeyUnresolvedError`). ``retry_safe=True`` (the ordinary tool path)
+    derives the key from that fingerprint when the caller supplied none, so an identical
+    retry reconciles without the caller having to retain anything; an explicit
+    ``request_key`` always wins (that is how a caller FORCES an independent new run of
+    identical inputs). Neither = the caller wants an independent submission (identical goal
+    text may be an intentional new run — this is not content deduplication).
 
     ``image`` (p3_base_image_caching) is the optional per-job image the submitted spec's phase
     cells should run — the fleet-manager passes it through UNCHECKED, same as every other
@@ -398,36 +483,56 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
         command["actor"] = "aio"
         command["aio"] = dict(aio)
     key = str(request_key or "").strip() or None
+    fingerprint = request_fingerprint(
+        spec=spec, goal=goal, model=model, workdir=workdir, image=image,
+        spec_sha256=spec_sha256, resume=resume, parent_run_id=parent_run_id,
+        admission=admission, execution=execution,
+    )
+    if key is None and retry_safe:
+        # The ordinary path retains its OWN identity before sending: the derived key is
+        # stable across an identical retry (same execution-relevant inputs), so a lost
+        # response reconciles without the caller having to remember anything.
+        key = f"auto:{fingerprint[:32]}"
     if key:
         command["request_key"] = key
     if key:
+        entry = json.dumps({"job_id": command["job_id"], "fingerprint": fingerprint})
         result = client.eval(
             _SUBMIT_LUA, 3, REQUESTS_KEY, COMMANDS_KEY, JOBS_KEY,
             key, command["job_id"], json.dumps(command),
-            json.dumps(_job_launch_record(command)),
+            json.dumps(_job_launch_record(command)), entry,
         )
-        existing_id = str(result[0] or "")
-        if existing_id and existing_id != command["job_id"]:
-            # The reconcile path: this key already names a job. Return it — never queue a
-            # second command — but refuse if the key is being reused for a DIFFERENT request
-            # (silently ignoring the new spec would be worse than a loud refusal).
+        first = str(result[0] or "")
+        if first and first != command["job_id"]:
+            # The reconcile path: this key already names a job. Never queue a second command
+            # — reconcile ONLY against a matching full fingerprint (any changed input is a
+            # different request), and refuse explicitly when the stored evidence is missing.
+            existing = _parse_request_entry(first, key)
+            if existing["fingerprint"] != fingerprint:
+                raise RequestKeyConflictError(
+                    f"request key {key!r} already maps to job {existing['job_id']} for a "
+                    "DIFFERENT request (the execution-relevant fingerprint changed: spec, "
+                    "digest, goal, model, worktree, continuation, admission, or execution "
+                    "settings) — a request key identifies ONE submission; a changed request "
+                    "needs a new key"
+                )
             raw_record = str(result[1] or "")
             try:
-                existing = json.loads(raw_record) if raw_record else {}
+                record = json.loads(raw_record) if raw_record else {}
             except (TypeError, ValueError):
-                existing = {}
-            if not isinstance(existing, dict) or not existing:
-                existing = {"job_id": existing_id}
-            existing_spec = str(existing.get("spec") or "")
-            if existing_spec and existing_spec != spec:
-                raise RequestKeyConflictError(
-                    f"request key {key!r} already maps to job {existing_id} for spec "
-                    f"{existing_spec!r} — a request key identifies ONE submission; a "
-                    "different request needs a new key"
-                )
-            existing["job_id"] = existing_id
-            existing["reconciled"] = True
-            return existing
+                record = {}
+            if not isinstance(record, dict) or not record:
+                # Same request (fingerprint proven), but the board record is gone: reconcile
+                # the identity and say the lifecycle is unknown — never fabricate a status.
+                record = {
+                    "job_id": existing["job_id"],
+                    "status": "unknown",
+                    "board_record": "missing",
+                }
+            record["job_id"] = existing["job_id"]
+            record["request_key"] = key
+            record["reconciled"] = True
+            return record
         return command
     client.lpush(COMMANDS_KEY, json.dumps(command))
     record_job_launch(client, command)
@@ -515,7 +620,13 @@ def main(argv: list[str] | None = None) -> int:
                           help="a caller-stable request key: a retry with the SAME key "
                                "reconciles to the existing job instead of minting a second one "
                                "(retain the key before sending; reuse it after an ambiguous or "
-                               "lost submit response)")
+                               "lost submit response). Reconciliation compares the FULL "
+                               "execution-relevant fingerprint — a changed request refuses.")
+    p_submit.add_argument("--retry-safe", action="store_true",
+                          help="derive the request key from the submission's execution-"
+                               "relevant inputs (the ordinary tool path sets this when the "
+                               "caller supplied no explicit key): an identical retry "
+                               "reconciles automatically; an explicit --request-key wins")
 
     parser.add_argument("--interval", type=float, default=DEFAULT_INTERVAL)
     parser.add_argument("--once", action="store_true")
@@ -607,16 +718,20 @@ def main(argv: list[str] | None = None) -> int:
                 client, spec=args.spec, goal=args.goal, model=args.model, workdir=args.workdir,
                 image=args.image, spec_sha256=args.spec_sha256, resume=args.resume,
                 parent_run_id=args.parent_run_id, admission=admission, execution=execution,
-                aio=aio, request_key=args.request_key,
+                aio=aio, request_key=args.request_key, retry_safe=args.retry_safe,
             )
-        except RequestKeyConflictError as exc:
+        except (RequestKeyConflictError, RequestKeyUnresolvedError) as exc:
             print(f"fleet:submit refused: {exc}", file=sys.stderr)
             return 2
         if cmd.get("reconciled"):
             # A keyed retry: NOTHING was queued — the existing job is the submission. The
             # echoed line keeps the tool's ``fleet:jobs[<id>]`` parse working under the same
             # identity, and the status tells the caller how far the original submit got.
-            print(f"fleet:jobs[{cmd['job_id']}] <- reconciled (status: {cmd.get('status') or 'unknown'})")
+            print(
+                f"fleet:jobs[{cmd['job_id']}] <- reconciled "
+                f"(status: {cmd.get('status') or 'unknown'}; "
+                f"request key {cmd.get('request_key') or '?'})"
+            )
         else:
             print(f"fleet:commands <- {json.dumps(cmd)}")
             print(f"fleet:jobs[{cmd['job_id']}] <- launching")

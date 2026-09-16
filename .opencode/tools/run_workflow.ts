@@ -120,7 +120,7 @@ export default tool({
     model: tool.schema.string().describe("provider/model id"),
     workdir: tool.schema.string().describe("Git worktree path to run in"),
     request_key: tool.schema.string().optional().describe(
-      "Caller-stable request key for safe retries: reuse the SAME key when retrying an ambiguous or lost submission and the fleet reconciles to the existing job instead of creating a second run (the result echoes the key). Omit for an ordinary new submission — an identical repeat without a key is an independent new run.",
+      "Optional EXPLICIT request key. Omitted (the ordinary case), the fleet derives a stable key from the submission's execution-relevant inputs before sending — an identical retry after an ambiguous or lost response reconciles to the existing job automatically. Pass an explicit NEW key to force an independent run of identical inputs.",
     ),
     backend: tool.schema.enum(["opencode", "claude_cli"]).optional().describe("Default: auto"),
     thinking_effort: tool.schema.string().optional().default("high"),
@@ -285,7 +285,12 @@ export default tool({
       "--spec-sha256", specSha,
     ]
     submitFlags.push(...aioFlags)
+    // Retry-safe by DEFAULT (Unit 2): the ordinary path retains its identity BEFORE sending —
+    // the fleet derives a stable key from the submission's execution-relevant inputs, so a
+    // retry after a lost response reconciles without the AIO having to remember anything. An
+    // explicit key wins (that is how a caller forces an independent new run).
     if (args.request_key) submitFlags.push("--request-key", args.request_key)
+    else submitFlags.push("--retry-safe")
     if (args.resume) submitFlags.push("--resume")
     if (args.parent_run_id) submitFlags.push("--parent-run-id", args.parent_run_id)
     if (admissionArmed) submitFlags.push("--admission-required")
@@ -319,8 +324,13 @@ export default tool({
     // A keyed retry the fleet reconciled to an EXISTING job: nothing new was queued, and the
     // same identity carries the observation (the durable job row is the truth of what ran).
     const reconciled = out.includes("<- reconciled")
-    const keyNote = args.request_key
-      ? ` Request key: ${args.request_key} — reuse it verbatim if this response is ever lost.`
+    // The EFFECTIVE key: the caller's explicit key, or the fleet's derived key echoed on the
+    // command line / reconcile line. Retained in the result so a later retry can reuse it.
+    const cmdKey = out.match(/"request_key":\s*"([^"]+)"/)
+    const reconcileKey = out.match(/request key ([^)\s;]+)/)
+    const effectiveKey = cmdKey?.[1] ?? reconcileKey?.[1] ?? args.request_key ?? ""
+    const keyNote = effectiveKey
+      ? ` Request key: ${effectiveKey} — reuse it verbatim if this response is ever lost.`
       : ""
     return {
       output:
@@ -335,6 +345,8 @@ export default tool({
         job_id: jobMatch ? jobMatch[1] : "",
         reconciled,
         request_key: args.request_key ?? "",
+        effective_request_key: effectiveKey,
+        retry_safe: !args.request_key,
         spec: args.spec,
         spec_sha256: specSha,
         model: args.model,

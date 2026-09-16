@@ -880,20 +880,24 @@ def _aio_binding_artifact_dir() -> Path:
     return Path(explicit).expanduser() if explicit else KB_ARTIFACT_DIR
 
 
-def _aio_budget_verdict(native_session_id: str) -> tuple[str, str, bool]:
-    """The AIO session's measured capacity verdict: ``(verdict, reason, backend_available)``.
+def _aio_budget_verdict(native_session_id: str) -> dict[str, Any]:
+    """The AIO session's capacity report: ``{verdict, reason, backend_available, measured}``.
 
     ADVISORY DIAGNOSTICS (2026-09-16 policy): the submit gate REPORTS this — it never refuses
     on it. Conversation capacity is a fact about the coordinator's own chat session, not an
     authorization for a workflow submit; the admission refusals are identity, binding,
     project, scope, and financial admission. The judgment is the SHARED one —
-    ``session_budget.measure_verdict`` resolves the ACTIVE session model's capacity through
+    ``session_budget.measure_report`` resolves the ACTIVE session model's capacity through
     ``agentic_dynamics.core.session_capacity`` (the ported opencode calculation), the same
     resolution the CLI and the capsule consume. The session under judgment is the EXPLICIT
     native identity carried by the binding — never a most-recently-updated guess.
-    ``backend_available=False`` means this reader cannot reach the session database (the
-    containerized orchestrator has no host DB mounted); that is reported as an unavailable
-    advisory with a reason, never converted into a refusal.
+
+    The two availability fields are DISTINCT (reviewer finding, 2026-09-16):
+    ``backend_available=False`` means this reader cannot reach the session database at all
+    (the containerized orchestrator has no host DB mounted); ``measured=False`` means the
+    verdict rests on no current usable reading even when the database WAS readable — a
+    corrupt database or a pending-only session reports ``backend_available=True`` with
+    ``measured=False``, never a claimed measurement.
     """
     try:
         from scripts import session_budget as budget  # repo root on sys.path
@@ -901,27 +905,27 @@ def _aio_budget_verdict(native_session_id: str) -> tuple[str, str, bool]:
         try:
             import session_budget as budget  # direct run: scripts/ is sys.path[0]
         except ImportError as exc:
-            return "UNJUDGED", f"the budget module is unavailable ({exc})", False
-    return budget.measure_verdict(native_session_id)
+            return {
+                "verdict": "UNJUDGED",
+                "reason": f"the budget module is unavailable ({exc})",
+                "backend_available": False,
+                "measured": False,
+            }
+    return budget.measure_report(native_session_id)
 
 
 def aio_capacity_report(native_session_id: str) -> dict[str, Any]:
     """The AIO session capacity report — advisory, structured, never an admission gate.
 
     Every consume site the capsule/CLI/gate shares renders the same fields: the verdict, its
-    reason, and whether a real measurement was possible (``measured``). A missing or
-    unmeasurable reading is reported as ``UNJUDGED`` WITH ITS REASON — it is never a refusal,
-    and never silently upgraded to ``OK``. Callers that want the diagnostics (the
-    ``validate-submit`` response, the AIO's in-process tool path) read this; no caller
+    reason, whether the session database was reachable (``backend_available``), and whether a
+    current usable reading produced the verdict (``measured``). A missing or unmeasurable
+    reading is reported as ``UNJUDGED`` WITH ITS REASON and with the flags told apart — it is
+    never a refusal, and never silently upgraded to ``OK``. Callers that want the diagnostics
+    (the ``validate-submit`` response, the AIO's in-process tool path) read this; no caller
     refuses on it (2026-09-16 policy).
     """
-    verdict, reason, measured = _aio_budget_verdict(native_session_id)
-    return {
-        "verdict": verdict,
-        "reason": reason,
-        "measured": measured,
-        "advisory": True,
-    }
+    return {**_aio_budget_verdict(native_session_id), "advisory": True}
 
 
 # The project-association identity (Unit D): a binding may only ride a submit whose spec /

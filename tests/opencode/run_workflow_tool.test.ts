@@ -185,8 +185,37 @@ test("the durable AIO submit carries the identity flags and no --project", async
     expect(submit!.args).toContain("--binding-id")
     expect(submit!.args).toContain(BINDING_ID)
     expect(submit!.args).not.toContain("--project")
+    // The ordinary path is RETRY-SAFE by default: the fleet derives and retains the request
+    // identity before sending — the AIO does not have to remember anything.
+    expect(submit!.args).toContain("--retry-safe")
+    expect(submit!.args).not.toContain("--request-key")
     expect((result.metadata as any).reconciled).toBe(false)
+    expect((result.metadata as any).retry_safe).toBe(true)
     expect(calls.some((c) => c.args.some((a) => a.endsWith("run_workflow.py")))).toBe(false)
+  } finally {
+    setCommandRunner(null)
+  }
+})
+
+test("the ordinary path surfaces the fleet-derived request key for retention", async () => {
+  const DERIVED = "auto:" + "c".repeat(32)
+  const { runner, calls } = fakeShell({
+    session_open: () => ({ stdout: FOUND_BINDING }),
+    digest: () => ({ stdout: "b".repeat(64) }),
+    submit: () => ({
+      stdout:
+        `fleet:commands <- {"action":"submit","request_key":"${DERIVED}"}\n` +
+        "fleet:jobs[abc123] <- launching",
+    }),
+  })
+  setCommandRunner(runner)
+  try {
+    const result = await (toolDef as any).execute(toolArgs({ orchestrator: true }), ctx("aio-control"))
+    const submit = calls.find((c) => c.args.some((a) => a.endsWith("fleet_manager.py")))
+    expect(submit!.args).toContain("--retry-safe")
+    // The effective (derived) key is echoed so a lost-response retry can reuse it verbatim.
+    expect((result.metadata as any).effective_request_key).toBe(DERIVED)
+    expect(result.output).toContain(DERIVED)
   } finally {
     setCommandRunner(null)
   }
@@ -206,6 +235,8 @@ test("a caller-stable request key forwards and a reconciled response is marked",
     const submit = calls.find((c) => c.args.some((a) => a.endsWith("fleet_manager.py")))
     expect(submit!.args).toContain("--request-key")
     expect(submit!.args).toContain("req-9")
+    // An EXPLICIT key wins over the retry-safe default.
+    expect(submit!.args).not.toContain("--retry-safe")
     // A reconciled retry says so — nothing new was queued and the same identity carries on.
     expect(result.output).toContain("RECONCILED")
     expect((result.metadata as any).reconciled).toBe(true)

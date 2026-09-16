@@ -94,17 +94,19 @@ control database; you never write a child's outbox.
    `agentic-dynamics session budget` each turn with the runtime's explicit session identity
    (`FINOPS_SESSION_ID`; `--session-id` overrides; no most-recently-updated fallback — an
    absent identity is `UNJUDGED`, never a guess). The verdict is ADVISORY diagnostics about
-   YOUR session: it guides wrap-up and hand-off discipline, and it never blocks a valid
-   submission. `OK` = keep working. `WARN` = near the effective limit: wrap up and hand
-   off. `COMPACT` = at/above the usable boundary: the installed runtime performs its own
-   compaction on its own schedule — this check reports the boundary; it does not trigger,
-   prove, or record compaction, and the session and its task binding continue. `CLOSE` =
-   at/over the model's hard limit (or the LOCAL POLICY cap `FINOPS_SESSION_CTX_LIMIT`, a
-   non-native trigger): close and hand off. `UNJUDGED` = the measurement is unavailable for
-   a named reason — report it; it is neither permission nor a missing authorization.
-   Message count is telemetry. Conversation capacity and financial spending are different
-   concerns: the submission gate enforces identity, binding, scope, source, and financial
-   admission; this verdict never weakens those gates and is never required for one.
+   YOUR session: it is reported, it never blocks a valid submission, and it never stops
+   useful work by itself. `OK` = keep working. `WARN` = at/above 80% of the effective
+   limit: INFORMATIONAL only — the backend still admits work and the remaining headroom is
+   real; it never requires stopping, closing, or handing off. `COMPACT` = at/above the
+   usable boundary: the installed runtime performs its own compaction on its own schedule —
+   this check reports the boundary; it does not trigger, prove, or record compaction, and
+   the session and its task binding continue. `CLOSE` = at/over the model's hard limit (or
+   the LOCAL POLICY cap `FINOPS_SESSION_CTX_LIMIT`, a non-native trigger): close and hand
+   off. `UNJUDGED` = the measurement is unavailable for a named reason — report it; it is
+   neither permission nor a missing authorization. Message count is telemetry. Conversation
+   capacity and financial spending are different concerns: the submission gate enforces
+   identity, binding, scope, source, and financial admission; this verdict never weakens
+   those gates and is never required for one.
 7. **One deliverable per session.** A session serves one user-visible deliverable with its
    acceptance test. Reviews, remediation, and meta-work each get their own session; the
    deliverable session's only job is the deliverable. When the deliverable is a UI change,

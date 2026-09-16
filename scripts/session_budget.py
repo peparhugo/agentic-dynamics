@@ -63,6 +63,13 @@ Exit codes: 0 = OK, 1 = WARN (advisory) / UNJUDGED, 2 = COMPACT (at/above the na
 re-evaluate after), 3 = CLOSE (close now). Every judgment appends one line to the session-budget
 journal (append-only; override the path with ``FINOPS_SESSION_BUDGET_JOURNAL`` for tests).
 
+Programmatic callers use ``measure_report`` for the structured judgment
+(``{verdict, reason, backend_available, measured}``): ``backend_available`` says the session
+database was reachable; ``measured`` says a CURRENT usable reading produced the verdict — a
+corrupt database reports ``backend_available=True`` with ``measured=False``, never a claimed
+measurement. ``measure_verdict`` keeps the 3-tuple shape for existing callers, where the third
+element is backend availability (NOT a measurement).
+
 The verdict is derived from the opencode session database (``~/.local/share/opencode/opencode.db``
 by default; ``FINOPS_OPENCODE_DB`` overrides).
 """
@@ -203,12 +210,17 @@ def _resolve(
         "capacity": None,
         "model": None,
         "reason": "",
+        #: Whether the session DATABASE was reachable to read (the file existed). Distinct
+        #: from a usable measurement: a corrupt database or a pending-only session reaches
+        #: the backend and still measures nothing.
+        "backend_available": False,
     }
     try:
         path = Path(db_path)
         if not path.is_file():
             result["reason"] = f"session db {path} not found"
             return result
+        result["backend_available"] = True
         sid = (session_id or "").strip()
         if not sid:
             result["reason"] = f"no session identity supplied (--session-id or {SESSION_ID_ENV})"
@@ -311,20 +323,66 @@ def _verdict_for(resolved: dict) -> tuple[str, str, dict]:
     return verdict, reason, capacity.as_dict()
 
 
+def _measured(resolved: dict) -> bool:
+    """Whether the verdict rests on a CURRENT usable reading — not merely a reachable backend.
+
+    False for every named non-measurement, even when the database was read: the initial
+    session (no usage recorded yet), an every-sample-pending session (no usable sample), a
+    completed compaction summary (the retained reading is stale BY CONSTRUCTION — measurement
+    resumes with the next completed sample), an unresolvable identity/capacity, and any
+    unreadable database (the shared error boundary lands in ``unresolved``).
+    """
+    return bool(resolved.get("status") == "measured" and not resolved.get("post_compaction"))
+
+
+def measure_report(
+    session_id: str | None,
+    *,
+    db_path: Path | None = None,
+    env: dict | None = None,
+) -> dict:
+    """The structured measurement report: ``{verdict, reason, backend_available, measured}``.
+
+    ``backend_available`` — the session DATABASE was reachable (present at this location).
+    ``measured`` — the verdict rests on a CURRENT usable reading (see :func:`_measured`).
+    The two are deliberately distinct: a corrupt database yields
+    ``UNJUDGED / backend_available=True / measured=False`` (never a claimed measurement), a
+    containerized gate with no host DB mounted yields ``False / False``, and a pending-only
+    session yields ``True / False``. Callers report both; no consumer converts an absent
+    measurement into a refusal (2026-09-16 policy — a missing chat token measurement is not
+    a missing authorization).
+    """
+    try:
+        path = Path(db_path) if db_path else _default_db()
+        resolved = _resolve(session_id or "", db_path=path, env=env)
+        verdict, reason, _ = _verdict_for(resolved)
+        return {
+            "verdict": verdict,
+            "reason": reason,
+            "backend_available": bool(resolved.get("backend_available")),
+            "measured": _measured(resolved),
+        }
+    except Exception as exc:  # noqa: BLE001 — an unreadable budget is UNJUDGED, never OK
+        return {
+            "verdict": "UNJUDGED",
+            "reason": f"{type(exc).__name__}: {exc}",
+            "backend_available": False,
+            "measured": False,
+        }
+
+
 def measure_verdict(
     session_id: str | None,
     *,
     db_path: Path | None = None,
     env: dict | None = None,
 ) -> tuple[str, str, bool]:
-    """The measurement seam for programmatic callers (the AIO exec-boundary gate).
+    """The 3-tuple measurement seam: ``(verdict, reason, backend_available)``.
 
-    Returns ``(verdict, reason, backend_available)``:
+    The third element is BACKEND AVAILABILITY, not a usable measurement — a corrupt database
+    reports it True while measuring nothing. Callers that report the distinction (the
+    exec-boundary advisory) use :func:`measure_report`. Semantics of the verdicts:
 
-    * ``backend_available=False`` — the session DATABASE is not present at this location
-      (e.g. the containerized orchestrator has no host DB mounted). The caller reports this
-      as an unavailable ADVISORY with its reason; no consumer converts it into a refusal
-      (2026-09-16 policy — a missing chat token measurement is not a missing authorization).
     * a genuinely INITIAL session (no assistant message recorded yet) is ``OK`` with the
       explicit reason ``"initial session: no usage recorded yet"`` — the one defined
       exception, named rather than silently zero.
@@ -339,18 +397,8 @@ def measure_verdict(
 
     The judged session is the EXPLICIT identity; there is no most-recently-updated fallback.
     """
-    try:
-        path = Path(db_path) if db_path else _default_db()
-        if not path.is_file():
-            return "UNJUDGED", f"session db {path} not found", False
-        sid = (session_id or "").strip()
-        if not sid:
-            return "UNJUDGED", f"no session identity supplied (--session-id or {SESSION_ID_ENV})", True
-        resolved = _resolve(sid, db_path=path, env=env)
-        verdict, reason, _ = _verdict_for(resolved)
-        return verdict, reason, True
-    except Exception as exc:  # noqa: BLE001 — an unreadable budget is UNJUDGED, never OK
-        return "UNJUDGED", f"{type(exc).__name__}: {exc}", True
+    report = measure_report(session_id, db_path=db_path, env=env)
+    return report["verdict"], report["reason"], report["backend_available"]
 
 
 def _append_journal(entry: dict[str, object]) -> None:
