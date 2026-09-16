@@ -177,7 +177,7 @@ test("the durable AIO submit carries the identity flags and no --project", async
   })
   setCommandRunner(runner)
   try {
-    await (toolDef as any).execute(toolArgs({ orchestrator: true }), ctx("aio-control"))
+    const result = await (toolDef as any).execute(toolArgs({ orchestrator: true }), ctx("aio-control"))
     const submit = calls.find((c) => c.args.some((a) => a.endsWith("fleet_manager.py")))
     expect(submit).toBeDefined()
     expect(submit!.args).toContain("--aio-session-id")
@@ -185,7 +185,32 @@ test("the durable AIO submit carries the identity flags and no --project", async
     expect(submit!.args).toContain("--binding-id")
     expect(submit!.args).toContain(BINDING_ID)
     expect(submit!.args).not.toContain("--project")
+    expect((result.metadata as any).reconciled).toBe(false)
     expect(calls.some((c) => c.args.some((a) => a.endsWith("run_workflow.py")))).toBe(false)
+  } finally {
+    setCommandRunner(null)
+  }
+})
+
+test("a caller-stable request key forwards and a reconciled response is marked", async () => {
+  const { runner, calls } = fakeShell({
+    session_open: () => ({ stdout: FOUND_BINDING }),
+    digest: () => ({ stdout: "b".repeat(64) }),
+    submit: () => ({ stdout: "fleet:jobs[abc123] <- reconciled (status: launching)" }),
+  })
+  setCommandRunner(runner)
+  try {
+    const result = await (toolDef as any).execute(
+      toolArgs({ orchestrator: true, request_key: "req-9" }), ctx("aio-control"),
+    )
+    const submit = calls.find((c) => c.args.some((a) => a.endsWith("fleet_manager.py")))
+    expect(submit!.args).toContain("--request-key")
+    expect(submit!.args).toContain("req-9")
+    // A reconciled retry says so — nothing new was queued and the same identity carries on.
+    expect(result.output).toContain("RECONCILED")
+    expect((result.metadata as any).reconciled).toBe(true)
+    expect((result.metadata as any).request_key).toBe("req-9")
+    expect((result.metadata as any).job_id).toBe("abc123")
   } finally {
     setCommandRunner(null)
   }

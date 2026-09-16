@@ -68,6 +68,13 @@ COMMANDS_KEY = "fleet:commands"
 #: "launching" at submit time; the orchestrator/downstream tooling would write "running"/
 #: "completed"/"failed" as those are observed), not recomputed wholesale on each watch cycle.
 JOBS_KEY = "fleet:jobs"
+#: The caller-stable request index (2026-09-16 delivery simplification, Unit 2): one hash field
+#: per ``request_key`` -> ``job_id``. A submit that names a request key claims it atomically
+#: with its LPUSH; a RETRY with the same key reconciles to the existing job instead of minting
+#: a second one. The key is explicitly caller-supplied — this is NOT content deduplication
+#: (identical goal text may be an intentional new run); a caller that wants a new run mints a
+#: new key, a caller retrying an ambiguous submit reuses its retained key.
+REQUESTS_KEY = "fleet:requests"
 #: The docs-drift row (``automatic_docs_sync`` p2). Written by
 #: ``scripts/docs_drift_watchdog.py`` on its own cadence and merged into the board snapshot
 #: here, for exactly the reason JOBS_KEY is separate: this watcher rebuilds BOARD_KEY
@@ -173,6 +180,20 @@ def _docs_drift_row(client: redis.Redis) -> dict:
     return row if isinstance(row, dict) else {}
 
 
+def _job_launch_record(command: dict) -> dict:
+    """The board's "launching" record for a submit command (the request key rides along)."""
+    record = {
+        "job_id": command["job_id"],
+        "spec": command["spec"],
+        "model": command["model"],
+        "status": "launching",
+        "ts": command["ts"],
+    }
+    if command.get("request_key"):
+        record["request_key"] = command["request_key"]
+    return record
+
+
 def record_job_launch(client: redis.Redis, command: dict) -> dict:
     """Write a submitted job's "launching" record onto the board (``fleet:jobs``).
 
@@ -182,15 +203,35 @@ def record_job_launch(client: redis.Redis, command: dict) -> dict:
     not wait for or assume any of that (submit is fire-and-forget onto the queue, matching
     resize/drain/restart's own "LPUSH and return" shape).
     """
-    record = {
-        "job_id": command["job_id"],
-        "spec": command["spec"],
-        "model": command["model"],
-        "status": "launching",
-        "ts": command["ts"],
-    }
+    record = _job_launch_record(command)
     client.hset(JOBS_KEY, mapping={command["job_id"]: json.dumps(record)})
     return record
+
+
+class RequestKeyConflictError(ValueError):
+    """A caller-stable request key was reused for a DIFFERENT submission.
+
+    A request key identifies exactly ONE submission; reconciling a keyed retry to a job for a
+    different spec would silently drop the new request, so the conflict refuses loudly.
+    """
+
+
+#: The request-keyed submit, ATOMICALLY (one server-side script): the request->job
+#: association, the command LPUSH, and the board record commit together — a key is either
+#: fully claimed-and-queued, or not claimed at all. A concurrent same-key submitter observes
+#: the winner's job and reconciles; a retry can never double-queue. Returns
+#: ``{job_id, record_json}``: the NEW job on the claim path, the EXISTING job's record on the
+#: reconcile path (empty string when the record is missing/unreadable).
+_SUBMIT_LUA = """
+local existing = redis.call('HGET', KEYS[1], ARGV[1])
+if existing then
+  return {existing, redis.call('HGET', KEYS[3], existing) or ''}
+end
+redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
+redis.call('LPUSH', KEYS[2], ARGV[3])
+redis.call('HSET', KEYS[3], ARGV[2], ARGV[4])
+return {ARGV[2], ARGV[4]}
+"""
 
 
 def record_job_status(client: redis.Redis, job_id: str, status: str, **fields) -> dict:
@@ -295,7 +336,8 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
                          parent_run_id: str | None = None,
                          admission: dict | None = None,
                          execution: dict | None = None,
-                         aio: dict | None = None) -> dict:
+                         aio: dict | None = None,
+                         request_key: str | None = None) -> dict:
     """LPUSH a submit command onto ``fleet:commands`` and record its "launching" board entry.
 
     The fleet-manager mints the ``job_id`` (the board's join key) but does NOT validate the
@@ -304,6 +346,13 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
     supervisor. Nothing here refuses a concurrent submit for the same or another spec; there is
     no lock (the design's "ZERO refusing of concurrency" rule) — every submit is independently
     LPUSHed and independently validated when it is popped.
+
+    ``request_key`` (2026-09-16, Unit 2) is the caller-stable retry identity: when supplied,
+    the association + LPUSH + board record commit ATOMICALLY (one server-side script). A
+    retry with the SAME key returns the EXISTING job (``reconciled: true``) and queues
+    nothing; reusing a key for a different spec refuses (:class:`RequestKeyConflictError`). No
+    key = the caller wants an independent submission (identical goal text may be an
+    intentional new run — this is not content deduplication).
 
     ``image`` (p3_base_image_caching) is the optional per-job image the submitted spec's phase
     cells should run — the fleet-manager passes it through UNCHECKED, same as every other
@@ -348,6 +397,38 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
     if aio:
         command["actor"] = "aio"
         command["aio"] = dict(aio)
+    key = str(request_key or "").strip() or None
+    if key:
+        command["request_key"] = key
+    if key:
+        result = client.eval(
+            _SUBMIT_LUA, 3, REQUESTS_KEY, COMMANDS_KEY, JOBS_KEY,
+            key, command["job_id"], json.dumps(command),
+            json.dumps(_job_launch_record(command)),
+        )
+        existing_id = str(result[0] or "")
+        if existing_id and existing_id != command["job_id"]:
+            # The reconcile path: this key already names a job. Return it — never queue a
+            # second command — but refuse if the key is being reused for a DIFFERENT request
+            # (silently ignoring the new spec would be worse than a loud refusal).
+            raw_record = str(result[1] or "")
+            try:
+                existing = json.loads(raw_record) if raw_record else {}
+            except (TypeError, ValueError):
+                existing = {}
+            if not isinstance(existing, dict) or not existing:
+                existing = {"job_id": existing_id}
+            existing_spec = str(existing.get("spec") or "")
+            if existing_spec and existing_spec != spec:
+                raise RequestKeyConflictError(
+                    f"request key {key!r} already maps to job {existing_id} for spec "
+                    f"{existing_spec!r} — a request key identifies ONE submission; a "
+                    "different request needs a new key"
+                )
+            existing["job_id"] = existing_id
+            existing["reconciled"] = True
+            return existing
+        return command
     client.lpush(COMMANDS_KEY, json.dumps(command))
     record_job_launch(client, command)
     return command
@@ -430,6 +511,11 @@ def main(argv: list[str] | None = None) -> int:
     p_submit.add_argument("--task-revision", type=int, default=None,
                           help="the binding's task/acceptance context version (stale revisions "
                                "are refused)")
+    p_submit.add_argument("--request-key", default=None,
+                          help="a caller-stable request key: a retry with the SAME key "
+                               "reconciles to the existing job instead of minting a second one "
+                               "(retain the key before sending; reuse it after an ambiguous or "
+                               "lost submit response)")
 
     parser.add_argument("--interval", type=float, default=DEFAULT_INTERVAL)
     parser.add_argument("--once", action="store_true")
@@ -516,14 +602,24 @@ def main(argv: list[str] | None = None) -> int:
                 "binding_id": args.binding_id or "",
                 "task_revision": args.task_revision,
             }
-        cmd = _send_submit_command(
-            client, spec=args.spec, goal=args.goal, model=args.model, workdir=args.workdir,
-            image=args.image, spec_sha256=args.spec_sha256, resume=args.resume,
-            parent_run_id=args.parent_run_id, admission=admission, execution=execution,
-            aio=aio,
-        )
-        print(f"fleet:commands <- {json.dumps(cmd)}")
-        print(f"fleet:jobs[{cmd['job_id']}] <- launching")
+        try:
+            cmd = _send_submit_command(
+                client, spec=args.spec, goal=args.goal, model=args.model, workdir=args.workdir,
+                image=args.image, spec_sha256=args.spec_sha256, resume=args.resume,
+                parent_run_id=args.parent_run_id, admission=admission, execution=execution,
+                aio=aio, request_key=args.request_key,
+            )
+        except RequestKeyConflictError as exc:
+            print(f"fleet:submit refused: {exc}", file=sys.stderr)
+            return 2
+        if cmd.get("reconciled"):
+            # A keyed retry: NOTHING was queued — the existing job is the submission. The
+            # echoed line keeps the tool's ``fleet:jobs[<id>]`` parse working under the same
+            # identity, and the status tells the caller how far the original submit got.
+            print(f"fleet:jobs[{cmd['job_id']}] <- reconciled (status: {cmd.get('status') or 'unknown'})")
+        else:
+            print(f"fleet:commands <- {json.dumps(cmd)}")
+            print(f"fleet:jobs[{cmd['job_id']}] <- launching")
         return 0
 
     parser.error(f"unknown command: {args.command}")

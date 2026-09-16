@@ -119,6 +119,9 @@ export default tool({
     goal: tool.schema.string().describe("Feature/task prompt (substituted for {goal})"),
     model: tool.schema.string().describe("provider/model id"),
     workdir: tool.schema.string().describe("Git worktree path to run in"),
+    request_key: tool.schema.string().optional().describe(
+      "Caller-stable request key for safe retries: reuse the SAME key when retrying an ambiguous or lost submission and the fleet reconciles to the existing job instead of creating a second run (the result echoes the key). Omit for an ordinary new submission — an identical repeat without a key is an independent new run.",
+    ),
     backend: tool.schema.enum(["opencode", "claude_cli"]).optional().describe("Default: auto"),
     thinking_effort: tool.schema.string().optional().default("high"),
     thinking_budget_tokens: tool.schema.number().optional().default(0),
@@ -282,6 +285,7 @@ export default tool({
       "--spec-sha256", specSha,
     ]
     submitFlags.push(...aioFlags)
+    if (args.request_key) submitFlags.push("--request-key", args.request_key)
     if (args.resume) submitFlags.push("--resume")
     if (args.parent_run_id) submitFlags.push("--parent-run-id", args.parent_run_id)
     if (admissionArmed) submitFlags.push("--admission-required")
@@ -312,13 +316,25 @@ export default tool({
       return { output: out || err || `fleet submit failed (exit ${submit.exitCode})`, metadata: { exit_code: submit.exitCode } }
     }
     const jobMatch = out.match(/fleet:jobs\[([0-9a-f]+)\]/)
+    // A keyed retry the fleet reconciled to an EXISTING job: nothing new was queued, and the
+    // same identity carries the observation (the durable job row is the truth of what ran).
+    const reconciled = out.includes("<- reconciled")
+    const keyNote = args.request_key
+      ? ` Request key: ${args.request_key} — reuse it verbatim if this response is ever lost.`
+      : ""
     return {
       output:
         `${out}\n` +
-        `Submission accepted by the durable path. Watch it: control packet (active_runs) or the Control Room; the broker validates the spec digest (${specSha.slice(0, 12)}…) and admission before the compose call. ` +
-        `A queued submit is NOT a running run — verify the run row exists before treating the build as started.`,
+        (reconciled
+          ? `RECONCILED to the EXISTING job under the same request key — nothing new was queued. ` +
+            `Observe it under the SAME identity: control packet (active_runs) or the Control Room.`
+          : `Submission accepted by the durable path. Watch it: control packet (active_runs) or the Control Room; the broker validates the spec digest (${specSha.slice(0, 12)}…) and admission before the compose call. ` +
+            `A queued submit is NOT a running run — verify the run row exists before treating the build as started.`) +
+        keyNote,
       metadata: {
         job_id: jobMatch ? jobMatch[1] : "",
+        reconciled,
+        request_key: args.request_key ?? "",
         spec: args.spec,
         spec_sha256: specSha,
         model: args.model,

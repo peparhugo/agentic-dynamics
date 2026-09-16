@@ -5,8 +5,10 @@ command onto ``fleet:commands``, and record a "launching" entry on the board. It
 validate the request — that is the orchestrator's spawn-wrapper's job
 (``scripts/fleet/spawn_wrapper.py:validate_submit_request``, covered in
 ``tests/test_spawn_wrapper.py``). These tests cover the supervisor-tier half of the contract:
-the LPUSH shape, the board record, and that nothing here refuses a concurrent submit (there is
-no orchestrator lock).
+the LPUSH shape, the board record, the caller-stable request key (reconcile, never
+double-queue), and that nothing here refuses a concurrent submit for the same or another spec
+(there is no orchestrator lock; the ONE named refusal is a request key reused for a different
+submission).
 """
 
 from __future__ import annotations
@@ -15,6 +17,8 @@ import importlib
 import json
 import sys
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -54,6 +58,22 @@ class _FakeRedis:
 
     def hgetall(self, key: str) -> dict[str, str]:
         return {}
+
+    def eval(self, script: str, numkeys: int, *keys_and_args) -> list[str]:
+        """Emulate the request-keyed submit script (single-threaded fake => atomic here).
+
+        The script's contract: reconcile when the key exists, otherwise claim + queue +
+        record, returning ``[job_id, record_json]``.
+        """
+        requests_key, commands_key, jobs_key = keys_and_args[0:3]
+        request_key, job_id, command_raw, record_raw = keys_and_args[3:7]
+        existing = self._hashes.get(requests_key, {}).get(request_key)
+        if existing:
+            return [existing, self._hashes.get(jobs_key, {}).get(existing, "")]
+        self._hashes.setdefault(requests_key, {})[request_key] = str(job_id)
+        self._lists.setdefault(commands_key, []).append(str(command_raw))
+        self._hashes.setdefault(jobs_key, {})[str(job_id)] = str(record_raw)
+        return [str(job_id), str(record_raw)]
 
 
 def test_send_submit_command_lpushes_a_bounded_submit_command():
@@ -329,3 +349,112 @@ def test_submit_cli_dispatches_the_aio_identity_flags(monkeypatch):
         "binding_id": "b" * 64,
         "task_revision": 5,
     }
+
+
+# ── The caller-stable request key (2026-09-16 delivery simplification, Unit 2) ──
+
+
+def test_a_keyed_retry_reconciles_to_the_existing_job_and_queues_nothing():
+    """The lost-response repair: a retry with the SAME request key returns the EXISTING job
+    identity (with its board status) and never queues a second command."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    first = fm._send_submit_command(
+        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
+        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x", request_key="req-A",
+    )
+    assert first.get("reconciled") is None
+    assert len(r._lists[fm.COMMANDS_KEY]) == 1
+
+    retry = fm._send_submit_command(
+        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
+        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x", request_key="req-A",
+    )
+    assert retry["job_id"] == first["job_id"]
+    assert retry["reconciled"] is True
+    assert retry["status"] == "launching"
+    assert len(r._lists[fm.COMMANDS_KEY]) == 1  # no second command
+
+
+def test_the_request_key_rides_the_command_and_the_board_record():
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    cmd = fm._send_submit_command(
+        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
+        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x", request_key="req-A",
+    )
+    assert cmd["request_key"] == "req-A"
+    record = json.loads(r._hashes[fm.JOBS_KEY][cmd["job_id"]])
+    assert record["request_key"] == "req-A"
+    assert record["status"] == "launching"
+    assert r._hashes[fm.REQUESTS_KEY]["req-A"] == cmd["job_id"]
+
+
+def test_a_key_reused_for_a_different_spec_refuses_loudly():
+    """A key identifies ONE submission: reconciling it to a job for a different spec would
+    silently drop the new request — the conflict refuses instead."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    fm._send_submit_command(
+        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
+        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x", request_key="req-A",
+    )
+    with pytest.raises(fm.RequestKeyConflictError, match="different request needs a new key"):
+        fm._send_submit_command(
+            r, spec="workflows/repository/control_room_new_ui.yaml", goal="g",
+            model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x", request_key="req-A",
+        )
+    assert len(r._lists[fm.COMMANDS_KEY]) == 1  # the refused submit queued nothing
+
+
+def test_without_a_key_an_identical_submit_is_an_independent_new_run():
+    """No key = an independent submission: identical parameters mint a SECOND job — an
+    intentional repeat is a new run, never content deduplication."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    a = fm._send_submit_command(
+        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
+        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x",
+    )
+    b = fm._send_submit_command(
+        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
+        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x",
+    )
+    assert a["job_id"] != b["job_id"]
+    assert len(r._lists[fm.COMMANDS_KEY]) == 2
+
+
+def test_submit_cli_reconciles_a_keyed_retry(monkeypatch, capsys):
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    argv = [
+        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
+        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
+        "--request-key", "req-cli",
+    ]
+    assert fm.main(argv) == 0
+    assert "launching" in capsys.readouterr().out
+    assert fm.main(argv) == 0
+    retry_out = capsys.readouterr().out
+    assert "fleet:jobs[" in retry_out and "reconciled" in retry_out
+    assert len(r._lists[fm.COMMANDS_KEY]) == 1
+
+
+def test_submit_cli_refuses_a_conflicting_key_with_exit_2(monkeypatch, capsys):
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    base = [
+        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
+        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
+        "--request-key", "req-cli",
+    ]
+    assert fm.main(base) == 0
+    conflicting = [
+        "submit", "--spec", "workflows/repository/control_room_new_ui.yaml",
+        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
+        "--request-key", "req-cli",
+    ]
+    assert fm.main(conflicting) == 2
+    assert "request key" in capsys.readouterr().err
