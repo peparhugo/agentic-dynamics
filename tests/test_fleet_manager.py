@@ -397,6 +397,7 @@ def test_the_request_key_rides_the_command_the_record_and_the_fingerprint_index(
     entry = json.loads(r._hashes[fm.REQUESTS_KEY]["req-A"])
     assert entry["job_id"] == cmd["job_id"]
     assert len(entry["fingerprint"]) == 64  # the reconcile evidence is retained
+    assert entry["workdir"] == cmd["workdir"]  # the RESOLVED workspace is retained too
 
 
 def test_a_key_reused_for_any_changed_execution_input_refuses():
@@ -837,3 +838,91 @@ def test_submit_cli_new_key_after_main_advances_gets_a_fresh_workspace(
     assert second["workdir"] != first["workdir"]
     assert second["workdir"].endswith(new_main[:7])
     assert Path(second["workdir"]).exists()
+
+
+def test_explicit_key_retry_reuses_the_recorded_suffixed_workspace(
+    tmp_path, monkeypatch, capsys
+):
+    """Reviewer finding (round 4): a retry resolves the workspace FROM the retained record —
+    the SHA-suffixed workspace assigned to the submission is reused (even after another main
+    advance) instead of failing as a DIFFERENT request."""
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    # 1) a first workspace at main_1 (the base name).
+    assert fm.main([
+        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g",
+        "--model", "m", "--retry-safe", "--json",
+    ]) == 0
+    first = json.loads(capsys.readouterr().out.strip())
+
+    # 2) main advances; a NEW explicit key gets the SHA-suffixed workspace.
+    (repo / "advance.txt").write_text("x", encoding="utf-8")
+    _git("add", "-A", cwd=repo)
+    _git("commit", "-m", "advance", cwd=repo)
+    new_main = _git("rev-parse", "HEAD", cwd=repo).stdout.strip()
+    assert fm.main([
+        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g",
+        "--model", "m", "--request-key", "k1", "--json",
+    ]) == 0
+    second = json.loads(capsys.readouterr().out.strip())
+    assert second["reconciled"] is False
+    assert second["workdir"] != first["workdir"]
+    assert second["workdir"].endswith(new_main[:7])
+
+    # 3) ANOTHER main advance; the retry with the same key must reconcile to the RECORDED
+    #    (suffixed) workspace — not the reconstructed unsuffixed path.
+    (repo / "advance2.txt").write_text("x", encoding="utf-8")
+    _git("add", "-A", cwd=repo)
+    _git("commit", "-m", "advance2", cwd=repo)
+    assert fm.main([
+        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g",
+        "--model", "m", "--request-key", "k1", "--json",
+    ]) == 0
+    retry = json.loads(capsys.readouterr().out.strip())
+    assert retry["reconciled"] is True
+    assert retry["job_id"] == second["job_id"]
+    assert retry["workdir"] == second["workdir"]
+    assert "retry: reconciling" in retry["prep_note"]
+    names = sorted(p.name for p in worktrees.iterdir())
+    assert names == sorted([Path(first["workdir"]).name, Path(second["workdir"]).name])
+
+
+def test_auto_key_retry_reuses_the_recorded_suffixed_workspace(tmp_path, monkeypatch, capsys):
+    """The automatic-key variant: a second task's first submission gets the suffixed
+    workspace; its retry after another main advance reuses the recorded workspace + job —
+    no duplicate is queued."""
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    # task-a's first submission creates the base workspace at main_1.
+    assert fm.main([
+        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g", "--model", "m",
+        "--retry-safe", "--task-identity", "task-a", "--json",
+    ]) == 0
+    first = json.loads(capsys.readouterr().out.strip())
+
+    # main advances; task-b's identical inputs get the SHA-suffixed workspace.
+    (repo / "advance.txt").write_text("x", encoding="utf-8")
+    _git("add", "-A", cwd=repo)
+    _git("commit", "-m", "advance", cwd=repo)
+    assert fm.main([
+        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g", "--model", "m",
+        "--retry-safe", "--task-identity", "task-b", "--json",
+    ]) == 0
+    second = json.loads(capsys.readouterr().out.strip())
+    assert second["reconciled"] is False
+    assert second["workdir"] != first["workdir"]
+
+    # ANOTHER advance; task-b's retry must reconcile to the recorded workspace + job.
+    (repo / "advance2.txt").write_text("x", encoding="utf-8")
+    _git("add", "-A", cwd=repo)
+    _git("commit", "-m", "advance2", cwd=repo)
+    assert fm.main([
+        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g", "--model", "m",
+        "--retry-safe", "--task-identity", "task-b", "--json",
+    ]) == 0
+    retry = json.loads(capsys.readouterr().out.strip())
+    assert retry["reconciled"] is True and retry["job_id"] == second["job_id"]
+    assert retry["workdir"] == second["workdir"]
+    assert len(r._lists[fm.COMMANDS_KEY]) == 2  # one command per logical task

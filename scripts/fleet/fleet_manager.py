@@ -290,10 +290,15 @@ def _parse_request_entry(raw: str, key: str) -> dict:
             f"request key {key!r} has an unreadable stored identity ({exc}) — cannot verify "
             "this retry; resolve it from the board or mint a new key"
         ) from exc
-    if not isinstance(entry, dict) or not entry.get("job_id") or not entry.get("fingerprint"):
+    if (
+        not isinstance(entry, dict)
+        or not entry.get("job_id")
+        or not entry.get("fingerprint")
+        or not entry.get("workdir")
+    ):
         raise RequestKeyUnresolvedError(
-            f"request key {key!r} carries no stored fingerprint (missing evidence) — cannot "
-            "verify this retry; resolve it from the board or mint a new key"
+            f"request key {key!r} carries no stored fingerprint/workspace (missing evidence) "
+            "— cannot verify this retry; resolve it from the board or mint a new key"
         )
     return entry
 
@@ -684,18 +689,21 @@ def _derive_request_key(
     explicit: str | None,
     retry_safe: bool,
     task_identity: str,
-    fingerprint: str,
+    scope_digest: str,
 ) -> str | None:
     """The effective request key: explicit wins; retry-safe derives per LOGICAL TASK.
 
     The derived key is scoped by the durable TASK identity (the binding's ``task_identity``,
-    passed by the tool) AND the execution fingerprint — a retry within the same task
-    reconciles, while the SAME inputs submitted from a DIFFERENT task/session are a different
-    logical submission and get a DIFFERENT identity (reviewer finding, 2026-09-16: an
-    input-only key conflated two tasks and returned the first task's completed job). A task
-    identity that is explicit (not the per-session fallback) also survives session changes:
-    a new session attached to the same task derives the same key. Without a task identity (a
-    bare CLI caller), the fingerprint alone scopes the key.
+    passed by the tool) AND the PRE-WORKDIR request digest (spec, goal, model, image, spec
+    digest, continuation, admission/execution — everything except the resolved workspace).
+    The digest deliberately EXCLUDES the workspace: the workspace is resolved by preparation
+    and recorded WITH the submission, so a retry must derive the SAME key no matter how the
+    workspace resolution would answer today (reviewer finding, 2026-09-16: a key over the
+    resolved path changed when main advanced, so a retry could not find its own record). A
+    retry within the same task reconciles; the SAME inputs from a DIFFERENT task/session are
+    a different logical submission and get a DIFFERENT identity; a task identity that is
+    explicit (not the per-session fallback) also survives session changes. Without a task
+    identity (a bare CLI caller), the digest alone scopes the key.
     """
     key = str(explicit or "").strip() or None
     if key is not None:
@@ -703,21 +711,31 @@ def _derive_request_key(
     if not retry_safe:
         return None
     scope = str(task_identity or "").strip()
-    basis = f"{scope}\x1f{fingerprint}" if scope else fingerprint
+    basis = f"{scope}\x1f{scope_digest}" if scope else scope_digest
     return f"auto:{hashlib.sha256(basis.encode('utf-8')).hexdigest()[:32]}"
 
 
-def _request_entry_exists(client: redis.Redis, key: str) -> bool:
-    """Whether a request key already has a stored identity — the submit path's retry probe.
+def _request_entry_lookup(client: redis.Redis, key: str) -> tuple[bool, dict | None]:
+    """The submit path's retry probe: ``(exists, parsed_entry)``.
 
-    A hit means the submission was already claimed: the workspace must NOT be re-prepared
-    (nothing will run; the claim reconciles or refuses the fingerprint mismatch). A Redis
-    error reads as "no entry": the submit itself needs Redis, so it will fail loudly there.
+    A hit means the submission was already claimed: the workspace must NOT be re-prepared —
+    the RETRY resolves the workspace from the retained record (nothing will run; the claim
+    reconciles or refuses the fingerprint mismatch). An entry that cannot be parsed still
+    reports ``exists=True`` so preparation is skipped; the atomic claim refuses it as
+    UNRESOLVED. A Redis error reads as "no entry": the submit itself needs Redis, so it will
+    fail loudly there.
     """
     try:
-        return bool(client.hget(REQUESTS_KEY, key))
+        raw = client.hget(REQUESTS_KEY, key)
     except Exception:  # noqa: BLE001 — never invent a new submission on a read blip
-        return False
+        return False, None
+    if not raw:
+        return False, None
+    try:
+        entry = json.loads(raw)
+    except (TypeError, ValueError):
+        return True, None
+    return True, entry if isinstance(entry, dict) else None
 
 
 def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: str,
@@ -804,16 +822,27 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
         spec_sha256=spec_sha256, resume=resume, parent_run_id=parent_run_id,
         admission=admission, execution=execution,
     )
+    scope_digest = _workspace_identity_digest(
+        spec=spec, goal=goal, model=model, image=image, spec_sha256=spec_sha256,
+        resume=resume, parent_run_id=parent_run_id, admission=admission, execution=execution,
+    )
     key = _derive_request_key(
         explicit=request_key, retry_safe=retry_safe,
-        task_identity=str(task_identity or ""), fingerprint=fingerprint,
+        task_identity=str(task_identity or ""), scope_digest=scope_digest,
     )
     if str(task_identity or "").strip():
         command["task_identity"] = str(task_identity).strip()
     if key:
         command["request_key"] = key
     if key:
-        entry = json.dumps({"job_id": command["job_id"], "fingerprint": fingerprint})
+        entry = json.dumps({
+            "job_id": command["job_id"],
+            "fingerprint": fingerprint,
+            # The RESOLVED workspace is part of the retained identity (reviewer finding,
+            # 2026-09-16): a retry must reuse exactly the workspace the submission was
+            # assigned — including a SHA-suffixed one — never re-resolve it.
+            "workdir": workdir,
+        })
         result = client.eval(
             _SUBMIT_LUA, 3, REQUESTS_KEY, COMMANDS_KEY, JOBS_KEY,
             key, command["job_id"], json.dumps(command),
@@ -1062,16 +1091,24 @@ def main(argv: list[str] | None = None) -> int:
             )
             probe_key = _derive_request_key(
                 explicit=args.request_key, retry_safe=args.retry_safe,
-                task_identity=task_identity,
-                fingerprint=request_fingerprint(
-                    spec=args.spec, goal=args.goal, model=args.model, workdir=str(candidate),
-                    image=args.image, spec_sha256=args.spec_sha256, resume=args.resume,
-                    parent_run_id=args.parent_run_id, admission=admission, execution=execution,
-                ),
+                task_identity=task_identity, scope_digest=digest,
             )
-            if probe_key and _request_entry_exists(client, probe_key):
-                workdir = str(candidate)
-                prep_note = f"retry: reconciling against the existing request {probe_key}"
+            probe_exists, probe_entry = (
+                _request_entry_lookup(client, probe_key) if probe_key else (False, None)
+            )
+            if probe_exists:
+                # A RETRY: the workspace comes FROM the retained record — never re-resolved.
+                # Re-resolving would fingerprint a path the submission was NOT assigned (the
+                # reviewer's repro: a SHA-suffixed workspace was recorded, the probe rebuilt
+                # the unsuffixed path, and the retry either conflicted or queued a duplicate
+                # after another main advance). An unreadable retained identity does not
+                # prepare either: the atomic claim refuses it as UNRESOLVED.
+                recorded = str((probe_entry or {}).get("workdir") or "").strip()
+                workdir = recorded or str(candidate)
+                prep_note = (
+                    f"retry: reconciling against the existing request {probe_key} "
+                    f"(workspace {workdir})"
+                )
             else:
                 resolved, prep_note, prep_errors = prepare_workspace(
                     spec=args.spec, goal=args.goal, model=args.model, image=args.image,

@@ -2714,3 +2714,150 @@ def test_a_binding_cannot_ride_the_shared_name_across_projects(aio_env, tmp_path
         _aio_block(binding_id=binding_id), repo_root=repo_a, workdir=str(repo_b),
     )
     assert any("DIFFERENT project" in e for e in errors)
+
+
+# ── Continuation provenance at the real AIO validation boundary (round 4) ─────
+
+
+def _local_only_repo(tmp_path: Path, name: str) -> Path:
+    """A git repo with NO origin remote (the local-only provenance channel)."""
+    root = tmp_path / name
+    root.mkdir()
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    (root / "README.md").write_text("x", encoding="utf-8")
+    git = ["git", "-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t"]
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "init"], check=True)
+    return root
+
+
+def _continuation_fixture(tmp_path, monkeypatch, canonical: Path):
+    """A parent run's private clone (with a phase commit) + its ledger + the preparer wired
+    in + the submit spec present at the canonical root. Returns (fm, cfg, clone)."""
+    import importlib
+    import sys as _sys
+
+    from agentic_dynamics.runtime.run_clone import create_run_clone
+
+    spec_src = (
+        Path(__file__).resolve().parent.parent
+        / "workflows" / "repository" / "fleet_job_submission.yaml"
+    )
+    spec_dst = canonical / "workflows" / "repository" / "fleet_job_submission.yaml"
+    spec_dst.parent.mkdir(parents=True, exist_ok=True)
+    spec_dst.write_bytes(spec_src.read_bytes())
+
+    runs_root = tmp_path / "runs"
+    cfg = PathConfig(
+        repo_root=canonical,
+        git_dir=canonical / ".git",
+        worktrees_root=tmp_path,
+        runs_root=runs_root,
+        results_dir=tmp_path / "results",
+        state_root=tmp_path / "state",
+        auth_home=tmp_path / "auth",
+    )
+    clone = create_run_clone("run-parent", path_config=cfg)
+    git = ["git", "-C", str(clone.path), "-c", "user.email=t@t", "-c", "user.name=t"]
+    (clone.path / "phase.txt").write_text("built", encoding="utf-8")
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "[workflow] build"], check=True)
+    candidate = subprocess.run(
+        ["git", "-C", str(clone.path), "rev-parse", "HEAD"], capture_output=True, text=True
+    ).stdout.strip()
+    ledger_dir = canonical / "experiments" / "results" / "workflows" / "demo"
+    ledger_dir.mkdir(parents=True)
+    (ledger_dir / "20260916T000000000000Z_run-parent.json").write_text(
+        json.dumps({
+            "run_id": "run-parent",
+            "git_sha": candidate,
+            "phases": [{"phase": "build", "status": "ok"}],
+        }),
+        encoding="utf-8",
+    )
+    fleet_dir = str(Path(__file__).resolve().parent.parent / "scripts" / "fleet")
+    if fleet_dir not in _sys.path:
+        _sys.path.insert(0, fleet_dir)
+    fm = importlib.import_module("fleet_manager")
+    monkeypatch.setenv("FINOPS_RUNS_ROOT", str(runs_root))
+    monkeypatch.setattr(fm, "_REPO_ROOT", canonical)
+    return fm, cfg, clone
+
+
+def _continuation_request(prepared, binding_id: str) -> dict:
+    return _valid_submit_request(
+        actor="aio",
+        aio=_aio_block(binding_id=binding_id),
+        workdir=str(prepared),
+        resume=True,
+        parent_run_id="run-parent",
+    )
+
+
+def test_a_prepared_continuation_passes_the_aio_boundary_with_an_origin(
+    aio_env, tmp_path, monkeypatch
+):
+    """Reviewer finding (round 4): the continuation workspace is the parent's private clone —
+    an independent repo with a local origin path. Through the REAL AIO validation boundary it
+    must present the canonical project's identity (via its stamped/aligned provenance), not
+    read as a DIFFERENT project."""
+    canonical = _git_project(
+        tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git"
+    )
+    fm, cfg, clone = _continuation_fixture(tmp_path, monkeypatch, canonical)
+    prepared, note, errors = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-parent"
+    )
+    assert errors == [] and prepared == clone.path
+
+    binding_id = _bound_store(aio_env)
+    validation_errors = validate_submit_request(
+        _continuation_request(prepared, binding_id),
+        repo_root=canonical,
+        path_config=cfg,
+    )
+    assert validation_errors == [], validation_errors
+
+
+def test_a_prepared_continuation_passes_the_aio_boundary_local_only(
+    aio_env, tmp_path, monkeypatch
+):
+    """The provenance channel without an origin: a local-only canonical repo's clone carries
+    the stamped common git dir and still agrees at the real boundary."""
+    canonical = _local_only_repo(tmp_path, "canonical")
+    fm, cfg, clone = _continuation_fixture(tmp_path, monkeypatch, canonical)
+    prepared, note, errors = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-parent"
+    )
+    assert errors == [] and prepared == clone.path
+
+    binding_id = _bound_store(aio_env)
+    validation_errors = validate_submit_request(
+        _continuation_request(prepared, binding_id),
+        repo_root=canonical,
+        path_config=cfg,
+    )
+    assert validation_errors == [], validation_errors
+
+
+def test_a_foreign_clone_still_refuses_at_the_aio_boundary(aio_env, tmp_path, monkeypatch):
+    """Foreign repositories still refuse: a clone of a DIFFERENT project records the foreign
+    provenance and the project check refuses it at the real boundary."""
+    from agentic_dynamics.runtime.run_clone import create_run_clone
+
+    canonical = _local_only_repo(tmp_path, "canonical")
+    foreign = _git_project(tmp_path, "foreign", "git@github.com:org/foreign.git")
+    fm, cfg, clone = _continuation_fixture(tmp_path, monkeypatch, canonical)
+    foreign_clone = create_run_clone("run-foreign", source_repo=foreign, path_config=cfg)
+
+    binding_id = _bound_store(aio_env)
+    errors = validate_submit_request(
+        _valid_submit_request(
+            actor="aio",
+            aio=_aio_block(binding_id=binding_id),
+            workdir=str(foreign_clone.path),
+        ),
+        repo_root=canonical,
+        path_config=cfg,
+    )
+    assert any("DIFFERENT project" in e for e in errors), errors

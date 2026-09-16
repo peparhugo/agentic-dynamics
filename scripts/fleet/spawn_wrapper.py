@@ -935,6 +935,39 @@ def aio_capacity_report(native_session_id: str) -> dict[str, Any]:
 # a fallback. The binding's ``project`` (when set) must normalize to one of them.
 _ORIGIN_URL_RE = re.compile(r"^\s*url\s*=\s*(.+?)\s*$", re.MULTILINE)
 _REMOTE_ORIGIN_RE = re.compile(r'\[remote\s+"origin"\]')
+_AD_SECTION_RE = re.compile(r"\[agentic-dynamics\]")
+_PROVENANCE_RE = re.compile(r"^\s*project\s*=\s*(.+?)\s*$", re.MULTILINE)
+
+
+def _project_provenance(git_dir: Path) -> str:
+    """The stamped continuation provenance (``origin:<url>`` / ``git-dir:<path>``), or "".
+
+    Written by ``create_run_clone`` (candidate continuity, 2026-09-16): a run clone's own
+    git dir + local origin path would otherwise read as a DIFFERENT project from the spec
+    repository. The stamp records the canonical identity the clone derives from; a clone of
+    a FOREIGN repository records the foreign identity — the agreement check still refuses it.
+    """
+    try:
+        config = (git_dir / "config").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    section = _AD_SECTION_RE.search(config)
+    if not section:
+        return ""
+    match = _PROVENANCE_RE.search(config, section.end())
+    if not match:
+        return ""
+    return match.group(1).strip()
+
+
+def _provenance_identity(token: str) -> str:
+    """The comparable identity a provenance token carries ('' when absent/unusable)."""
+    text = str(token or "").strip()
+    if text.startswith("origin:"):
+        return _normalize_project(text[len("origin:"):])
+    if text.startswith("git-dir:"):
+        return text[len("git-dir:"):]
+    return ""
 
 
 def _git_common_dir(checkout: Path) -> Path | None:
@@ -1003,6 +1036,7 @@ def _checkout_identity(checkout: Path) -> dict | None:
         return None
     common = _git_common_dir(checkout)
     origin = _origin_url(common) if common is not None else ""
+    provenance = _project_provenance(common) if common is not None else ""
     canonical = ""
     if common is not None and common.name == ".git":
         canonical = _normalize_project(common.parent.name)
@@ -1011,6 +1045,7 @@ def _checkout_identity(checkout: Path) -> dict | None:
         "canonical_name": canonical,
         "origin": _normalize_project(origin),
         "common_dir": str(common) if common is not None else "",
+        "provenance": provenance,
         "is_git": common is not None,
     }
 
@@ -1040,10 +1075,20 @@ def _project_agreement(repo_root: Path, workdir: str) -> tuple[set[str], list[st
             and repo["common_dir"] == work["common_dir"]
         ):
             shared = f"git-dir:{repo['common_dir']}"
+        else:
+            # Continuation provenance (candidate continuity, 2026-09-16): a run clone is an
+            # independent repository with a LOCAL origin path, so it shares neither origin
+            # nor common git dir with the spec repository — but it was cloned FROM it and
+            # carries the stamped source identity. An equal origin or the source's common
+            # git dir proves the derivation; a FOREIGN clone's provenance matches neither
+            # and still refuses below.
+            provenance = _provenance_identity(work.get("provenance", ""))
+            if provenance and provenance in (repo["origin"], repo["common_dir"]):
+                shared = provenance
         if not shared:
             return set(), [
                 "submit: the worktree belongs to a DIFFERENT project than the spec repository "
-                f"(origins {work['origin'] or work['common_dir'] or work['name']} vs "
+                f"(origins {work['origin'] or work.get('provenance') or work['common_dir'] or work['name']} vs "
                 f"{repo['origin'] or repo['common_dir'] or repo['name']}) — a submit may not "
                 "cross projects (a shared directory name is not shared identity)"
             ]
