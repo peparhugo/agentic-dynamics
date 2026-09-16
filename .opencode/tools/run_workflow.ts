@@ -154,6 +154,9 @@ export default tool({
     // first; the native identity comes from the tool context. Non-AIO sessions skip it and
     // keep the existing authority contract.
     let aioFlags: string[] = []
+    // The AIO session capacity report is ADVISORY (2026-09-16 policy): the gate measures it
+    // so the result can carry it, and it never contributes to a refusal.
+    let aioCapacity: Record<string, unknown> | null = null
     if (isAioAgent(String(ctx.agent ?? ""))) {
       const bindingRead = await commandRunner(
         ["python3", "scripts/session_open.py", "--binding",
@@ -179,9 +182,10 @@ export default tool({
     if (!args.orchestrator) {
       if (isAioAgent(String(ctx.agent ?? ""))) {
         // The AIO local exception (Unit D repair): an in-process run is permitted only for a
-        // VERIFIED DETERMINISTIC workflow AND only when the same budget/scope gate the durable
-        // path uses passes — checked through the REAL validator, so a CLOSE session (or an
-        // agent workflow) refuses BEFORE any local execution.
+        // VERIFIED DETERMINISTIC workflow AND only when the same binding/scope gate the
+        // durable path uses passes — checked through the REAL validator, so an agent workflow
+        // refuses BEFORE any local execution. Conversation capacity is NOT part of the
+        // refusal (2026-09-16 policy): the validator reports it as advisory diagnostics.
         const checkRequest = {
           spec: args.spec,
           goal: args.goal,
@@ -197,24 +201,33 @@ export default tool({
         }
         const validation = await commandRunner(
           ["python3", "scripts/fleet/spawn_wrapper.py", "validate-submit",
-           "--strict-aio-budget", "--require-deterministic"],
+           "--require-deterministic"],
           ctx.directory,
           JSON.stringify(checkRequest),
         )
-        let verdict: { ok?: boolean; errors?: string[] } | null = null
+        let verdict: {
+          ok?: boolean
+          errors?: string[]
+          aio_capacity?: Record<string, unknown>
+        } | null = null
         try {
           const parsed = JSON.parse(validation.stdout.trim())
           verdict = parsed && typeof parsed === "object" ? parsed : null
         } catch {
           verdict = null
         }
+        aioCapacity = verdict?.aio_capacity ?? null
         if (!verdict || verdict.ok !== true) {
           return {
             output:
               "AIO in-process run refused: " +
               ((verdict?.errors ?? []).join("; ") ||
-                `the deterministic/budget validator is unavailable (exit ${validation.exitCode})`),
-            metadata: { exit_code: 2, execution_mode: "in-process" },
+                `the deterministic/binding validator is unavailable (exit ${validation.exitCode})`),
+            metadata: {
+              exit_code: 2,
+              execution_mode: "in-process",
+              aio_capacity: aioCapacity,
+            },
           }
         }
       }
@@ -240,7 +253,7 @@ export default tool({
       }
       return {
         output: output || `Workflow completed for goal "${args.goal}"`,
-        metadata: { spec: args.spec, model: args.model, workdir: args.workdir, resume: args.resume, timestamp: new Date().toISOString() },
+        metadata: { spec: args.spec, model: args.model, workdir: args.workdir, resume: args.resume, aio_capacity: aioCapacity, timestamp: new Date().toISOString() },
       }
     }
 

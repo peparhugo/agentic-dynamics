@@ -90,31 +90,21 @@ control database; you never write a child's outbox.
    `agent_config/` source.
 5. Keep the control packet read-only. You read live state; you never fake, fork, or mutate it
    to make an action look safe.
-6. **The session budget is binding, and it measures YOU — explicitly, against the ACTIVE
-   model's resolved capacity.** With the packet each turn, run `agentic-dynamics session
-   budget` with the runtime's explicit session identity exported (`FINOPS_SESSION_ID`;
-   `--session-id` overrides). There is NO most-recently-updated fallback: an absent or
-   nonexistent identity is UNJUDGED, never a guess. The limit is NOT a universal constant:
-   it is resolved from the active session model (never the repository default or a child
-   workflow's model) through the installed OpenCode runtime's own overflow calculation
-   (response headroom + compaction reserve), so switching models moves the limit. `OK` =
-   keep working. `WARN` = at/above 80% of the effective limit: ADVISORY only — informational,
-   never a stopping condition. `COMPACT` = at/above the effective (usable) boundary: the
-   native runtime compacts on the next request and THIS session continues under the same
-   task binding — do not close; continue, and re-evaluate against the reduced context before
-   starting new consequential work. After a completed compaction the check reports the
-   post-compaction state and resumes measuring with the next completed sample — the first
-   resumed work is never blocked by the stale pre-compaction reading. `CLOSE` = at/over the
-   model's hard context limit (or the boundary with native compaction disabled): close now
-   and hand off; the next session reads the close record and continues. Message count is
-   TELEMETRY, never a stopping condition. An `UNJUDGED` verdict (unreadable session,
-   unresolved model, no usable measurement) is a warning, never permission. The one explicit
-   override is `FINOPS_SESSION_CTX_LIMIT`, a LOCAL policy cap the CLI, the capsule, and the
-   submission gate all consume — clamped by the native capacity, and crossing it closes the
-   session (a policy cap is not a native compaction trigger). This is the
-   25-hour-session failure class made executable without a fixed 200K/80 policy: a session
-   that keeps accepting work past its model's usable capacity is repeating the exact defect
-   the audit named.
+6. **The session budget is a self-check, not an admission gate.** Run
+   `agentic-dynamics session budget` each turn with the runtime's explicit session identity
+   (`FINOPS_SESSION_ID`; `--session-id` overrides; no most-recently-updated fallback — an
+   absent identity is `UNJUDGED`, never a guess). The verdict is ADVISORY diagnostics about
+   YOUR session: it guides wrap-up and hand-off discipline, and it never blocks a valid
+   submission. `OK` = keep working. `WARN` = near the effective limit: wrap up and hand
+   off. `COMPACT` = at/above the usable boundary: the installed runtime performs its own
+   compaction on its own schedule — this check reports the boundary; it does not trigger,
+   prove, or record compaction, and the session and its task binding continue. `CLOSE` =
+   at/over the model's hard limit (or the LOCAL POLICY cap `FINOPS_SESSION_CTX_LIMIT`, a
+   non-native trigger): close and hand off. `UNJUDGED` = the measurement is unavailable for
+   a named reason — report it; it is neither permission nor a missing authorization.
+   Message count is telemetry. Conversation capacity and financial spending are different
+   concerns: the submission gate enforces identity, binding, scope, source, and financial
+   admission; this verdict never weakens those gates and is never required for one.
 7. **One deliverable per session.** A session serves one user-visible deliverable with its
    acceptance test. Reviews, remediation, and meta-work each get their own session; the
    deliverable session's only job is the deliverable. When the deliverable is a UI change,

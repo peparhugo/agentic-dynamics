@@ -883,15 +883,17 @@ def _aio_binding_artifact_dir() -> Path:
 def _aio_budget_verdict(native_session_id: str) -> tuple[str, str, bool]:
     """The AIO session's measured capacity verdict: ``(verdict, reason, backend_available)``.
 
-    The judgment is the SHARED one — ``session_budget.measure_verdict`` resolves the ACTIVE
-    session model's capacity through ``agentic_dynamics.core.session_capacity`` (the ported
-    opencode calculation), the same resolution the CLI and the capsule consume. The session
-    under judgment is the EXPLICIT native identity carried by the binding — never a
-    most-recently-updated guess. ``backend_available=False`` means this gate cannot reach
-    the session database (the containerized orchestrator has no host DB mounted): a gate that
-    cannot measure DEFERS to the host-side gate, which owns the canonical database — it must
-    not fabricate UNJUDGED and block a valid job (reviewer finding, 2026-09-15). When the
-    backend IS available, an unknown verdict refuses (an unknown budget is never unlimited).
+    ADVISORY DIAGNOSTICS (2026-09-16 policy): the submit gate REPORTS this — it never refuses
+    on it. Conversation capacity is a fact about the coordinator's own chat session, not an
+    authorization for a workflow submit; the admission refusals are identity, binding,
+    project, scope, and financial admission. The judgment is the SHARED one —
+    ``session_budget.measure_verdict`` resolves the ACTIVE session model's capacity through
+    ``agentic_dynamics.core.session_capacity`` (the ported opencode calculation), the same
+    resolution the CLI and the capsule consume. The session under judgment is the EXPLICIT
+    native identity carried by the binding — never a most-recently-updated guess.
+    ``backend_available=False`` means this reader cannot reach the session database (the
+    containerized orchestrator has no host DB mounted); that is reported as an unavailable
+    advisory with a reason, never converted into a refusal.
     """
     try:
         from scripts import session_budget as budget  # repo root on sys.path
@@ -901,6 +903,25 @@ def _aio_budget_verdict(native_session_id: str) -> tuple[str, str, bool]:
         except ImportError as exc:
             return "UNJUDGED", f"the budget module is unavailable ({exc})", False
     return budget.measure_verdict(native_session_id)
+
+
+def aio_capacity_report(native_session_id: str) -> dict[str, Any]:
+    """The AIO session capacity report — advisory, structured, never an admission gate.
+
+    Every consume site the capsule/CLI/gate shares renders the same fields: the verdict, its
+    reason, and whether a real measurement was possible (``measured``). A missing or
+    unmeasurable reading is reported as ``UNJUDGED`` WITH ITS REASON — it is never a refusal,
+    and never silently upgraded to ``OK``. Callers that want the diagnostics (the
+    ``validate-submit`` response, the AIO's in-process tool path) read this; no caller
+    refuses on it (2026-09-16 policy).
+    """
+    verdict, reason, measured = _aio_budget_verdict(native_session_id)
+    return {
+        "verdict": verdict,
+        "reason": reason,
+        "measured": measured,
+        "advisory": True,
+    }
 
 
 # The project-association identity (Unit D): a binding may only ride a submit whose spec /
@@ -1075,7 +1096,7 @@ def _deterministic_phase_errors(spec: Any) -> list[str]:
 
 
 def _validate_aio_binding(
-    aio: Any, *, repo_root: Path, workdir: str, strict_budget: bool = False
+    aio: Any, *, repo_root: Path, workdir: str
 ) -> list[str]:
     """The AIO actor's binding gate: resolve + validate the binding BY IDENTITY.
 
@@ -1085,10 +1106,10 @@ def _validate_aio_binding(
     project identities (the reviewer finding: a binding naming an unrelated git project must
     not ride an Agentic Dynamics workflow). Refusals (each named): malformed identity fields,
     an unavailable store, no binding, an agent mismatch, a foreign/stale binding id, a stale
-    task revision, a project mismatch, and a session-capacity verdict that blocks new
-    consequential work (COMPACT / CLOSE / UNJUDGED — where measurable; WARN is ADVISORY and
-    never blocks, per the 2026-09-15 context-policy; ``strict_budget`` gates that cannot
-    reach the session database refuse instead of deferring).
+    task revision, and a project mismatch. Conversation capacity is deliberately NOT a
+    refusal here (2026-09-16 policy): it is advisory diagnostics (``aio_capacity_report``),
+    never an authorization field — a missing chat token measurement is not a missing
+    authorization.
     """
     if not isinstance(aio, dict):
         return [f"submit: aio must be a mapping (got {type(aio).__name__})"]
@@ -1152,24 +1173,13 @@ def _validate_aio_binding(
             f"submitted project ({sorted(agreed) or 'unresolvable'}) — a binding may only "
             "ride work from its own project"
         )
-    verdict, reason, measured_here = _aio_budget_verdict(native_session_id)
-    if measured_here:
-        # The 2026-09-15 capacity policy: WARN is ADVISORY (a session near its effective
-        # limit may still start new work); COMPACT is the native-compaction boundary (let the
-        # runtime reduce the context, then re-submit — the session/task binding continues);
-        # CLOSE is the hard model limit (next request cannot be processed); UNJUDGED is no
-        # measurement — never permission.
-        if verdict in ("COMPACT", "CLOSE", "UNJUDGED"):
-            errors.append(
-                f"submit: AIO session budget verdict is {verdict} — new consequential work is "
-                f"blocked ({reason or 'session at its capacity boundary'})"
-            )
-    elif strict_budget:
-        errors.append(
-            "submit: the AIO session budget cannot be measured at this gate "
-            f"({reason or 'session database unavailable'}) — the host gate must measure it "
-            "before the launch effect"
-        )
+    # Conversation capacity is deliberately NOT consulted here (2026-09-16 policy): the
+    # verdict — even an unavailable one — is a diagnostic about the coordinator's own chat
+    # session, never an authorization for the submit. The report is measured separately
+    # (``aio_capacity_report``, and by the AIO's own turn check) and rides the validation
+    # response as ``aio_capacity``; it never becomes an error. What DOES refuse here: the
+    # identity fields above, the durable binding, the agent/binding revision, and the
+    # project agreement — an unbound or stale submit stays refused regardless of capacity.
     return errors
 
 
@@ -1179,7 +1189,6 @@ def validate_submit_request(
     repo_root: Path | str | None = None,
     phase_scopes: dict[str, str] | None = None,
     path_config: PathConfig | None = None,
-    strict_aio_budget: bool = False,
     require_deterministic: bool = False,
 ) -> list[str]:
     """Validate a ``submit`` request. Empty list = valid; the socket is reached only then.
@@ -1434,7 +1443,8 @@ def validate_submit_request(
 
     # Step 12a — the AIO local-execution exception (Unit D repair): an AIO in-process run is
     # permitted only for a VERIFIED DETERMINISTIC workflow (no agent phases), so the local
-    # mode can never dispatch a consequential agent turn around the durable budget/scope gates.
+    # mode can never dispatch a consequential agent turn around the durable execution path's
+    # scope and admission gates.
     if require_deterministic:
         errors.extend(_deterministic_phase_errors(spec))
 
@@ -1442,10 +1452,11 @@ def validate_submit_request(
     # CONSISTENT: actor=aio demands a complete block (a missing/null block is not a binding),
     # and a block supplied without the actor is an inconsistent declaration. The binding is
     # then resolved + validated BY IDENTITY — including that its project matches the submitted
-    # spec/worktree and (where measurable) that the session budget allows new work. A submit
-    # with NO actor/aio declarations keeps its existing contract: valid non-AIO automation is
-    # never asked to impersonate the coordinator. The broker re-runs this same gate (strictly)
-    # before the launch effect.
+    # spec/worktree. Conversation capacity is NOT part of this gate (2026-09-16 policy): it is
+    # advisory diagnostics (`aio_capacity_report`), reported, never refused on. A submit with
+    # NO actor/aio declarations keeps its existing contract: valid non-AIO automation is never
+    # asked to impersonate the coordinator. The broker re-runs this same gate before the
+    # launch effect.
     actor = str(request.get("actor") or "").strip()
     aio = request.get("aio")
     if actor == "aio" and not isinstance(aio, dict):
@@ -1460,9 +1471,7 @@ def validate_submit_request(
                 "inconsistent declaration (the block declares the AIO actor)"
             )
         errors.extend(
-            _validate_aio_binding(
-                aio, repo_root=repo_root, workdir=workdir, strict_budget=strict_aio_budget
-            )
+            _validate_aio_binding(aio, repo_root=repo_root, workdir=workdir)
         )
 
     return errors
@@ -2427,10 +2436,6 @@ def main(argv: list[str] | None = None) -> int:
         help="validate a submit request (JSON on stdin), including the AIO binding gate",
     )
     p_validate_submit.add_argument(
-        "--strict-aio-budget", action="store_true",
-        help="refuse when the AIO session budget cannot be measured at this gate",
-    )
-    p_validate_submit.add_argument(
         "--require-deterministic", action="store_true",
         help="refuse a spec containing agent phases (the AIO in-process exception)",
     )
@@ -2452,10 +2457,17 @@ def main(argv: list[str] | None = None) -> int:
         request = json.loads(sys.stdin.read())
         errors = validate_submit_request(
             request,
-            strict_aio_budget=args.strict_aio_budget,
             require_deterministic=args.require_deterministic,
         )
-        print(json.dumps({"ok": not errors, "errors": errors}))
+        output: dict[str, Any] = {"ok": not errors, "errors": errors}
+        # The capacity report is ADVISORY (2026-09-16 policy): it rides the response so the
+        # caller can see it, and it never contributes to ``errors``. An unavailable reading
+        # is reported as UNJUDGED with its reason — never a missing authorization.
+        aio = request.get("aio") if isinstance(request.get("aio"), dict) else None
+        native = str((aio or {}).get("native_session_id") or "").strip()
+        if str(request.get("actor") or "").strip() == "aio" and native:
+            output["aio_capacity"] = aio_capacity_report(native)
+        print(json.dumps(output))
         return 0 if not errors else 2
 
     consume_fleet_commands(dry_run=args.dry_run, once=args.once)

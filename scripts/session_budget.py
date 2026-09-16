@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""session_budget.py — the AIO's session budget check (capacity-derived, 2026-09-15 policy).
+"""session_budget.py — the AIO's session budget check (capacity-derived; ADVISORY since 2026-09-16).
 
 The 25-hour 2026-09-13 session ran to ~698K context tokens with zero compactions. The first
 repair (decision f987cde9) made the failure class executable against a FIXED policy budget
 (200K tokens / 80 assistant turns). The operator's 2026-09-15 context-policy change replaced
-that constant with the ACTIVE session model's resolved capacity:
+that constant with the ACTIVE session model's resolved capacity. The operator's 2026-09-16
+delivery-path simplification then separated this DIAGNOSTIC from workflow ADMISSION: the
+verdict informs the coordinator's own wrap-up/hand-off discipline and is reported wherever
+it is consumed; it never blocks a valid submission. Native identity, the durable binding,
+project association, source/scope guarantees, and FINANCIAL admission remain the refusals —
+a missing chat token measurement is not a missing authorization.
 
     agentic-dynamics session budget                        # human verdict
     agentic-dynamics session budget --json                 # machine surface: session-budget/v2
@@ -21,24 +26,27 @@ far, TELEMETRY ONLY — message count is never a stopping condition):
   mirrors the runtime and re-measures with the next completed sample.
 * ``WARN``    — at/above 80% of the operative limit: ADVISORY. Informational; not a stopping
   condition; never a reason to refuse new work.
-* ``COMPACT`` — at/above the NATIVE usable boundary: the installed runtime compacts natively
-  on the next request and the SAME session/task continues. Do not close; re-evaluate against
-  the reduced context afterward. (When the runtime's native compaction is disabled, no
-  mechanism can reduce the context and the verdict is CLOSE instead.)
+* ``COMPACT`` — at/above the NATIVE usable boundary: the runtime's own compaction may engage
+  on its next request, and the SAME session/task continues. This check REPORTS the boundary;
+  it does not trigger, prove, or record compaction (only the runtime does that, at its native
+  boundary). Do not close; re-evaluate against the reduced context afterward. (When the
+  runtime's native compaction is disabled, no mechanism can reduce the context and the
+  verdict is CLOSE instead.)
 * ``CLOSE``   — at/over the model's HARD context limit (the next request cannot be processed),
   or at/over a LOCAL POLICY cap below the native boundary (``FINOPS_SESSION_CTX_LIMIT`` —
   a policy cap is not a native trigger, so nothing will reduce the context; close and hand
   off).
-* ``UNJUDGED`` — the session/model/capacity cannot be measured. Exit code 1, deliberately: an
-  unknown budget is never treated as unlimited (the same rule as unknown cost) — and never as
-  a fabricated OK.
+* ``UNJUDGED`` — the session/model/capacity cannot be measured. Exit code 1, deliberately: it
+  is reported as an unavailable ADVISORY with its reason — never a fabricated OK, and never a
+  fabricated refusal (workflow admission no longer consumes this verdict; see the 2026-09-16
+  policy above).
 
 Capacity is resolved by ``agentic_dynamics.core.session_capacity``: the installed runtime's
 own CLI resolution first (``opencode models --verbose``), the catalog+config fallback second —
-the same resolution the capsule (``session_open.py``) and the fleet exec-boundary gate
-(``scripts/fleet/spawn_wrapper.py``) consume, so all three return the SAME judgment. The
-operator override ``FINOPS_SESSION_CTX_LIMIT`` is a clamped LOCAL POLICY cap read by the same
-resolver.
+the same resolution the capsule (``session_open.py``) and the fleet exec-boundary's advisory
+report (``scripts/fleet/spawn_wrapper.py:aio_capacity_report``) consume, so all of them return
+the SAME judgment. The operator override ``FINOPS_SESSION_CTX_LIMIT`` is a clamped LOCAL POLICY
+cap read by the same resolver.
 
 Identity (unchanged): the session under judgment is the EXPLICIT one — ``--session-id``, else
 ``FINOPS_SESSION_ID``. There is NO most-recently-updated fallback; an absent identity and a
@@ -51,7 +59,7 @@ A completed COMPACTION SUMMARY is never a context sample (its usage describes th
 generation call over the old conversation, not the new context); it marks the post-compaction
 state instead.
 
-Exit codes: 0 = OK, 1 = WARN (advisory) / UNJUDGED, 2 = COMPACT (native compaction expected;
+Exit codes: 0 = OK, 1 = WARN (advisory) / UNJUDGED, 2 = COMPACT (at/above the native boundary;
 re-evaluate after), 3 = CLOSE (close now). Every judgment appends one line to the session-budget
 journal (append-only; override the path with ``FINOPS_SESSION_BUDGET_JOURNAL`` for tests).
 
@@ -314,9 +322,9 @@ def measure_verdict(
     Returns ``(verdict, reason, backend_available)``:
 
     * ``backend_available=False`` — the session DATABASE is not present at this location
-      (the containerized gate has no host DB mounted). The caller must NOT read this as a
-      verdict: a gate that cannot measure defers, and the host-side gate (the broker) —
-      which owns the canonical database — measures before the launch effect.
+      (e.g. the containerized orchestrator has no host DB mounted). The caller reports this
+      as an unavailable ADVISORY with its reason; no consumer converts it into a refusal
+      (2026-09-16 policy — a missing chat token measurement is not a missing authorization).
     * a genuinely INITIAL session (no assistant message recorded yet) is ``OK`` with the
       explicit reason ``"initial session: no usage recorded yet"`` — the one defined
       exception, named rather than silently zero.

@@ -80,13 +80,13 @@ const FOUND_BINDING = JSON.stringify({
   binding: { context_version: 1 },
 })
 
-test("a bound AIO in-process run refuses when the REAL validator reports CLOSE", async () => {
+test("a bound AIO in-process run refuses on a validator refusal, without the retired capacity flag", async () => {
   const { runner, calls } = fakeShell({
     session_open: () => ({ stdout: FOUND_BINDING }),
     validate: () => ({
       stdout: JSON.stringify({
         ok: false,
-        errors: ["submit: AIO session budget verdict is CLOSE — new consequential work is blocked"],
+        errors: ["submit: no durable AIO binding for session 'ses_tool' (status missing) — an unbound AIO submit is refused"],
       }),
       exitCode: 2,
     }),
@@ -96,13 +96,41 @@ test("a bound AIO in-process run refuses when the REAL validator reports CLOSE",
   try {
     const result = await (toolDef as any).execute(toolArgs(), ctx("aio-control"))
     expect(result.output).toContain("refused")
-    expect(result.output).toContain("CLOSE")
     // ZERO executor calls: the local runner never ran.
     expect(calls.some((c) => c.args.some((a) => a.endsWith("run_workflow.py")))).toBe(false)
-    // The validator was asked with the real gate flags.
+    // The validator was asked with the real gate flag — and NOT the retired capacity flag
+    // (2026-09-16 policy: conversation capacity is advisory, never an admission refusal).
     const validator = calls.find((c) => c.args.some((a) => a.endsWith("spawn_wrapper.py")))
-    expect(validator?.args).toContain("--strict-aio-budget")
     expect(validator?.args).toContain("--require-deterministic")
+    expect(validator?.args).not.toContain("--strict-aio-budget")
+  } finally {
+    setCommandRunner(null)
+  }
+})
+
+test("a capacity advisory rides the result and never refuses", async () => {
+  const { runner, calls } = fakeShell({
+    session_open: () => ({ stdout: FOUND_BINDING }),
+    validate: () => ({
+      stdout: JSON.stringify({
+        ok: true,
+        errors: [],
+        aio_capacity: {
+          verdict: "COMPACT",
+          reason: "at the native boundary",
+          measured: true,
+          advisory: true,
+        },
+      }),
+    }),
+    run: () => ({ stdout: "workflow completed" }),
+  })
+  setCommandRunner(runner)
+  try {
+    const result = await (toolDef as any).execute(toolArgs(), ctx("aio-control"))
+    expect(result.output).toContain("workflow completed")
+    expect((result.metadata as any).aio_capacity?.verdict).toBe("COMPACT")
+    expect(calls.some((c) => c.args.some((a) => a.endsWith("run_workflow.py")))).toBe(true)
   } finally {
     setCommandRunner(null)
   }
