@@ -185,6 +185,7 @@ function fleetSubmit(overrides: Record<string, unknown> = {}) {
     resume: false,
     parent_run_id: "",
     prep_note: "",
+    task_note: "",
     ...overrides,
   })
 }
@@ -219,6 +220,8 @@ test("the durable AIO submit carries the identity flags and no --project", async
     expect((result.metadata as any).retry_safe).toBe(true)
     expect((result.metadata as any).job_id).toBe("abc123")
     expect((result.metadata as any).status).toBe("launching")
+    // The task-state recording is clean (the submission was recorded into the binding).
+    expect((result.metadata as any).task_note).toBe("")
     expect(calls.some((c) => c.args.some((a) => a.endsWith("run_workflow.py")))).toBe(false)
   } finally {
     setCommandRunner(null)
@@ -311,6 +314,26 @@ test("a caller-stable request key forwards and a reconciled response is marked",
     expect((result.metadata as any).reconciled).toBe(true)
     expect((result.metadata as any).request_key).toBe("req-9")
     expect((result.metadata as any).job_id).toBe("abc123")
+  } finally {
+    setCommandRunner(null)
+  }
+})
+
+test("a task-state recording failure is surfaced, never silent", async () => {
+  // Unit 3: the submit records the pending job into the durable binding; a failure to
+  // record is REPORTED (the job itself is already durable) — never dropped silently.
+  const { runner } = fakeShell({
+    session_open: () => ({ stdout: FOUND_BINDING }),
+    digest: () => ({ stdout: "b".repeat(64) }),
+    submit: () => ({
+      stdout: fleetSubmit({ task_note: "task state not updated (store_missing: no store)" }),
+    }),
+  })
+  setCommandRunner(runner)
+  try {
+    const result = await (toolDef as any).execute(toolArgs({ orchestrator: true }), ctx("aio-control"))
+    expect(result.output).toContain("TASK STATE")
+    expect((result.metadata as any).task_note).toContain("not updated")
   } finally {
     setCommandRunner(null)
   }

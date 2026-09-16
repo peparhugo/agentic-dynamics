@@ -367,6 +367,9 @@ export default tool({
     const reconciled = Boolean(result.reconciled)
     const effectiveKey = String(result.request_key ?? args.request_key ?? "")
     const prepNote = String(result.prep_note ?? "")
+    // The task-state note: "" means the submission was recorded into the durable binding
+    // (the continuation glue); a non-empty note is a REPORTED, non-fatal failure to record.
+    const taskNote = String(result.task_note ?? "")
     const keyNote = effectiveKey
       ? ` Request key: ${effectiveKey} — reuse it verbatim if this response is ever lost.`
       : ""
@@ -377,11 +380,13 @@ export default tool({
             `Observe it under the SAME identity: control packet (active_runs) or the Control Room.`
           : `Submission accepted by the durable path: job ${jobId}. The broker validates the spec digest (${specSha.slice(0, 12)}…) and admission before the compose call; a QUEUED submit is not a running run — verify the run row exists (control packet, active_runs) before treating the build as started.`) +
         (prepNote ? ` ${prepNote}.` : "") +
+        (taskNote ? ` TASK STATE: ${taskNote}.` : "") +
         keyNote,
       metadata: {
         job_id: jobId,
         reconciled,
         status: String(result.status ?? ""),
+        task_note: taskNote,
         request_key: args.request_key ?? "",
         effective_request_key: effectiveKey,
         retry_safe: !args.request_key,

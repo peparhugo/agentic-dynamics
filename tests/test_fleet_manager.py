@@ -990,3 +990,104 @@ def test_two_successive_continuations_keep_the_canonical_provenance(tmp_path, mo
     )
     assert errors2 == [] and prep2 == gen2.path
     assert fm._stamped_provenance(gen2.path) == token
+
+
+# ── Unit 3: the submission records itself into the existing task state ────────
+
+
+def _binding_store(tmp_path):
+    """A tmp binding store with ONE real binding for ses_aio; returns (store, binding_id)."""
+    from agentic_dynamics.knowledge import session_ingestion as si
+
+    store = tmp_path / "kb"
+    si.init_binding_store(store)
+    written = si.write_binding(
+        {
+            "native_session_id": "ses_aio",
+            "resolved_agent": "aio-control",
+            "task_identity": "unit-3",
+            "original_request": "record the submission into the task state",
+        },
+        artifact_dir=store,
+        publish=False,
+    )
+    assert written.status == si.BINDING_STATUS_CREATED
+    return store, written.knowledge_id
+
+
+def test_a_submission_records_its_job_into_the_task_state(tmp_path, monkeypatch, capsys):
+    """Unit 3: the durable submit writes the pending job + one next action into the EXISTING
+    binding (labeled [auto], version-guarded) — continuation glue without a reminder."""
+    from agentic_dynamics.knowledge import session_ingestion as si
+
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    store, binding_id = _binding_store(tmp_path)
+    monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(store))
+
+    rc = fm.main([
+        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
+        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
+        "--aio-session-id", "ses_aio", "--aio-agent", "aio-control",
+        "--binding-id", binding_id, "--task-revision", "1",
+        "--retry-safe", "--json",
+    ])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert payload["task_note"] == ""  # recorded cleanly
+
+    binding = si.read_binding("ses_aio", artifact_dir=store)
+    assert binding.status == si.BINDING_STATUS_FOUND
+    next_action = str(binding.binding["next_action"])
+    assert "[auto]" in next_action
+    assert payload["job_id"] in next_action
+    assert payload["request_key"] in next_action
+    assert int(binding.binding["context_version"]) == 2
+
+
+def test_a_stale_revision_never_overwrites_the_task_state(tmp_path, monkeypatch, capsys):
+    """The version guard: a submit carrying an OLD task revision reports the failure and
+    leaves the newer binding untouched — a stale session cannot advance the task."""
+    from agentic_dynamics.knowledge import session_ingestion as si
+
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    store, binding_id = _binding_store(tmp_path)
+    monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(store))
+    si.update_binding_context(
+        "ses_aio", context={"next_action": "the newer AIO action"}, expected_version=1,
+        artifact_dir=store,
+    )
+
+    rc = fm.main([
+        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
+        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
+        "--aio-session-id", "ses_aio", "--aio-agent", "aio-control",
+        "--binding-id", binding_id, "--task-revision", "1",
+        "--retry-safe", "--json",
+    ])
+    assert rc == 0  # the submission itself is unaffected (the job is durable)
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert "task state not updated" in payload["task_note"]
+    binding = si.read_binding("ses_aio", artifact_dir=store)
+    assert binding.binding["next_action"] == "the newer AIO action"  # untouched
+
+
+def test_a_submission_without_a_store_reports_the_missing_task_update(monkeypatch, capsys):
+    """A missing store never fails the submission: the note reports it (best-effort glue)."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", "/nonexistent/kb-store")
+    rc = fm.main([
+        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
+        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
+        "--aio-session-id", "ses_aio", "--aio-agent", "aio-control",
+        "--binding-id", "b" * 64, "--task-revision", "1",
+        "--retry-safe", "--json",
+    ])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert "task state not updated" in payload["task_note"]
