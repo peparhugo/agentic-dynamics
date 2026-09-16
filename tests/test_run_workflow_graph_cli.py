@@ -18,6 +18,7 @@ everywhere; ``run_workflow`` / ``load_spec`` are stubbed; nothing touches the ne
 
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -549,6 +550,7 @@ def test_load_resume_state_reads_the_selected_parents_own_ledger(tmp_path, monke
     monkeypatch.setattr(module, "ROOT", tmp_path)
     own = _write_parent_ledger(tmp_path, "demo", "20260912T164142123456Z_run-parent.json", {
         "run_id": "run-parent",
+        "git_sha": "a" * 40,
         "phases": [
             {"phase": "scope", "status": "ok"},
             {"phase": "ux_design", "status": "failed"},
@@ -565,6 +567,52 @@ def test_load_resume_state_reads_the_selected_parents_own_ledger(tmp_path, monke
     assert state.parent_run_id == "run-parent"
     assert state.ledger_path == str(own)
     assert state.completed_phases == frozenset({"scope", "implement"})  # ok only
+    # The parent's candidate (its final committed tree) rides along for the continuity check.
+    assert state.parent_candidate_sha == "a" * 40
+
+
+def test_verify_resume_candidate_requires_the_parents_commits_in_the_tree(tmp_path):
+    """Candidate continuity (reviewer finding, 2026-09-16): the tree a continuation runs
+    from must CONTAIN the parent's candidate commit — a tree without it (e.g. the original
+    source worktree) refuses before any completed phase is inherited."""
+    module = _load_module()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    def _g(*args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            ["git", *args], cwd=str(repo), capture_output=True, text=True
+        )
+
+    _g("init", "-q", "-b", "main")
+    _g("config", "user.email", "t@example.com")
+    _g("config", "user.name", "t")
+    (repo / "a.txt").write_text("x", encoding="utf-8")
+    _g("add", "-A")
+    _g("commit", "-qm", "base")
+    base = _g("rev-parse", "HEAD").stdout.strip()
+
+    def _state(candidate: str, completed: bool) -> object:
+        return module.ResumeState(
+            parent_run_id="run-parent",
+            ledger_path="/x",
+            completed_phases=frozenset({"build"}) if completed else frozenset(),
+            parent_candidate_sha=candidate,
+        )
+
+    # The candidate object is absent from the tree: refuse.
+    errors = module._verify_resume_candidate(repo, _state("0" * 40, completed=True))
+    assert errors and "does not contain" in errors[0]
+
+    # The candidate present and reachable from HEAD: pass.
+    assert module._verify_resume_candidate(repo, _state(base, completed=True)) == []
+
+    # Completed phases but no candidate SHA: refuse (the tree cannot be identified).
+    errors = module._verify_resume_candidate(repo, _state("", completed=True))
+    assert errors and "no candidate SHA" in errors[0]
+
+    # No completed phases: nothing is inherited — no check at all.
+    assert module._verify_resume_candidate(repo, _state("", completed=False)) == []
 
 
 def test_load_resume_state_matches_only_the_exact_run_identity(tmp_path, monkeypatch):
@@ -704,9 +752,25 @@ def test_load_resume_state_refuses_malformed_inherited_lineage(tmp_path, monkeyp
 def test_main_passes_the_parent_snapshot_to_the_engine(tmp_path, monkeypatch):
     """The composition root wires the selected parent's ledger into the engine: a --resume
     with a linked parent calls run_workflow with the explicit ResumeState (not just a
-    boolean)."""
+    boolean). The parent's candidate must EXIST in the resume tree (candidate continuity,
+    2026-09-16) — the workdir is a real repo at the candidate here."""
     module = _load_module()
     monkeypatch.setattr(module, "ROOT", tmp_path)
+
+    # The resume tree: a real repo whose HEAD IS the parent's candidate.
+    workdir = tmp_path / "wt"
+    workdir.mkdir()
+
+    def _g(*args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(["git", *args], cwd=str(workdir), capture_output=True, text=True)
+
+    _g("init", "-q", "-b", "main")
+    _g("config", "user.email", "t@example.com")
+    _g("config", "user.name", "t")
+    (workdir / "phase.txt").write_text("built", encoding="utf-8")
+    _g("add", "-A")
+    _g("commit", "-qm", "[workflow] scope")
+    candidate = _g("rev-parse", "HEAD").stdout.strip()
 
     # A continuable parent row in the hermetic control db (conftest points FINOPS_CONTROL_DB
     # at a per-test file), then its ledger under the patched ROOT.
@@ -717,7 +781,11 @@ def test_main_passes_the_parent_snapshot_to_the_engine(tmp_path, monkeypatch):
     db.close()
     ledger = _write_parent_ledger(
         tmp_path, "demo", f"20260912T164142123456Z_{parent.run_id}.json",
-        {"run_id": parent.run_id, "phases": [{"phase": "scope", "status": "ok"}]},
+        {
+            "run_id": parent.run_id,
+            "git_sha": candidate,
+            "phases": [{"phase": "scope", "status": "ok"}],
+        },
     )
 
     seen = {}
@@ -731,7 +799,7 @@ def test_main_passes_the_parent_snapshot_to_the_engine(tmp_path, monkeypatch):
     monkeypatch.setenv("FINOPS_FACT_AUTO_EMIT", "0")
     monkeypatch.setattr(sys, "argv", [
         "run_workflow.py", "--spec", "x.yaml", "--goal", "g", "--model", "m",
-        "--workdir", str(tmp_path), "--resume",
+        "--workdir", str(workdir), "--resume",
     ])
     module.main()
 
@@ -741,3 +809,53 @@ def test_main_passes_the_parent_snapshot_to_the_engine(tmp_path, monkeypatch):
     assert state.parent_run_id == parent.run_id
     assert state.ledger_path == str(ledger)
     assert state.completed_phases == frozenset({"scope"})
+    assert state.parent_candidate_sha == candidate
+
+
+def test_main_refuses_a_resume_whose_tree_lacks_the_parents_candidate(
+    tmp_path, monkeypatch, capsys
+):
+    """Reviewer reproduction (2026-09-16): continuing on a tree WITHOUT the parent's
+    committed work must REFUSE before any completed phase is inherited — never run the next
+    phase on a tree missing the deliverable and report success."""
+    module = _load_module()
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+
+    workdir = tmp_path / "wt"
+    workdir.mkdir()
+
+    def _g(*args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(["git", *args], cwd=str(workdir), capture_output=True, text=True)
+
+    _g("init", "-q", "-b", "main")
+    _g("config", "user.email", "t@example.com")
+    _g("config", "user.name", "t")
+    (workdir / "a.txt").write_text("x", encoding="utf-8")
+    _g("add", "-A")
+    _g("commit", "-qm", "base")
+
+    db = module._control_db()
+    assert db is not None
+    parent = db.create_run(spec_name="demo", model="m", state=module.RunState.RUNNING)
+    db.transition_run(parent.run_id, module.RunState.FAILED, reason="boom")
+    db.close()
+    _write_parent_ledger(
+        tmp_path, "demo", f"20260912T164142123456Z_{parent.run_id}.json",
+        {
+            "run_id": parent.run_id,
+            "git_sha": "0" * 40,  # NOT present in the workdir
+            "phases": [{"phase": "scope", "status": "ok"}],
+        },
+    )
+
+    monkeypatch.setattr(module, "load_spec_any", lambda p: _stub_spec())
+    monkeypatch.setattr(module, "run_workflow", lambda *a, **k: _stub_result())
+    monkeypatch.setenv("FINOPS_FACT_AUTO_EMIT", "0")
+    monkeypatch.setattr(sys, "argv", [
+        "run_workflow.py", "--spec", "x.yaml", "--goal", "g", "--model", "m",
+        "--workdir", str(workdir), "--resume",
+    ])
+    with pytest.raises(SystemExit) as exc:
+        module.main()
+    assert exc.value.code == 2
+    assert "REFUSED" in capsys.readouterr().err

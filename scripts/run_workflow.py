@@ -69,6 +69,7 @@ from agentic_dynamics.runtime.executor import StepRequest, load_prepared_step  #
 from agentic_dynamics.runtime.run_clone import (  # noqa: E402
     RUN_CLONE_ENV,
     create_run_clone,
+    run_clone_dir,
 )
 from agentic_dynamics.runtime.workflow_runner import (  # noqa: E402
     AWAITING_STATUS,
@@ -424,6 +425,53 @@ def _resolve_workdir_head(workdir: str | Path) -> str | None:
     return proc.stdout.strip()
 
 
+def _git_query(workdir: str | Path, *args: str) -> tuple[int, str]:
+    """One git query for the resume-candidate check; ``(127, detail)`` when git cannot run."""
+    try:
+        proc = subprocess.run(  # noqa: S603 — the composition root's probe
+            ["git", "-C", str(workdir), *args],
+            capture_output=True, text=True, timeout=15,
+        )
+    except Exception as exc:  # noqa: BLE001 — a missing/broken git is a named refusal here
+        return 127, f"git unavailable ({type(exc).__name__}: {exc})"
+    return proc.returncode, ((proc.stdout or "") + (proc.stderr or "")).strip()
+
+
+def _verify_resume_candidate(tree: str | Path, resume_state: ResumeState) -> list[str]:
+    """The parent's candidate must exist in ``tree`` BEFORE its completed phases are inherited.
+
+    A continuation skips the parent's completed phases; the tree it continues from must
+    actually CONTAIN their commits. The parent's commits live in its private clone — the
+    original source worktree does not have them, and continuing there would run the next
+    phase on a tree missing the completed deliverables while reporting success (reviewer
+    reproduction, 2026-09-16). No completed phases = nothing inherited = no check.
+    """
+    if not resume_state.completed_phases:
+        return []
+    tree_path = Path(tree)
+    candidate = str(getattr(resume_state, "parent_candidate_sha", "") or "").strip()
+    if not candidate:
+        return [
+            f"the parent run {resume_state.parent_run_id} records completed phases but no "
+            "candidate SHA — the tree that contains them cannot be identified; refusing to "
+            "inherit them"
+        ]
+    rc, _out = _git_query(tree_path, "cat-file", "-e", f"{candidate}^{{commit}}")
+    if rc != 0:
+        return [
+            f"the resume tree {tree_path} does not contain the parent's candidate "
+            f"{candidate[:12]} — a continuation cannot inherit completed phases from a tree "
+            "that does not contain their commits (the parent's commits live in its own clone)"
+        ]
+    rc, _out = _git_query(tree_path, "merge-base", "--is-ancestor", candidate, "HEAD")
+    if rc != 0:
+        return [
+            f"the parent's candidate {candidate[:12]} is not reachable from {tree_path}'s "
+            "HEAD — refusing to inherit completed phases from a divergent tree"
+        ]
+    return []
+
+
 def _build_orchestrator_executors(
     spec: ExperimentSpec,
     args: argparse.Namespace,
@@ -455,8 +503,17 @@ def _build_orchestrator_executors(
     # 1. The clone is born FIRST — before either executor is constructed. Its path is the
     #    explicit run_clone argument; an executor that read FINOPS_RUN_CLONE from the
     #    environment instead would resolve whatever the ambient env held (NOT this path, which
-    #    is only exported AFTER construction — see below).
-    clone = create_run_clone(run_id, base_sha=_resolve_workdir_head(args.workdir), path_config=path_config)
+    #    is only exported AFTER construction — see below). The clone is created FROM THE
+    #    WORKDIR when the workdir is a repo (candidate continuity, 2026-09-16): a
+    #    continuation's base commits live in its workspace's repository — cloning the
+    #    canonical repo would drop them even when the base sha names them. A non-repo workdir
+    #    (never validated as one at this seam) keeps the historical canonical-repo fallback.
+    workdir_path = Path(args.workdir)
+    clone_source = workdir_path if (workdir_path / ".git").exists() else None
+    clone = create_run_clone(
+        run_id, base_sha=_resolve_workdir_head(args.workdir),
+        source_repo=clone_source, path_config=path_config,
+    )
     run_clone = str(clone.path)
 
     spec_path = f"/repo/{args.spec}"  # the sibling's view (the orchestrator mounts /repo)
@@ -885,6 +942,32 @@ def _run_workflow_cli(
                 "worktree's git history / the spec index (no explicit parent snapshot)",
                 file=sys.stderr,
             )
+
+    # Candidate continuity (reviewer finding, 2026-09-16): BEFORE any completed phase is
+    # inherited, the trees this continuation will run from must CONTAIN the parent's
+    # candidate. Checked on the workdir (the clone source) and, in orchestrator mode, on
+    # the freshly created run clone (the tree the cells actually mount). A tree without the
+    # candidate REFUSES — it would run the next phase on a tree missing the completed work.
+    if resume_state is not None:
+        resume_trees = [Path(args.workdir)]
+        if getattr(args, "orchestrator", False) and control_run_id:
+            clone_path = run_clone_dir(control_run_id)
+            if clone_path.is_dir():
+                resume_trees.append(clone_path)
+        candidate_errors: list[str] = []
+        for tree in resume_trees:
+            candidate_errors.extend(_verify_resume_candidate(tree, resume_state))
+        if candidate_errors:
+            print(f"REFUSED: {candidate_errors[0]}", file=sys.stderr)
+            if control_db is not None and control_run_id is not None:
+                with contextlib.suppress(Exception):
+                    control_db.transition_run(
+                        control_run_id, RunState.CANCELLED,
+                        reason=f"resume candidate unavailable: {candidate_errors[0]}",
+                    )
+                with contextlib.suppress(Exception):
+                    control_db.close()
+            raise SystemExit(2)
 
     # e2 (control_db_evidence): while this process runs the engine, a daemon heartbeat thread
     # proves to the zombie-run sweep that the run is ALIVE. A killed orchestrator stops beating
@@ -1489,6 +1572,10 @@ def _load_resume_state(spec_name: str, parent_run_id: str) -> ResumeState:
         completed_phases=frozenset(completed),
         reached_checkpoints=frozenset(reached),
         inherited_phases=tuple(inherited),
+        # The parent's final committed tree: the composition root verifies it EXISTS in the
+        # tree the continuation runs from before any completed phase is inherited (candidate
+        # continuity, 2026-09-16).
+        parent_candidate_sha=str(payload.get("git_sha") or "").strip(),
     )
 
 

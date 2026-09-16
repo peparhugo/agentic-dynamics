@@ -98,6 +98,30 @@ def test_clone_created_at_runs_root_repo_with_expected_head(tmp_path):
     assert (clone.path / ".git").is_dir()
 
 
+def test_a_clone_from_a_parent_clone_carries_its_detached_candidate(tmp_path):
+    """Candidate continuity (reviewer finding, 2026-09-16): a run clone's phase commits land
+    on a DETACHED head; a continuation clone created FROM that clone must still carry the
+    candidate commit. The composition root passes the workspace as the clone source for
+    exactly this reason — cloning the canonical repo would drop the candidate objects."""
+    repo = _make_source_repo(tmp_path)
+    base_sha = _git("rev-parse", "HEAD", cwd=repo)
+    cfg = _make_cfg(tmp_path, repo)
+
+    parent = create_run_clone("run-parent", base_sha, path_config=cfg)
+    # A phase commit on the parent clone's DETACHED head (the runner's real shape).
+    (parent.path / "phase-deliverable.txt").write_text("built")
+    _git("add", ".", cwd=parent.path)
+    _git("commit", "-q", "-m", "[workflow] build", cwd=parent.path)
+    candidate = _git("rev-parse", "HEAD", cwd=parent.path)
+
+    child = create_run_clone(
+        "run-child", candidate, source_repo=parent.path, path_config=cfg
+    )
+    assert child.base_sha == candidate
+    assert _git("rev-parse", "HEAD", cwd=child.path) == candidate
+    assert (child.path / "phase-deliverable.txt").read_text() == "built"
+
+
 def test_two_run_ids_produce_distinct_clones_never_sharing_metadata(tmp_path):
     """(b) two run ids → two distinct clones; a commit in one is invisible to the other."""
     repo = _make_source_repo(tmp_path)

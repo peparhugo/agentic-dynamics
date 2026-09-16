@@ -630,6 +630,14 @@ class ResumeState:
     #: Carried-over ancestor completions with provenance: one dict per phase with the
     #: ``phase`` / ``from_run_id`` / ``ledger_path`` / ``status`` keys the child ledger records.
     inherited_phases: tuple[dict[str, str], ...] = ()
+    #: ADDED field (candidate continuity, 2026-09-16 — never re-shapes existing ones): the
+    #: parent ledger's ``git_sha``, its final committed tree. The composition root verifies
+    #: this candidate EXISTS in the tree a continuation will run from (and in the fresh run
+    #: clone) BEFORE any completed phase is inherited — a tree that does not contain the
+    #: parent's commits cannot continue its work, and skipping phases against it would run
+    #: the next phase on a tree missing the completed deliverables (reviewer reproduction,
+    #: 2026-09-16). Empty means "no candidate recorded" — a refusal when phases are inherited.
+    parent_candidate_sha: str = ""
 
 
 @dataclass

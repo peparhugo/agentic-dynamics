@@ -59,7 +59,7 @@ export function aioSubmitFlags(
   bindingReport: {
     status?: unknown
     knowledge_id?: unknown
-    binding?: { context_version?: unknown; project?: unknown } | null
+    binding?: { context_version?: unknown; project?: unknown; task_identity?: unknown } | null
   } | null,
 ): { flags: string[]; refuse: string } {
   // The binding gate applies to the AIO actor. A worker / specialized profile keeps the
@@ -100,15 +100,20 @@ export function aioSubmitFlags(
   // accepted --project, and a tool-emitted flag the CLI rejects is a broken connection). The
   // backend resolves the project from the durable binding and validates it against the
   // submitted spec/worktree — the flag would be redundant and unparseable.
-  return {
-    flags: [
-      "--aio-session-id", sessionID,
-      "--aio-agent", String(agent ?? ""),
-      "--binding-id", bindingID,
-      "--task-revision", String(revision),
-    ],
-    refuse: "",
-  }
+  const flags = [
+    "--aio-session-id", sessionID,
+    "--aio-agent", String(agent ?? ""),
+    "--binding-id", bindingID,
+    "--task-revision", String(revision),
+  ]
+  // The LOGICAL TASK identity scopes the retry-safe request key (reviewer finding,
+  // 2026-09-16): the same inputs from a different task/session are a different logical
+  // submission — never the first task's job. An explicit task identity (not the per-session
+  // fallback) also survives session changes: a new session attached to the same task derives
+  // the same key.
+  const taskIdentity = String(bindingReport.binding?.task_identity ?? "").trim()
+  if (taskIdentity) flags.push("--task-identity", taskIdentity)
+  return { flags, refuse: "" }
 }
 
 export default tool({

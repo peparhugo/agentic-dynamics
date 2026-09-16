@@ -482,6 +482,41 @@ def test_an_explicit_key_wins_over_retry_safe():
     assert cmd["request_key"] == "req-explicit"
 
 
+def test_task_identity_scopes_the_retry_key_across_logical_tasks():
+    """Reviewer finding (2026-09-16): identical inputs from a DIFFERENT logical task are a
+    different submission. Retry-safe keys are scoped by the durable task identity (the AIO
+    binding's task_identity): same task = retry reconciles; different task = a new job."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    a1 = _keyed_submit(fm, r, request_key=None, retry_safe=True, task_identity="task-a")
+    a2 = _keyed_submit(fm, r, request_key=None, retry_safe=True, task_identity="task-a")
+    b1 = _keyed_submit(fm, r, request_key=None, retry_safe=True, task_identity="task-b")
+    assert a1["job_id"] == a2["job_id"] and a2["reconciled"] is True
+    assert b1.get("reconciled") is None
+    assert b1["job_id"] != a1["job_id"]
+    assert a1["request_key"] != b1["request_key"]
+    assert b1["task_identity"] == "task-b"
+    assert len(r._lists[fm.COMMANDS_KEY]) == 2  # one command per logical task
+
+
+def test_submit_cli_carries_the_task_identity(tmp_path, monkeypatch, capsys):
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    rc = fm.main([
+        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
+        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
+        "--retry-safe", "--task-identity", "session:ses_x", "--json",
+    ])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert payload["task_identity"] == "session:ses_x"
+    queued = [json.loads(raw) for raw in r._lists[fm.COMMANDS_KEY]]
+    assert queued[0]["task_identity"] == "session:ses_x"
+    record = json.loads(r._hashes[fm.JOBS_KEY][queued[0]["job_id"]])
+    assert record["task_identity"] == "session:ses_x"
+
+
 def test_without_a_key_or_retry_safe_an_identical_submit_is_an_independent_new_run():
     """No key = an independent submission: identical parameters mint a SECOND job — an
     intentional repeat is a new run, never content deduplication."""
@@ -594,23 +629,121 @@ def test_prepare_workspace_refuses_a_non_worktree_candidate(tmp_path, monkeypatc
     assert any("not a git worktree" in e for e in errors)
 
 
-def test_prepare_workspace_reuses_the_parent_runs_workdir(tmp_path, monkeypatch):
-    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
-    path, _n, _e = fm.prepare_workspace(spec="s", goal="g", model="m")
+def _parent_clone(tmp_path, monkeypatch):
+    """A repo + a parent run's PRIVATE CLONE (runs_root/<id>/repo, detached candidate commit)
+    + the parent's ledger. Returns (fm, repo, runs_root, clone, candidate)."""
+    fm, repo, _worktrees = _prep_repo(tmp_path, monkeypatch)
+    runs_root = tmp_path / "runs"
+    runs_root.mkdir()
+    monkeypatch.setenv("FINOPS_RUNS_ROOT", str(runs_root))
+    base_sha = _git("rev-parse", "HEAD", cwd=repo).stdout.strip()
+    clone = runs_root / "run-parent" / "repo"
+    clone.parent.mkdir(parents=True)
+    proc = subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", "--", str(repo), str(clone)],
+        capture_output=True, text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    _git("checkout", "-q", "--detach", base_sha, cwd=clone)
+    (clone / "phase.txt").write_text("built", encoding="utf-8")
+    _git("add", ".", cwd=clone)
+    _git("commit", "-q", "-m", "[workflow] build", cwd=clone)
+    candidate = _git("rev-parse", "HEAD", cwd=clone).stdout.strip()
     ledger_dir = repo / "experiments" / "results" / "workflows" / "demo"
     ledger_dir.mkdir(parents=True)
-    (ledger_dir / "20260916T000000000000Z_run-parent.json").write_text(
-        json.dumps({"workdir": str(path)}), encoding="utf-8"
-    )
-    reused, note, errors = fm.prepare_workspace(
-        spec="s", goal="g", model="m", resume=True, parent_run_id="run-parent"
-    )
-    assert errors == [] and reused == path and "parent run run-parent" in note
+    _write_parent_ledger(ledger_dir, candidate=candidate, completed=True)
+    return fm, repo, runs_root, clone, candidate
 
-    _p, _n, missing = fm.prepare_workspace(
-        spec="s", goal="g", model="m", resume=True, parent_run_id="run-missing"
+
+def _write_parent_ledger(ledger_dir, *, candidate: str, completed: bool) -> None:
+    (ledger_dir / "20260916T000000000000Z_run-parent.json").write_text(
+        json.dumps({
+            "run_id": "run-parent",
+            "git_sha": candidate,
+            "phases": [{"phase": "build", "status": "ok" if completed else "failed"}],
+        }),
+        encoding="utf-8",
     )
-    assert any("no ledger found" in e for e in missing)
+
+
+def test_prepare_workspace_continuation_uses_the_parent_clone_at_the_candidate(
+    tmp_path, monkeypatch
+):
+    """Reviewer finding (2026-09-16): the continuation base is the parent's PRIVATE CLONE —
+    the repository that actually contains its committed phases — at the ledger's candidate
+    SHA. The declared workdir is never the base: its commits are not there."""
+    fm, repo, runs_root, clone, candidate = _parent_clone(tmp_path, monkeypatch)
+    path, note, errors = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-parent"
+    )
+    assert errors == [] and path == clone
+    assert "parent run run-parent" in note and candidate[:12] in note
+
+
+def test_prepare_workspace_continuation_refuses_without_clone_or_candidate(
+    tmp_path, monkeypatch
+):
+    """No silent fallback: a missing clone or a candidate the clone does not contain refuses
+    — the continuation must never start from a tree without the completed work."""
+    import shutil as _shutil
+
+    fm, repo, runs_root, clone, candidate = _parent_clone(tmp_path, monkeypatch)
+    ledger_dir = repo / "experiments" / "results" / "workflows" / "demo"
+
+    # The clone does not contain the declared candidate: refuse.
+    _write_parent_ledger(ledger_dir, candidate="0" * 40, completed=True)
+    _p, _n, errors = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-parent"
+    )
+    assert any("is not present" in e for e in errors)
+
+    # Completed phases but no candidate SHA: refuse (the tree cannot be identified).
+    _write_parent_ledger(ledger_dir, candidate="", completed=True)
+    _p, _n, errors = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-parent"
+    )
+    assert any("no candidate SHA" in e for e in errors)
+
+    # The clone is gone: refuse — never fall back to the source tree.
+    _write_parent_ledger(ledger_dir, candidate=candidate, completed=True)
+    _shutil.rmtree(runs_root / "run-parent")
+    _p, _n, errors = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-parent"
+    )
+    assert any("private clone" in e for e in errors)
+
+    # No ledger at all: refuse with the named parent.
+    _shutil.rmtree(ledger_dir)
+    _p, _n, errors = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-missing"
+    )
+    assert any("no ledger found" in e for e in errors)
+
+
+def test_prepare_workspace_never_reuses_a_stale_workspace(tmp_path, monkeypatch):
+    """Reviewer finding (2026-09-16): a fresh submission is bound to the SELECTED source SHA.
+    A workspace created at an older main tip is not reused (and never reset) — a separate,
+    SHA-suffixed workspace is created beside it and reused thereafter."""
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    first, _n, errors = fm.prepare_workspace(spec="demo.yaml", goal="g", model="m")
+    assert errors == [] and first is not None
+
+    (repo / "advance.txt").write_text("x", encoding="utf-8")
+    _git("add", "-A", cwd=repo)
+    _git("commit", "-m", "advance", cwd=repo)
+    new_main = _git("rev-parse", "HEAD", cwd=repo).stdout.strip()
+
+    second, _note, errors2 = fm.prepare_workspace(spec="demo.yaml", goal="g", model="m")
+    assert errors2 == [] and second is not None and second != first
+    assert second.name.endswith(new_main[:7])
+    assert _git("rev-parse", "HEAD", cwd=second).stdout.strip() == new_main
+    # The stale workspace is left untouched — never reset to fit.
+    assert first.exists()
+    assert _git("rev-parse", "HEAD", cwd=first).stdout.strip() != new_main
+
+    # A repeated fresh submission at the same main reuses the suffixed workspace.
+    third, _n3, errors3 = fm.prepare_workspace(spec="demo.yaml", goal="g", model="m")
+    assert errors3 == [] and third == second
 
 
 def test_submit_cli_json_result_is_structured(monkeypatch, capsys):
@@ -647,3 +780,60 @@ def test_submit_cli_prepares_a_workspace_when_workdir_is_omitted(tmp_path, monke
     assert payload["workdir"].startswith(str(worktrees))
     assert "prepared" in payload["prep_note"]
     assert Path(payload["workdir"]).exists()
+
+
+def test_submit_cli_retry_skips_workspace_preparation(tmp_path, monkeypatch, capsys):
+    """A retry must NEVER re-resolve the workspace: with the key present, preparation is
+    skipped entirely (nothing runs) — the same job reconciles even after main advances."""
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    argv = [
+        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g",
+        "--model", "m", "--retry-safe", "--json",
+    ]
+    assert fm.main(argv) == 0
+    first = json.loads(capsys.readouterr().out.strip())
+    first_path = first["workdir"]
+
+    (repo / "advance.txt").write_text("x", encoding="utf-8")
+    _git("add", "-A", cwd=repo)
+    _git("commit", "-m", "advance", cwd=repo)
+
+    assert fm.main(argv) == 0
+    retry = json.loads(capsys.readouterr().out.strip())
+    assert retry["job_id"] == first["job_id"] and retry["reconciled"] is True
+    assert retry["workdir"] == first_path
+    assert "retry: reconciling" in retry["prep_note"]
+    # Exactly one workspace (no SHA-suffixed sibling was created) and one queued command.
+    made = sorted(p.name for p in worktrees.iterdir())
+    assert made == [Path(first_path).name]
+    assert len(r._lists[fm.COMMANDS_KEY]) == 1
+
+
+def test_submit_cli_new_key_after_main_advances_gets_a_fresh_workspace(
+    tmp_path, monkeypatch, capsys
+):
+    """Reviewer repro (2026-09-16): a deliberate new submission (a NEW key) after main
+    advances must get a workspace AT the new tip — never the stale one."""
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    argv = [
+        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g",
+        "--model", "m", "--retry-safe", "--json",
+    ]
+    assert fm.main(argv) == 0
+    first = json.loads(capsys.readouterr().out.strip())
+
+    (repo / "advance.txt").write_text("x", encoding="utf-8")
+    _git("add", "-A", cwd=repo)
+    _git("commit", "-m", "advance", cwd=repo)
+    new_main = _git("rev-parse", "HEAD", cwd=repo).stdout.strip()
+
+    assert fm.main([*argv[:-1], "--request-key", "fresh-1", "--json"]) == 0
+    second = json.loads(capsys.readouterr().out.strip())
+    assert second["reconciled"] is False
+    assert second["workdir"] != first["workdir"]
+    assert second["workdir"].endswith(new_main[:7])
+    assert Path(second["workdir"]).exists()

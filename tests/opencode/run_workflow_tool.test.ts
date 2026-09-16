@@ -77,7 +77,7 @@ const FOUND_BINDING = JSON.stringify({
   schema: "session-binding/v1",
   status: "found",
   knowledge_id: BINDING_ID,
-  binding: { context_version: 1 },
+  binding: { context_version: 1, task_identity: "task:demo" },
 })
 
 test("a bound AIO in-process run refuses on a validator refusal, without the retired capacity flag", async () => {
@@ -205,6 +205,9 @@ test("the durable AIO submit carries the identity flags and no --project", async
     expect(submit!.args).toContain("--binding-id")
     expect(submit!.args).toContain(BINDING_ID)
     expect(submit!.args).not.toContain("--project")
+    // The LOGICAL TASK identity scopes the retry-safe key (reviewer finding, 2026-09-16).
+    expect(submit!.args).toContain("--task-identity")
+    expect(submit!.args).toContain("task:demo")
     expect(submit!.args).toContain("--workdir")
     // The structured result is the requested interface.
     expect(submit!.args).toContain("--json")
