@@ -80,13 +80,13 @@ const FOUND_BINDING = JSON.stringify({
   binding: { context_version: 1 },
 })
 
-test("a bound AIO in-process run refuses when the REAL validator reports CLOSE", async () => {
+test("a bound AIO in-process run refuses on a validator refusal, without the retired capacity flag", async () => {
   const { runner, calls } = fakeShell({
     session_open: () => ({ stdout: FOUND_BINDING }),
     validate: () => ({
       stdout: JSON.stringify({
         ok: false,
-        errors: ["submit: AIO session budget verdict is CLOSE — new consequential work is blocked"],
+        errors: ["submit: no durable AIO binding for session 'ses_tool' (status missing) — an unbound AIO submit is refused"],
       }),
       exitCode: 2,
     }),
@@ -96,13 +96,41 @@ test("a bound AIO in-process run refuses when the REAL validator reports CLOSE",
   try {
     const result = await (toolDef as any).execute(toolArgs(), ctx("aio-control"))
     expect(result.output).toContain("refused")
-    expect(result.output).toContain("CLOSE")
     // ZERO executor calls: the local runner never ran.
     expect(calls.some((c) => c.args.some((a) => a.endsWith("run_workflow.py")))).toBe(false)
-    // The validator was asked with the real gate flags.
+    // The validator was asked with the real gate flag — and NOT the retired capacity flag
+    // (2026-09-16 policy: conversation capacity is advisory, never an admission refusal).
     const validator = calls.find((c) => c.args.some((a) => a.endsWith("spawn_wrapper.py")))
-    expect(validator?.args).toContain("--strict-aio-budget")
     expect(validator?.args).toContain("--require-deterministic")
+    expect(validator?.args).not.toContain("--strict-aio-budget")
+  } finally {
+    setCommandRunner(null)
+  }
+})
+
+test("a capacity advisory rides the result and never refuses", async () => {
+  const { runner, calls } = fakeShell({
+    session_open: () => ({ stdout: FOUND_BINDING }),
+    validate: () => ({
+      stdout: JSON.stringify({
+        ok: true,
+        errors: [],
+        aio_capacity: {
+          verdict: "COMPACT",
+          reason: "at the native boundary",
+          measured: true,
+          advisory: true,
+        },
+      }),
+    }),
+    run: () => ({ stdout: "workflow completed" }),
+  })
+  setCommandRunner(runner)
+  try {
+    const result = await (toolDef as any).execute(toolArgs(), ctx("aio-control"))
+    expect(result.output).toContain("workflow completed")
+    expect((result.metadata as any).aio_capacity?.verdict).toBe("COMPACT")
+    expect(calls.some((c) => c.args.some((a) => a.endsWith("run_workflow.py")))).toBe(true)
   } finally {
     setCommandRunner(null)
   }
@@ -141,15 +169,35 @@ test("a worker skips the AIO gate and keeps the local path", async () => {
   }
 })
 
+/** The fleet-submit/v1 document the manager emits (the durable interface, never a log line). */
+function fleetSubmit(overrides: Record<string, unknown> = {}) {
+  return JSON.stringify({
+    schema: "fleet-submit/v1",
+    job_id: "abc123",
+    reconciled: false,
+    status: "launching",
+    request_key: "",
+    spec: "workflows/repository/fleet_job_submission.yaml",
+    spec_sha256: "b".repeat(64),
+    goal: "g",
+    model: "openai/gpt-6-astra",
+    workdir: "/tmp/wt_tool_entry",
+    resume: false,
+    parent_run_id: "",
+    prep_note: "",
+    ...overrides,
+  })
+}
+
 test("the durable AIO submit carries the identity flags and no --project", async () => {
   const { runner, calls } = fakeShell({
     session_open: () => ({ stdout: FOUND_BINDING }),
     digest: () => ({ stdout: "b".repeat(64) }),
-    submit: () => ({ stdout: "fleet:commands <- {}\nfleet:jobs[abc123] <- launching" }),
+    submit: () => ({ stdout: fleetSubmit() }),
   })
   setCommandRunner(runner)
   try {
-    await (toolDef as any).execute(toolArgs({ orchestrator: true }), ctx("aio-control"))
+    const result = await (toolDef as any).execute(toolArgs({ orchestrator: true }), ctx("aio-control"))
     const submit = calls.find((c) => c.args.some((a) => a.endsWith("fleet_manager.py")))
     expect(submit).toBeDefined()
     expect(submit!.args).toContain("--aio-session-id")
@@ -157,7 +205,109 @@ test("the durable AIO submit carries the identity flags and no --project", async
     expect(submit!.args).toContain("--binding-id")
     expect(submit!.args).toContain(BINDING_ID)
     expect(submit!.args).not.toContain("--project")
+    expect(submit!.args).toContain("--workdir")
+    // The structured result is the requested interface.
+    expect(submit!.args).toContain("--json")
+    // The ordinary path is RETRY-SAFE by default: the fleet derives and retains the request
+    // identity before sending — the AIO does not have to remember anything.
+    expect(submit!.args).toContain("--retry-safe")
+    expect(submit!.args).not.toContain("--request-key")
+    expect((result.metadata as any).reconciled).toBe(false)
+    expect((result.metadata as any).retry_safe).toBe(true)
+    expect((result.metadata as any).job_id).toBe("abc123")
+    expect((result.metadata as any).status).toBe("launching")
     expect(calls.some((c) => c.args.some((a) => a.endsWith("run_workflow.py")))).toBe(false)
+  } finally {
+    setCommandRunner(null)
+  }
+})
+
+test("an omitted workdir rides through — the fleet prepares the workspace", async () => {
+  const { runner, calls } = fakeShell({
+    session_open: () => ({ stdout: FOUND_BINDING }),
+    digest: () => ({ stdout: "b".repeat(64) }),
+    submit: () => ({
+      stdout: fleetSubmit({
+        workdir: "/tmp/wtroot/wt_spec_1234abcd",
+        prep_note: "workspace prepared: /tmp/wtroot/wt_spec_1234abcd (branch wt_spec_1234abcd, base main)",
+      }),
+    }),
+  })
+  setCommandRunner(runner)
+  try {
+    const result = await (toolDef as any).execute(
+      toolArgs({ orchestrator: true, workdir: undefined }), ctx("aio-control"),
+    )
+    const submit = calls.find((c) => c.args.some((a) => a.endsWith("fleet_manager.py")))
+    expect(submit!.args).not.toContain("--workdir")
+    expect((result.metadata as any).workdir).toBe("/tmp/wtroot/wt_spec_1234abcd")
+    expect((result.metadata as any).prep_note).toContain("workspace prepared")
+    expect(result.output).toContain("workspace prepared")
+  } finally {
+    setCommandRunner(null)
+  }
+})
+
+test("an in-process run without a workdir refuses before execution", async () => {
+  const { runner, calls } = fakeShell({
+    session_open: () => ({ stdout: FOUND_BINDING }),
+    run: () => ({ stdout: "SHOULD NOT RUN" }),
+  })
+  setCommandRunner(runner)
+  try {
+    const result = await (toolDef as any).execute(
+      toolArgs({ orchestrator: false, workdir: undefined }), ctx("aio-control"),
+    )
+    expect(result.output).toContain("explicit workdir")
+    expect(calls.some((c) => c.args.some((a) => a.endsWith("run_workflow.py")))).toBe(false)
+  } finally {
+    setCommandRunner(null)
+  }
+})
+
+test("the ordinary path surfaces the fleet-derived request key for retention", async () => {
+  const DERIVED = "auto:" + "c".repeat(32)
+  const { runner, calls } = fakeShell({
+    session_open: () => ({ stdout: FOUND_BINDING }),
+    digest: () => ({ stdout: "b".repeat(64) }),
+    submit: () => ({ stdout: fleetSubmit({ request_key: DERIVED }) }),
+  })
+  setCommandRunner(runner)
+  try {
+    const result = await (toolDef as any).execute(toolArgs({ orchestrator: true }), ctx("aio-control"))
+    const submit = calls.find((c) => c.args.some((a) => a.endsWith("fleet_manager.py")))
+    expect(submit!.args).toContain("--retry-safe")
+    // The effective (derived) key is echoed so a lost-response retry can reuse it verbatim.
+    expect((result.metadata as any).effective_request_key).toBe(DERIVED)
+    expect(result.output).toContain(DERIVED)
+  } finally {
+    setCommandRunner(null)
+  }
+})
+
+test("a caller-stable request key forwards and a reconciled response is marked", async () => {
+  const { runner, calls } = fakeShell({
+    session_open: () => ({ stdout: FOUND_BINDING }),
+    digest: () => ({ stdout: "b".repeat(64) }),
+    submit: () => ({
+      stdout: fleetSubmit({ reconciled: true, status: "launching", request_key: "req-9" }),
+    }),
+  })
+  setCommandRunner(runner)
+  try {
+    const result = await (toolDef as any).execute(
+      toolArgs({ orchestrator: true, request_key: "req-9" }), ctx("aio-control"),
+    )
+    const submit = calls.find((c) => c.args.some((a) => a.endsWith("fleet_manager.py")))
+    expect(submit!.args).toContain("--request-key")
+    expect(submit!.args).toContain("req-9")
+    // An EXPLICIT key wins over the retry-safe default.
+    expect(submit!.args).not.toContain("--retry-safe")
+    // A reconciled retry says so — nothing new was queued and the same identity carries on.
+    expect(result.output).toContain("RECONCILED")
+    expect((result.metadata as any).reconciled).toBe(true)
+    expect((result.metadata as any).request_key).toBe("req-9")
+    expect((result.metadata as any).job_id).toBe("abc123")
   } finally {
     setCommandRunner(null)
   }

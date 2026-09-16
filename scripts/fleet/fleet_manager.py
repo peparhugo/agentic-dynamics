@@ -40,8 +40,10 @@ the visibility the bare ``setsid nohup`` workers never had.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import subprocess
 import sys
 import time
 import uuid
@@ -50,6 +52,14 @@ from pathlib import Path
 
 # scripts/fleet/ -> add scripts/ to the path, then reuse the shared bootstrap.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+# The repo root + src/ (the same clean-environment bootstrap spawn_wrapper applies): the
+# preparation path resolves the shared PathConfig so the derived workspace lands under the
+# SAME worktrees root the exec boundary validates against.
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+if str(_REPO_ROOT / "src") not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 import broker_contract  # noqa: E402  (scripts/fleet/ is this module's dir)
 import dlq  # noqa: E402  (scripts/fleet/ is this module's dir)
@@ -68,6 +78,13 @@ COMMANDS_KEY = "fleet:commands"
 #: "launching" at submit time; the orchestrator/downstream tooling would write "running"/
 #: "completed"/"failed" as those are observed), not recomputed wholesale on each watch cycle.
 JOBS_KEY = "fleet:jobs"
+#: The caller-stable request index (2026-09-16 delivery simplification, Unit 2): one hash field
+#: per ``request_key`` -> ``job_id``. A submit that names a request key claims it atomically
+#: with its LPUSH; a RETRY with the same key reconciles to the existing job instead of minting
+#: a second one. The key is explicitly caller-supplied — this is NOT content deduplication
+#: (identical goal text may be an intentional new run); a caller that wants a new run mints a
+#: new key, a caller retrying an ambiguous submit reuses its retained key.
+REQUESTS_KEY = "fleet:requests"
 #: The docs-drift row (``automatic_docs_sync`` p2). Written by
 #: ``scripts/docs_drift_watchdog.py`` on its own cadence and merged into the board snapshot
 #: here, for exactly the reason JOBS_KEY is separate: this watcher rebuilds BOARD_KEY
@@ -173,6 +190,20 @@ def _docs_drift_row(client: redis.Redis) -> dict:
     return row if isinstance(row, dict) else {}
 
 
+def _job_launch_record(command: dict) -> dict:
+    """The board's "launching" record for a submit command (the request key rides along)."""
+    record = {
+        "job_id": command["job_id"],
+        "spec": command["spec"],
+        "model": command["model"],
+        "status": "launching",
+        "ts": command["ts"],
+    }
+    if command.get("request_key"):
+        record["request_key"] = command["request_key"]
+    return record
+
+
 def record_job_launch(client: redis.Redis, command: dict) -> dict:
     """Write a submitted job's "launching" record onto the board (``fleet:jobs``).
 
@@ -182,15 +213,263 @@ def record_job_launch(client: redis.Redis, command: dict) -> dict:
     not wait for or assume any of that (submit is fire-and-forget onto the queue, matching
     resize/drain/restart's own "LPUSH and return" shape).
     """
-    record = {
-        "job_id": command["job_id"],
-        "spec": command["spec"],
-        "model": command["model"],
-        "status": "launching",
-        "ts": command["ts"],
-    }
+    record = _job_launch_record(command)
     client.hset(JOBS_KEY, mapping={command["job_id"]: json.dumps(record)})
     return record
+
+
+class RequestKeyConflictError(ValueError):
+    """A caller-stable request key was reused for a DIFFERENT submission.
+
+    Reconciliation compares the FULL execution-relevant fingerprint (spec path AND digest,
+    goal, model, worktree, continuation, admission/execution settings) — a key reused with
+    any changed input is a different request and refuses loudly (reviewer finding,
+    2026-09-16: comparing the spec filename alone silently discarded edited requests).
+    """
+
+
+class RequestKeyUnresolvedError(ValueError):
+    """A stored request identity cannot be verified — the evidence is missing/corrupt.
+
+    When the retained entry carries no fingerprint (missing evidence), the retry is neither
+    reconciled nor re-queued: an explicit unresolved state refuses loudly, naming the key.
+    """
+
+
+def request_fingerprint(
+    *,
+    spec: str,
+    goal: str,
+    model: str,
+    workdir: str,
+    image: str | None = None,
+    spec_sha256: str | None = None,
+    resume: bool = False,
+    parent_run_id: str | None = None,
+    admission: dict | None = None,
+    execution: dict | None = None,
+) -> str:
+    """The canonical fingerprint of a submission's EXECUTION-RELEVANT inputs.
+
+    Retained alongside the request identity at claim time and compared at reconcile time: a
+    retry reconciles only when every execution-relevant input matches; any change is a
+    different request. The AIO binding identity is deliberately NOT part of the fingerprint —
+    a legitimate retry after re-binding/compaction carries a newer task revision and must
+    still reconcile. Declared inputs only (the tool always supplies ``spec_sha256``; a caller
+    that omits it cannot see a same-path edit — the digest is what catches that).
+    """
+    payload = {
+        "spec": str(spec or ""),
+        "goal": str(goal or ""),
+        "model": str(model or ""),
+        "workdir": str(workdir or ""),
+        "image": str(image or ""),
+        "spec_sha256": str(spec_sha256 or ""),
+        "resume": bool(resume),
+        "parent_run_id": str(parent_run_id or ""),
+        "admission": admission or {},
+        "execution": execution or {},
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _parse_request_entry(raw: str, key: str) -> dict:
+    """Parse a stored request entry ``{job_id, fingerprint}``; missing evidence refuses.
+
+    An unparseable entry or one without a fingerprint is the explicit UNRESOLVED state — the
+    retry cannot be verified against anything, and silently reconciling it (or silently
+    re-queueing it) would be exactly the ambiguity the request key exists to remove.
+    """
+    try:
+        entry = json.loads(raw)
+    except (TypeError, ValueError) as exc:
+        raise RequestKeyUnresolvedError(
+            f"request key {key!r} has an unreadable stored identity ({exc}) — cannot verify "
+            "this retry; resolve it from the board or mint a new key"
+        ) from exc
+    if not isinstance(entry, dict) or not entry.get("job_id") or not entry.get("fingerprint"):
+        raise RequestKeyUnresolvedError(
+            f"request key {key!r} carries no stored fingerprint (missing evidence) — cannot "
+            "verify this retry; resolve it from the board or mint a new key"
+        )
+    return entry
+
+
+# ── The workspace preparation path (Unit 2) ────────────────────────────────────
+#
+# A submit may OMIT --workdir: the preparation path selects/creates the workspace using the
+# existing worktree support, instead of every caller assembling one by hand. The derived
+# name is DETERMINISTIC for the request's pre-workdir identity, so a retry-safe
+# resubmission resolves the SAME candidate path and reconciles by key (no second workspace,
+# no mutation). An omitted --workdir on a continuation (--resume --parent-run-id) reuses the
+# parent run's own workdir from its ledger. A pre-existing candidate that is not this repo's
+# CLEAN worktree refuses loudly — never mutated to fit.
+
+
+def _workspace_identity_digest(
+    *,
+    spec: str,
+    goal: str,
+    model: str,
+    image: str | None = None,
+    spec_sha256: str | None = None,
+    resume: bool = False,
+    parent_run_id: str | None = None,
+    admission: dict | None = None,
+    execution: dict | None = None,
+) -> str:
+    """The PRE-workdir digest that names the derived workspace (stable across a retry)."""
+    payload = {
+        "spec": str(spec or ""), "goal": str(goal or ""), "model": str(model or ""),
+        "image": str(image or ""), "spec_sha256": str(spec_sha256 or ""),
+        "resume": bool(resume), "parent_run_id": str(parent_run_id or ""),
+        "admission": admission or {}, "execution": execution or {},
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _git_run(*args: str, cwd: Path, timeout: int = 120) -> tuple[int, str]:
+    """One git call for the preparation path; a missing/broken git is a named refusal."""
+    try:
+        proc = subprocess.run(  # noqa: S603 — the submission tier owns workspace preparation
+            ["git", *args], cwd=str(cwd), capture_output=True, text=True, timeout=timeout,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return 127, f"git unavailable ({type(exc).__name__}: {exc})"
+    return proc.returncode, ((proc.stdout or "") + (proc.stderr or "")).strip()
+
+
+def _derived_workspace_path(spec: str, digest: str) -> Path:
+    """The deterministic workspace path for a request: worktrees_root/wt_<spec>_<digest8>."""
+    from agentic_dynamics.core.paths import PathConfig
+
+    worktrees_root = Path(PathConfig.from_env(require_existing=False).worktrees_root)
+    stem = "".join(
+        c if (c.isalnum() or c in "-_") else "_" for c in Path(str(spec or "run")).stem
+    )[:48] or "run"
+    return worktrees_root / f"wt_{stem}_{digest[:8]}"
+
+
+def _parent_run_workdir(parent_run_id: str) -> Path | None:
+    """The parent run's workdir from its ledger (the pinned continuation workspace)."""
+    root = Path(_REPO_ROOT) / "experiments" / "results" / "workflows"
+    try:
+        ledgers = sorted(root.glob(f"*/*_{parent_run_id}.json"))
+    except OSError:
+        return None
+    for ledger in ledgers:
+        try:
+            data = json.loads(ledger.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        workdir = str(data.get("workdir") or "").strip()
+        if workdir:
+            return Path(workdir)
+    return None
+
+
+def prepare_workspace(
+    *,
+    spec: str,
+    goal: str,
+    model: str,
+    image: str | None = None,
+    spec_sha256: str | None = None,
+    resume: bool = False,
+    parent_run_id: str | None = None,
+    admission: dict | None = None,
+    execution: dict | None = None,
+) -> tuple[Path | None, str, list[str]]:
+    """Resolve the workspace for a submit that omits --workdir: ``(path, note, errors)``.
+
+    A continuation reuses the parent run's workdir (from its ledger). Otherwise the derived
+    path is reused when it is this repo's clean worktree, and CREATED (branch ``wt_<name>``
+    at the repo's main tip — the base the deployment probe requires) when absent. Errors are
+    named refusals; the caller prints them and submits nothing.
+    """
+    if resume and str(parent_run_id or "").strip():
+        parent = _parent_run_workdir(str(parent_run_id))
+        if parent is None:
+            return None, "", [
+                f"submit: no ledger found for parent run {parent_run_id!r} to reuse its "
+                "workdir — pass --workdir explicitly for this continuation"
+            ]
+        if not (parent / ".git").exists():
+            return None, "", [
+                f"submit: the parent run's workdir {parent} is not a git worktree — pass "
+                "--workdir explicitly for this continuation"
+            ]
+        return parent, f"workspace reused from parent run {parent_run_id}: {parent}", []
+
+    digest = _workspace_identity_digest(
+        spec=spec, goal=goal, model=model, image=image, spec_sha256=spec_sha256,
+        resume=resume, parent_run_id=parent_run_id, admission=admission, execution=execution,
+    )
+    path = _derived_workspace_path(spec, digest)
+    if path.exists():
+        if not (path / ".git").exists():
+            return None, "", [
+                f"submit: the derived workspace {path} exists but is not a git worktree — "
+                "refusing to reuse or overwrite it; pass an explicit --workdir or move it aside"
+            ]
+        rc, out = _git_run("status", "--porcelain", cwd=path)
+        if rc != 0:
+            return None, "", [
+                f"submit: the derived workspace {path} is not a readable git worktree "
+                f"({out or 'git status failed'}) — pass an explicit --workdir"
+            ]
+        if out.strip():
+            return None, "", [
+                f"submit: the derived workspace {path} has uncommitted changes (a likely "
+                "interrupted run) — refusing to mutate it; inspect it, clean it, or pass an "
+                "explicit --workdir"
+            ]
+        return path, f"workspace reused: {path}", []
+
+    repo_root = Path(_REPO_ROOT)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        return None, "", [f"submit: cannot create the worktrees root {path.parent} ({exc})"]
+    branch = path.name
+    rc, out = _git_run("worktree", "add", "-b", branch, str(path), "main", cwd=repo_root)
+    if rc != 0 and "already exists" in out:
+        # A leftover branch from a removed worktree: check the branch out at the path
+        # instead of resetting it (-B would move the branch under any existing commits).
+        rc, out = _git_run("worktree", "add", str(path), branch, cwd=repo_root)
+    if rc != 0:
+        return None, "", [
+            f"submit: workspace preparation failed ({out or 'git worktree add failed'}) — "
+            "pass an explicit --workdir"
+        ]
+    return path, f"workspace prepared: {path} (branch {branch}, base main)", []
+
+
+#: The request-keyed submit, ATOMICALLY (one server-side script): the request->job
+#: association, the command LPUSH, and the board record commit together — a key is either
+#: fully claimed-and-queued, or not claimed at all. A concurrent same-key submitter observes
+#: the winner's identity and reconciles; a retry can never double-queue. Keys[1] stores the
+#: JSON entry ``{job_id, fingerprint}`` (the fingerprint is the reconcile evidence — it must
+#: survive even when the board record does not). Returns ``{first, record_json}``: the NEW
+#: job id on the claim path; the EXISTING entry JSON on the reconcile path (the record follows
+#: separately, empty when the board record is missing/unreadable).
+_SUBMIT_LUA = """
+local existing = redis.call('HGET', KEYS[1], ARGV[1])
+if existing then
+  local ok, entry = pcall(cjson.decode, existing)
+  if ok and type(entry) == 'table' and entry['job_id'] then
+    return {existing, redis.call('HGET', KEYS[3], tostring(entry['job_id'])) or ''}
+  end
+  -- Corrupt/legacy evidence rides back raw; the caller refuses it as UNRESOLVED.
+  return {existing, ''}
+end
+redis.call('HSET', KEYS[1], ARGV[1], ARGV[5])
+redis.call('LPUSH', KEYS[2], ARGV[3])
+redis.call('HSET', KEYS[3], ARGV[2], ARGV[4])
+return {ARGV[2], ARGV[4]}
+"""
 
 
 def record_job_status(client: redis.Redis, job_id: str, status: str, **fields) -> dict:
@@ -295,7 +574,9 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
                          parent_run_id: str | None = None,
                          admission: dict | None = None,
                          execution: dict | None = None,
-                         aio: dict | None = None) -> dict:
+                         aio: dict | None = None,
+                         request_key: str | None = None,
+                         retry_safe: bool = False) -> dict:
     """LPUSH a submit command onto ``fleet:commands`` and record its "launching" board entry.
 
     The fleet-manager mints the ``job_id`` (the board's join key) but does NOT validate the
@@ -304,6 +585,19 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
     supervisor. Nothing here refuses a concurrent submit for the same or another spec; there is
     no lock (the design's "ZERO refusing of concurrency" rule) — every submit is independently
     LPUSHed and independently validated when it is popped.
+
+    ``request_key`` (2026-09-16, Unit 2) is the caller-stable retry identity: when supplied,
+    the association + LPUSH + board record commit ATOMICALLY (one server-side script). A
+    retry with the SAME key reconciles ONLY when the FULL execution-relevant fingerprint
+    matches — any changed input (spec digest, goal, model, worktree, continuation,
+    admission/execution settings) refuses (:class:`RequestKeyConflictError`), and a stored
+    entry without a fingerprint is an explicit unresolved state
+    (:class:`RequestKeyUnresolvedError`). ``retry_safe=True`` (the ordinary tool path)
+    derives the key from that fingerprint when the caller supplied none, so an identical
+    retry reconciles without the caller having to retain anything; an explicit
+    ``request_key`` always wins (that is how a caller FORCES an independent new run of
+    identical inputs). Neither = the caller wants an independent submission (identical goal
+    text may be an intentional new run — this is not content deduplication).
 
     ``image`` (p3_base_image_caching) is the optional per-job image the submitted spec's phase
     cells should run — the fleet-manager passes it through UNCHECKED, same as every other
@@ -348,6 +642,58 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
     if aio:
         command["actor"] = "aio"
         command["aio"] = dict(aio)
+    key = str(request_key or "").strip() or None
+    fingerprint = request_fingerprint(
+        spec=spec, goal=goal, model=model, workdir=workdir, image=image,
+        spec_sha256=spec_sha256, resume=resume, parent_run_id=parent_run_id,
+        admission=admission, execution=execution,
+    )
+    if key is None and retry_safe:
+        # The ordinary path retains its OWN identity before sending: the derived key is
+        # stable across an identical retry (same execution-relevant inputs), so a lost
+        # response reconciles without the caller having to remember anything.
+        key = f"auto:{fingerprint[:32]}"
+    if key:
+        command["request_key"] = key
+    if key:
+        entry = json.dumps({"job_id": command["job_id"], "fingerprint": fingerprint})
+        result = client.eval(
+            _SUBMIT_LUA, 3, REQUESTS_KEY, COMMANDS_KEY, JOBS_KEY,
+            key, command["job_id"], json.dumps(command),
+            json.dumps(_job_launch_record(command)), entry,
+        )
+        first = str(result[0] or "")
+        if first and first != command["job_id"]:
+            # The reconcile path: this key already names a job. Never queue a second command
+            # — reconcile ONLY against a matching full fingerprint (any changed input is a
+            # different request), and refuse explicitly when the stored evidence is missing.
+            existing = _parse_request_entry(first, key)
+            if existing["fingerprint"] != fingerprint:
+                raise RequestKeyConflictError(
+                    f"request key {key!r} already maps to job {existing['job_id']} for a "
+                    "DIFFERENT request (the execution-relevant fingerprint changed: spec, "
+                    "digest, goal, model, worktree, continuation, admission, or execution "
+                    "settings) — a request key identifies ONE submission; a changed request "
+                    "needs a new key"
+                )
+            raw_record = str(result[1] or "")
+            try:
+                record = json.loads(raw_record) if raw_record else {}
+            except (TypeError, ValueError):
+                record = {}
+            if not isinstance(record, dict) or not record:
+                # Same request (fingerprint proven), but the board record is gone: reconcile
+                # the identity and say the lifecycle is unknown — never fabricate a status.
+                record = {
+                    "job_id": existing["job_id"],
+                    "status": "unknown",
+                    "board_record": "missing",
+                }
+            record["job_id"] = existing["job_id"]
+            record["request_key"] = key
+            record["reconciled"] = True
+            return record
+        return command
     client.lpush(COMMANDS_KEY, json.dumps(command))
     record_job_launch(client, command)
     return command
@@ -373,7 +719,13 @@ def main(argv: list[str] | None = None) -> int:
     p_submit.add_argument("--spec", required=True, help="spec path, e.g. workflows/repository/<name>.yaml")
     p_submit.add_argument("--goal", required=True)
     p_submit.add_argument("--model", required=True)
-    p_submit.add_argument("--workdir", required=True, help="a worktree path under FINOPS_WORKTREE_ROOT")
+    p_submit.add_argument("--workdir", default=None,
+                          help="a worktree path under FINOPS_WORKTREE_ROOT; OMITTED, the "
+                               "preparation path selects/creates one (deterministic name, "
+                               "reused across an identical retry; a continuation reuses the "
+                               "parent run's workdir)")
+    p_submit.add_argument("--json", action="store_true",
+                          help="emit the machine result (fleet-submit/v1) instead of human lines")
     p_submit.add_argument("--image", default=None,
                           help="optional per-job image for the spec's phase cells "
                                "(fleet/job-<name>, built via scripts/fleet/build.sh job <name> "
@@ -430,6 +782,17 @@ def main(argv: list[str] | None = None) -> int:
     p_submit.add_argument("--task-revision", type=int, default=None,
                           help="the binding's task/acceptance context version (stale revisions "
                                "are refused)")
+    p_submit.add_argument("--request-key", default=None,
+                          help="a caller-stable request key: a retry with the SAME key "
+                               "reconciles to the existing job instead of minting a second one "
+                               "(retain the key before sending; reuse it after an ambiguous or "
+                               "lost submit response). Reconciliation compares the FULL "
+                               "execution-relevant fingerprint — a changed request refuses.")
+    p_submit.add_argument("--retry-safe", action="store_true",
+                          help="derive the request key from the submission's execution-"
+                               "relevant inputs (the ordinary tool path sets this when the "
+                               "caller supplied no explicit key): an identical retry "
+                               "reconciles automatically; an explicit --request-key wins")
 
     parser.add_argument("--interval", type=float, default=DEFAULT_INTERVAL)
     parser.add_argument("--once", action="store_true")
@@ -516,14 +879,64 @@ def main(argv: list[str] | None = None) -> int:
                 "binding_id": args.binding_id or "",
                 "task_revision": args.task_revision,
             }
-        cmd = _send_submit_command(
-            client, spec=args.spec, goal=args.goal, model=args.model, workdir=args.workdir,
-            image=args.image, spec_sha256=args.spec_sha256, resume=args.resume,
-            parent_run_id=args.parent_run_id, admission=admission, execution=execution,
-            aio=aio,
-        )
-        print(f"fleet:commands <- {json.dumps(cmd)}")
-        print(f"fleet:jobs[{cmd['job_id']}] <- launching")
+        # The workspace preparation path (Unit 2): an omitted --workdir is resolved here —
+        # never a caller obligation to assemble one by hand.
+        workdir = str(args.workdir or "").strip()
+        prep_note = ""
+        if not workdir:
+            resolved, prep_note, prep_errors = prepare_workspace(
+                spec=args.spec, goal=args.goal, model=args.model, image=args.image,
+                spec_sha256=args.spec_sha256, resume=bool(args.resume),
+                parent_run_id=args.parent_run_id, admission=admission, execution=execution,
+            )
+            if prep_errors:
+                print(f"fleet:submit refused: {prep_errors[0]}", file=sys.stderr)
+                return 2
+            workdir = str(resolved)
+        try:
+            cmd = _send_submit_command(
+                client, spec=args.spec, goal=args.goal, model=args.model, workdir=workdir,
+                image=args.image, spec_sha256=args.spec_sha256, resume=args.resume,
+                parent_run_id=args.parent_run_id, admission=admission, execution=execution,
+                aio=aio, request_key=args.request_key, retry_safe=args.retry_safe,
+            )
+        except (RequestKeyConflictError, RequestKeyUnresolvedError) as exc:
+            print(f"fleet:submit refused: {exc}", file=sys.stderr)
+            return 2
+        if args.json:
+            # The structured result (fleet-submit/v1): job identity, state, resolved
+            # source/spec, request identity, and the prep note — machine-first, so no caller
+            # parses a human log line as the durable interface.
+            print(json.dumps({
+                "schema": "fleet-submit/v1",
+                "job_id": cmd.get("job_id", ""),
+                "reconciled": bool(cmd.get("reconciled")),
+                "status": cmd.get("status") or ("unknown" if cmd.get("reconciled") else "launching"),
+                "request_key": cmd.get("request_key", ""),
+                "spec": args.spec,
+                "spec_sha256": args.spec_sha256 or "",
+                "goal": args.goal,
+                "model": args.model,
+                "workdir": workdir,
+                "resume": bool(args.resume),
+                "parent_run_id": args.parent_run_id or "",
+                "prep_note": prep_note,
+            }))
+            return 0
+        if prep_note:
+            print(f"fleet:prep {prep_note}")
+        if cmd.get("reconciled"):
+            # A keyed retry: NOTHING was queued — the existing job is the submission. The
+            # echoed line keeps the tool's ``fleet:jobs[<id>]`` parse working under the same
+            # identity, and the status tells the caller how far the original submit got.
+            print(
+                f"fleet:jobs[{cmd['job_id']}] <- reconciled "
+                f"(status: {cmd.get('status') or 'unknown'}; "
+                f"request key {cmd.get('request_key') or '?'})"
+            )
+        else:
+            print(f"fleet:commands <- {json.dumps(cmd)}")
+            print(f"fleet:jobs[{cmd['job_id']}] <- launching")
         return 0
 
     parser.error(f"unknown command: {args.command}")

@@ -5,16 +5,21 @@ command onto ``fleet:commands``, and record a "launching" entry on the board. It
 validate the request — that is the orchestrator's spawn-wrapper's job
 (``scripts/fleet/spawn_wrapper.py:validate_submit_request``, covered in
 ``tests/test_spawn_wrapper.py``). These tests cover the supervisor-tier half of the contract:
-the LPUSH shape, the board record, and that nothing here refuses a concurrent submit (there is
-no orchestrator lock).
+the LPUSH shape, the board record, the caller-stable request key (reconcile, never
+double-queue), and that nothing here refuses a concurrent submit for the same or another spec
+(there is no orchestrator lock; the ONE named refusal is a request key reused for a different
+submission).
 """
 
 from __future__ import annotations
 
 import importlib
 import json
+import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -54,6 +59,28 @@ class _FakeRedis:
 
     def hgetall(self, key: str) -> dict[str, str]:
         return {}
+
+    def eval(self, script: str, numkeys: int, *keys_and_args) -> list[str]:
+        """Emulate the request-keyed submit script (single-threaded fake => atomic here).
+
+        Contract: reconcile when the key exists, otherwise claim + queue + record, returning
+        ``[first, record_json]`` — the NEW job id on the claim path, the EXISTING entry JSON
+        on the reconcile path.
+        """
+        requests_key, commands_key, jobs_key = keys_and_args[0:3]
+        request_key, job_id, command_raw, record_raw, entry_raw = keys_and_args[3:8]
+        existing = self._hashes.get(requests_key, {}).get(request_key)
+        if existing:
+            try:
+                entry = json.loads(existing)
+                existing_job = str((entry or {}).get("job_id") or "")
+            except (TypeError, ValueError):
+                existing_job = ""
+            return [existing, self._hashes.get(jobs_key, {}).get(existing_job, "")]
+        self._hashes.setdefault(requests_key, {})[request_key] = str(entry_raw)
+        self._lists.setdefault(commands_key, []).append(str(command_raw))
+        self._hashes.setdefault(jobs_key, {})[str(job_id)] = str(record_raw)
+        return [str(job_id), str(record_raw)]
 
 
 def test_send_submit_command_lpushes_a_bounded_submit_command():
@@ -329,3 +356,294 @@ def test_submit_cli_dispatches_the_aio_identity_flags(monkeypatch):
         "binding_id": "b" * 64,
         "task_revision": 5,
     }
+
+
+# ── The caller-stable request key (2026-09-16 delivery simplification, Unit 2) ──
+
+_REQ_SPEC = "workflows/repository/fleet_job_submission.yaml"
+
+
+def _keyed_submit(fm, r, *, request_key="req-A", retry_safe=False, **overrides):
+    """One keyed submit with the default request inputs (overridable per case)."""
+    kwargs = dict(spec=_REQ_SPEC, goal="g", model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x")
+    kwargs.update(overrides)
+    return fm._send_submit_command(r, request_key=request_key, retry_safe=retry_safe, **kwargs)
+
+
+def test_a_keyed_retry_reconciles_to_the_existing_job_and_queues_nothing():
+    """The lost-response repair: a retry with the SAME key and inputs returns the EXISTING
+    job identity (with its board status) and never queues a second command."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    first = _keyed_submit(fm, r)
+    assert first.get("reconciled") is None
+    assert len(r._lists[fm.COMMANDS_KEY]) == 1
+
+    retry = _keyed_submit(fm, r)
+    assert retry["job_id"] == first["job_id"]
+    assert retry["reconciled"] is True
+    assert retry["status"] == "launching"
+    assert retry["request_key"] == "req-A"
+    assert len(r._lists[fm.COMMANDS_KEY]) == 1  # no second command
+
+
+def test_the_request_key_rides_the_command_the_record_and_the_fingerprint_index():
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    cmd = _keyed_submit(fm, r)
+    assert cmd["request_key"] == "req-A"
+    record = json.loads(r._hashes[fm.JOBS_KEY][cmd["job_id"]])
+    assert record["request_key"] == "req-A" and record["status"] == "launching"
+    entry = json.loads(r._hashes[fm.REQUESTS_KEY]["req-A"])
+    assert entry["job_id"] == cmd["job_id"]
+    assert len(entry["fingerprint"]) == 64  # the reconcile evidence is retained
+
+
+def test_a_key_reused_for_any_changed_execution_input_refuses():
+    """Reviewer finding (2026-09-16): reconciliation compares the FULL execution-relevant
+    fingerprint — the spec filename alone is not the request. Every changed input refuses."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    _keyed_submit(fm, r)
+    changed_cases = [
+        # The same spec path with a DIFFERENT digest (an edited workflow) — the case a
+        # filename-only comparison silently discarded.
+        {"spec_sha256": "a" * 64},
+        {"goal": "a different goal"},
+        {"model": "deepseek/deepseek-v4-flash"},
+        {"workdir": "/tmp/wt_other"},
+        {"resume": True, "parent_run_id": "run-2"},
+        {"admission": {"required": True, "campaign_budget_usd": 5.0}},
+        {"execution": {"backend": "opencode"}},
+    ]
+    for overrides in changed_cases:
+        with pytest.raises(fm.RequestKeyConflictError, match="DIFFERENT request"):
+            _keyed_submit(fm, r, **overrides)
+    assert len(r._lists[fm.COMMANDS_KEY]) == 1  # nothing after the original submission
+
+
+def test_a_missing_board_record_reconciles_the_identity_with_an_unknown_status():
+    """Same request + missing board record: the identity is still proven by the retained
+    fingerprint — reconcile it and report the lifecycle as unknown, never fabricate one. A
+    CHANGED request with the record missing must still refuse (the reviewer's observation:
+    the record is not the evidence)."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    first = _keyed_submit(fm, r)
+    del r._hashes[fm.JOBS_KEY][first["job_id"]]
+    retry = _keyed_submit(fm, r)
+    assert retry["job_id"] == first["job_id"] and retry["reconciled"] is True
+    assert retry["status"] == "unknown" and retry["board_record"] == "missing"
+    with pytest.raises(fm.RequestKeyConflictError, match="DIFFERENT request"):
+        _keyed_submit(fm, r, goal="changed while the board record is missing")
+    # The reviewer's exact repro: with the record missing, a DIFFERENT spec filename must
+    # still refuse — the fingerprint index, not the board record, is the evidence.
+    with pytest.raises(fm.RequestKeyConflictError, match="DIFFERENT request"):
+        _keyed_submit(fm, r, spec="workflows/repository/control_room_new_ui.yaml")
+    assert len(r._lists[fm.COMMANDS_KEY]) == 1
+
+
+def test_missing_or_corrupt_stored_evidence_is_an_explicit_unresolved_state():
+    """Missing evidence must NOT silently reconcile (or silently re-queue): a stored entry
+    without a fingerprint, and an unparseable entry, each refuse as UNRESOLVED."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    first = _keyed_submit(fm, r)
+    r._hashes[fm.REQUESTS_KEY]["req-A"] = json.dumps({"job_id": first["job_id"]})
+    with pytest.raises(fm.RequestKeyUnresolvedError, match="missing evidence"):
+        _keyed_submit(fm, r)
+    r._hashes[fm.REQUESTS_KEY]["req-A"] = "not-json"
+    with pytest.raises(fm.RequestKeyUnresolvedError, match="unreadable stored identity"):
+        _keyed_submit(fm, r)
+    assert len(r._lists[fm.COMMANDS_KEY]) == 1
+
+
+def test_retry_safe_derives_a_stable_key_and_reconciles():
+    """The ordinary path retains its OWN identity before sending: with retry_safe and no
+    explicit key, an identical retry reconciles automatically. A CHANGED input derives a
+    different key — it becomes a NEW independent request, never a silent reconcile to the
+    old job (the reviewer's silent-discard failure cannot occur on this path)."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    first = _keyed_submit(fm, r, request_key=None, retry_safe=True)
+    assert str(first["request_key"]).startswith("auto:")
+    retry = _keyed_submit(fm, r, request_key=None, retry_safe=True)
+    assert retry["job_id"] == first["job_id"] and retry["reconciled"] is True
+    changed = _keyed_submit(fm, r, request_key=None, retry_safe=True, goal="changed")
+    assert changed.get("reconciled") is None and changed["job_id"] != first["job_id"]
+    assert len(r._lists[fm.COMMANDS_KEY]) == 2
+
+
+def test_an_explicit_key_wins_over_retry_safe():
+    """An explicit key is how a caller FORCES an independent run (or names its own retry)."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    cmd = _keyed_submit(fm, r, request_key="req-explicit", retry_safe=True)
+    assert cmd["request_key"] == "req-explicit"
+
+
+def test_without_a_key_or_retry_safe_an_identical_submit_is_an_independent_new_run():
+    """No key = an independent submission: identical parameters mint a SECOND job — an
+    intentional repeat is a new run, never content deduplication."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    a = _keyed_submit(fm, r, request_key=None)
+    b = _keyed_submit(fm, r, request_key=None)
+    assert a["job_id"] != b["job_id"]
+    assert len(r._lists[fm.COMMANDS_KEY]) == 2
+
+
+def test_submit_cli_reconciles_a_keyed_retry(monkeypatch, capsys):
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    argv = [
+        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
+        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
+        "--request-key", "req-cli",
+    ]
+    assert fm.main(argv) == 0
+    assert "launching" in capsys.readouterr().out
+    assert fm.main(argv) == 0
+    retry_out = capsys.readouterr().out
+    assert "fleet:jobs[" in retry_out and "reconciled" in retry_out
+    assert len(r._lists[fm.COMMANDS_KEY]) == 1
+
+
+def test_submit_cli_refuses_a_conflicting_key_with_exit_2(monkeypatch, capsys):
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    base = [
+        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
+        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
+        "--request-key", "req-cli",
+    ]
+    assert fm.main(base) == 0
+    conflicting = [
+        "submit", "--spec", "workflows/repository/control_room_new_ui.yaml",
+        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
+        "--request-key", "req-cli",
+    ]
+    assert fm.main(conflicting) == 2
+    assert "request key" in capsys.readouterr().err
+
+
+# ── The workspace preparation path (Unit 2) ────────────────────────────────────
+
+
+def _git(*args, cwd):
+    return subprocess.run(["git", *args], cwd=str(cwd), capture_output=True, text=True)
+
+
+def _prep_repo(tmp_path, monkeypatch):
+    """A real git repo (branch main, one commit) + a tmp worktrees root, wired in."""
+    fm = _fleet_manager()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git("init", "-b", "main", cwd=repo)
+    _git("config", "user.email", "t@example.com", cwd=repo)
+    _git("config", "user.name", "test", cwd=repo)
+    (repo / "README.md").write_text("x", encoding="utf-8")
+    _git("add", "-A", cwd=repo)
+    _git("commit", "-m", "init", cwd=repo)
+    worktrees = tmp_path / "wtroot"
+    worktrees.mkdir()
+    monkeypatch.setenv("FINOPS_WORKTREE_ROOT", str(worktrees))
+    monkeypatch.setattr(fm, "_REPO_ROOT", repo)
+    return fm, repo, worktrees
+
+
+def test_prepare_workspace_creates_reuses_and_refuses_dirty(tmp_path, monkeypatch):
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    path, note, errors = fm.prepare_workspace(
+        spec="workflows/repository/demo.yaml", goal="g", model="m"
+    )
+    assert errors == [] and path is not None and path.exists()
+    assert "prepared" in note and path.parent == worktrees
+    main_sha = _git("rev-parse", "HEAD", cwd=repo).stdout.strip()
+    assert _git("rev-parse", "HEAD", cwd=path).stdout.strip() == main_sha
+    assert _git("branch", "--show-current", cwd=path).stdout.strip() == path.name
+
+    # An identical call reuses the same deterministic workspace; nothing is re-created.
+    again, note2, errors2 = fm.prepare_workspace(
+        spec="workflows/repository/demo.yaml", goal="g", model="m"
+    )
+    assert errors2 == [] and again == path and "reused" in note2
+
+    # A dirty candidate refuses — never mutated to fit.
+    (path / "dirty.txt").write_text("d", encoding="utf-8")
+    _p, _n, dirty_errors = fm.prepare_workspace(
+        spec="workflows/repository/demo.yaml", goal="g", model="m"
+    )
+    assert any("uncommitted changes" in e for e in dirty_errors)
+
+    # A different request derives a different workspace (the name carries its digest).
+    other, _n, errors4 = fm.prepare_workspace(
+        spec="workflows/repository/demo.yaml", goal="other", model="m"
+    )
+    assert errors4 == [] and other != path
+
+
+def test_prepare_workspace_refuses_a_non_worktree_candidate(tmp_path, monkeypatch):
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    plain = worktrees / "wt_demo_deadbeef"
+    plain.mkdir()
+    monkeypatch.setattr(fm, "_derived_workspace_path", lambda spec, digest: plain)
+    _p, _n, errors = fm.prepare_workspace(spec="s", goal="g", model="m")
+    assert any("not a git worktree" in e for e in errors)
+
+
+def test_prepare_workspace_reuses_the_parent_runs_workdir(tmp_path, monkeypatch):
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    path, _n, _e = fm.prepare_workspace(spec="s", goal="g", model="m")
+    ledger_dir = repo / "experiments" / "results" / "workflows" / "demo"
+    ledger_dir.mkdir(parents=True)
+    (ledger_dir / "20260916T000000000000Z_run-parent.json").write_text(
+        json.dumps({"workdir": str(path)}), encoding="utf-8"
+    )
+    reused, note, errors = fm.prepare_workspace(
+        spec="s", goal="g", model="m", resume=True, parent_run_id="run-parent"
+    )
+    assert errors == [] and reused == path and "parent run run-parent" in note
+
+    _p, _n, missing = fm.prepare_workspace(
+        spec="s", goal="g", model="m", resume=True, parent_run_id="run-missing"
+    )
+    assert any("no ledger found" in e for e in missing)
+
+
+def test_submit_cli_json_result_is_structured(monkeypatch, capsys):
+    """The durable interface is the fleet-submit/v1 document — never a parsed log line."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    rc = fm.main([
+        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
+        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
+        "--json",
+    ])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert payload["schema"] == "fleet-submit/v1"
+    assert payload["job_id"] and payload["reconciled"] is False
+    assert payload["status"] == "launching"
+    assert payload["workdir"] == "/tmp/wt_cli"
+    assert payload["spec"] == "workflows/repository/fleet_job_submission.yaml"
+    assert payload["request_key"] == ""  # no key, no retry-safe: the caller chose neither
+    assert payload["prep_note"] == ""
+
+
+def test_submit_cli_prepares_a_workspace_when_workdir_is_omitted(tmp_path, monkeypatch, capsys):
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    rc = fm.main([
+        "submit", "--spec", "workflows/repository/demo.yaml",
+        "--goal", "g", "--model", "m", "--json",
+    ])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert payload["workdir"].startswith(str(worktrees))
+    assert "prepared" in payload["prep_note"]
+    assert Path(payload["workdir"]).exists()

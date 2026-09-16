@@ -1958,7 +1958,12 @@ def aio_env(tmp_path, monkeypatch):
     from scripts.fleet import spawn_wrapper as sw
 
     monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(tmp_path))
-    monkeypatch.setattr(sw, "_aio_budget_verdict", lambda session_id: ("OK", "", True))
+    monkeypatch.setattr(
+        sw, "_aio_budget_verdict",
+        lambda session_id: {
+            "verdict": "OK", "reason": "", "backend_available": True, "measured": True,
+        },
+    )
     return tmp_path
 
 
@@ -1974,7 +1979,12 @@ def test_an_aio_submit_without_a_store_is_refused(tmp_path, monkeypatch):
     from scripts.fleet import spawn_wrapper as sw
 
     monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(tmp_path / "absent"))
-    monkeypatch.setattr(sw, "_aio_budget_verdict", lambda session_id: ("OK", ""))
+    monkeypatch.setattr(
+        sw, "_aio_budget_verdict",
+        lambda session_id: {
+            "verdict": "OK", "reason": "", "backend_available": True, "measured": True,
+        },
+    )
     errors = validate_submit_request(_aio_request(aio=_aio_block(binding_id="0" * 64)))
     assert any("binding store is unavailable" in e for e in errors)
 
@@ -2016,24 +2026,71 @@ def test_a_stale_task_revision_is_refused_and_the_current_one_passes(aio_env):
     assert current == []
 
 
-def test_warn_is_advisory_and_boundary_verdicts_block(aio_env, monkeypatch):
-    """The 2026-09-15 capacity policy at the gate: WARN is ADVISORY (a session near its
-    effective limit may still start new work); COMPACT (native compaction boundary), CLOSE
-    (hard model limit) and UNJUDGED (no measurement) block new consequential work."""
+def test_capacity_verdicts_are_advisory_at_the_gate(aio_env, monkeypatch):
+    """The 2026-09-16 policy: conversation capacity is ADVISORY to workflow admission.
+    Every verdict — including COMPACT (native boundary), CLOSE (hard limit), and UNJUDGED
+    (no measurement) — leaves a valid bound submission untouched; the report is measured
+    separately (``aio_capacity_report``) and never enters the refusal list."""
     from scripts.fleet import spawn_wrapper as sw
 
     binding_id = _bound_store(aio_env)
-    for verdict, blocked in (("WARN", False), ("COMPACT", True), ("CLOSE", True), ("UNJUDGED", True)):
+    for verdict in ("OK", "WARN", "COMPACT", "CLOSE", "UNJUDGED"):
         monkeypatch.setattr(
-            sw, "_aio_budget_verdict", lambda session_id, v=verdict: (v, "measured reason", True)
+            sw, "_aio_budget_verdict",
+            lambda session_id, v=verdict: {
+                "verdict": v, "reason": "measured reason",
+                "backend_available": True, "measured": True,
+            },
         )
         errors = validate_submit_request(
             _aio_request(aio=_aio_block(binding_id=binding_id))
         )
-        if blocked:
-            assert any(f"budget verdict is {verdict}" in e for e in errors), verdict
-        else:
-            assert errors == [], f"WARN must not block: {errors}"
+        assert errors == [], f"{verdict} must not block: {errors}"
+        assert sw.aio_capacity_report("ses_aio") == {
+            "verdict": verdict,
+            "reason": "measured reason",
+            "backend_available": True,
+            "measured": True,
+            "advisory": True,
+        }, verdict
+
+
+def test_the_capacity_report_reports_unmeasurable_honestly(aio_env, monkeypatch):
+    """An unmeasurable reading is reported — with its reason — as an unavailable advisory:
+    never a refusal, never silently upgraded to OK, and never a claimed measurement."""
+    from scripts.fleet import spawn_wrapper as sw
+
+    monkeypatch.setattr(
+        sw, "_aio_budget_verdict",
+        lambda session_id: {
+            "verdict": "UNJUDGED", "reason": "db unavailable",
+            "backend_available": False, "measured": False,
+        },
+    )
+    assert sw.aio_capacity_report("ses_aio") == {
+        "verdict": "UNJUDGED",
+        "reason": "db unavailable",
+        "backend_available": False,
+        "measured": False,
+        "advisory": True,
+    }
+
+
+def test_a_corrupt_db_reports_backend_reachable_and_not_measured(tmp_path, monkeypatch):
+    """The reviewer's reproduction (2026-09-16): a reachable-but-unreadable database must
+    never read as ``measured`` — the two availability facts are told apart."""
+    from scripts.fleet import spawn_wrapper as sw
+
+    _capacity_env(tmp_path, monkeypatch)
+    db = tmp_path / "corrupt.db"
+    db.write_bytes(b"this is not a sqlite database" * 100)
+    monkeypatch.setenv("FINOPS_OPENCODE_DB", str(db))
+    report = sw._aio_budget_verdict("ses_aio")
+    assert report["verdict"] == "UNJUDGED"
+    assert report["backend_available"] is True and report["measured"] is False
+    assert "not a database" in report["reason"]
+    full = sw.aio_capacity_report("ses_aio")
+    assert full["advisory"] is True and full["measured"] is False
 
 
 def test_the_budget_verdict_is_measured_from_the_explicit_session(tmp_path, monkeypatch):
@@ -2061,9 +2118,13 @@ def test_the_budget_verdict_is_measured_from_the_explicit_session(tmp_path, monk
     con.commit()
     con.close()
     monkeypatch.setenv("FINOPS_OPENCODE_DB", str(db))
-    assert sw._aio_budget_verdict("ses_aio") == ("OK", "", True)
-    verdict, reason, measured = sw._aio_budget_verdict("ses_unknown")
-    assert verdict == "UNJUDGED" and "does not exist" in reason and measured is True
+    report = sw._aio_budget_verdict("ses_aio")
+    assert report["verdict"] == "OK" and report["reason"] == ""
+    assert report["backend_available"] is True and report["measured"] is True
+    report = sw._aio_budget_verdict("ses_unknown")
+    assert report["verdict"] == "UNJUDGED" and "does not exist" in report["reason"]
+    # The backend WAS reachable; the identity is what failed — neither flag claims a reading.
+    assert report["backend_available"] is True and report["measured"] is False
 
 
 def test_a_malformed_aio_block_is_refused():
@@ -2157,73 +2218,117 @@ def _valid_bound_request(tmp_path, monkeypatch, *, db_name: str | None, **store_
     return _aio_request(aio=_aio_block(binding_id=binding_id)), binding_id
 
 
-def test_a_gate_without_the_session_db_defers_a_valid_binding(tmp_path, monkeypatch):
+def test_a_gate_without_the_session_db_never_refuses_a_valid_binding(tmp_path, monkeypatch):
     """THE Docker-shape proof: the containerized wrapper has no host DB — a valid binding
-    passes (the budget is deferred), instead of being refused as UNJUDGED."""
+    passes, and the capacity reading is reported as an unavailable ADVISORY with a reason
+    (2026-09-16 policy: never converted into a refusal)."""
+    from scripts.fleet import spawn_wrapper as sw
+
     request, _ = _valid_bound_request(tmp_path, monkeypatch, db_name=None)
     monkeypatch.setenv("FINOPS_OPENCODE_DB", str(tmp_path / "absent.db"))
     assert validate_submit_request(request) == []
+    report = sw.aio_capacity_report("ses_aio")
+    assert report["verdict"] == "UNJUDGED" and report["measured"] is False
+    assert report["backend_available"] is False
+    assert "not found" in report["reason"]
 
 
-def test_a_strict_gate_refuses_when_the_db_is_missing(tmp_path, monkeypatch):
-    """The host gate (strict) must measure: a missing DB is itself a refusal there."""
+def test_the_capacity_reading_never_becomes_an_authorization_failure(tmp_path, monkeypatch):
+    """The 2026-09-16 separation, end to end: an unmeasurable capacity reading refuses
+    NOTHING, while the binding refusals are untouched (the retired strict gate's regression
+    pair — the missing measurement is not a missing authorization)."""
     request, _ = _valid_bound_request(tmp_path, monkeypatch, db_name=None)
     monkeypatch.setenv("FINOPS_OPENCODE_DB", str(tmp_path / "absent.db"))
-    errors = validate_submit_request(request, strict_aio_budget=True)
-    assert any("cannot be measured at this gate" in e for e in errors)
+    assert validate_submit_request(request) == []
+    broken = {**request, "aio": {**_aio_block(binding_id="f" * 64)}}
+    errors = validate_submit_request(broken)
+    assert any("does not match the durable binding record" in e for e in errors)
 
 
-def test_the_budget_is_measured_for_real_against_the_canonical_db(tmp_path, monkeypatch):
-    """No verdict mocking: a real opencode-shaped DB decides admission and refusal."""
+def test_validate_submit_cli_reports_capacity_as_advisory(tmp_path, monkeypatch, capsys):
+    """The CLI surface: ``validate-submit`` emits a structured ``aio_capacity`` ADVISORY
+    block — present, honest about being unmeasured, and never part of ``errors``."""
+    import io
+    import json as _json
+
+    from scripts.fleet import spawn_wrapper as sw
+
+    request, _ = _valid_bound_request(tmp_path, monkeypatch, db_name=None)
+    monkeypatch.setenv("FINOPS_OPENCODE_DB", str(tmp_path / "absent.db"))
+    monkeypatch.setattr("sys.stdin", io.StringIO(_json.dumps(request)))
+    rc = sw.main(["validate-submit"])
+    payload = _json.loads(capsys.readouterr().out.strip())
+    assert rc == 0 and payload["ok"] is True and payload["errors"] == []
+    assert payload["aio_capacity"]["advisory"] is True
+    assert payload["aio_capacity"]["verdict"] == "UNJUDGED"
+    assert payload["aio_capacity"]["measured"] is False
+
+
+def test_the_budget_is_measured_for_real_and_never_blocks(tmp_path, monkeypatch):
+    """No verdict mocking: a real opencode-shaped DB drives the ADVISORY report, and the
+    gate itself never refuses on capacity — at any reading (2026-09-16 policy)."""
+    from scripts.fleet import spawn_wrapper as sw
+
     _capacity_env(tmp_path, monkeypatch)
     request, _ = _valid_bound_request(tmp_path, monkeypatch, db_name="ok.db")
     assert validate_submit_request(request) == []
+    assert sw.aio_capacity_report("ses_aio")["verdict"] == "OK"
 
-    # Message count is TELEMETRY: 120 low-context messages do NOT block (the removed
-    # 80-message stopping condition).
+    # Message count is TELEMETRY: 120 low-context messages report OK and never block.
     busy = tmp_path / "busy.db"
     _canonical_session_db(busy, turns=120, context=1000)
     monkeypatch.setenv("FINOPS_OPENCODE_DB", str(busy))
     assert validate_submit_request(request) == []
+    assert sw.aio_capacity_report("ses_aio")["verdict"] == "OK"
 
-    # The native compaction boundary DOES block new consequential work until the reduced
-    # context is observed (same session/task binding continues).
+    # The native boundary is REPORTED (COMPACT) — and still never blocks the submit.
     boundary = tmp_path / "boundary.db"
     _canonical_session_db(boundary, turns=60, context=970_000)
     monkeypatch.setenv("FINOPS_OPENCODE_DB", str(boundary))
-    errors = validate_submit_request(request)
-    assert any("budget verdict is COMPACT" in e for e in errors)
+    assert validate_submit_request(request) == []
+    report = sw.aio_capacity_report("ses_aio")
+    assert report["verdict"] == "COMPACT"
+    assert report["advisory"] is True
 
 
-def test_the_gate_consumes_the_shared_override(tmp_path, monkeypatch):
+def test_the_report_consumes_the_shared_override(tmp_path, monkeypatch):
     """The SAME resolution the CLI and capsule consume: FINOPS_SESSION_CTX_LIMIT moves the
-    gate's verdict. A policy cap below the native boundary is a LOCAL POLICY close (never a
-    claimed native compaction — reviewer finding)."""
+    report. A policy cap below the native boundary is a LOCAL POLICY close (never a claimed
+    native compaction — reviewer finding) — reported as an advisory, never a refusal."""
+    from scripts.fleet import spawn_wrapper as sw
+
     _capacity_env(tmp_path, monkeypatch)
     db = tmp_path / "override.db"
     _canonical_session_db(db, turns=10, context=120_000)
     request, _ = _valid_bound_request(tmp_path, monkeypatch, db_name=None)
     monkeypatch.setenv("FINOPS_OPENCODE_DB", str(db))
     assert validate_submit_request(request) == []  # 120K < 968K usable
+    assert sw.aio_capacity_report("ses_aio")["verdict"] == "OK"
     monkeypatch.setenv("FINOPS_SESSION_CTX_LIMIT", "100000")
-    errors = validate_submit_request(request)
-    assert any("budget verdict is CLOSE" in e for e in errors), errors
-    assert any("LOCAL POLICY" in e for e in errors), errors
+    assert validate_submit_request(request) == []
+    report = sw.aio_capacity_report("ses_aio")
+    assert report["verdict"] == "CLOSE"
+    assert "LOCAL POLICY" in report["reason"]
 
 
-def test_a_completed_compaction_allows_the_resumed_submission(tmp_path, monkeypatch):
-    """Reviewer reproduction at the gate: after a successful compaction (summary + pending
-    resumed turn) the stale 975K reading must not block the first resumed submit."""
+def test_a_completed_compaction_moves_the_report_to_the_post_compaction_state(
+    tmp_path, monkeypatch
+):
+    """Reviewer reproduction, retained as a REPORT regression: after a successful compaction
+    (summary + pending resumed turn) the stale 975K reading must not linger — the report
+    reads OK/post-compaction. The gate never blocked in either state (2026-09-16 policy)."""
     import json as _json
     import sqlite3 as _sqlite3
+
+    from scripts.fleet import spawn_wrapper as sw
 
     _capacity_env(tmp_path, monkeypatch)
     db = tmp_path / "compacted.db"
     _canonical_session_db(db, turns=60, context=975_000)
     request, _ = _valid_bound_request(tmp_path, monkeypatch, db_name=None)
     monkeypatch.setenv("FINOPS_OPENCODE_DB", str(db))
-    errors = validate_submit_request(request)
-    assert any("budget verdict is COMPACT" in e for e in errors), errors
+    assert validate_submit_request(request) == []
+    assert sw.aio_capacity_report("ses_aio")["verdict"] == "COMPACT"
 
     con = _sqlite3.connect(db)
     con.execute(
@@ -2239,6 +2344,9 @@ def test_a_completed_compaction_allows_the_resumed_submission(tmp_path, monkeypa
     con.commit()
     con.close()
     assert validate_submit_request(request) == []
+    report = sw.aio_capacity_report("ses_aio")
+    assert report["verdict"] == "OK"
+    assert "post-compaction" in report["reason"]
 
 
 def test_a_pending_only_session_has_no_usable_measurement(tmp_path, monkeypatch):
@@ -2248,10 +2356,11 @@ def test_a_pending_only_session_has_no_usable_measurement(tmp_path, monkeypatch)
     db = tmp_path / "pending.db"
     _canonical_session_db(db, pending_only=True)
     monkeypatch.setenv("FINOPS_OPENCODE_DB", str(db))
-    verdict, reason, measured = sw._aio_budget_verdict("ses_aio")
-    assert verdict == "UNJUDGED"
-    assert "no usable measurement" in reason
-    assert measured is True
+    report = sw._aio_budget_verdict("ses_aio")
+    assert report["verdict"] == "UNJUDGED"
+    assert "no usable measurement" in report["reason"]
+    # Reachable backend, no usable sample: never a claimed measurement.
+    assert report["backend_available"] is True and report["measured"] is False
 
 
 def test_an_initial_session_is_the_explicit_exception(tmp_path, monkeypatch):
@@ -2268,9 +2377,10 @@ def test_an_initial_session_is_the_explicit_exception(tmp_path, monkeypatch):
     con.commit()
     con.close()
     monkeypatch.setenv("FINOPS_OPENCODE_DB", str(db))
-    verdict, reason, measured = sw._aio_budget_verdict("ses_aio")
-    assert (verdict, measured) == ("OK", True)
-    assert "initial session" in reason
+    report = sw._aio_budget_verdict("ses_aio")
+    assert report["verdict"] == "OK" and "initial session" in report["reason"]
+    # A NAMED exception, not a measurement: nothing was recorded to measure.
+    assert report["backend_available"] is True and report["measured"] is False
 
 
 # ── The actor declaration must be consistent (reviewer repair) ────────────────

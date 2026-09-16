@@ -473,13 +473,12 @@ def submit_run(
 
     # The shared gate INCLUDES Unit D's AIO binding step: an ``aio`` submit is re-resolved
     # from the durable store here (its claimed binding id is never proof), so even a submit
-    # that bypassed the wrapper cannot ride a string to the launch effect.
-    # The shared gate INCLUDES Unit D's AIO binding step — and at THIS gate the budget is
-    # measured STRICTLY: the broker owns the host's canonical session database, so "cannot
-    # measure here" is itself a refusal (the containerized gate defers to this one).
+    # that bypassed the wrapper cannot ride a string to the launch effect. Conversation
+    # capacity is NOT re-checked here (2026-09-16 policy): it is advisory diagnostics about
+    # the coordinator's own session, never an authorization — this gate refuses on the
+    # identity/binding/scope guarantees and the financial admission settings only.
     errors = spawn_wrapper.validate_submit_request(
         command, repo_root=repo_root, phase_scopes=phase_scopes, path_config=path_config,
-        strict_aio_budget=True,
     )
     if errors:
         raise LaunchRequestError(errors)
