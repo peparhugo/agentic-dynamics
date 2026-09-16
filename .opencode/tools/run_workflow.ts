@@ -118,7 +118,9 @@ export default tool({
     spec: tool.schema.string().describe("Path to an ExperimentSpec OR a workflow-v1 YAML"),
     goal: tool.schema.string().describe("Feature/task prompt (substituted for {goal})"),
     model: tool.schema.string().describe("provider/model id"),
-    workdir: tool.schema.string().describe("Git worktree path to run in"),
+    workdir: tool.schema.string().optional().describe(
+      "Git worktree path to run in. OMITTED on the durable path, the fleet preparation path selects/creates the workspace (deterministic name, reused across an identical retry; a continuation reuses the parent run's workdir). In-process runs still need an explicit workdir.",
+    ),
     request_key: tool.schema.string().optional().describe(
       "Optional EXPLICIT request key. Omitted (the ordinary case), the fleet derives a stable key from the submission's execution-relevant inputs before sending — an identical retry after an ambiguous or lost response reconciles to the existing job automatically. Pass an explicit NEW key to force an independent run of identical inputs.",
     ),
@@ -183,6 +185,17 @@ export default tool({
     }
 
     if (!args.orchestrator) {
+      if (!String(args.workdir ?? "").trim()) {
+        // The workspace preparation path applies to DURABLE submits (the composition root
+        // resolves the workspace before the launch); an in-process run executes directly in
+        // the given worktree and still needs it explicitly.
+        return {
+          output:
+            "in-process runs need an explicit workdir — the fleet preparation path applies " +
+            "to durable submits (orchestrator=true).",
+          metadata: { exit_code: 2, execution_mode: "in-process" },
+        }
+      }
       if (isAioAgent(String(ctx.agent ?? ""))) {
         // The AIO local exception (Unit D repair): an in-process run is permitted only for a
         // VERIFIED DETERMINISTIC workflow AND only when the same binding/scope gate the
@@ -281,9 +294,11 @@ export default tool({
       "--spec", args.spec,
       "--goal", args.goal,
       "--model", args.model,
-      "--workdir", args.workdir,
       "--spec-sha256", specSha,
     ]
+    // An omitted workdir rides through as an omission: the fleet preparation path selects or
+    // creates the workspace (Unit 2) — the caller assembles nothing.
+    if (args.workdir) submitFlags.push("--workdir", args.workdir)
     submitFlags.push(...aioFlags)
     // Retry-safe by DEFAULT (Unit 2): the ordinary path retains its identity BEFORE sending —
     // the fleet derives a stable key from the submission's execution-relevant inputs, so a
@@ -311,6 +326,9 @@ export default tool({
     if (args.output_token_limit) submitFlags.push("--output-token-limit", String(args.output_token_limit))
     if (args.timeout_min) submitFlags.push("--timeout-seconds", String(args.timeout_min * 60))
     if (args.no_commit) submitFlags.push("--no-commit")
+    // The STRUCTURED result (fleet-submit/v1): the durable interface is ONE JSON document —
+    // never a human log line parsed for an identity.
+    submitFlags.push("--json")
 
     const submit = await commandRunner(
       ["python3", "scripts/fleet/fleet_manager.py", ...submitFlags], ctx.directory,
@@ -320,37 +338,53 @@ export default tool({
     if (submit.exitCode !== 0) {
       return { output: out || err || `fleet submit failed (exit ${submit.exitCode})`, metadata: { exit_code: submit.exitCode } }
     }
-    const jobMatch = out.match(/fleet:jobs\[([0-9a-f]+)\]/)
+    let result: Record<string, unknown> | null = null
+    try {
+      const parsed = JSON.parse(out)
+      result =
+        parsed && typeof parsed === "object" && (parsed as any).schema === "fleet-submit/v1"
+          ? (parsed as Record<string, unknown>)
+          : null
+    } catch {
+      result = null
+    }
+    if (!result) {
+      return {
+        output:
+          "fleet submit returned no fleet-submit/v1 result — refusing to guess the job " +
+          `identity from unstructured output:\n${out || err}`,
+        metadata: { exit_code: 3 },
+      }
+    }
+    const jobId = String(result.job_id ?? "")
     // A keyed retry the fleet reconciled to an EXISTING job: nothing new was queued, and the
     // same identity carries the observation (the durable job row is the truth of what ran).
-    const reconciled = out.includes("<- reconciled")
-    // The EFFECTIVE key: the caller's explicit key, or the fleet's derived key echoed on the
-    // command line / reconcile line. Retained in the result so a later retry can reuse it.
-    const cmdKey = out.match(/"request_key":\s*"([^"]+)"/)
-    const reconcileKey = out.match(/request key ([^)\s;]+)/)
-    const effectiveKey = cmdKey?.[1] ?? reconcileKey?.[1] ?? args.request_key ?? ""
+    const reconciled = Boolean(result.reconciled)
+    const effectiveKey = String(result.request_key ?? args.request_key ?? "")
+    const prepNote = String(result.prep_note ?? "")
     const keyNote = effectiveKey
       ? ` Request key: ${effectiveKey} — reuse it verbatim if this response is ever lost.`
       : ""
     return {
       output:
-        `${out}\n` +
         (reconciled
-          ? `RECONCILED to the EXISTING job under the same request key — nothing new was queued. ` +
+          ? `RECONCILED to the EXISTING job ${jobId} under the same request key — nothing new was queued. ` +
             `Observe it under the SAME identity: control packet (active_runs) or the Control Room.`
-          : `Submission accepted by the durable path. Watch it: control packet (active_runs) or the Control Room; the broker validates the spec digest (${specSha.slice(0, 12)}…) and admission before the compose call. ` +
-            `A queued submit is NOT a running run — verify the run row exists before treating the build as started.`) +
+          : `Submission accepted by the durable path: job ${jobId}. The broker validates the spec digest (${specSha.slice(0, 12)}…) and admission before the compose call; a QUEUED submit is not a running run — verify the run row exists (control packet, active_runs) before treating the build as started.`) +
+        (prepNote ? ` ${prepNote}.` : "") +
         keyNote,
       metadata: {
-        job_id: jobMatch ? jobMatch[1] : "",
+        job_id: jobId,
         reconciled,
+        status: String(result.status ?? ""),
         request_key: args.request_key ?? "",
         effective_request_key: effectiveKey,
         retry_safe: !args.request_key,
         spec: args.spec,
         spec_sha256: specSha,
         model: args.model,
-        workdir: args.workdir,
+        workdir: String(result.workdir ?? args.workdir ?? ""),
+        prep_note: prepNote,
         resume: args.resume,
         parent_run_id: args.parent_run_id ?? "",
         aio_session_id: String(ctx.sessionID ?? ""),

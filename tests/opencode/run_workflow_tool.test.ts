@@ -169,11 +169,31 @@ test("a worker skips the AIO gate and keeps the local path", async () => {
   }
 })
 
+/** The fleet-submit/v1 document the manager emits (the durable interface, never a log line). */
+function fleetSubmit(overrides: Record<string, unknown> = {}) {
+  return JSON.stringify({
+    schema: "fleet-submit/v1",
+    job_id: "abc123",
+    reconciled: false,
+    status: "launching",
+    request_key: "",
+    spec: "workflows/repository/fleet_job_submission.yaml",
+    spec_sha256: "b".repeat(64),
+    goal: "g",
+    model: "openai/gpt-6-astra",
+    workdir: "/tmp/wt_tool_entry",
+    resume: false,
+    parent_run_id: "",
+    prep_note: "",
+    ...overrides,
+  })
+}
+
 test("the durable AIO submit carries the identity flags and no --project", async () => {
   const { runner, calls } = fakeShell({
     session_open: () => ({ stdout: FOUND_BINDING }),
     digest: () => ({ stdout: "b".repeat(64) }),
-    submit: () => ({ stdout: "fleet:commands <- {}\nfleet:jobs[abc123] <- launching" }),
+    submit: () => ({ stdout: fleetSubmit() }),
   })
   setCommandRunner(runner)
   try {
@@ -185,12 +205,60 @@ test("the durable AIO submit carries the identity flags and no --project", async
     expect(submit!.args).toContain("--binding-id")
     expect(submit!.args).toContain(BINDING_ID)
     expect(submit!.args).not.toContain("--project")
+    expect(submit!.args).toContain("--workdir")
+    // The structured result is the requested interface.
+    expect(submit!.args).toContain("--json")
     // The ordinary path is RETRY-SAFE by default: the fleet derives and retains the request
     // identity before sending — the AIO does not have to remember anything.
     expect(submit!.args).toContain("--retry-safe")
     expect(submit!.args).not.toContain("--request-key")
     expect((result.metadata as any).reconciled).toBe(false)
     expect((result.metadata as any).retry_safe).toBe(true)
+    expect((result.metadata as any).job_id).toBe("abc123")
+    expect((result.metadata as any).status).toBe("launching")
+    expect(calls.some((c) => c.args.some((a) => a.endsWith("run_workflow.py")))).toBe(false)
+  } finally {
+    setCommandRunner(null)
+  }
+})
+
+test("an omitted workdir rides through — the fleet prepares the workspace", async () => {
+  const { runner, calls } = fakeShell({
+    session_open: () => ({ stdout: FOUND_BINDING }),
+    digest: () => ({ stdout: "b".repeat(64) }),
+    submit: () => ({
+      stdout: fleetSubmit({
+        workdir: "/tmp/wtroot/wt_spec_1234abcd",
+        prep_note: "workspace prepared: /tmp/wtroot/wt_spec_1234abcd (branch wt_spec_1234abcd, base main)",
+      }),
+    }),
+  })
+  setCommandRunner(runner)
+  try {
+    const result = await (toolDef as any).execute(
+      toolArgs({ orchestrator: true, workdir: undefined }), ctx("aio-control"),
+    )
+    const submit = calls.find((c) => c.args.some((a) => a.endsWith("fleet_manager.py")))
+    expect(submit!.args).not.toContain("--workdir")
+    expect((result.metadata as any).workdir).toBe("/tmp/wtroot/wt_spec_1234abcd")
+    expect((result.metadata as any).prep_note).toContain("workspace prepared")
+    expect(result.output).toContain("workspace prepared")
+  } finally {
+    setCommandRunner(null)
+  }
+})
+
+test("an in-process run without a workdir refuses before execution", async () => {
+  const { runner, calls } = fakeShell({
+    session_open: () => ({ stdout: FOUND_BINDING }),
+    run: () => ({ stdout: "SHOULD NOT RUN" }),
+  })
+  setCommandRunner(runner)
+  try {
+    const result = await (toolDef as any).execute(
+      toolArgs({ orchestrator: false, workdir: undefined }), ctx("aio-control"),
+    )
+    expect(result.output).toContain("explicit workdir")
     expect(calls.some((c) => c.args.some((a) => a.endsWith("run_workflow.py")))).toBe(false)
   } finally {
     setCommandRunner(null)
@@ -202,11 +270,7 @@ test("the ordinary path surfaces the fleet-derived request key for retention", a
   const { runner, calls } = fakeShell({
     session_open: () => ({ stdout: FOUND_BINDING }),
     digest: () => ({ stdout: "b".repeat(64) }),
-    submit: () => ({
-      stdout:
-        `fleet:commands <- {"action":"submit","request_key":"${DERIVED}"}\n` +
-        "fleet:jobs[abc123] <- launching",
-    }),
+    submit: () => ({ stdout: fleetSubmit({ request_key: DERIVED }) }),
   })
   setCommandRunner(runner)
   try {
@@ -225,7 +289,9 @@ test("a caller-stable request key forwards and a reconciled response is marked",
   const { runner, calls } = fakeShell({
     session_open: () => ({ stdout: FOUND_BINDING }),
     digest: () => ({ stdout: "b".repeat(64) }),
-    submit: () => ({ stdout: "fleet:jobs[abc123] <- reconciled (status: launching)" }),
+    submit: () => ({
+      stdout: fleetSubmit({ reconciled: true, status: "launching", request_key: "req-9" }),
+    }),
   })
   setCommandRunner(runner)
   try {

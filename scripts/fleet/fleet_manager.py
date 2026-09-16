@@ -43,6 +43,7 @@ import argparse
 import hashlib
 import json
 import os
+import subprocess
 import sys
 import time
 import uuid
@@ -51,6 +52,14 @@ from pathlib import Path
 
 # scripts/fleet/ -> add scripts/ to the path, then reuse the shared bootstrap.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+# The repo root + src/ (the same clean-environment bootstrap spawn_wrapper applies): the
+# preparation path resolves the shared PathConfig so the derived workspace lands under the
+# SAME worktrees root the exec boundary validates against.
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+if str(_REPO_ROOT / "src") not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 import broker_contract  # noqa: E402  (scripts/fleet/ is this module's dir)
 import dlq  # noqa: E402  (scripts/fleet/ is this module's dir)
@@ -285,6 +294,157 @@ def _parse_request_entry(raw: str, key: str) -> dict:
             "verify this retry; resolve it from the board or mint a new key"
         )
     return entry
+
+
+# ── The workspace preparation path (Unit 2) ────────────────────────────────────
+#
+# A submit may OMIT --workdir: the preparation path selects/creates the workspace using the
+# existing worktree support, instead of every caller assembling one by hand. The derived
+# name is DETERMINISTIC for the request's pre-workdir identity, so a retry-safe
+# resubmission resolves the SAME candidate path and reconciles by key (no second workspace,
+# no mutation). An omitted --workdir on a continuation (--resume --parent-run-id) reuses the
+# parent run's own workdir from its ledger. A pre-existing candidate that is not this repo's
+# CLEAN worktree refuses loudly — never mutated to fit.
+
+
+def _workspace_identity_digest(
+    *,
+    spec: str,
+    goal: str,
+    model: str,
+    image: str | None = None,
+    spec_sha256: str | None = None,
+    resume: bool = False,
+    parent_run_id: str | None = None,
+    admission: dict | None = None,
+    execution: dict | None = None,
+) -> str:
+    """The PRE-workdir digest that names the derived workspace (stable across a retry)."""
+    payload = {
+        "spec": str(spec or ""), "goal": str(goal or ""), "model": str(model or ""),
+        "image": str(image or ""), "spec_sha256": str(spec_sha256 or ""),
+        "resume": bool(resume), "parent_run_id": str(parent_run_id or ""),
+        "admission": admission or {}, "execution": execution or {},
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _git_run(*args: str, cwd: Path, timeout: int = 120) -> tuple[int, str]:
+    """One git call for the preparation path; a missing/broken git is a named refusal."""
+    try:
+        proc = subprocess.run(  # noqa: S603 — the submission tier owns workspace preparation
+            ["git", *args], cwd=str(cwd), capture_output=True, text=True, timeout=timeout,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return 127, f"git unavailable ({type(exc).__name__}: {exc})"
+    return proc.returncode, ((proc.stdout or "") + (proc.stderr or "")).strip()
+
+
+def _derived_workspace_path(spec: str, digest: str) -> Path:
+    """The deterministic workspace path for a request: worktrees_root/wt_<spec>_<digest8>."""
+    from agentic_dynamics.core.paths import PathConfig
+
+    worktrees_root = Path(PathConfig.from_env(require_existing=False).worktrees_root)
+    stem = "".join(
+        c if (c.isalnum() or c in "-_") else "_" for c in Path(str(spec or "run")).stem
+    )[:48] or "run"
+    return worktrees_root / f"wt_{stem}_{digest[:8]}"
+
+
+def _parent_run_workdir(parent_run_id: str) -> Path | None:
+    """The parent run's workdir from its ledger (the pinned continuation workspace)."""
+    root = Path(_REPO_ROOT) / "experiments" / "results" / "workflows"
+    try:
+        ledgers = sorted(root.glob(f"*/*_{parent_run_id}.json"))
+    except OSError:
+        return None
+    for ledger in ledgers:
+        try:
+            data = json.loads(ledger.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        workdir = str(data.get("workdir") or "").strip()
+        if workdir:
+            return Path(workdir)
+    return None
+
+
+def prepare_workspace(
+    *,
+    spec: str,
+    goal: str,
+    model: str,
+    image: str | None = None,
+    spec_sha256: str | None = None,
+    resume: bool = False,
+    parent_run_id: str | None = None,
+    admission: dict | None = None,
+    execution: dict | None = None,
+) -> tuple[Path | None, str, list[str]]:
+    """Resolve the workspace for a submit that omits --workdir: ``(path, note, errors)``.
+
+    A continuation reuses the parent run's workdir (from its ledger). Otherwise the derived
+    path is reused when it is this repo's clean worktree, and CREATED (branch ``wt_<name>``
+    at the repo's main tip — the base the deployment probe requires) when absent. Errors are
+    named refusals; the caller prints them and submits nothing.
+    """
+    if resume and str(parent_run_id or "").strip():
+        parent = _parent_run_workdir(str(parent_run_id))
+        if parent is None:
+            return None, "", [
+                f"submit: no ledger found for parent run {parent_run_id!r} to reuse its "
+                "workdir — pass --workdir explicitly for this continuation"
+            ]
+        if not (parent / ".git").exists():
+            return None, "", [
+                f"submit: the parent run's workdir {parent} is not a git worktree — pass "
+                "--workdir explicitly for this continuation"
+            ]
+        return parent, f"workspace reused from parent run {parent_run_id}: {parent}", []
+
+    digest = _workspace_identity_digest(
+        spec=spec, goal=goal, model=model, image=image, spec_sha256=spec_sha256,
+        resume=resume, parent_run_id=parent_run_id, admission=admission, execution=execution,
+    )
+    path = _derived_workspace_path(spec, digest)
+    if path.exists():
+        if not (path / ".git").exists():
+            return None, "", [
+                f"submit: the derived workspace {path} exists but is not a git worktree — "
+                "refusing to reuse or overwrite it; pass an explicit --workdir or move it aside"
+            ]
+        rc, out = _git_run("status", "--porcelain", cwd=path)
+        if rc != 0:
+            return None, "", [
+                f"submit: the derived workspace {path} is not a readable git worktree "
+                f"({out or 'git status failed'}) — pass an explicit --workdir"
+            ]
+        if out.strip():
+            return None, "", [
+                f"submit: the derived workspace {path} has uncommitted changes (a likely "
+                "interrupted run) — refusing to mutate it; inspect it, clean it, or pass an "
+                "explicit --workdir"
+            ]
+        return path, f"workspace reused: {path}", []
+
+    repo_root = Path(_REPO_ROOT)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        return None, "", [f"submit: cannot create the worktrees root {path.parent} ({exc})"]
+    branch = path.name
+    rc, out = _git_run("worktree", "add", "-b", branch, str(path), "main", cwd=repo_root)
+    if rc != 0 and "already exists" in out:
+        # A leftover branch from a removed worktree: check the branch out at the path
+        # instead of resetting it (-B would move the branch under any existing commits).
+        rc, out = _git_run("worktree", "add", str(path), branch, cwd=repo_root)
+    if rc != 0:
+        return None, "", [
+            f"submit: workspace preparation failed ({out or 'git worktree add failed'}) — "
+            "pass an explicit --workdir"
+        ]
+    return path, f"workspace prepared: {path} (branch {branch}, base main)", []
 
 
 #: The request-keyed submit, ATOMICALLY (one server-side script): the request->job
@@ -559,7 +719,13 @@ def main(argv: list[str] | None = None) -> int:
     p_submit.add_argument("--spec", required=True, help="spec path, e.g. workflows/repository/<name>.yaml")
     p_submit.add_argument("--goal", required=True)
     p_submit.add_argument("--model", required=True)
-    p_submit.add_argument("--workdir", required=True, help="a worktree path under FINOPS_WORKTREE_ROOT")
+    p_submit.add_argument("--workdir", default=None,
+                          help="a worktree path under FINOPS_WORKTREE_ROOT; OMITTED, the "
+                               "preparation path selects/creates one (deterministic name, "
+                               "reused across an identical retry; a continuation reuses the "
+                               "parent run's workdir)")
+    p_submit.add_argument("--json", action="store_true",
+                          help="emit the machine result (fleet-submit/v1) instead of human lines")
     p_submit.add_argument("--image", default=None,
                           help="optional per-job image for the spec's phase cells "
                                "(fleet/job-<name>, built via scripts/fleet/build.sh job <name> "
@@ -713,9 +879,23 @@ def main(argv: list[str] | None = None) -> int:
                 "binding_id": args.binding_id or "",
                 "task_revision": args.task_revision,
             }
+        # The workspace preparation path (Unit 2): an omitted --workdir is resolved here —
+        # never a caller obligation to assemble one by hand.
+        workdir = str(args.workdir or "").strip()
+        prep_note = ""
+        if not workdir:
+            resolved, prep_note, prep_errors = prepare_workspace(
+                spec=args.spec, goal=args.goal, model=args.model, image=args.image,
+                spec_sha256=args.spec_sha256, resume=bool(args.resume),
+                parent_run_id=args.parent_run_id, admission=admission, execution=execution,
+            )
+            if prep_errors:
+                print(f"fleet:submit refused: {prep_errors[0]}", file=sys.stderr)
+                return 2
+            workdir = str(resolved)
         try:
             cmd = _send_submit_command(
-                client, spec=args.spec, goal=args.goal, model=args.model, workdir=args.workdir,
+                client, spec=args.spec, goal=args.goal, model=args.model, workdir=workdir,
                 image=args.image, spec_sha256=args.spec_sha256, resume=args.resume,
                 parent_run_id=args.parent_run_id, admission=admission, execution=execution,
                 aio=aio, request_key=args.request_key, retry_safe=args.retry_safe,
@@ -723,6 +903,28 @@ def main(argv: list[str] | None = None) -> int:
         except (RequestKeyConflictError, RequestKeyUnresolvedError) as exc:
             print(f"fleet:submit refused: {exc}", file=sys.stderr)
             return 2
+        if args.json:
+            # The structured result (fleet-submit/v1): job identity, state, resolved
+            # source/spec, request identity, and the prep note — machine-first, so no caller
+            # parses a human log line as the durable interface.
+            print(json.dumps({
+                "schema": "fleet-submit/v1",
+                "job_id": cmd.get("job_id", ""),
+                "reconciled": bool(cmd.get("reconciled")),
+                "status": cmd.get("status") or ("unknown" if cmd.get("reconciled") else "launching"),
+                "request_key": cmd.get("request_key", ""),
+                "spec": args.spec,
+                "spec_sha256": args.spec_sha256 or "",
+                "goal": args.goal,
+                "model": args.model,
+                "workdir": workdir,
+                "resume": bool(args.resume),
+                "parent_run_id": args.parent_run_id or "",
+                "prep_note": prep_note,
+            }))
+            return 0
+        if prep_note:
+            print(f"fleet:prep {prep_note}")
         if cmd.get("reconciled"):
             # A keyed retry: NOTHING was queued — the existing job is the submission. The
             # echoed line keeps the tool's ``fleet:jobs[<id>]`` parse working under the same

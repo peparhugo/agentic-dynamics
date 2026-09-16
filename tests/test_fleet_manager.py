@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -526,3 +527,123 @@ def test_submit_cli_refuses_a_conflicting_key_with_exit_2(monkeypatch, capsys):
     ]
     assert fm.main(conflicting) == 2
     assert "request key" in capsys.readouterr().err
+
+
+# ── The workspace preparation path (Unit 2) ────────────────────────────────────
+
+
+def _git(*args, cwd):
+    return subprocess.run(["git", *args], cwd=str(cwd), capture_output=True, text=True)
+
+
+def _prep_repo(tmp_path, monkeypatch):
+    """A real git repo (branch main, one commit) + a tmp worktrees root, wired in."""
+    fm = _fleet_manager()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git("init", "-b", "main", cwd=repo)
+    _git("config", "user.email", "t@example.com", cwd=repo)
+    _git("config", "user.name", "test", cwd=repo)
+    (repo / "README.md").write_text("x", encoding="utf-8")
+    _git("add", "-A", cwd=repo)
+    _git("commit", "-m", "init", cwd=repo)
+    worktrees = tmp_path / "wtroot"
+    worktrees.mkdir()
+    monkeypatch.setenv("FINOPS_WORKTREE_ROOT", str(worktrees))
+    monkeypatch.setattr(fm, "_REPO_ROOT", repo)
+    return fm, repo, worktrees
+
+
+def test_prepare_workspace_creates_reuses_and_refuses_dirty(tmp_path, monkeypatch):
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    path, note, errors = fm.prepare_workspace(
+        spec="workflows/repository/demo.yaml", goal="g", model="m"
+    )
+    assert errors == [] and path is not None and path.exists()
+    assert "prepared" in note and path.parent == worktrees
+    main_sha = _git("rev-parse", "HEAD", cwd=repo).stdout.strip()
+    assert _git("rev-parse", "HEAD", cwd=path).stdout.strip() == main_sha
+    assert _git("branch", "--show-current", cwd=path).stdout.strip() == path.name
+
+    # An identical call reuses the same deterministic workspace; nothing is re-created.
+    again, note2, errors2 = fm.prepare_workspace(
+        spec="workflows/repository/demo.yaml", goal="g", model="m"
+    )
+    assert errors2 == [] and again == path and "reused" in note2
+
+    # A dirty candidate refuses — never mutated to fit.
+    (path / "dirty.txt").write_text("d", encoding="utf-8")
+    _p, _n, dirty_errors = fm.prepare_workspace(
+        spec="workflows/repository/demo.yaml", goal="g", model="m"
+    )
+    assert any("uncommitted changes" in e for e in dirty_errors)
+
+    # A different request derives a different workspace (the name carries its digest).
+    other, _n, errors4 = fm.prepare_workspace(
+        spec="workflows/repository/demo.yaml", goal="other", model="m"
+    )
+    assert errors4 == [] and other != path
+
+
+def test_prepare_workspace_refuses_a_non_worktree_candidate(tmp_path, monkeypatch):
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    plain = worktrees / "wt_demo_deadbeef"
+    plain.mkdir()
+    monkeypatch.setattr(fm, "_derived_workspace_path", lambda spec, digest: plain)
+    _p, _n, errors = fm.prepare_workspace(spec="s", goal="g", model="m")
+    assert any("not a git worktree" in e for e in errors)
+
+
+def test_prepare_workspace_reuses_the_parent_runs_workdir(tmp_path, monkeypatch):
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    path, _n, _e = fm.prepare_workspace(spec="s", goal="g", model="m")
+    ledger_dir = repo / "experiments" / "results" / "workflows" / "demo"
+    ledger_dir.mkdir(parents=True)
+    (ledger_dir / "20260916T000000000000Z_run-parent.json").write_text(
+        json.dumps({"workdir": str(path)}), encoding="utf-8"
+    )
+    reused, note, errors = fm.prepare_workspace(
+        spec="s", goal="g", model="m", resume=True, parent_run_id="run-parent"
+    )
+    assert errors == [] and reused == path and "parent run run-parent" in note
+
+    _p, _n, missing = fm.prepare_workspace(
+        spec="s", goal="g", model="m", resume=True, parent_run_id="run-missing"
+    )
+    assert any("no ledger found" in e for e in missing)
+
+
+def test_submit_cli_json_result_is_structured(monkeypatch, capsys):
+    """The durable interface is the fleet-submit/v1 document — never a parsed log line."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    rc = fm.main([
+        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
+        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
+        "--json",
+    ])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert payload["schema"] == "fleet-submit/v1"
+    assert payload["job_id"] and payload["reconciled"] is False
+    assert payload["status"] == "launching"
+    assert payload["workdir"] == "/tmp/wt_cli"
+    assert payload["spec"] == "workflows/repository/fleet_job_submission.yaml"
+    assert payload["request_key"] == ""  # no key, no retry-safe: the caller chose neither
+    assert payload["prep_note"] == ""
+
+
+def test_submit_cli_prepares_a_workspace_when_workdir_is_omitted(tmp_path, monkeypatch, capsys):
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    rc = fm.main([
+        "submit", "--spec", "workflows/repository/demo.yaml",
+        "--goal", "g", "--model", "m", "--json",
+    ])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert payload["workdir"].startswith(str(worktrees))
+    assert "prepared" in payload["prep_note"]
+    assert Path(payload["workdir"]).exists()
