@@ -1040,6 +1040,9 @@ def _checkout_identity(checkout: Path) -> dict | None:
         "name": _normalize_project(checkout.name),
         "canonical_name": canonical,
         "origin": _normalize_project(origin),
+        #: The RAW origin string — needed to tell a remote URL from a local path when a
+        #: provenance stamp is audited (round-7: a conflicting remote origin defeats it).
+        "origin_raw": origin,
         "common_dir": str(common) if common is not None else "",
         "provenance": provenance,
         "is_git": common is not None,
@@ -1076,9 +1079,22 @@ def _project_agreement(repo_root: Path, workdir: str) -> tuple[set[str], list[st
             # independent repository with a LOCAL origin path, so it shares neither origin
             # nor common git dir with the spec repository — but it was cloned FROM it and
             # carries the stamped source identity. An equal origin or the source's common
-            # git dir proves the derivation; a FOREIGN clone's provenance matches neither
-            # and still refuses below.
+            # git dir proves the derivation; an explicitly conflicting REMOTE origin
+            # defeats a stamp (round-7 repair, 2026-09-16 — the previous upgrader could
+            # write a canonical stamp onto a fork clone; that stale stamp does not override
+            # the fork's own origin), and a foreign clone matches neither and refuses.
+            origin_raw = str(work.get("origin_raw") or "")
+            explicit_remote = bool(origin_raw) and (
+                "://" in origin_raw or origin_raw.startswith("git@")
+            )
             provenance = _provenance_identity(work.get("provenance", ""))
+            if explicit_remote and provenance:
+                return set(), [
+                    "submit: the worktree's remote origin "
+                    f"{work['origin']} names a DIFFERENT project than the spec repository "
+                    f"({repo['origin'] or repo['common_dir'] or repo['name']}) — an "
+                    "explicitly conflicting origin is never overridden by a provenance stamp"
+                ]
             if provenance and provenance in (repo["origin"], repo["common_dir"]):
                 shared = provenance
         if not shared:

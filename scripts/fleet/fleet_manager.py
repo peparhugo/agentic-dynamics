@@ -456,11 +456,16 @@ def _stamped_provenance(clone: Path) -> str:
 
 
 def _canonical_project_token(repo_root: Path) -> str:
-    """The canonical project's identity token: its origin URL, else its common git dir."""
+    """The canonical project's identity token: its origin URL, else its common git dir.
+
+    The URL is NORMALIZED so the token vocabulary matches every other origin token
+    (:func:`_origin_chain_identity`, the per-clone origin tokens) — a raw-vs-normalized
+    mismatch would refuse legitimate clones.
+    """
     rc, out = _git_run("config", "--get", "remote.origin.url", cwd=repo_root)
     origin = out.strip() if rc == 0 else ""
     if origin:
-        return f"origin:{origin}"
+        return f"origin:{broker_contract.normalize_project(origin)}"
     rc, out = _git_run("rev-parse", "--git-common-dir", cwd=repo_root)
     common = out.strip() if rc == 0 else ""
     if not common:
@@ -482,12 +487,6 @@ def _clone_origin(clone: Path) -> str:
     return out.strip() if rc == 0 else ""
 
 
-def _canonical_origin_url(repo_root: Path) -> str:
-    """The canonical repository's raw ``remote.origin.url`` ('' when it declares none)."""
-    rc, out = _git_run("config", "--get", "remote.origin.url", cwd=repo_root)
-    return out.strip() if rc == 0 else ""
-
-
 def _same_repo_identity(a: Path, b: Path) -> bool:
     """Whether two paths share ONE common git dir (the same repository / its worktrees)."""
     common_a = _git_run("rev-parse", "--git-common-dir", cwd=a)[1].strip()
@@ -503,12 +502,22 @@ def _same_repo_identity(a: Path, b: Path) -> bool:
     return path_a == path_b
 
 
-def _origin_chain_token(path: Path, *, _seen: set[str] | None = None, _depth: int = 0) -> str:
-    """The terminal identity token of a local-path origin CHAIN: a normalized URL, else ''.
+def _is_remote_origin(origin: str) -> bool:
+    """Whether a raw origin string names a REMOTE (URL) rather than a local path."""
+    return bool(origin) and ("://" in origin or origin.startswith("git@"))
 
-    ``git clone <local path>`` records a local path origin; following it (bounded, cycle-safe)
-    reaches the repo whose origin is the project URL — that URL is the comparable identity.
-    A chain terminating in a repo with no remote has NO URL identity ('').
+
+def _origin_chain_identity(
+    path: Path, *, _seen: set[str] | None = None, _depth: int = 0
+) -> str:
+    """The terminal project-identity token of a local-path origin CHAIN ('' when none).
+
+    ``git clone <local path>`` records a local path origin; following it (bounded,
+    cycle-safe) reaches the terminal repository. The token vocabulary is the SAME as
+    :func:`_canonical_project_token` — ``origin:<normalized url>``, else
+    ``git-dir:<common git dir>`` — so a chain ending at the canonical repository compares
+    EQUAL to the canonical token whether the canonical is remote-backed or local-only. A
+    path origin that cannot be followed at this view returns '' (unknown).
     """
     seen = _seen if _seen is not None else set()
     try:
@@ -519,13 +528,21 @@ def _origin_chain_token(path: Path, *, _seen: set[str] | None = None, _depth: in
         return ""
     seen.add(key)
     origin = _clone_origin(path)
-    if origin and ("://" in origin or origin.startswith("git@")):
-        return broker_contract.normalize_project(origin)
+    if origin and _is_remote_origin(origin):
+        return f"origin:{broker_contract.normalize_project(origin)}"
     if origin:
         nxt = Path(origin).expanduser()
-        if nxt.is_dir() and (nxt / ".git").exists():
-            return _origin_chain_token(nxt, _seen=seen, _depth=_depth + 1)
-    return ""
+        if not (nxt.is_dir() and (nxt / ".git").exists()):
+            return ""  # an origin that cannot be followed at this view: unknown
+        return _origin_chain_identity(nxt, _seen=seen, _depth=_depth + 1)
+    rc, out = _git_run("rev-parse", "--git-common-dir", cwd=path)
+    common = out.strip() if rc == 0 else ""
+    if not common:
+        return ""
+    common_path = Path(common)
+    if not common_path.is_absolute():
+        common_path = (path / common_path).resolve()
+    return f"git-dir:{common_path}"
 
 
 def _shares_root(clone: Path, repo_root: Path) -> bool:
@@ -543,101 +560,110 @@ def _shares_root(clone: Path, repo_root: Path) -> bool:
 def _ensure_clone_provenance(
     clone: Path, repo_root: Path, *, parent_run_id: str = ""
 ) -> list[str]:
-    """Verify a PRE-FIX clone's project identity and stamp it — identity BEFORE ancestry.
+    """Verify a clone's project identity and stamp it when needed — EVIDENCE BEFORE TRUST.
 
-    A clone created before the provenance stamp carries only git's default origin (the
-    source as the creating context saw it, e.g. the container view ``/repo``). The identity
-    channels, in order (round-6 repair, 2026-09-16):
+    The identity channels are evaluated FIRST, whether or not a provenance stamp exists
+    (round-7 repair, 2026-09-16: a stale stamp written by the previous ancestry-only
+    upgrader must never override an explicitly conflicting origin — a fork clone carrying
+    a canonical stamp was still accepted). An unstamped clone additionally needs a channel
+    to prove its identity before being stamped:
 
-    1. An EXPLICIT origin that conflicts with the canonical project REFUSES FIRST — a fork
-       shares the canonical history but has its own origin, and shared ancestry must never
-       establish identity (``origin:<url>`` equal to the canonical's normalized URL, or a
-       local-path origin that RESOLVES at this view to a repository with the canonical's
-       common git dir / the canonical origin, is accepted; anything else refuses).
-    2. A container-local origin (``/repo``) is established through the run/source
-       relationship: the clone must be a run clone under the canonical runs root (the
-       parent run id, when supplied, must map to exactly this path), with shared ancestry
-       as CORROBORATION only.
-    3. No origin at all: nothing to verify — refused.
+    1. An explicit REMOTE origin must normalize equal to the canonical token — a conflict
+       refuses, stamp or no stamp.
+    2. A local-path origin that RESOLVES at this view must be the canonical repository
+       itself, or an origin chain ending at the canonical token — otherwise it refuses.
+    3. A container-local origin (``/repo``) is the canonical mount view: a stamped clone
+       stands on its stamp; an unstamped clone is established through the run/source
+       relationship (run-clone path under the canonical runs root, the parent run id when
+       supplied) with shared ancestry as CORROBORATION.
+    4. No origin: a stamp stands; an unstamped clone refuses (nothing to verify).
 
-    On success the clone is stamped exactly as a fresh clone would be; nothing else about
-    it is touched — its candidate commits and worktree are preserved.
+    On success an unstamped clone is stamped exactly as a fresh clone would be; nothing
+    else about it is touched — its candidate commits and worktree are preserved.
     """
-    if _stamped_provenance(clone):
-        return []  # already stamped (validated when written)
-    from agentic_dynamics.core.paths import PathConfig
-    from agentic_dynamics.runtime.run_clone import PROJECT_PROVENANCE_KEY, run_clone_dir
-
-    canonical_url = _canonical_origin_url(repo_root)
-    canonical_norm = broker_contract.normalize_project(canonical_url) if canonical_url else ""
+    stamp_present = bool(_stamped_provenance(clone))
+    canonical_token = _canonical_project_token(repo_root)
     origin = _clone_origin(clone)
+    verified = False
 
-    if origin and ("://" in origin or origin.startswith("git@")):
-        # An explicit remote origin: it either IS the canonical project or it is not.
-        origin_norm = broker_contract.normalize_project(origin)
-        if not canonical_norm:
-            return [
-                f"submit: the parent clone {clone} names origin {origin!r}, but the "
-                "canonical repository declares no origin — the project identity cannot be "
-                "verified; refusing to continue (shared history alone is not identity)"
-            ]
-        if origin_norm != canonical_norm:
+    if origin and _is_remote_origin(origin):
+        # An explicit remote origin: it either IS the canonical project or it is not. This
+        # runs even with a stamp present — a stamp never overrides its own origin.
+        origin_token = f"origin:{broker_contract.normalize_project(origin)}"
+        if origin_token != canonical_token:
             return [
                 f"submit: the parent clone {clone} names origin {origin!r}, which CONFLICTS "
-                f"with the canonical origin {canonical_url!r} — a different project (e.g. a "
-                "fork) is never accepted, shared history notwithstanding"
+                "with the canonical project — an explicitly different remote origin is never "
+                "accepted (a fork is not the canonical repository, and no provenance stamp "
+                "overrides its own origin)"
             ]
+        verified = True
     elif origin:
         resolved_origin = Path(origin).expanduser()
         if resolved_origin.is_dir() and (resolved_origin / ".git").exists():
             # A local-path origin that resolves at THIS view: identity is the repo it names.
             if _same_repo_identity(resolved_origin, repo_root):
-                pass  # the canonical repository itself (or a worktree of it)
+                verified = True  # the canonical repository itself (or a worktree of it)
             else:
-                chain = _origin_chain_token(resolved_origin)
-                if not (chain and canonical_norm and chain == canonical_norm):
+                chain = _origin_chain_identity(resolved_origin)
+                if chain and chain == canonical_token:
+                    verified = True
+                else:
                     return [
                         f"submit: the parent clone {clone} names origin {origin!r}, which "
                         "resolves to a DIFFERENT repository than the canonical project — "
-                        "refusing to continue (shared history alone is not identity)"
+                        "refusing to continue (provenance is never assumed from history)"
                     ]
         elif origin.rstrip("/") in _CONTAINER_REPO_VIEWS:
-            # The container-local view of the canonical repository: the run/source
-            # relationship is the evidence — the clone must be a run clone under the
-            # canonical runs root, and shared ancestry must CORROBORATE it.
-            cfg = PathConfig.from_env(require_existing=False)
-            if not cfg.is_run_clone_dir(clone):
-                return [
-                    f"submit: the parent clone {clone} names the container-local origin "
-                    f"{origin!r} but is not a run clone under {cfg.runs_root} — the "
-                    "source relationship cannot be established; refusing"
-                ]
-            if parent_run_id and run_clone_dir(parent_run_id) != clone:
-                return [
-                    f"submit: the parent run {parent_run_id!r} does not map to the clone "
-                    f"{clone} — the source relationship cannot be established; refusing"
-                ]
-            if not _shares_root(clone, repo_root):
-                return [
-                    f"submit: the parent clone {clone} shares no history with the canonical "
-                    "repository — the container-local origin cannot be corroborated; "
-                    "refusing to continue"
-                ]
-        else:
-            return [
-                f"submit: the parent clone {clone} names origin {origin!r}, which cannot be "
-                "resolved at this view nor recognized as the canonical container path — "
-                "refusing to continue"
-            ]
-    else:
-        return [
-            f"submit: the parent clone {clone} has no origin — its project identity cannot "
-            "be verified; refusing to continue (shared history alone is not identity)"
-        ]
+            if stamp_present:
+                verified = True  # the stamp stands; the container view is its expected shape
+            else:
+                # The run/source relationship is the evidence — the clone must be a run
+                # clone under the canonical runs root, corroborated by shared ancestry.
+                from agentic_dynamics.core.paths import PathConfig
+                from agentic_dynamics.runtime.run_clone import run_clone_dir
 
-    token = _canonical_project_token(repo_root)
-    if token:
-        _git_run("config", PROJECT_PROVENANCE_KEY, token, cwd=clone)
+                cfg = PathConfig.from_env(require_existing=False)
+                if not cfg.is_run_clone_dir(clone):
+                    return [
+                        f"submit: the parent clone {clone} names the container-local origin "
+                        f"{origin!r} but is not a run clone under {cfg.runs_root} — the "
+                        "source relationship cannot be established; refusing"
+                    ]
+                if parent_run_id and run_clone_dir(parent_run_id) != clone:
+                    return [
+                        f"submit: the parent run {parent_run_id!r} does not map to the clone "
+                        f"{clone} — the source relationship cannot be established; refusing"
+                    ]
+                if not _shares_root(clone, repo_root):
+                    return [
+                        f"submit: the parent clone {clone} shares no history with the "
+                        "canonical repository — the container-local origin cannot be "
+                        "corroborated; refusing to continue"
+                    ]
+                verified = True
+        else:
+            if stamp_present:
+                verified = True  # an unresolvable local path contradicts nothing
+            else:
+                return [
+                    f"submit: the parent clone {clone} names origin {origin!r}, which cannot "
+                    "be resolved at this view nor recognized as the canonical container "
+                    "path — refusing to continue"
+                ]
+    else:
+        if not stamp_present:
+            return [
+                f"submit: the parent clone {clone} has no origin and no provenance stamp — "
+                "its project identity cannot be verified; refusing to continue"
+            ]
+        verified = True  # a stamp with no origin: nothing contradicts it
+
+    if verified and not stamp_present:
+        from agentic_dynamics.runtime.run_clone import PROJECT_PROVENANCE_KEY
+
+        if canonical_token:
+            _git_run("config", PROJECT_PROVENANCE_KEY, canonical_token, cwd=clone)
     return []
 
 

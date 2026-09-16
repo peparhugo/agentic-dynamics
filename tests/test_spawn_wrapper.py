@@ -3064,3 +3064,50 @@ def test_a_two_step_local_origin_chain_resolves_to_the_canonical_identity(
     errors = fm._ensure_clone_provenance(chained, canonical, parent_run_id="run-chain")
     assert errors == [], errors
     assert _clone_provenance(chained) != ""
+
+
+def test_a_stale_canonical_stamp_never_overrides_a_foreign_remote_origin(
+    aio_env, tmp_path, monkeypatch
+):
+    """Round-7 finding (2026-09-16): the PREVIOUS ancestry-only upgrader could write a
+    canonical provenance stamp onto a fork clone. An explicitly conflicting REMOTE origin
+    must defeat that stale stamp — in preparation AND at the submission validator."""
+    canonical = _git_project(
+        tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git"
+    )
+    fm, cfg, _clone = _continuation_fixture(tmp_path, monkeypatch, canonical)
+
+    # The contradictory artifact: a clone of the canonical whose ORIGIN names the fork,
+    # carrying the stale canonical stamp the previous upgrader wrote.
+    fork_stamped = cfg.runs_root / "run-fork" / "repo"
+    fork_stamped.parent.mkdir(parents=True)
+    subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", "--", str(canonical), str(fork_stamped)],
+        check=True,
+    )
+    stale = "origin:git@github.com:peparhugo/agentic-dynamics.git"
+    subprocess.run(
+        ["git", "-C", str(fork_stamped), "remote", "set-url", "origin",
+         "git@github.com:other/agentic-dynamics.git"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(fork_stamped), "config", "agentic-dynamics.project", stale],
+        check=True,
+    )
+    assert _clone_provenance(fork_stamped) == stale  # the contradictory state, reproduced
+
+    # 1) Preparation refuses DESPITE the stamp.
+    errors = fm._ensure_clone_provenance(fork_stamped, canonical, parent_run_id="run-fork")
+    assert errors and "CONFLICTS" in errors[0], errors
+
+    # 2) The submission validator refuses DESPITE the stamp.
+    binding_id = _bound_store(aio_env)
+    validation_errors = validate_submit_request(
+        _valid_submit_request(
+            actor="aio", aio=_aio_block(binding_id=binding_id), workdir=str(fork_stamped),
+        ),
+        repo_root=canonical,
+        path_config=cfg,
+    )
+    assert any("DIFFERENT project" in e for e in validation_errors), validation_errors
