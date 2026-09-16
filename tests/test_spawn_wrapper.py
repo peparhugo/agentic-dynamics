@@ -2731,9 +2731,22 @@ def _local_only_repo(tmp_path: Path, name: str) -> Path:
     return root
 
 
-def _continuation_fixture(tmp_path, monkeypatch, canonical: Path):
+def _clone_provenance(path: Path) -> str:
+    """The clone's stamped project provenance ('' when unstamped)."""
+    proc = subprocess.run(
+        ["git", "-C", str(path), "config", "--get", "agentic-dynamics.project"],
+        capture_output=True, text=True,
+    )
+    return proc.stdout.strip() if proc.returncode == 0 else ""
+
+
+def _continuation_fixture(tmp_path, monkeypatch, canonical: Path, *, stamped: bool = True):
     """A parent run's private clone (with a phase commit) + its ledger + the preparer wired
-    in + the submit spec present at the canonical root. Returns (fm, cfg, clone)."""
+    in + the submit spec present at the canonical root. Returns (fm, cfg, clone_path).
+
+    ``stamped=False`` builds the PRE-FIX shape by hand: ``git clone`` only (local origin,
+    no provenance stamp), exactly how a clone created before the provenance fix looks.
+    """
     import importlib
     import sys as _sys
 
@@ -2757,13 +2770,21 @@ def _continuation_fixture(tmp_path, monkeypatch, canonical: Path):
         state_root=tmp_path / "state",
         auth_home=tmp_path / "auth",
     )
-    clone = create_run_clone("run-parent", path_config=cfg)
-    git = ["git", "-C", str(clone.path), "-c", "user.email=t@t", "-c", "user.name=t"]
-    (clone.path / "phase.txt").write_text("built", encoding="utf-8")
+    if stamped:
+        clone_path = create_run_clone("run-parent", path_config=cfg).path
+    else:
+        clone_path = runs_root / "run-parent" / "repo"
+        clone_path.parent.mkdir(parents=True)
+        subprocess.run(
+            ["git", "clone", "-q", "--no-hardlinks", "--", str(canonical), str(clone_path)],
+            check=True,
+        )
+    git = ["git", "-C", str(clone_path), "-c", "user.email=t@t", "-c", "user.name=t"]
+    (clone_path / "phase.txt").write_text("built", encoding="utf-8")
     subprocess.run([*git, "add", "-A"], check=True)
     subprocess.run([*git, "commit", "-qm", "[workflow] build"], check=True)
     candidate = subprocess.run(
-        ["git", "-C", str(clone.path), "rev-parse", "HEAD"], capture_output=True, text=True
+        ["git", "-C", str(clone_path), "rev-parse", "HEAD"], capture_output=True, text=True
     ).stdout.strip()
     ledger_dir = canonical / "experiments" / "results" / "workflows" / "demo"
     ledger_dir.mkdir(parents=True)
@@ -2781,7 +2802,7 @@ def _continuation_fixture(tmp_path, monkeypatch, canonical: Path):
     fm = importlib.import_module("fleet_manager")
     monkeypatch.setenv("FINOPS_RUNS_ROOT", str(runs_root))
     monkeypatch.setattr(fm, "_REPO_ROOT", canonical)
-    return fm, cfg, clone
+    return fm, cfg, clone_path
 
 
 def _continuation_request(prepared, binding_id: str) -> dict:
@@ -2808,7 +2829,7 @@ def test_a_prepared_continuation_passes_the_aio_boundary_with_an_origin(
     prepared, note, errors = fm.prepare_workspace(
         spec="demo", goal="g", model="m", resume=True, parent_run_id="run-parent"
     )
-    assert errors == [] and prepared == clone.path
+    assert errors == [] and prepared == clone
 
     binding_id = _bound_store(aio_env)
     validation_errors = validate_submit_request(
@@ -2829,7 +2850,7 @@ def test_a_prepared_continuation_passes_the_aio_boundary_local_only(
     prepared, note, errors = fm.prepare_workspace(
         spec="demo", goal="g", model="m", resume=True, parent_run_id="run-parent"
     )
-    assert errors == [] and prepared == clone.path
+    assert errors == [] and prepared == clone
 
     binding_id = _bound_store(aio_env)
     validation_errors = validate_submit_request(
@@ -2861,3 +2882,62 @@ def test_a_foreign_clone_still_refuses_at_the_aio_boundary(aio_env, tmp_path, mo
         path_config=cfg,
     )
     assert any("DIFFERENT project" in e for e in errors), errors
+
+
+def test_a_pre_fix_clone_is_verified_and_stamped_then_passes_the_boundary(
+    aio_env, tmp_path, monkeypatch
+):
+    """Round-5 finding (2026-09-16): a parent clone created BEFORE the provenance stamp
+    (local origin, no stamp) must still continue — preparation verifies it by SHARED HISTORY
+    and stamps it (candidate commits untouched), and the real AIO boundary then passes."""
+    canonical = _git_project(
+        tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git"
+    )
+    fm, cfg, clone = _continuation_fixture(tmp_path, monkeypatch, canonical, stamped=False)
+    # The fixture really is the pre-fix shape: local origin, no provenance stamp.
+    assert _clone_provenance(clone) == ""
+
+    prepared, note, errors = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-parent"
+    )
+    assert errors == [] and prepared == clone
+    # Verified and stamped at preparation — the stamp now carries the canonical identity.
+    assert _clone_provenance(clone) != ""
+
+    binding_id = _bound_store(aio_env)
+    validation_errors = validate_submit_request(
+        _continuation_request(prepared, binding_id),
+        repo_root=canonical,
+        path_config=cfg,
+    )
+    assert validation_errors == [], validation_errors
+
+
+def test_a_foreign_pre_fix_clone_is_never_stamped(aio_env, tmp_path, monkeypatch):
+    """The pre-fix verification preserves the foreign-project check: a clone of an unrelated
+    repository shares no history with the canonical one, refuses — and is never stamped.
+
+    The foreign fixture gets a genuinely DIFFERENT root commit (distinct content + message):
+    git identity is content-addressed, so fixtures that happen to produce bit-identical
+    roots would be the same lineage by git's own model.
+    """
+    canonical = _local_only_repo(tmp_path, "canonical")
+    fm, cfg, _clone = _continuation_fixture(tmp_path, monkeypatch, canonical)
+
+    foreign = tmp_path / "foreign"
+    foreign.mkdir()
+    subprocess.run(["git", "init", "-q", str(foreign)], check=True)
+    (foreign / "different.txt").write_text("foreign-only", encoding="utf-8")
+    git = ["git", "-C", str(foreign), "-c", "user.email=t@t", "-c", "user.name=t"]
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "foreign root"], check=True)
+
+    foreign_clone = cfg.runs_root / "run-foreign" / "repo"
+    foreign_clone.parent.mkdir(parents=True)
+    subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", "--", str(foreign), str(foreign_clone)],
+        check=True,
+    )
+    errors = fm._ensure_clone_provenance(foreign_clone, canonical)
+    assert any("shares no history" in e for e in errors), errors
+    assert _clone_provenance(foreign_clone) == ""

@@ -926,3 +926,67 @@ def test_auto_key_retry_reuses_the_recorded_suffixed_workspace(tmp_path, monkeyp
     assert retry["reconciled"] is True and retry["job_id"] == second["job_id"]
     assert retry["workdir"] == second["workdir"]
     assert len(r._lists[fm.COMMANDS_KEY]) == 2  # one command per logical task
+
+
+def test_two_successive_continuations_keep_the_canonical_provenance(tmp_path, monkeypatch):
+    """Round-5 finding (2026-09-16): for a project WITHOUT an origin remote, cloning a clone
+    replaced the recorded canonical git dir with its local origin path — the SECOND
+    continuation then failed validation. The validated provenance must survive generations."""
+    from agentic_dynamics.core.paths import PathConfig as _PathConfig
+    from agentic_dynamics.runtime.run_clone import create_run_clone
+
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    runs_root = tmp_path / "runs"
+    runs_root.mkdir()
+    monkeypatch.setenv("FINOPS_RUNS_ROOT", str(runs_root))
+    cfg = _PathConfig.from_env(require_existing=False)
+    ledger_dir = repo / "experiments" / "results" / "workflows" / "demo"
+    ledger_dir.mkdir(parents=True)
+
+    # Generation 1: the first run's clone (stamped with the canonical git dir).
+    gen1 = create_run_clone("run-gen1", source_repo=repo, path_config=cfg)
+    git = ["git", "-C", str(gen1.path), "-c", "user.email=t@t", "-c", "user.name=t"]
+    (gen1.path / "p1.txt").write_text("one", encoding="utf-8")
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "[workflow] p1"], check=True)
+    c1 = subprocess.run(
+        ["git", "-C", str(gen1.path), "rev-parse", "HEAD"], capture_output=True, text=True
+    ).stdout.strip()
+    (ledger_dir / "20260916T000000000000Z_run-gen1.json").write_text(
+        json.dumps({"run_id": "run-gen1", "git_sha": c1,
+                    "phases": [{"phase": "p1", "status": "ok"}]}),
+        encoding="utf-8",
+    )
+
+    # Continuation 1: prepared from gen1 (verified + stamped).
+    prep1, _note1, errors1 = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-gen1"
+    )
+    assert errors1 == [] and prep1 == gen1.path
+    token = fm._stamped_provenance(gen1.path)
+    assert token and not token.startswith("origin:")  # the canonical git-dir identity
+
+    # Generation 2: a clone created FROM the prepared workspace (as the run's composition
+    # root does) INHERITS the stamp — never the local origin path.
+    gen2 = create_run_clone("run-gen2", source_repo=gen1.path, path_config=cfg)
+    assert fm._stamped_provenance(gen2.path) == token
+
+    (gen2.path / "p2.txt").write_text("two", encoding="utf-8")
+    git2 = ["git", "-C", str(gen2.path), "-c", "user.email=t@t", "-c", "user.name=t"]
+    subprocess.run([*git2, "add", "-A"], check=True)
+    subprocess.run([*git2, "commit", "-qm", "[workflow] p2"], check=True)
+    c2 = subprocess.run(
+        ["git", "-C", str(gen2.path), "rev-parse", "HEAD"], capture_output=True, text=True
+    ).stdout.strip()
+    (ledger_dir / "20260916T000000000001Z_run-gen2.json").write_text(
+        json.dumps({"run_id": "run-gen2", "git_sha": c2,
+                    "phases": [{"phase": "p2", "status": "ok"}]}),
+        encoding="utf-8",
+    )
+
+    # Continuation 2: prepared from gen2 — must succeed with the canonical identity intact.
+    prep2, _note2, errors2 = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-gen2"
+    )
+    assert errors2 == [] and prep2 == gen2.path
+    assert fm._stamped_provenance(gen2.path) == token

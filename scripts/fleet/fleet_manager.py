@@ -447,6 +447,74 @@ def _parent_run_ledger(parent_run_id: str) -> dict | None:
     return None
 
 
+def _stamped_provenance(clone: Path) -> str:
+    """The clone's stamped project provenance ('' when unstamped)."""
+    from agentic_dynamics.runtime.run_clone import PROJECT_PROVENANCE_KEY
+
+    rc, out = _git_run("config", "--get", PROJECT_PROVENANCE_KEY, cwd=clone)
+    return out.strip() if rc == 0 else ""
+
+
+def _canonical_project_token(repo_root: Path) -> str:
+    """The canonical project's identity token: its origin URL, else its common git dir."""
+    rc, out = _git_run("config", "--get", "remote.origin.url", cwd=repo_root)
+    origin = out.strip() if rc == 0 else ""
+    if origin:
+        return f"origin:{origin}"
+    rc, out = _git_run("rev-parse", "--git-common-dir", cwd=repo_root)
+    common = out.strip() if rc == 0 else ""
+    if not common:
+        return ""
+    common_path = Path(common)
+    if not common_path.is_absolute():
+        common_path = (repo_root / common_path).resolve()
+    return f"git-dir:{common_path}"
+
+
+def _ensure_clone_provenance(clone: Path, repo_root: Path) -> list[str]:
+    """Verify a PRE-FIX clone's derivation from the canonical project and stamp it.
+
+    A clone created before the provenance stamp carries only git's default LOCAL origin (the
+    source path as the creating container saw it, e.g. ``/repo``), which the project
+    validator cannot match — validation refused an otherwise valid continuation (round-5
+    finding, 2026-09-16). Verification is by SHARED HISTORY: a clone copies its source's
+    full history, so a clone derived from THIS project carries this project's root commit;
+    a foreign clone carries a different root and refuses. On success the clone is stamped
+    exactly as a fresh clone would be; nothing else about it is touched — its candidate
+    commits and worktree are preserved.
+    """
+    if _stamped_provenance(clone):
+        return []  # already stamped (validated when written)
+    rc, roots_out = _git_run("rev-list", "--max-parents=0", "HEAD", cwd=clone)
+    if rc != 0:
+        return [
+            f"submit: cannot read {clone}'s history to verify its project provenance "
+            f"({roots_out or 'git rev-list failed'}) — refusing the continuation"
+        ]
+    roots = [line.strip() for line in roots_out.splitlines() if line.strip()]
+    if not roots:
+        return [
+            f"submit: {clone} has no root commit — its derivation cannot be verified; "
+            "refusing the continuation"
+        ]
+    verified = any(
+        _git_run("cat-file", "-e", f"{root}^{{commit}}", cwd=repo_root)[0] == 0
+        for root in roots
+    )
+    if not verified:
+        return [
+            f"submit: the parent clone {clone} shares no history with the canonical "
+            "repository — its derivation cannot be verified; refusing to continue from it "
+            "(a foreign clone is never accepted)"
+        ]
+    token = _canonical_project_token(repo_root)
+    if token:
+        from agentic_dynamics.runtime.run_clone import PROJECT_PROVENANCE_KEY
+
+        _git_run("config", PROJECT_PROVENANCE_KEY, token, cwd=clone)
+    return []
+
+
 def _candidate_present(tree: Path, candidate: str) -> list[str]:
     """The candidate commit must EXIST in ``tree`` and be reachable from its HEAD.
 
@@ -511,6 +579,11 @@ def prepare_workspace(
                 f"prepared without it (candidate {candidate[:12] or 'unknown'})"
             ]
         errors = _candidate_present(clone, candidate)
+        if errors:
+            return None, "", errors
+        # A PRE-FIX clone (created before the provenance stamp) is verified by shared
+        # history and stamped here, so validation sees the canonical project identity.
+        errors = _ensure_clone_provenance(clone, Path(_REPO_ROOT))
         if errors:
             return None, "", errors
         return clone, (
