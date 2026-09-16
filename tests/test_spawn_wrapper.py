@@ -2939,5 +2939,128 @@ def test_a_foreign_pre_fix_clone_is_never_stamped(aio_env, tmp_path, monkeypatch
         check=True,
     )
     errors = fm._ensure_clone_provenance(foreign_clone, canonical)
-    assert any("shares no history" in e for e in errors), errors
+    assert any("DIFFERENT repository" in e for e in errors), errors
     assert _clone_provenance(foreign_clone) == ""
+
+
+def _fork_of(canonical: Path, tmp_path: Path, name: str, url: str) -> Path:
+    """A clone of ``canonical`` with a FORK's origin (shared history, different project)."""
+    fork = tmp_path / name
+    subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", "--", str(canonical), str(fork)], check=True
+    )
+    subprocess.run(["git", "-C", str(fork), "remote", "set-url", "origin", url], check=True)
+    (fork / "fork-only.txt").write_text("fork", encoding="utf-8")
+    git = ["git", "-C", str(fork), "-c", "user.email=t@t", "-c", "user.name=t"]
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "fork change"], check=True)
+    return fork
+
+
+def test_a_foreign_fork_with_shared_history_is_never_stamped(aio_env, tmp_path, monkeypatch):
+    """Round-6 finding (2026-09-16): a FORK shares the canonical root commit but has its own
+    origin. Preparation must NOT stamp it — the explicit origin conflict refuses first, and
+    shared ancestry may only corroborate a relationship, never establish identity."""
+    canonical = _git_project(
+        tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git"
+    )
+    fm, cfg, _clone = _continuation_fixture(tmp_path, monkeypatch, canonical)
+    fork = _fork_of(canonical, tmp_path, "fork", "git@github.com:other/agentic-dynamics.git")
+
+    # A pre-fix clone OF THE FORK: shared root history, origin = the fork's local path.
+    fork_clone = cfg.runs_root / "run-fork" / "repo"
+    fork_clone.parent.mkdir(parents=True)
+    subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", "--", str(fork), str(fork_clone)],
+        check=True,
+    )
+    head = subprocess.run(
+        ["git", "-C", str(fork_clone), "rev-parse", "HEAD"], capture_output=True, text=True
+    ).stdout.strip()
+    assert fm._shares_root(fork_clone, canonical)  # the regression's precondition
+
+    # Direct verification: refused, never stamped.
+    errors = fm._ensure_clone_provenance(fork_clone, canonical, parent_run_id="run-fork")
+    assert any("DIFFERENT repository" in e for e in errors), errors
+    assert _clone_provenance(fork_clone) == ""
+
+    # Through PREPARATION: the fork clone + its ledger refuses (and stays unstamped).
+    ledger_dir = canonical / "experiments" / "results" / "workflows" / "demo"
+    (ledger_dir / "20260916T000000000000Z_run-fork.json").write_text(
+        json.dumps({"run_id": "run-fork", "git_sha": head,
+                    "phases": [{"phase": "build", "status": "ok"}]}),
+        encoding="utf-8",
+    )
+    prepared, _note, prep_errors = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-fork"
+    )
+    assert prepared is None and prep_errors
+    assert _clone_provenance(fork_clone) == ""
+
+    # And the full submission validator still refuses it (no stamp was written).
+    binding_id = _bound_store(aio_env)
+    validation_errors = validate_submit_request(
+        _valid_submit_request(
+            actor="aio", aio=_aio_block(binding_id=binding_id), workdir=str(fork_clone),
+        ),
+        repo_root=canonical,
+        path_config=cfg,
+    )
+    assert any("DIFFERENT project" in e for e in validation_errors), validation_errors
+
+
+def test_a_container_local_repo_origin_is_established_by_record_and_mapping(
+    aio_env, tmp_path, monkeypatch
+):
+    """The legacy container-local case (retained from round 5): a pre-fix clone whose origin
+    is ``/repo`` (the compose mount view). The run/source relationship — run-clone path +
+    run id — establishes it, shared ancestry corroborates, and the real boundary passes."""
+    # The container view must not be a GIT repository on this host, or the resolved-path
+    # branch (correctly) takes precedence over the container-view channel.
+    assert not (Path("/repo") / ".git").exists(), "the container view must not be a repo here"
+    canonical = _git_project(
+        tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git"
+    )
+    fm, cfg, clone = _continuation_fixture(tmp_path, monkeypatch, canonical, stamped=False)
+    subprocess.run(
+        ["git", "-C", str(clone), "remote", "set-url", "origin", "/repo"], check=True
+    )
+    assert _clone_provenance(clone) == ""
+
+    errors = fm._ensure_clone_provenance(clone, canonical, parent_run_id="run-parent")
+    assert errors == [], errors
+    assert _clone_provenance(clone) != ""
+
+    binding_id = _bound_store(aio_env)
+    validation_errors = validate_submit_request(
+        _continuation_request(clone, binding_id),
+        repo_root=canonical,
+        path_config=cfg,
+    )
+    assert validation_errors == [], validation_errors
+
+
+def test_a_two_step_local_origin_chain_resolves_to_the_canonical_identity(
+    tmp_path, monkeypatch
+):
+    """A local-path origin chain (a clone of a clone of the canonical repo) resolves through
+    to the project URL — accepted with the canonical stamp. A fork anywhere in the chain
+    would end at the fork's URL and refuse (the fork test above)."""
+    canonical = _git_project(
+        tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git"
+    )
+    fm, cfg, _clone = _continuation_fixture(tmp_path, monkeypatch, canonical)
+    intermediate = tmp_path / "intermediate"
+    subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", "--", str(canonical), str(intermediate)],
+        check=True,
+    )
+    chained = cfg.runs_root / "run-chain" / "repo"
+    chained.parent.mkdir(parents=True)
+    subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", "--", str(intermediate), str(chained)],
+        check=True,
+    )
+    errors = fm._ensure_clone_provenance(chained, canonical, parent_run_id="run-chain")
+    assert errors == [], errors
+    assert _clone_provenance(chained) != ""

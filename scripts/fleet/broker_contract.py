@@ -295,6 +295,29 @@ def sanitize_namespace(namespace: str) -> str:
     return "/".join(parts)
 
 
+# ── project-identity normalization (shared with spawn_wrapper + fleet_manager) ─
+
+
+def normalize_project(value: str) -> str:
+    """Normalize a project identity for comparison: host/path form, no scheme/.git/case.
+
+    ONE definition (candidate-continuity work, 2026-09-16): the project validator compares
+    repository identities (origins, common git dirs) and the fleet-manager's clone-provenance
+    verification compares origin URLs — both must normalize the SAME way, or a clone whose
+    origin is legitimately equal in another spelling would be read as foreign.
+    """
+    text = str(value or "").strip().lower().rstrip("/")
+    if text.startswith("git@"):
+        text = text[4:].replace(":", "/", 1)
+    for prefix in ("ssh://git@", "ssh://", "https://", "http://", "git://"):
+        if text.startswith(prefix):
+            text = text[len(prefix):]
+            break
+    if text.endswith(".git"):
+        text = text[:-4]
+    return text
+
+
 # ── The shared profile→mounts expansion ─────────────────────────────────────
 
 

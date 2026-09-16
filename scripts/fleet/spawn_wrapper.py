@@ -105,6 +105,7 @@ _FLEET_DIR = Path(__file__).resolve().parent
 if str(_FLEET_DIR) not in sys.path:
     sys.path.insert(0, str(_FLEET_DIR))
 
+import broker_contract  # noqa: E402  (the module handle for the shared normalization)
 from broker_client import BrokerClient, BrokerError  # noqa: E402
 from broker_contract import (  # noqa: E402
     AUTH_CRED_FILE,
@@ -1012,17 +1013,12 @@ def _origin_url(git_dir: Path) -> str:
 
 
 def _normalize_project(value: str) -> str:
-    """Normalize a project identity for comparison: host/path form, no scheme/.git/case."""
-    text = str(value or "").strip().lower().rstrip("/")
-    if text.startswith("git@"):
-        text = text[4:].replace(":", "/", 1)
-    for prefix in ("ssh://git@", "ssh://", "https://", "http://", "git://"):
-        if text.startswith(prefix):
-            text = text[len(prefix):]
-            break
-    if text.endswith(".git"):
-        text = text[:-4]
-    return text
+    """Normalize a project identity for comparison — the SHARED contract's definition.
+
+    Delegates to ``broker_contract.normalize_project`` (one definition for the validator
+    and the fleet-manager's provenance verification).
+    """
+    return broker_contract.normalize_project(value)
 
 
 def _checkout_identity(checkout: Path) -> dict | None:
