@@ -216,6 +216,7 @@ def create_run_clone(
         else:
             _git("clone", "--no-hardlinks", "--", str(source), str(dest))
             head = _git("-C", str(dest), "rev-parse", "HEAD")
+        _stamp_project_provenance(dest, source)
         return RunClone(run_id=run_id, path=dest, base_sha=head)
     except RunCloneError:
         if dest.exists():
@@ -225,6 +226,111 @@ def create_run_clone(
 
 def _looks_like_repo(path: Path) -> bool:
     return (path / ".git").exists()
+
+
+#: The git config key a run clone carries to state its PROJECT PROVENANCE (candidate
+#: continuity, 2026-09-16). The clone is an independent repository whose default origin is
+#: the SOURCE'S LOCAL PATH; the project validator (``scripts/fleet/spawn_wrapper.py``) would
+#: read a continuation's clone as a DIFFERENT project from the canonical repository. The
+#: stamp records the source's canonical identity — ``origin:<url>`` (its origin remote URL)
+#: or ``git-dir:<absolute path>`` (its common git dir when it has no origin) — and the
+#: origin URL is aligned too, so nested clones transitively carry the canonical origin. A
+#: clone of a FOREIGN repository records the foreign identity: rejection is preserved.
+PROJECT_PROVENANCE_KEY = "agentic-dynamics.project"
+
+
+def _config_get(repo: Path, key: str) -> str:
+    """One ``git config --get``; '' on any failure (best-effort provenance read)."""
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(repo), "config", "--get", key],
+            capture_output=True, text=True, timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return (proc.stdout or "").strip() if proc.returncode == 0 else ""
+
+
+def _git_common_dir_abs(repo: Path) -> str:
+    """``repo``'s absolute common git dir ('' on failure); resolves relative output."""
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(repo), "rev-parse", "--git-common-dir"],
+            capture_output=True, text=True, timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    common = (proc.stdout or "").strip() if proc.returncode == 0 else ""
+    if not common:
+        return ""
+    common_path = Path(common)
+    if not common_path.is_absolute():
+        common_path = (repo / common_path).resolve()
+    return str(common_path)
+
+
+def _source_project_token(
+    source: Path, *, _seen: set[str] | None = None, _depth: int = 0
+) -> str:
+    """The source repository's project-identity token for the stamp ('' when unresolvable).
+
+    INHERITANCE FIRST (round 5, 2026-09-16): a source that already carries a VALIDATED
+    provenance stamp passes it through verbatim. Without this, cloning a clone replaced the
+    recorded canonical identity with git's default LOCAL origin path (every ``git clone``
+    sets ``origin`` to its source path), so the NEXT continuation of a local-only project
+    failed project validation. Then a REMOTE origin URL (the canonical identity); then one
+    transitive step through a LOCAL-path origin (resolving the repo it names at THIS path
+    view); finally the source's own common git dir. A visited-set + depth cap make the
+    traversal cycle-safe.
+    """
+    seen = _seen if _seen is not None else set()
+    try:
+        key = str(source.resolve())
+    except OSError:
+        key = str(source)
+    if key in seen or _depth > 8:
+        return ""
+    seen.add(key)
+
+    stamped = _config_get(source, PROJECT_PROVENANCE_KEY)
+    if stamped:
+        return stamped
+
+    origin = _config_get(source, "remote.origin.url")
+    if origin and ("://" in origin or origin.startswith("git@")):
+        return f"origin:{origin}"
+    if origin:
+        # git's default for ``git clone <local path>``: resolve the named repository when it
+        # is a real repo at this view (host paths resolve; a container-only path does not —
+        # the inheritance branch above covers stamped clones).
+        candidate = Path(origin).expanduser()
+        if candidate.is_dir() and (candidate / ".git").exists():
+            inherited = _source_project_token(candidate, _seen=seen, _depth=_depth + 1)
+            if inherited:
+                return inherited
+
+    common = _git_common_dir_abs(source)
+    return f"git-dir:{common}" if common else ""
+
+
+def _stamp_project_provenance(dest: Path, source: Path) -> None:
+    """Stamp a fresh clone with its source's project provenance (+ align its origin).
+
+    Best-effort by design: a clone whose source identity cannot be read is left stampless —
+    the project validator then treats it as it always has (a linked worktree shares the
+    canonical common git dir; a stampless clone without shared identity is refused, loudly).
+    The stamp never fails the clone: a normal run's value does not depend on it, and the
+    future continuation's refusal names the project.
+    """
+    try:
+        origin = _config_get(source, "remote.origin.url")
+        if origin and ("://" in origin or origin.startswith("git@")):
+            _git("-C", str(dest), "remote", "set-url", "origin", origin)
+        token = _source_project_token(source)
+        if token:
+            _git("-C", str(dest), "config", PROJECT_PROVENANCE_KEY, token)
+    except RunCloneError:
+        return
 
 
 def _clone_path_for(clone: RunClone | Path | str, *, path_config: PathConfig | None = None) -> Path:

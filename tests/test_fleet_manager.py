@@ -5,16 +5,21 @@ command onto ``fleet:commands``, and record a "launching" entry on the board. It
 validate the request — that is the orchestrator's spawn-wrapper's job
 (``scripts/fleet/spawn_wrapper.py:validate_submit_request``, covered in
 ``tests/test_spawn_wrapper.py``). These tests cover the supervisor-tier half of the contract:
-the LPUSH shape, the board record, and that nothing here refuses a concurrent submit (there is
-no orchestrator lock).
+the LPUSH shape, the board record, the caller-stable request key (reconcile, never
+double-queue), and that nothing here refuses a concurrent submit for the same or another spec
+(there is no orchestrator lock; the ONE named refusal is a request key reused for a different
+submission).
 """
 
 from __future__ import annotations
 
 import importlib
 import json
+import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -54,6 +59,28 @@ class _FakeRedis:
 
     def hgetall(self, key: str) -> dict[str, str]:
         return {}
+
+    def eval(self, script: str, numkeys: int, *keys_and_args) -> list[str]:
+        """Emulate the request-keyed submit script (single-threaded fake => atomic here).
+
+        Contract: reconcile when the key exists, otherwise claim + queue + record, returning
+        ``[first, record_json]`` — the NEW job id on the claim path, the EXISTING entry JSON
+        on the reconcile path.
+        """
+        requests_key, commands_key, jobs_key = keys_and_args[0:3]
+        request_key, job_id, command_raw, record_raw, entry_raw = keys_and_args[3:8]
+        existing = self._hashes.get(requests_key, {}).get(request_key)
+        if existing:
+            try:
+                entry = json.loads(existing)
+                existing_job = str((entry or {}).get("job_id") or "")
+            except (TypeError, ValueError):
+                existing_job = ""
+            return [existing, self._hashes.get(jobs_key, {}).get(existing_job, "")]
+        self._hashes.setdefault(requests_key, {})[request_key] = str(entry_raw)
+        self._lists.setdefault(commands_key, []).append(str(command_raw))
+        self._hashes.setdefault(jobs_key, {})[str(job_id)] = str(record_raw)
+        return [str(job_id), str(record_raw)]
 
 
 def test_send_submit_command_lpushes_a_bounded_submit_command():
@@ -329,3 +356,637 @@ def test_submit_cli_dispatches_the_aio_identity_flags(monkeypatch):
         "binding_id": "b" * 64,
         "task_revision": 5,
     }
+
+
+# ── The caller-stable request key (2026-09-16 delivery simplification, Unit 2) ──
+
+_REQ_SPEC = "workflows/repository/fleet_job_submission.yaml"
+
+
+def _keyed_submit(fm, r, *, request_key="req-A", retry_safe=False, **overrides):
+    """One keyed submit with the default request inputs (overridable per case)."""
+    kwargs = dict(spec=_REQ_SPEC, goal="g", model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x")
+    kwargs.update(overrides)
+    return fm._send_submit_command(r, request_key=request_key, retry_safe=retry_safe, **kwargs)
+
+
+def test_a_keyed_retry_reconciles_to_the_existing_job_and_queues_nothing():
+    """The lost-response repair: a retry with the SAME key and inputs returns the EXISTING
+    job identity (with its board status) and never queues a second command."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    first = _keyed_submit(fm, r)
+    assert first.get("reconciled") is None
+    assert len(r._lists[fm.COMMANDS_KEY]) == 1
+
+    retry = _keyed_submit(fm, r)
+    assert retry["job_id"] == first["job_id"]
+    assert retry["reconciled"] is True
+    assert retry["status"] == "launching"
+    assert retry["request_key"] == "req-A"
+    assert len(r._lists[fm.COMMANDS_KEY]) == 1  # no second command
+
+
+def test_the_request_key_rides_the_command_the_record_and_the_fingerprint_index():
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    cmd = _keyed_submit(fm, r)
+    assert cmd["request_key"] == "req-A"
+    record = json.loads(r._hashes[fm.JOBS_KEY][cmd["job_id"]])
+    assert record["request_key"] == "req-A" and record["status"] == "launching"
+    entry = json.loads(r._hashes[fm.REQUESTS_KEY]["req-A"])
+    assert entry["job_id"] == cmd["job_id"]
+    assert len(entry["fingerprint"]) == 64  # the reconcile evidence is retained
+    assert entry["workdir"] == cmd["workdir"]  # the RESOLVED workspace is retained too
+
+
+def test_a_key_reused_for_any_changed_execution_input_refuses():
+    """Reviewer finding (2026-09-16): reconciliation compares the FULL execution-relevant
+    fingerprint — the spec filename alone is not the request. Every changed input refuses."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    _keyed_submit(fm, r)
+    changed_cases = [
+        # The same spec path with a DIFFERENT digest (an edited workflow) — the case a
+        # filename-only comparison silently discarded.
+        {"spec_sha256": "a" * 64},
+        {"goal": "a different goal"},
+        {"model": "deepseek/deepseek-v4-flash"},
+        {"workdir": "/tmp/wt_other"},
+        {"resume": True, "parent_run_id": "run-2"},
+        {"admission": {"required": True, "campaign_budget_usd": 5.0}},
+        {"execution": {"backend": "opencode"}},
+    ]
+    for overrides in changed_cases:
+        with pytest.raises(fm.RequestKeyConflictError, match="DIFFERENT request"):
+            _keyed_submit(fm, r, **overrides)
+    assert len(r._lists[fm.COMMANDS_KEY]) == 1  # nothing after the original submission
+
+
+def test_a_missing_board_record_reconciles_the_identity_with_an_unknown_status():
+    """Same request + missing board record: the identity is still proven by the retained
+    fingerprint — reconcile it and report the lifecycle as unknown, never fabricate one. A
+    CHANGED request with the record missing must still refuse (the reviewer's observation:
+    the record is not the evidence)."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    first = _keyed_submit(fm, r)
+    del r._hashes[fm.JOBS_KEY][first["job_id"]]
+    retry = _keyed_submit(fm, r)
+    assert retry["job_id"] == first["job_id"] and retry["reconciled"] is True
+    assert retry["status"] == "unknown" and retry["board_record"] == "missing"
+    with pytest.raises(fm.RequestKeyConflictError, match="DIFFERENT request"):
+        _keyed_submit(fm, r, goal="changed while the board record is missing")
+    # The reviewer's exact repro: with the record missing, a DIFFERENT spec filename must
+    # still refuse — the fingerprint index, not the board record, is the evidence.
+    with pytest.raises(fm.RequestKeyConflictError, match="DIFFERENT request"):
+        _keyed_submit(fm, r, spec="workflows/repository/control_room_new_ui.yaml")
+    assert len(r._lists[fm.COMMANDS_KEY]) == 1
+
+
+def test_missing_or_corrupt_stored_evidence_is_an_explicit_unresolved_state():
+    """Missing evidence must NOT silently reconcile (or silently re-queue): a stored entry
+    without a fingerprint, and an unparseable entry, each refuse as UNRESOLVED."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    first = _keyed_submit(fm, r)
+    r._hashes[fm.REQUESTS_KEY]["req-A"] = json.dumps({"job_id": first["job_id"]})
+    with pytest.raises(fm.RequestKeyUnresolvedError, match="missing evidence"):
+        _keyed_submit(fm, r)
+    r._hashes[fm.REQUESTS_KEY]["req-A"] = "not-json"
+    with pytest.raises(fm.RequestKeyUnresolvedError, match="unreadable stored identity"):
+        _keyed_submit(fm, r)
+    assert len(r._lists[fm.COMMANDS_KEY]) == 1
+
+
+def test_retry_safe_derives_a_stable_key_and_reconciles():
+    """The ordinary path retains its OWN identity before sending: with retry_safe and no
+    explicit key, an identical retry reconciles automatically. A CHANGED input derives a
+    different key — it becomes a NEW independent request, never a silent reconcile to the
+    old job (the reviewer's silent-discard failure cannot occur on this path)."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    first = _keyed_submit(fm, r, request_key=None, retry_safe=True)
+    assert str(first["request_key"]).startswith("auto:")
+    retry = _keyed_submit(fm, r, request_key=None, retry_safe=True)
+    assert retry["job_id"] == first["job_id"] and retry["reconciled"] is True
+    changed = _keyed_submit(fm, r, request_key=None, retry_safe=True, goal="changed")
+    assert changed.get("reconciled") is None and changed["job_id"] != first["job_id"]
+    assert len(r._lists[fm.COMMANDS_KEY]) == 2
+
+
+def test_an_explicit_key_wins_over_retry_safe():
+    """An explicit key is how a caller FORCES an independent run (or names its own retry)."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    cmd = _keyed_submit(fm, r, request_key="req-explicit", retry_safe=True)
+    assert cmd["request_key"] == "req-explicit"
+
+
+def test_task_identity_scopes_the_retry_key_across_logical_tasks():
+    """Reviewer finding (2026-09-16): identical inputs from a DIFFERENT logical task are a
+    different submission. Retry-safe keys are scoped by the durable task identity (the AIO
+    binding's task_identity): same task = retry reconciles; different task = a new job."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    a1 = _keyed_submit(fm, r, request_key=None, retry_safe=True, task_identity="task-a")
+    a2 = _keyed_submit(fm, r, request_key=None, retry_safe=True, task_identity="task-a")
+    b1 = _keyed_submit(fm, r, request_key=None, retry_safe=True, task_identity="task-b")
+    assert a1["job_id"] == a2["job_id"] and a2["reconciled"] is True
+    assert b1.get("reconciled") is None
+    assert b1["job_id"] != a1["job_id"]
+    assert a1["request_key"] != b1["request_key"]
+    assert b1["task_identity"] == "task-b"
+    assert len(r._lists[fm.COMMANDS_KEY]) == 2  # one command per logical task
+
+
+def test_submit_cli_carries_the_task_identity(tmp_path, monkeypatch, capsys):
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    rc = fm.main([
+        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
+        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
+        "--retry-safe", "--task-identity", "session:ses_x", "--json",
+    ])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert payload["task_identity"] == "session:ses_x"
+    queued = [json.loads(raw) for raw in r._lists[fm.COMMANDS_KEY]]
+    assert queued[0]["task_identity"] == "session:ses_x"
+    record = json.loads(r._hashes[fm.JOBS_KEY][queued[0]["job_id"]])
+    assert record["task_identity"] == "session:ses_x"
+
+
+def test_without_a_key_or_retry_safe_an_identical_submit_is_an_independent_new_run():
+    """No key = an independent submission: identical parameters mint a SECOND job — an
+    intentional repeat is a new run, never content deduplication."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    a = _keyed_submit(fm, r, request_key=None)
+    b = _keyed_submit(fm, r, request_key=None)
+    assert a["job_id"] != b["job_id"]
+    assert len(r._lists[fm.COMMANDS_KEY]) == 2
+
+
+def test_submit_cli_reconciles_a_keyed_retry(monkeypatch, capsys):
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    argv = [
+        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
+        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
+        "--request-key", "req-cli",
+    ]
+    assert fm.main(argv) == 0
+    assert "launching" in capsys.readouterr().out
+    assert fm.main(argv) == 0
+    retry_out = capsys.readouterr().out
+    assert "fleet:jobs[" in retry_out and "reconciled" in retry_out
+    assert len(r._lists[fm.COMMANDS_KEY]) == 1
+
+
+def test_submit_cli_refuses_a_conflicting_key_with_exit_2(monkeypatch, capsys):
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    base = [
+        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
+        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
+        "--request-key", "req-cli",
+    ]
+    assert fm.main(base) == 0
+    conflicting = [
+        "submit", "--spec", "workflows/repository/control_room_new_ui.yaml",
+        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
+        "--request-key", "req-cli",
+    ]
+    assert fm.main(conflicting) == 2
+    assert "request key" in capsys.readouterr().err
+
+
+# ── The workspace preparation path (Unit 2) ────────────────────────────────────
+
+
+def _git(*args, cwd):
+    return subprocess.run(["git", *args], cwd=str(cwd), capture_output=True, text=True)
+
+
+def _prep_repo(tmp_path, monkeypatch):
+    """A real git repo (branch main, one commit) + a tmp worktrees root, wired in."""
+    fm = _fleet_manager()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git("init", "-b", "main", cwd=repo)
+    _git("config", "user.email", "t@example.com", cwd=repo)
+    _git("config", "user.name", "test", cwd=repo)
+    (repo / "README.md").write_text("x", encoding="utf-8")
+    _git("add", "-A", cwd=repo)
+    _git("commit", "-m", "init", cwd=repo)
+    worktrees = tmp_path / "wtroot"
+    worktrees.mkdir()
+    monkeypatch.setenv("FINOPS_WORKTREE_ROOT", str(worktrees))
+    monkeypatch.setattr(fm, "_REPO_ROOT", repo)
+    return fm, repo, worktrees
+
+
+def test_prepare_workspace_creates_reuses_and_refuses_dirty(tmp_path, monkeypatch):
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    path, note, errors = fm.prepare_workspace(
+        spec="workflows/repository/demo.yaml", goal="g", model="m"
+    )
+    assert errors == [] and path is not None and path.exists()
+    assert "prepared" in note and path.parent == worktrees
+    main_sha = _git("rev-parse", "HEAD", cwd=repo).stdout.strip()
+    assert _git("rev-parse", "HEAD", cwd=path).stdout.strip() == main_sha
+    assert _git("branch", "--show-current", cwd=path).stdout.strip() == path.name
+
+    # An identical call reuses the same deterministic workspace; nothing is re-created.
+    again, note2, errors2 = fm.prepare_workspace(
+        spec="workflows/repository/demo.yaml", goal="g", model="m"
+    )
+    assert errors2 == [] and again == path and "reused" in note2
+
+    # A dirty candidate refuses — never mutated to fit.
+    (path / "dirty.txt").write_text("d", encoding="utf-8")
+    _p, _n, dirty_errors = fm.prepare_workspace(
+        spec="workflows/repository/demo.yaml", goal="g", model="m"
+    )
+    assert any("uncommitted changes" in e for e in dirty_errors)
+
+    # A different request derives a different workspace (the name carries its digest).
+    other, _n, errors4 = fm.prepare_workspace(
+        spec="workflows/repository/demo.yaml", goal="other", model="m"
+    )
+    assert errors4 == [] and other != path
+
+
+def test_prepare_workspace_refuses_a_non_worktree_candidate(tmp_path, monkeypatch):
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    plain = worktrees / "wt_demo_deadbeef"
+    plain.mkdir()
+    monkeypatch.setattr(fm, "_derived_workspace_path", lambda spec, digest: plain)
+    _p, _n, errors = fm.prepare_workspace(spec="s", goal="g", model="m")
+    assert any("not a git worktree" in e for e in errors)
+
+
+def _parent_clone(tmp_path, monkeypatch):
+    """A repo + a parent run's PRIVATE CLONE (runs_root/<id>/repo, detached candidate commit)
+    + the parent's ledger. Returns (fm, repo, runs_root, clone, candidate)."""
+    fm, repo, _worktrees = _prep_repo(tmp_path, monkeypatch)
+    runs_root = tmp_path / "runs"
+    runs_root.mkdir()
+    monkeypatch.setenv("FINOPS_RUNS_ROOT", str(runs_root))
+    base_sha = _git("rev-parse", "HEAD", cwd=repo).stdout.strip()
+    clone = runs_root / "run-parent" / "repo"
+    clone.parent.mkdir(parents=True)
+    proc = subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", "--", str(repo), str(clone)],
+        capture_output=True, text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    _git("checkout", "-q", "--detach", base_sha, cwd=clone)
+    (clone / "phase.txt").write_text("built", encoding="utf-8")
+    _git("add", ".", cwd=clone)
+    _git("commit", "-q", "-m", "[workflow] build", cwd=clone)
+    candidate = _git("rev-parse", "HEAD", cwd=clone).stdout.strip()
+    ledger_dir = repo / "experiments" / "results" / "workflows" / "demo"
+    ledger_dir.mkdir(parents=True)
+    _write_parent_ledger(ledger_dir, candidate=candidate, completed=True)
+    return fm, repo, runs_root, clone, candidate
+
+
+def _write_parent_ledger(ledger_dir, *, candidate: str, completed: bool) -> None:
+    (ledger_dir / "20260916T000000000000Z_run-parent.json").write_text(
+        json.dumps({
+            "run_id": "run-parent",
+            "git_sha": candidate,
+            "phases": [{"phase": "build", "status": "ok" if completed else "failed"}],
+        }),
+        encoding="utf-8",
+    )
+
+
+def test_prepare_workspace_continuation_uses_the_parent_clone_at_the_candidate(
+    tmp_path, monkeypatch
+):
+    """Reviewer finding (2026-09-16): the continuation base is the parent's PRIVATE CLONE —
+    the repository that actually contains its committed phases — at the ledger's candidate
+    SHA. The declared workdir is never the base: its commits are not there."""
+    fm, repo, runs_root, clone, candidate = _parent_clone(tmp_path, monkeypatch)
+    path, note, errors = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-parent"
+    )
+    assert errors == [] and path == clone
+    assert "parent run run-parent" in note and candidate[:12] in note
+
+
+def test_prepare_workspace_continuation_refuses_without_clone_or_candidate(
+    tmp_path, monkeypatch
+):
+    """No silent fallback: a missing clone or a candidate the clone does not contain refuses
+    — the continuation must never start from a tree without the completed work."""
+    import shutil as _shutil
+
+    fm, repo, runs_root, clone, candidate = _parent_clone(tmp_path, monkeypatch)
+    ledger_dir = repo / "experiments" / "results" / "workflows" / "demo"
+
+    # The clone does not contain the declared candidate: refuse.
+    _write_parent_ledger(ledger_dir, candidate="0" * 40, completed=True)
+    _p, _n, errors = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-parent"
+    )
+    assert any("is not present" in e for e in errors)
+
+    # Completed phases but no candidate SHA: refuse (the tree cannot be identified).
+    _write_parent_ledger(ledger_dir, candidate="", completed=True)
+    _p, _n, errors = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-parent"
+    )
+    assert any("no candidate SHA" in e for e in errors)
+
+    # The clone is gone: refuse — never fall back to the source tree.
+    _write_parent_ledger(ledger_dir, candidate=candidate, completed=True)
+    _shutil.rmtree(runs_root / "run-parent")
+    _p, _n, errors = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-parent"
+    )
+    assert any("private clone" in e for e in errors)
+
+    # No ledger at all: refuse with the named parent.
+    _shutil.rmtree(ledger_dir)
+    _p, _n, errors = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-missing"
+    )
+    assert any("no ledger found" in e for e in errors)
+
+
+def test_prepare_workspace_never_reuses_a_stale_workspace(tmp_path, monkeypatch):
+    """Reviewer finding (2026-09-16): a fresh submission is bound to the SELECTED source SHA.
+    A workspace created at an older main tip is not reused (and never reset) — a separate,
+    SHA-suffixed workspace is created beside it and reused thereafter."""
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    first, _n, errors = fm.prepare_workspace(spec="demo.yaml", goal="g", model="m")
+    assert errors == [] and first is not None
+
+    (repo / "advance.txt").write_text("x", encoding="utf-8")
+    _git("add", "-A", cwd=repo)
+    _git("commit", "-m", "advance", cwd=repo)
+    new_main = _git("rev-parse", "HEAD", cwd=repo).stdout.strip()
+
+    second, _note, errors2 = fm.prepare_workspace(spec="demo.yaml", goal="g", model="m")
+    assert errors2 == [] and second is not None and second != first
+    assert second.name.endswith(new_main[:7])
+    assert _git("rev-parse", "HEAD", cwd=second).stdout.strip() == new_main
+    # The stale workspace is left untouched — never reset to fit.
+    assert first.exists()
+    assert _git("rev-parse", "HEAD", cwd=first).stdout.strip() != new_main
+
+    # A repeated fresh submission at the same main reuses the suffixed workspace.
+    third, _n3, errors3 = fm.prepare_workspace(spec="demo.yaml", goal="g", model="m")
+    assert errors3 == [] and third == second
+
+
+def test_submit_cli_json_result_is_structured(monkeypatch, capsys):
+    """The durable interface is the fleet-submit/v1 document — never a parsed log line."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    rc = fm.main([
+        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
+        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
+        "--json",
+    ])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert payload["schema"] == "fleet-submit/v1"
+    assert payload["job_id"] and payload["reconciled"] is False
+    assert payload["status"] == "launching"
+    assert payload["workdir"] == "/tmp/wt_cli"
+    assert payload["spec"] == "workflows/repository/fleet_job_submission.yaml"
+    assert payload["request_key"] == ""  # no key, no retry-safe: the caller chose neither
+    assert payload["prep_note"] == ""
+
+
+def test_submit_cli_prepares_a_workspace_when_workdir_is_omitted(tmp_path, monkeypatch, capsys):
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    rc = fm.main([
+        "submit", "--spec", "workflows/repository/demo.yaml",
+        "--goal", "g", "--model", "m", "--json",
+    ])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert payload["workdir"].startswith(str(worktrees))
+    assert "prepared" in payload["prep_note"]
+    assert Path(payload["workdir"]).exists()
+
+
+def test_submit_cli_retry_skips_workspace_preparation(tmp_path, monkeypatch, capsys):
+    """A retry must NEVER re-resolve the workspace: with the key present, preparation is
+    skipped entirely (nothing runs) — the same job reconciles even after main advances."""
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    argv = [
+        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g",
+        "--model", "m", "--retry-safe", "--json",
+    ]
+    assert fm.main(argv) == 0
+    first = json.loads(capsys.readouterr().out.strip())
+    first_path = first["workdir"]
+
+    (repo / "advance.txt").write_text("x", encoding="utf-8")
+    _git("add", "-A", cwd=repo)
+    _git("commit", "-m", "advance", cwd=repo)
+
+    assert fm.main(argv) == 0
+    retry = json.loads(capsys.readouterr().out.strip())
+    assert retry["job_id"] == first["job_id"] and retry["reconciled"] is True
+    assert retry["workdir"] == first_path
+    assert "retry: reconciling" in retry["prep_note"]
+    # Exactly one workspace (no SHA-suffixed sibling was created) and one queued command.
+    made = sorted(p.name for p in worktrees.iterdir())
+    assert made == [Path(first_path).name]
+    assert len(r._lists[fm.COMMANDS_KEY]) == 1
+
+
+def test_submit_cli_new_key_after_main_advances_gets_a_fresh_workspace(
+    tmp_path, monkeypatch, capsys
+):
+    """Reviewer repro (2026-09-16): a deliberate new submission (a NEW key) after main
+    advances must get a workspace AT the new tip — never the stale one."""
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    argv = [
+        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g",
+        "--model", "m", "--retry-safe", "--json",
+    ]
+    assert fm.main(argv) == 0
+    first = json.loads(capsys.readouterr().out.strip())
+
+    (repo / "advance.txt").write_text("x", encoding="utf-8")
+    _git("add", "-A", cwd=repo)
+    _git("commit", "-m", "advance", cwd=repo)
+    new_main = _git("rev-parse", "HEAD", cwd=repo).stdout.strip()
+
+    assert fm.main([*argv[:-1], "--request-key", "fresh-1", "--json"]) == 0
+    second = json.loads(capsys.readouterr().out.strip())
+    assert second["reconciled"] is False
+    assert second["workdir"] != first["workdir"]
+    assert second["workdir"].endswith(new_main[:7])
+    assert Path(second["workdir"]).exists()
+
+
+def test_explicit_key_retry_reuses_the_recorded_suffixed_workspace(
+    tmp_path, monkeypatch, capsys
+):
+    """Reviewer finding (round 4): a retry resolves the workspace FROM the retained record —
+    the SHA-suffixed workspace assigned to the submission is reused (even after another main
+    advance) instead of failing as a DIFFERENT request."""
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    # 1) a first workspace at main_1 (the base name).
+    assert fm.main([
+        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g",
+        "--model", "m", "--retry-safe", "--json",
+    ]) == 0
+    first = json.loads(capsys.readouterr().out.strip())
+
+    # 2) main advances; a NEW explicit key gets the SHA-suffixed workspace.
+    (repo / "advance.txt").write_text("x", encoding="utf-8")
+    _git("add", "-A", cwd=repo)
+    _git("commit", "-m", "advance", cwd=repo)
+    new_main = _git("rev-parse", "HEAD", cwd=repo).stdout.strip()
+    assert fm.main([
+        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g",
+        "--model", "m", "--request-key", "k1", "--json",
+    ]) == 0
+    second = json.loads(capsys.readouterr().out.strip())
+    assert second["reconciled"] is False
+    assert second["workdir"] != first["workdir"]
+    assert second["workdir"].endswith(new_main[:7])
+
+    # 3) ANOTHER main advance; the retry with the same key must reconcile to the RECORDED
+    #    (suffixed) workspace — not the reconstructed unsuffixed path.
+    (repo / "advance2.txt").write_text("x", encoding="utf-8")
+    _git("add", "-A", cwd=repo)
+    _git("commit", "-m", "advance2", cwd=repo)
+    assert fm.main([
+        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g",
+        "--model", "m", "--request-key", "k1", "--json",
+    ]) == 0
+    retry = json.loads(capsys.readouterr().out.strip())
+    assert retry["reconciled"] is True
+    assert retry["job_id"] == second["job_id"]
+    assert retry["workdir"] == second["workdir"]
+    assert "retry: reconciling" in retry["prep_note"]
+    names = sorted(p.name for p in worktrees.iterdir())
+    assert names == sorted([Path(first["workdir"]).name, Path(second["workdir"]).name])
+
+
+def test_auto_key_retry_reuses_the_recorded_suffixed_workspace(tmp_path, monkeypatch, capsys):
+    """The automatic-key variant: a second task's first submission gets the suffixed
+    workspace; its retry after another main advance reuses the recorded workspace + job —
+    no duplicate is queued."""
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    # task-a's first submission creates the base workspace at main_1.
+    assert fm.main([
+        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g", "--model", "m",
+        "--retry-safe", "--task-identity", "task-a", "--json",
+    ]) == 0
+    first = json.loads(capsys.readouterr().out.strip())
+
+    # main advances; task-b's identical inputs get the SHA-suffixed workspace.
+    (repo / "advance.txt").write_text("x", encoding="utf-8")
+    _git("add", "-A", cwd=repo)
+    _git("commit", "-m", "advance", cwd=repo)
+    assert fm.main([
+        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g", "--model", "m",
+        "--retry-safe", "--task-identity", "task-b", "--json",
+    ]) == 0
+    second = json.loads(capsys.readouterr().out.strip())
+    assert second["reconciled"] is False
+    assert second["workdir"] != first["workdir"]
+
+    # ANOTHER advance; task-b's retry must reconcile to the recorded workspace + job.
+    (repo / "advance2.txt").write_text("x", encoding="utf-8")
+    _git("add", "-A", cwd=repo)
+    _git("commit", "-m", "advance2", cwd=repo)
+    assert fm.main([
+        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g", "--model", "m",
+        "--retry-safe", "--task-identity", "task-b", "--json",
+    ]) == 0
+    retry = json.loads(capsys.readouterr().out.strip())
+    assert retry["reconciled"] is True and retry["job_id"] == second["job_id"]
+    assert retry["workdir"] == second["workdir"]
+    assert len(r._lists[fm.COMMANDS_KEY]) == 2  # one command per logical task
+
+
+def test_two_successive_continuations_keep_the_canonical_provenance(tmp_path, monkeypatch):
+    """Round-5 finding (2026-09-16): for a project WITHOUT an origin remote, cloning a clone
+    replaced the recorded canonical git dir with its local origin path — the SECOND
+    continuation then failed validation. The validated provenance must survive generations."""
+    from agentic_dynamics.core.paths import PathConfig as _PathConfig
+    from agentic_dynamics.runtime.run_clone import create_run_clone
+
+    fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
+    runs_root = tmp_path / "runs"
+    runs_root.mkdir()
+    monkeypatch.setenv("FINOPS_RUNS_ROOT", str(runs_root))
+    cfg = _PathConfig.from_env(require_existing=False)
+    ledger_dir = repo / "experiments" / "results" / "workflows" / "demo"
+    ledger_dir.mkdir(parents=True)
+
+    # Generation 1: the first run's clone (stamped with the canonical git dir).
+    gen1 = create_run_clone("run-gen1", source_repo=repo, path_config=cfg)
+    git = ["git", "-C", str(gen1.path), "-c", "user.email=t@t", "-c", "user.name=t"]
+    (gen1.path / "p1.txt").write_text("one", encoding="utf-8")
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "[workflow] p1"], check=True)
+    c1 = subprocess.run(
+        ["git", "-C", str(gen1.path), "rev-parse", "HEAD"], capture_output=True, text=True
+    ).stdout.strip()
+    (ledger_dir / "20260916T000000000000Z_run-gen1.json").write_text(
+        json.dumps({"run_id": "run-gen1", "git_sha": c1,
+                    "phases": [{"phase": "p1", "status": "ok"}]}),
+        encoding="utf-8",
+    )
+
+    # Continuation 1: prepared from gen1 (verified + stamped).
+    prep1, _note1, errors1 = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-gen1"
+    )
+    assert errors1 == [] and prep1 == gen1.path
+    token = fm._stamped_provenance(gen1.path)
+    assert token and not token.startswith("origin:")  # the canonical git-dir identity
+
+    # Generation 2: a clone created FROM the prepared workspace (as the run's composition
+    # root does) INHERITS the stamp — never the local origin path.
+    gen2 = create_run_clone("run-gen2", source_repo=gen1.path, path_config=cfg)
+    assert fm._stamped_provenance(gen2.path) == token
+
+    (gen2.path / "p2.txt").write_text("two", encoding="utf-8")
+    git2 = ["git", "-C", str(gen2.path), "-c", "user.email=t@t", "-c", "user.name=t"]
+    subprocess.run([*git2, "add", "-A"], check=True)
+    subprocess.run([*git2, "commit", "-qm", "[workflow] p2"], check=True)
+    c2 = subprocess.run(
+        ["git", "-C", str(gen2.path), "rev-parse", "HEAD"], capture_output=True, text=True
+    ).stdout.strip()
+    (ledger_dir / "20260916T000000000001Z_run-gen2.json").write_text(
+        json.dumps({"run_id": "run-gen2", "git_sha": c2,
+                    "phases": [{"phase": "p2", "status": "ok"}]}),
+        encoding="utf-8",
+    )
+
+    # Continuation 2: prepared from gen2 — must succeed with the canonical identity intact.
+    prep2, _note2, errors2 = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-gen2"
+    )
+    assert errors2 == [] and prep2 == gen2.path
+    assert fm._stamped_provenance(gen2.path) == token

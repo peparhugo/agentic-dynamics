@@ -295,6 +295,185 @@ def sanitize_namespace(namespace: str) -> str:
     return "/".join(parts)
 
 
+# ── project identity: the ONE shared rule (spawn_wrapper + fleet_manager) ─────
+#
+# Preparation (the fleet-manager's clone verification) and execution (the submission
+# validator) must answer "does this workspace belong to the canonical project?" with the
+# SAME rule — an explicitly supplied workspace gets the same verdict as an automatically
+# prepared one (round-8 requirement, 2026-09-16). These functions are pure and
+# filesystem-only (no subprocess): both modules import THIS definition.
+
+
+def normalize_project(value: str) -> str:
+    """Normalize a project identity for comparison: host/path form, no scheme/.git/case.
+
+    ONE definition: the project validator compares repository identities (origins, common
+    git dirs) and the fleet-manager's clone verification compares origin URLs — both must
+    normalize the SAME way, or a clone whose origin is legitimately equal in another
+    spelling would be read as foreign.
+    """
+    text = str(value or "").strip().lower().rstrip("/")
+    if text.startswith("git@"):
+        text = text[4:].replace(":", "/", 1)
+    for prefix in ("ssh://git@", "ssh://", "https://", "http://", "git://"):
+        if text.startswith(prefix):
+            text = text[len(prefix):]
+            break
+    if text.endswith(".git"):
+        text = text[:-4]
+    return text
+
+
+def is_remote_origin(origin: str) -> bool:
+    """Whether a raw origin string names a REMOTE (URL) rather than a local path."""
+    return bool(origin) and ("://" in origin or origin.startswith("git@"))
+
+
+def git_common_dir(checkout: str | Path) -> Path | None:
+    """Resolve a checkout's common git dir filesystem-only (handles a linked worktree)."""
+    checkout = Path(checkout)
+    git_path = checkout / ".git"
+    if git_path.is_dir():
+        return git_path
+    if not git_path.is_file():
+        return None
+    try:
+        text = git_path.read_text(encoding="utf-8", errors="replace").strip()
+    except OSError:
+        return None
+    if not text.startswith("gitdir:"):
+        return None
+    git_dir = Path(text.split(":", 1)[1].strip())
+    if not git_dir.is_absolute():
+        git_dir = (checkout / git_dir).resolve()
+    commondir = git_dir / "commondir"
+    if commondir.is_file():
+        try:
+            common = Path(commondir.read_text(encoding="utf-8", errors="replace").strip())
+        except OSError:
+            return git_dir
+        if not common.is_absolute():
+            common = (git_dir / common).resolve()
+        return common
+    return git_dir
+
+
+#: The git config sections this contract reads, plus the property-line shape.
+_REMOTE_ORIGIN_RE = re.compile(r'\[remote\s+"origin"\]', re.IGNORECASE)
+_AD_SECTION_RE = re.compile(r"\[agentic-dynamics\]", re.IGNORECASE)
+_PROPERTY_VALUE_RE = re.compile(r"^\s*([A-Za-z][\w-]*)\s*=\s*(.+?)\s*$", re.MULTILINE)
+_SECTION_HEADER_RE = re.compile(r"^\[", re.MULTILINE)
+
+
+def _section_property(config: str, section: re.Pattern, property_name: str) -> str:
+    """The named property inside ONE config section (bounded before the next header)."""
+    section_match = section.search(config)
+    if not section_match:
+        return ""
+    next_header = _SECTION_HEADER_RE.search(config, section_match.end())
+    body = config[section_match.end(): next_header.start() if next_header else len(config)]
+    for match in _PROPERTY_VALUE_RE.finditer(body):
+        if match.group(1).lower() == property_name:
+            return match.group(2).strip()
+    return ""
+
+
+def origin_url(git_dir: Path | None) -> str:
+    """The ``origin`` remote URL recorded in a common git dir's config ('' when unset)."""
+    if git_dir is None:
+        return ""
+    try:
+        config = (git_dir / "config").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    return _section_property(config, _REMOTE_ORIGIN_RE, "url")
+
+
+def provenance_token(git_dir: Path | None) -> str:
+    """The stamped project provenance from a common git dir's config ('' when unstamped)."""
+    if git_dir is None:
+        return ""
+    try:
+        config = (git_dir / "config").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    return _section_property(config, _AD_SECTION_RE, "project")
+
+
+def origin_chain_identity(
+    checkout: str | Path, *, _seen: set[str] | None = None, _depth: int = 0
+) -> str:
+    """The terminal project-identity token of a checkout's LOCAL origin chain ('' when none).
+
+    ``git clone <local path>`` records a local path origin; following it (bounded,
+    cycle-safe) reaches the terminal repository. The token vocabulary is ``origin:<normalized
+    url>`` when a remote URL terminates the chain, else ``git-dir:<common git dir>`` — so a
+    chain ending at the canonical repository compares EQUAL to the canonical token whether
+    the canonical is remote-backed or local-only. A path origin that cannot be followed at
+    this view returns '' (unknown).
+    """
+    checkout = Path(checkout)
+    seen = _seen if _seen is not None else set()
+    try:
+        key = str(checkout.resolve())
+    except OSError:
+        key = str(checkout)
+    if key in seen or _depth > 8:
+        return ""
+    seen.add(key)
+    common = git_common_dir(checkout)
+    origin = origin_url(common)
+    if origin and is_remote_origin(origin):
+        return f"origin:{normalize_project(origin)}"
+    if origin:
+        nxt = Path(origin).expanduser()
+        if not (nxt.is_dir() and (nxt / ".git").exists()):
+            return ""  # an origin that cannot be followed at this view: unknown
+        return origin_chain_identity(nxt, _seen=seen, _depth=_depth + 1)
+    return f"git-dir:{common}" if common is not None else ""
+
+
+def identity_verdict(canonical_root: str | Path, workdir: str | Path) -> tuple[str, str]:
+    """The SHARED project-identity verdict: ``("match"|"conflict"|"unknown", detail)``.
+
+    Preparation and the submission validator call THIS function, so an explicitly supplied
+    workspace receives the same verdict as an automatically prepared one:
+
+    * the SAME common git dir → ``match`` (the repository itself, or a linked worktree);
+    * a REMOTE origin equal to the canonical token → ``match``; a different remote → ``conflict``;
+    * a LOCAL origin: followed when it resolves at this view (the origin chain) — a chain
+      ending at the canonical token (origin URL or common git dir) → ``match``; ending
+      anywhere else (e.g. a fork's origin) → ``conflict``;
+    * a local origin that cannot be resolved here (the container view ``/repo``), a missing
+      origin, or a canonical identity that cannot be established → ``unknown`` — the
+      caller's stamp/corroboration rules apply.
+    """
+    canonical_root = Path(canonical_root)
+    workdir = Path(workdir)
+    canonical_common = git_common_dir(canonical_root)
+    work_common = git_common_dir(workdir)
+    if canonical_common is None or work_common is None:
+        return "unknown", "not a git checkout"
+    if canonical_common == work_common:
+        return "match", f"same common git dir ({canonical_common})"
+    canonical_token = origin_chain_identity(canonical_root)
+    if not canonical_token:
+        return "unknown", "the canonical project identity cannot be established"
+    work_origin = origin_url(work_common)
+    if not work_origin:
+        return "unknown", "the worktree declares no origin"
+    if is_remote_origin(work_origin):
+        token = f"origin:{normalize_project(work_origin)}"
+        return ("match" if token == canonical_token else "conflict"), work_origin
+    resolved = Path(work_origin).expanduser()
+    if not (resolved.is_dir() and (resolved / ".git").exists()):
+        return "unknown", f"the local origin {work_origin!r} cannot be resolved at this view"
+    token = origin_chain_identity(resolved)
+    if not token:
+        return "unknown", f"the local origin chain from {work_origin!r} has no identity"
+    return ("match" if token == canonical_token else "conflict"), work_origin
+
+
 # ── The shared profile→mounts expansion ─────────────────────────────────────
 
 

@@ -500,8 +500,8 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
           `(${input.tool}): no durable session binding resolved for ${sessionID}` +
           (report?.status ? ` (status ${String(report.status)})` : "") +
           ". This early check is convenience only — the fleet exec boundary (the spawn " +
-          "wrapper / host launch broker) re-validates the binding and the session capacity " +
-          "before the launch effect.",
+          "wrapper / host launch broker) re-validates the binding before the launch effect " +
+          "(the session capacity report is advisory diagnostics, never an admission gate).",
       )
     },
   }

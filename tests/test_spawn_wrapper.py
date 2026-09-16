@@ -1958,7 +1958,12 @@ def aio_env(tmp_path, monkeypatch):
     from scripts.fleet import spawn_wrapper as sw
 
     monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(tmp_path))
-    monkeypatch.setattr(sw, "_aio_budget_verdict", lambda session_id: ("OK", "", True))
+    monkeypatch.setattr(
+        sw, "_aio_budget_verdict",
+        lambda session_id: {
+            "verdict": "OK", "reason": "", "backend_available": True, "measured": True,
+        },
+    )
     return tmp_path
 
 
@@ -1974,7 +1979,12 @@ def test_an_aio_submit_without_a_store_is_refused(tmp_path, monkeypatch):
     from scripts.fleet import spawn_wrapper as sw
 
     monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(tmp_path / "absent"))
-    monkeypatch.setattr(sw, "_aio_budget_verdict", lambda session_id: ("OK", ""))
+    monkeypatch.setattr(
+        sw, "_aio_budget_verdict",
+        lambda session_id: {
+            "verdict": "OK", "reason": "", "backend_available": True, "measured": True,
+        },
+    )
     errors = validate_submit_request(_aio_request(aio=_aio_block(binding_id="0" * 64)))
     assert any("binding store is unavailable" in e for e in errors)
 
@@ -2016,24 +2026,71 @@ def test_a_stale_task_revision_is_refused_and_the_current_one_passes(aio_env):
     assert current == []
 
 
-def test_warn_is_advisory_and_boundary_verdicts_block(aio_env, monkeypatch):
-    """The 2026-09-15 capacity policy at the gate: WARN is ADVISORY (a session near its
-    effective limit may still start new work); COMPACT (native compaction boundary), CLOSE
-    (hard model limit) and UNJUDGED (no measurement) block new consequential work."""
+def test_capacity_verdicts_are_advisory_at_the_gate(aio_env, monkeypatch):
+    """The 2026-09-16 policy: conversation capacity is ADVISORY to workflow admission.
+    Every verdict — including COMPACT (native boundary), CLOSE (hard limit), and UNJUDGED
+    (no measurement) — leaves a valid bound submission untouched; the report is measured
+    separately (``aio_capacity_report``) and never enters the refusal list."""
     from scripts.fleet import spawn_wrapper as sw
 
     binding_id = _bound_store(aio_env)
-    for verdict, blocked in (("WARN", False), ("COMPACT", True), ("CLOSE", True), ("UNJUDGED", True)):
+    for verdict in ("OK", "WARN", "COMPACT", "CLOSE", "UNJUDGED"):
         monkeypatch.setattr(
-            sw, "_aio_budget_verdict", lambda session_id, v=verdict: (v, "measured reason", True)
+            sw, "_aio_budget_verdict",
+            lambda session_id, v=verdict: {
+                "verdict": v, "reason": "measured reason",
+                "backend_available": True, "measured": True,
+            },
         )
         errors = validate_submit_request(
             _aio_request(aio=_aio_block(binding_id=binding_id))
         )
-        if blocked:
-            assert any(f"budget verdict is {verdict}" in e for e in errors), verdict
-        else:
-            assert errors == [], f"WARN must not block: {errors}"
+        assert errors == [], f"{verdict} must not block: {errors}"
+        assert sw.aio_capacity_report("ses_aio") == {
+            "verdict": verdict,
+            "reason": "measured reason",
+            "backend_available": True,
+            "measured": True,
+            "advisory": True,
+        }, verdict
+
+
+def test_the_capacity_report_reports_unmeasurable_honestly(aio_env, monkeypatch):
+    """An unmeasurable reading is reported — with its reason — as an unavailable advisory:
+    never a refusal, never silently upgraded to OK, and never a claimed measurement."""
+    from scripts.fleet import spawn_wrapper as sw
+
+    monkeypatch.setattr(
+        sw, "_aio_budget_verdict",
+        lambda session_id: {
+            "verdict": "UNJUDGED", "reason": "db unavailable",
+            "backend_available": False, "measured": False,
+        },
+    )
+    assert sw.aio_capacity_report("ses_aio") == {
+        "verdict": "UNJUDGED",
+        "reason": "db unavailable",
+        "backend_available": False,
+        "measured": False,
+        "advisory": True,
+    }
+
+
+def test_a_corrupt_db_reports_backend_reachable_and_not_measured(tmp_path, monkeypatch):
+    """The reviewer's reproduction (2026-09-16): a reachable-but-unreadable database must
+    never read as ``measured`` — the two availability facts are told apart."""
+    from scripts.fleet import spawn_wrapper as sw
+
+    _capacity_env(tmp_path, monkeypatch)
+    db = tmp_path / "corrupt.db"
+    db.write_bytes(b"this is not a sqlite database" * 100)
+    monkeypatch.setenv("FINOPS_OPENCODE_DB", str(db))
+    report = sw._aio_budget_verdict("ses_aio")
+    assert report["verdict"] == "UNJUDGED"
+    assert report["backend_available"] is True and report["measured"] is False
+    assert "not a database" in report["reason"]
+    full = sw.aio_capacity_report("ses_aio")
+    assert full["advisory"] is True and full["measured"] is False
 
 
 def test_the_budget_verdict_is_measured_from_the_explicit_session(tmp_path, monkeypatch):
@@ -2061,9 +2118,13 @@ def test_the_budget_verdict_is_measured_from_the_explicit_session(tmp_path, monk
     con.commit()
     con.close()
     monkeypatch.setenv("FINOPS_OPENCODE_DB", str(db))
-    assert sw._aio_budget_verdict("ses_aio") == ("OK", "", True)
-    verdict, reason, measured = sw._aio_budget_verdict("ses_unknown")
-    assert verdict == "UNJUDGED" and "does not exist" in reason and measured is True
+    report = sw._aio_budget_verdict("ses_aio")
+    assert report["verdict"] == "OK" and report["reason"] == ""
+    assert report["backend_available"] is True and report["measured"] is True
+    report = sw._aio_budget_verdict("ses_unknown")
+    assert report["verdict"] == "UNJUDGED" and "does not exist" in report["reason"]
+    # The backend WAS reachable; the identity is what failed — neither flag claims a reading.
+    assert report["backend_available"] is True and report["measured"] is False
 
 
 def test_a_malformed_aio_block_is_refused():
@@ -2157,73 +2218,117 @@ def _valid_bound_request(tmp_path, monkeypatch, *, db_name: str | None, **store_
     return _aio_request(aio=_aio_block(binding_id=binding_id)), binding_id
 
 
-def test_a_gate_without_the_session_db_defers_a_valid_binding(tmp_path, monkeypatch):
+def test_a_gate_without_the_session_db_never_refuses_a_valid_binding(tmp_path, monkeypatch):
     """THE Docker-shape proof: the containerized wrapper has no host DB — a valid binding
-    passes (the budget is deferred), instead of being refused as UNJUDGED."""
+    passes, and the capacity reading is reported as an unavailable ADVISORY with a reason
+    (2026-09-16 policy: never converted into a refusal)."""
+    from scripts.fleet import spawn_wrapper as sw
+
     request, _ = _valid_bound_request(tmp_path, monkeypatch, db_name=None)
     monkeypatch.setenv("FINOPS_OPENCODE_DB", str(tmp_path / "absent.db"))
     assert validate_submit_request(request) == []
+    report = sw.aio_capacity_report("ses_aio")
+    assert report["verdict"] == "UNJUDGED" and report["measured"] is False
+    assert report["backend_available"] is False
+    assert "not found" in report["reason"]
 
 
-def test_a_strict_gate_refuses_when_the_db_is_missing(tmp_path, monkeypatch):
-    """The host gate (strict) must measure: a missing DB is itself a refusal there."""
+def test_the_capacity_reading_never_becomes_an_authorization_failure(tmp_path, monkeypatch):
+    """The 2026-09-16 separation, end to end: an unmeasurable capacity reading refuses
+    NOTHING, while the binding refusals are untouched (the retired strict gate's regression
+    pair — the missing measurement is not a missing authorization)."""
     request, _ = _valid_bound_request(tmp_path, monkeypatch, db_name=None)
     monkeypatch.setenv("FINOPS_OPENCODE_DB", str(tmp_path / "absent.db"))
-    errors = validate_submit_request(request, strict_aio_budget=True)
-    assert any("cannot be measured at this gate" in e for e in errors)
+    assert validate_submit_request(request) == []
+    broken = {**request, "aio": {**_aio_block(binding_id="f" * 64)}}
+    errors = validate_submit_request(broken)
+    assert any("does not match the durable binding record" in e for e in errors)
 
 
-def test_the_budget_is_measured_for_real_against_the_canonical_db(tmp_path, monkeypatch):
-    """No verdict mocking: a real opencode-shaped DB decides admission and refusal."""
+def test_validate_submit_cli_reports_capacity_as_advisory(tmp_path, monkeypatch, capsys):
+    """The CLI surface: ``validate-submit`` emits a structured ``aio_capacity`` ADVISORY
+    block — present, honest about being unmeasured, and never part of ``errors``."""
+    import io
+    import json as _json
+
+    from scripts.fleet import spawn_wrapper as sw
+
+    request, _ = _valid_bound_request(tmp_path, monkeypatch, db_name=None)
+    monkeypatch.setenv("FINOPS_OPENCODE_DB", str(tmp_path / "absent.db"))
+    monkeypatch.setattr("sys.stdin", io.StringIO(_json.dumps(request)))
+    rc = sw.main(["validate-submit"])
+    payload = _json.loads(capsys.readouterr().out.strip())
+    assert rc == 0 and payload["ok"] is True and payload["errors"] == []
+    assert payload["aio_capacity"]["advisory"] is True
+    assert payload["aio_capacity"]["verdict"] == "UNJUDGED"
+    assert payload["aio_capacity"]["measured"] is False
+
+
+def test_the_budget_is_measured_for_real_and_never_blocks(tmp_path, monkeypatch):
+    """No verdict mocking: a real opencode-shaped DB drives the ADVISORY report, and the
+    gate itself never refuses on capacity — at any reading (2026-09-16 policy)."""
+    from scripts.fleet import spawn_wrapper as sw
+
     _capacity_env(tmp_path, monkeypatch)
     request, _ = _valid_bound_request(tmp_path, monkeypatch, db_name="ok.db")
     assert validate_submit_request(request) == []
+    assert sw.aio_capacity_report("ses_aio")["verdict"] == "OK"
 
-    # Message count is TELEMETRY: 120 low-context messages do NOT block (the removed
-    # 80-message stopping condition).
+    # Message count is TELEMETRY: 120 low-context messages report OK and never block.
     busy = tmp_path / "busy.db"
     _canonical_session_db(busy, turns=120, context=1000)
     monkeypatch.setenv("FINOPS_OPENCODE_DB", str(busy))
     assert validate_submit_request(request) == []
+    assert sw.aio_capacity_report("ses_aio")["verdict"] == "OK"
 
-    # The native compaction boundary DOES block new consequential work until the reduced
-    # context is observed (same session/task binding continues).
+    # The native boundary is REPORTED (COMPACT) — and still never blocks the submit.
     boundary = tmp_path / "boundary.db"
     _canonical_session_db(boundary, turns=60, context=970_000)
     monkeypatch.setenv("FINOPS_OPENCODE_DB", str(boundary))
-    errors = validate_submit_request(request)
-    assert any("budget verdict is COMPACT" in e for e in errors)
+    assert validate_submit_request(request) == []
+    report = sw.aio_capacity_report("ses_aio")
+    assert report["verdict"] == "COMPACT"
+    assert report["advisory"] is True
 
 
-def test_the_gate_consumes_the_shared_override(tmp_path, monkeypatch):
+def test_the_report_consumes_the_shared_override(tmp_path, monkeypatch):
     """The SAME resolution the CLI and capsule consume: FINOPS_SESSION_CTX_LIMIT moves the
-    gate's verdict. A policy cap below the native boundary is a LOCAL POLICY close (never a
-    claimed native compaction — reviewer finding)."""
+    report. A policy cap below the native boundary is a LOCAL POLICY close (never a claimed
+    native compaction — reviewer finding) — reported as an advisory, never a refusal."""
+    from scripts.fleet import spawn_wrapper as sw
+
     _capacity_env(tmp_path, monkeypatch)
     db = tmp_path / "override.db"
     _canonical_session_db(db, turns=10, context=120_000)
     request, _ = _valid_bound_request(tmp_path, monkeypatch, db_name=None)
     monkeypatch.setenv("FINOPS_OPENCODE_DB", str(db))
     assert validate_submit_request(request) == []  # 120K < 968K usable
+    assert sw.aio_capacity_report("ses_aio")["verdict"] == "OK"
     monkeypatch.setenv("FINOPS_SESSION_CTX_LIMIT", "100000")
-    errors = validate_submit_request(request)
-    assert any("budget verdict is CLOSE" in e for e in errors), errors
-    assert any("LOCAL POLICY" in e for e in errors), errors
+    assert validate_submit_request(request) == []
+    report = sw.aio_capacity_report("ses_aio")
+    assert report["verdict"] == "CLOSE"
+    assert "LOCAL POLICY" in report["reason"]
 
 
-def test_a_completed_compaction_allows_the_resumed_submission(tmp_path, monkeypatch):
-    """Reviewer reproduction at the gate: after a successful compaction (summary + pending
-    resumed turn) the stale 975K reading must not block the first resumed submit."""
+def test_a_completed_compaction_moves_the_report_to_the_post_compaction_state(
+    tmp_path, monkeypatch
+):
+    """Reviewer reproduction, retained as a REPORT regression: after a successful compaction
+    (summary + pending resumed turn) the stale 975K reading must not linger — the report
+    reads OK/post-compaction. The gate never blocked in either state (2026-09-16 policy)."""
     import json as _json
     import sqlite3 as _sqlite3
+
+    from scripts.fleet import spawn_wrapper as sw
 
     _capacity_env(tmp_path, monkeypatch)
     db = tmp_path / "compacted.db"
     _canonical_session_db(db, turns=60, context=975_000)
     request, _ = _valid_bound_request(tmp_path, monkeypatch, db_name=None)
     monkeypatch.setenv("FINOPS_OPENCODE_DB", str(db))
-    errors = validate_submit_request(request)
-    assert any("budget verdict is COMPACT" in e for e in errors), errors
+    assert validate_submit_request(request) == []
+    assert sw.aio_capacity_report("ses_aio")["verdict"] == "COMPACT"
 
     con = _sqlite3.connect(db)
     con.execute(
@@ -2239,6 +2344,9 @@ def test_a_completed_compaction_allows_the_resumed_submission(tmp_path, monkeypa
     con.commit()
     con.close()
     assert validate_submit_request(request) == []
+    report = sw.aio_capacity_report("ses_aio")
+    assert report["verdict"] == "OK"
+    assert "post-compaction" in report["reason"]
 
 
 def test_a_pending_only_session_has_no_usable_measurement(tmp_path, monkeypatch):
@@ -2248,10 +2356,11 @@ def test_a_pending_only_session_has_no_usable_measurement(tmp_path, monkeypatch)
     db = tmp_path / "pending.db"
     _canonical_session_db(db, pending_only=True)
     monkeypatch.setenv("FINOPS_OPENCODE_DB", str(db))
-    verdict, reason, measured = sw._aio_budget_verdict("ses_aio")
-    assert verdict == "UNJUDGED"
-    assert "no usable measurement" in reason
-    assert measured is True
+    report = sw._aio_budget_verdict("ses_aio")
+    assert report["verdict"] == "UNJUDGED"
+    assert "no usable measurement" in report["reason"]
+    # Reachable backend, no usable sample: never a claimed measurement.
+    assert report["backend_available"] is True and report["measured"] is False
 
 
 def test_an_initial_session_is_the_explicit_exception(tmp_path, monkeypatch):
@@ -2268,9 +2377,10 @@ def test_an_initial_session_is_the_explicit_exception(tmp_path, monkeypatch):
     con.commit()
     con.close()
     monkeypatch.setenv("FINOPS_OPENCODE_DB", str(db))
-    verdict, reason, measured = sw._aio_budget_verdict("ses_aio")
-    assert (verdict, measured) == ("OK", True)
-    assert "initial session" in reason
+    report = sw._aio_budget_verdict("ses_aio")
+    assert report["verdict"] == "OK" and "initial session" in report["reason"]
+    # A NAMED exception, not a measurement: nothing was recorded to measure.
+    assert report["backend_available"] is True and report["measured"] is False
 
 
 # ── The actor declaration must be consistent (reviewer repair) ────────────────
@@ -2604,3 +2714,546 @@ def test_a_binding_cannot_ride_the_shared_name_across_projects(aio_env, tmp_path
         _aio_block(binding_id=binding_id), repo_root=repo_a, workdir=str(repo_b),
     )
     assert any("DIFFERENT project" in e for e in errors)
+
+
+# ── Continuation provenance at the real AIO validation boundary (round 4) ─────
+
+
+def _local_only_repo(tmp_path: Path, name: str) -> Path:
+    """A git repo with NO origin remote (the local-only provenance channel)."""
+    root = tmp_path / name
+    root.mkdir()
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    (root / "README.md").write_text("x", encoding="utf-8")
+    git = ["git", "-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t"]
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "init"], check=True)
+    return root
+
+
+def _clone_provenance(path: Path) -> str:
+    """The clone's stamped project provenance ('' when unstamped)."""
+    proc = subprocess.run(
+        ["git", "-C", str(path), "config", "--get", "agentic-dynamics.project"],
+        capture_output=True, text=True,
+    )
+    return proc.stdout.strip() if proc.returncode == 0 else ""
+
+
+def _continuation_fixture(tmp_path, monkeypatch, canonical: Path, *, stamped: bool = True):
+    """A parent run's private clone (with a phase commit) + its ledger + the preparer wired
+    in + the submit spec present at the canonical root. Returns (fm, cfg, clone_path).
+
+    ``stamped=False`` builds the PRE-FIX shape by hand: ``git clone`` only (local origin,
+    no provenance stamp), exactly how a clone created before the provenance fix looks.
+    """
+    import importlib
+    import sys as _sys
+
+    from agentic_dynamics.runtime.run_clone import create_run_clone
+
+    spec_src = (
+        Path(__file__).resolve().parent.parent
+        / "workflows" / "repository" / "fleet_job_submission.yaml"
+    )
+    spec_dst = canonical / "workflows" / "repository" / "fleet_job_submission.yaml"
+    spec_dst.parent.mkdir(parents=True, exist_ok=True)
+    spec_dst.write_bytes(spec_src.read_bytes())
+
+    runs_root = tmp_path / "runs"
+    cfg = PathConfig(
+        repo_root=canonical,
+        git_dir=canonical / ".git",
+        worktrees_root=tmp_path,
+        runs_root=runs_root,
+        results_dir=tmp_path / "results",
+        state_root=tmp_path / "state",
+        auth_home=tmp_path / "auth",
+    )
+    if stamped:
+        clone_path = create_run_clone("run-parent", path_config=cfg).path
+    else:
+        clone_path = runs_root / "run-parent" / "repo"
+        clone_path.parent.mkdir(parents=True)
+        subprocess.run(
+            ["git", "clone", "-q", "--no-hardlinks", "--", str(canonical), str(clone_path)],
+            check=True,
+        )
+    git = ["git", "-C", str(clone_path), "-c", "user.email=t@t", "-c", "user.name=t"]
+    (clone_path / "phase.txt").write_text("built", encoding="utf-8")
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "[workflow] build"], check=True)
+    candidate = subprocess.run(
+        ["git", "-C", str(clone_path), "rev-parse", "HEAD"], capture_output=True, text=True
+    ).stdout.strip()
+    ledger_dir = canonical / "experiments" / "results" / "workflows" / "demo"
+    ledger_dir.mkdir(parents=True)
+    (ledger_dir / "20260916T000000000000Z_run-parent.json").write_text(
+        json.dumps({
+            "run_id": "run-parent",
+            "git_sha": candidate,
+            "phases": [{"phase": "build", "status": "ok"}],
+        }),
+        encoding="utf-8",
+    )
+    fleet_dir = str(Path(__file__).resolve().parent.parent / "scripts" / "fleet")
+    if fleet_dir not in _sys.path:
+        _sys.path.insert(0, fleet_dir)
+    fm = importlib.import_module("fleet_manager")
+    monkeypatch.setenv("FINOPS_RUNS_ROOT", str(runs_root))
+    monkeypatch.setattr(fm, "_REPO_ROOT", canonical)
+    return fm, cfg, clone_path
+
+
+def _continuation_request(prepared, binding_id: str) -> dict:
+    return _valid_submit_request(
+        actor="aio",
+        aio=_aio_block(binding_id=binding_id),
+        workdir=str(prepared),
+        resume=True,
+        parent_run_id="run-parent",
+    )
+
+
+def test_a_prepared_continuation_passes_the_aio_boundary_with_an_origin(
+    aio_env, tmp_path, monkeypatch
+):
+    """Reviewer finding (round 4): the continuation workspace is the parent's private clone —
+    an independent repo with a local origin path. Through the REAL AIO validation boundary it
+    must present the canonical project's identity (via its stamped/aligned provenance), not
+    read as a DIFFERENT project."""
+    canonical = _git_project(
+        tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git"
+    )
+    fm, cfg, clone = _continuation_fixture(tmp_path, monkeypatch, canonical)
+    prepared, note, errors = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-parent"
+    )
+    assert errors == [] and prepared == clone
+
+    binding_id = _bound_store(aio_env)
+    validation_errors = validate_submit_request(
+        _continuation_request(prepared, binding_id),
+        repo_root=canonical,
+        path_config=cfg,
+    )
+    assert validation_errors == [], validation_errors
+
+
+def test_a_prepared_continuation_passes_the_aio_boundary_local_only(
+    aio_env, tmp_path, monkeypatch
+):
+    """The provenance channel without an origin: a local-only canonical repo's clone carries
+    the stamped common git dir and still agrees at the real boundary."""
+    canonical = _local_only_repo(tmp_path, "canonical")
+    fm, cfg, clone = _continuation_fixture(tmp_path, monkeypatch, canonical)
+    prepared, note, errors = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-parent"
+    )
+    assert errors == [] and prepared == clone
+
+    binding_id = _bound_store(aio_env)
+    validation_errors = validate_submit_request(
+        _continuation_request(prepared, binding_id),
+        repo_root=canonical,
+        path_config=cfg,
+    )
+    assert validation_errors == [], validation_errors
+
+
+def test_a_foreign_clone_still_refuses_at_the_aio_boundary(aio_env, tmp_path, monkeypatch):
+    """Foreign repositories still refuse: a clone of a DIFFERENT project records the foreign
+    provenance and the project check refuses it at the real boundary."""
+    from agentic_dynamics.runtime.run_clone import create_run_clone
+
+    canonical = _local_only_repo(tmp_path, "canonical")
+    foreign = _git_project(tmp_path, "foreign", "git@github.com:org/foreign.git")
+    fm, cfg, clone = _continuation_fixture(tmp_path, monkeypatch, canonical)
+    foreign_clone = create_run_clone("run-foreign", source_repo=foreign, path_config=cfg)
+
+    binding_id = _bound_store(aio_env)
+    errors = validate_submit_request(
+        _valid_submit_request(
+            actor="aio",
+            aio=_aio_block(binding_id=binding_id),
+            workdir=str(foreign_clone.path),
+        ),
+        repo_root=canonical,
+        path_config=cfg,
+    )
+    assert any("DIFFERENT project" in e for e in errors), errors
+
+
+def test_a_pre_fix_clone_is_verified_and_stamped_then_passes_the_boundary(
+    aio_env, tmp_path, monkeypatch
+):
+    """Round-5 finding (2026-09-16): a parent clone created BEFORE the provenance stamp
+    (local origin, no stamp) must still continue — preparation verifies it by SHARED HISTORY
+    and stamps it (candidate commits untouched), and the real AIO boundary then passes."""
+    canonical = _git_project(
+        tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git"
+    )
+    fm, cfg, clone = _continuation_fixture(tmp_path, monkeypatch, canonical, stamped=False)
+    # The fixture really is the pre-fix shape: local origin, no provenance stamp.
+    assert _clone_provenance(clone) == ""
+
+    prepared, note, errors = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-parent"
+    )
+    assert errors == [] and prepared == clone
+    # Verified and stamped at preparation — the stamp now carries the canonical identity.
+    assert _clone_provenance(clone) != ""
+
+    binding_id = _bound_store(aio_env)
+    validation_errors = validate_submit_request(
+        _continuation_request(prepared, binding_id),
+        repo_root=canonical,
+        path_config=cfg,
+    )
+    assert validation_errors == [], validation_errors
+
+
+def test_a_foreign_pre_fix_clone_is_never_stamped(aio_env, tmp_path, monkeypatch):
+    """The pre-fix verification preserves the foreign-project check: a clone of an unrelated
+    repository shares no history with the canonical one, refuses — and is never stamped.
+
+    The foreign fixture gets a genuinely DIFFERENT root commit (distinct content + message):
+    git identity is content-addressed, so fixtures that happen to produce bit-identical
+    roots would be the same lineage by git's own model.
+    """
+    canonical = _local_only_repo(tmp_path, "canonical")
+    fm, cfg, _clone = _continuation_fixture(tmp_path, monkeypatch, canonical)
+
+    foreign = tmp_path / "foreign"
+    foreign.mkdir()
+    subprocess.run(["git", "init", "-q", str(foreign)], check=True)
+    (foreign / "different.txt").write_text("foreign-only", encoding="utf-8")
+    git = ["git", "-C", str(foreign), "-c", "user.email=t@t", "-c", "user.name=t"]
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "foreign root"], check=True)
+
+    foreign_clone = cfg.runs_root / "run-foreign" / "repo"
+    foreign_clone.parent.mkdir(parents=True)
+    subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", "--", str(foreign), str(foreign_clone)],
+        check=True,
+    )
+    errors = fm._ensure_clone_provenance(foreign_clone, canonical)
+    assert any("DIFFERENT repository" in e for e in errors), errors
+    assert _clone_provenance(foreign_clone) == ""
+
+
+def _fork_of(canonical: Path, tmp_path: Path, name: str, url: str) -> Path:
+    """A clone of ``canonical`` with a FORK's origin (shared history, different project)."""
+    fork = tmp_path / name
+    subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", "--", str(canonical), str(fork)], check=True
+    )
+    subprocess.run(["git", "-C", str(fork), "remote", "set-url", "origin", url], check=True)
+    (fork / "fork-only.txt").write_text("fork", encoding="utf-8")
+    git = ["git", "-C", str(fork), "-c", "user.email=t@t", "-c", "user.name=t"]
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "fork change"], check=True)
+    return fork
+
+
+def test_a_foreign_fork_with_shared_history_is_never_stamped(aio_env, tmp_path, monkeypatch):
+    """Round-6 finding (2026-09-16): a FORK shares the canonical root commit but has its own
+    origin. Preparation must NOT stamp it — the explicit origin conflict refuses first, and
+    shared ancestry may only corroborate a relationship, never establish identity."""
+    canonical = _git_project(
+        tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git"
+    )
+    fm, cfg, _clone = _continuation_fixture(tmp_path, monkeypatch, canonical)
+    fork = _fork_of(canonical, tmp_path, "fork", "git@github.com:other/agentic-dynamics.git")
+
+    # A pre-fix clone OF THE FORK: shared root history, origin = the fork's local path.
+    fork_clone = cfg.runs_root / "run-fork" / "repo"
+    fork_clone.parent.mkdir(parents=True)
+    subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", "--", str(fork), str(fork_clone)],
+        check=True,
+    )
+    head = subprocess.run(
+        ["git", "-C", str(fork_clone), "rev-parse", "HEAD"], capture_output=True, text=True
+    ).stdout.strip()
+    assert fm._shares_root(fork_clone, canonical)  # the regression's precondition
+
+    # Direct verification: refused, never stamped.
+    errors = fm._ensure_clone_provenance(fork_clone, canonical, parent_run_id="run-fork")
+    assert any("DIFFERENT repository" in e for e in errors), errors
+    assert _clone_provenance(fork_clone) == ""
+
+    # Through PREPARATION: the fork clone + its ledger refuses (and stays unstamped).
+    ledger_dir = canonical / "experiments" / "results" / "workflows" / "demo"
+    (ledger_dir / "20260916T000000000000Z_run-fork.json").write_text(
+        json.dumps({"run_id": "run-fork", "git_sha": head,
+                    "phases": [{"phase": "build", "status": "ok"}]}),
+        encoding="utf-8",
+    )
+    prepared, _note, prep_errors = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-fork"
+    )
+    assert prepared is None and prep_errors
+    assert _clone_provenance(fork_clone) == ""
+
+    # And the full submission validator still refuses it (no stamp was written).
+    binding_id = _bound_store(aio_env)
+    validation_errors = validate_submit_request(
+        _valid_submit_request(
+            actor="aio", aio=_aio_block(binding_id=binding_id), workdir=str(fork_clone),
+        ),
+        repo_root=canonical,
+        path_config=cfg,
+    )
+    assert any("DIFFERENT project" in e for e in validation_errors), validation_errors
+
+
+def test_a_container_local_repo_origin_is_established_by_record_and_mapping(
+    aio_env, tmp_path, monkeypatch
+):
+    """The legacy container-local case (retained from round 5): a pre-fix clone whose origin
+    is ``/repo`` (the compose mount view). The run/source relationship — run-clone path +
+    run id — establishes it, shared ancestry corroborates, and the real boundary passes."""
+    # The container view must not be a GIT repository on this host, or the resolved-path
+    # branch (correctly) takes precedence over the container-view channel.
+    assert not (Path("/repo") / ".git").exists(), "the container view must not be a repo here"
+    canonical = _git_project(
+        tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git"
+    )
+    fm, cfg, clone = _continuation_fixture(tmp_path, monkeypatch, canonical, stamped=False)
+    subprocess.run(
+        ["git", "-C", str(clone), "remote", "set-url", "origin", "/repo"], check=True
+    )
+    assert _clone_provenance(clone) == ""
+
+    errors = fm._ensure_clone_provenance(clone, canonical, parent_run_id="run-parent")
+    assert errors == [], errors
+    assert _clone_provenance(clone) != ""
+
+    binding_id = _bound_store(aio_env)
+    validation_errors = validate_submit_request(
+        _continuation_request(clone, binding_id),
+        repo_root=canonical,
+        path_config=cfg,
+    )
+    assert validation_errors == [], validation_errors
+
+
+def test_a_two_step_local_origin_chain_resolves_to_the_canonical_identity(
+    tmp_path, monkeypatch
+):
+    """A local-path origin chain (a clone of a clone of the canonical repo) resolves through
+    to the project URL — accepted with the canonical stamp. A fork anywhere in the chain
+    would end at the fork's URL and refuse (the fork test above)."""
+    canonical = _git_project(
+        tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git"
+    )
+    fm, cfg, _clone = _continuation_fixture(tmp_path, monkeypatch, canonical)
+    intermediate = tmp_path / "intermediate"
+    subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", "--", str(canonical), str(intermediate)],
+        check=True,
+    )
+    chained = cfg.runs_root / "run-chain" / "repo"
+    chained.parent.mkdir(parents=True)
+    subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", "--", str(intermediate), str(chained)],
+        check=True,
+    )
+    errors = fm._ensure_clone_provenance(chained, canonical, parent_run_id="run-chain")
+    assert errors == [], errors
+    assert _clone_provenance(chained) != ""
+
+
+def test_a_stale_canonical_stamp_never_overrides_a_foreign_remote_origin(
+    aio_env, tmp_path, monkeypatch
+):
+    """Round-7 finding (2026-09-16): the PREVIOUS ancestry-only upgrader could write a
+    canonical provenance stamp onto a fork clone. An explicitly conflicting REMOTE origin
+    must defeat that stale stamp — in preparation AND at the submission validator."""
+    canonical = _git_project(
+        tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git"
+    )
+    fm, cfg, _clone = _continuation_fixture(tmp_path, monkeypatch, canonical)
+
+    # The contradictory artifact: a clone of the canonical whose ORIGIN names the fork,
+    # carrying the stale canonical stamp the previous upgrader wrote.
+    fork_stamped = cfg.runs_root / "run-fork" / "repo"
+    fork_stamped.parent.mkdir(parents=True)
+    subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", "--", str(canonical), str(fork_stamped)],
+        check=True,
+    )
+    stale = "origin:git@github.com:peparhugo/agentic-dynamics.git"
+    subprocess.run(
+        ["git", "-C", str(fork_stamped), "remote", "set-url", "origin",
+         "git@github.com:other/agentic-dynamics.git"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(fork_stamped), "config", "agentic-dynamics.project", stale],
+        check=True,
+    )
+    assert _clone_provenance(fork_stamped) == stale  # the contradictory state, reproduced
+
+    # 1) Preparation refuses DESPITE the stamp.
+    errors = fm._ensure_clone_provenance(fork_stamped, canonical, parent_run_id="run-fork")
+    assert errors and "CONFLICTS" in errors[0], errors
+
+    # 2) The submission validator refuses DESPITE the stamp.
+    binding_id = _bound_store(aio_env)
+    validation_errors = validate_submit_request(
+        _valid_submit_request(
+            actor="aio", aio=_aio_block(binding_id=binding_id), workdir=str(fork_stamped),
+        ),
+        repo_root=canonical,
+        path_config=cfg,
+    )
+    assert any("DIFFERENT project" in e for e in validation_errors), validation_errors
+
+
+def test_a_foreign_local_origin_with_a_stale_stamp_refuses_the_broker_dry_run(
+    aio_env, tmp_path, monkeypatch
+):
+    """Round-8 finding (2026-09-16): an explicit --workdir skips preparation, so the SHARED
+    identity rule must reach the same verdict as preparation — a local origin pointing at a
+    foreign fork with a stale canonical stamp refuses in the validator AND in the broker's
+    explicit-workdir dry run (the reviewer's `ok: true` surface)."""
+    import launch_broker
+
+    canonical = _git_project(
+        tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git"
+    )
+    fork = _git_project(tmp_path, "fork-src", "git@github.com:other/agentic-dynamics.git")
+    fm, cfg, _clone = _continuation_fixture(tmp_path, monkeypatch, canonical)
+
+    # A canonical-derived clone whose ORIGIN is the fork's LOCAL path (the worktree shares
+    # canonical history — the reviewer's bypass shape) + the stale canonical stamp.
+    workdir = cfg.runs_root / "run-fork" / "repo"
+    workdir.parent.mkdir(parents=True)
+    subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", "--", str(canonical), str(workdir)],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(workdir), "remote", "set-url", "origin", str(fork)], check=True
+    )
+    stale = "origin:git@github.com:peparhugo/agentic-dynamics.git"
+    subprocess.run(
+        ["git", "-C", str(workdir), "config", "agentic-dynamics.project", stale], check=True
+    )
+
+    # The SHARED rule follows the local origin chain: conflict.
+    from scripts.fleet import broker_contract as bc
+
+    verdict, detail = bc.identity_verdict(canonical, workdir)
+    assert verdict == "conflict", (verdict, detail)
+
+    # 1) Explicit-workdir validation refuses despite the stamp.
+    binding_id = _bound_store(aio_env)
+    errors = validate_submit_request(
+        _valid_submit_request(
+            actor="aio", aio=_aio_block(binding_id=binding_id), workdir=str(workdir),
+        ),
+        repo_root=canonical,
+        path_config=cfg,
+    )
+    assert any("DIFFERENT project" in e for e in errors), errors
+
+    # 2) The SAME workspace through AUTOMATIC preparation refuses too (equivalence).
+    head = subprocess.run(
+        ["git", "-C", str(workdir), "rev-parse", "HEAD"], capture_output=True, text=True
+    ).stdout.strip()
+    ledger_dir = canonical / "experiments" / "results" / "workflows" / "demo"
+    (ledger_dir / "20260916T000000000000Z_run-fork.json").write_text(
+        json.dumps({"run_id": "run-fork", "git_sha": head,
+                    "phases": [{"phase": "build", "status": "ok"}]}),
+        encoding="utf-8",
+    )
+    prepared, _note, prep_errors = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-fork"
+    )
+    assert prepared is None and prep_errors
+
+    # 3) The BROKER's explicit-workdir dry run refuses (not `ok: true`).
+    monkeypatch.setattr(launch_broker, "admission_required", lambda: False)
+    command = {
+        "action": "submit",
+        "job_id": "abcdef123456",
+        "spec": "workflows/repository/fleet_job_submission.yaml",
+        "goal": "g",
+        "model": "anthropic/claude-sonnet-5",
+        "workdir": str(workdir),
+        "ts": 0.0,
+        "nonce": "0" * 12,
+        "actor": "aio",
+        "aio": {
+            "native_session_id": "ses_aio",
+            "agent": "aio-control",
+            "binding_id": binding_id,
+            "task_revision": 1,
+        },
+    }
+    with pytest.raises(launch_broker.LaunchRequestError) as exc:
+        launch_broker.submit_run(
+            command, repo_root=canonical, path_config=cfg, dry_run=True
+        )
+    assert "DIFFERENT project" in str(exc.value)
+
+
+def test_the_shared_identity_rule_covers_the_verdict_channels(tmp_path):
+    """The ONE rule both preparation and the validator call: same git dir / equal remote /
+    followed local chain → match; conflicting remote / a chain to a foreign origin →
+    conflict; unresolvable or missing origin → unknown (the stamp's evidence decides)."""
+    from scripts.fleet import broker_contract as bc
+
+    canonical = _git_project(tmp_path, "canonical", "git@github.com:org/proj.git")
+
+    # A LINKED WORKTREE of the canonical: same common git dir → match.
+    wt = tmp_path / "wt"
+    subprocess.run(
+        ["git", "-C", str(canonical), "worktree", "add", "-q", str(wt), "-b", "wt-branch"],
+        check=True,
+    )
+    assert bc.identity_verdict(canonical, wt)[0] == "match"
+
+    # An EQUAL remote origin → match; a conflicting remote → conflict.
+    same = tmp_path / "same"
+    subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", "--", str(canonical), str(same)],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(same), "remote", "set-url", "origin",
+         "git@github.com:org/proj.git"],
+        check=True,
+    )
+    assert bc.identity_verdict(canonical, same)[0] == "match"
+    subprocess.run(
+        ["git", "-C", str(same), "remote", "set-url", "origin",
+         "git@github.com:other/proj.git"],
+        check=True,
+    )
+    assert bc.identity_verdict(canonical, same)[0] == "conflict"
+
+    # A local origin chain: to the canonical → match; redirected to a fork → conflict.
+    chain = tmp_path / "chain"
+    subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", "--", str(canonical), str(chain)],
+        check=True,
+    )
+    assert bc.identity_verdict(canonical, chain)[0] == "match"  # origin = canonical path
+    fork = _git_project(tmp_path, "fork-src", "git@github.com:other/proj-fork.git")
+    subprocess.run(
+        ["git", "-C", str(chain), "remote", "set-url", "origin", str(fork)], check=True
+    )
+    assert bc.identity_verdict(canonical, chain)[0] == "conflict"
+
+    # An unresolvable local origin (the container view) and a missing origin → unknown.
+    subprocess.run(
+        ["git", "-C", str(chain), "remote", "set-url", "origin", "/repo"], check=True
+    )
+    assert bc.identity_verdict(canonical, chain)[0] == "unknown"
+    subprocess.run(["git", "-C", str(chain), "remote", "remove", "origin"], check=True)
+    assert bc.identity_verdict(canonical, chain)[0] == "unknown"

@@ -105,6 +105,7 @@ _FLEET_DIR = Path(__file__).resolve().parent
 if str(_FLEET_DIR) not in sys.path:
     sys.path.insert(0, str(_FLEET_DIR))
 
+import broker_contract  # noqa: E402  (the module handle for the shared normalization)
 from broker_client import BrokerClient, BrokerError  # noqa: E402
 from broker_contract import (  # noqa: E402
     AUTH_CRED_FILE,
@@ -880,18 +881,24 @@ def _aio_binding_artifact_dir() -> Path:
     return Path(explicit).expanduser() if explicit else KB_ARTIFACT_DIR
 
 
-def _aio_budget_verdict(native_session_id: str) -> tuple[str, str, bool]:
-    """The AIO session's measured capacity verdict: ``(verdict, reason, backend_available)``.
+def _aio_budget_verdict(native_session_id: str) -> dict[str, Any]:
+    """The AIO session's capacity report: ``{verdict, reason, backend_available, measured}``.
 
-    The judgment is the SHARED one — ``session_budget.measure_verdict`` resolves the ACTIVE
-    session model's capacity through ``agentic_dynamics.core.session_capacity`` (the ported
-    opencode calculation), the same resolution the CLI and the capsule consume. The session
-    under judgment is the EXPLICIT native identity carried by the binding — never a
-    most-recently-updated guess. ``backend_available=False`` means this gate cannot reach
-    the session database (the containerized orchestrator has no host DB mounted): a gate that
-    cannot measure DEFERS to the host-side gate, which owns the canonical database — it must
-    not fabricate UNJUDGED and block a valid job (reviewer finding, 2026-09-15). When the
-    backend IS available, an unknown verdict refuses (an unknown budget is never unlimited).
+    ADVISORY DIAGNOSTICS (2026-09-16 policy): the submit gate REPORTS this — it never refuses
+    on it. Conversation capacity is a fact about the coordinator's own chat session, not an
+    authorization for a workflow submit; the admission refusals are identity, binding,
+    project, scope, and financial admission. The judgment is the SHARED one —
+    ``session_budget.measure_report`` resolves the ACTIVE session model's capacity through
+    ``agentic_dynamics.core.session_capacity`` (the ported opencode calculation), the same
+    resolution the CLI and the capsule consume. The session under judgment is the EXPLICIT
+    native identity carried by the binding — never a most-recently-updated guess.
+
+    The two availability fields are DISTINCT (reviewer finding, 2026-09-16):
+    ``backend_available=False`` means this reader cannot reach the session database at all
+    (the containerized orchestrator has no host DB mounted); ``measured=False`` means the
+    verdict rests on no current usable reading even when the database WAS readable — a
+    corrupt database or a pending-only session reports ``backend_available=True`` with
+    ``measured=False``, never a claimed measurement.
     """
     try:
         from scripts import session_budget as budget  # repo root on sys.path
@@ -899,72 +906,76 @@ def _aio_budget_verdict(native_session_id: str) -> tuple[str, str, bool]:
         try:
             import session_budget as budget  # direct run: scripts/ is sys.path[0]
         except ImportError as exc:
-            return "UNJUDGED", f"the budget module is unavailable ({exc})", False
-    return budget.measure_verdict(native_session_id)
+            return {
+                "verdict": "UNJUDGED",
+                "reason": f"the budget module is unavailable ({exc})",
+                "backend_available": False,
+                "measured": False,
+            }
+    return budget.measure_report(native_session_id)
+
+
+def aio_capacity_report(native_session_id: str) -> dict[str, Any]:
+    """The AIO session capacity report — advisory, structured, never an admission gate.
+
+    Every consume site the capsule/CLI/gate shares renders the same fields: the verdict, its
+    reason, whether the session database was reachable (``backend_available``), and whether a
+    current usable reading produced the verdict (``measured``). A missing or unmeasurable
+    reading is reported as ``UNJUDGED`` WITH ITS REASON and with the flags told apart — it is
+    never a refusal, and never silently upgraded to ``OK``. Callers that want the diagnostics
+    (the ``validate-submit`` response, the AIO's in-process tool path) read this; no caller
+    refuses on it (2026-09-16 policy).
+    """
+    return {**_aio_budget_verdict(native_session_id), "advisory": True}
 
 
 # The project-association identity (Unit D): a binding may only ride a submit whose spec /
 # worktree belong to the SAME project. The identity is derived filesystem-only (no
 # subprocess) from the git common dir: the origin URL when one exists (a content identity
 # that is stable across host/container path views), plus the repo/worktree directory names as
-# a fallback. The binding's ``project`` (when set) must normalize to one of them.
-_ORIGIN_URL_RE = re.compile(r"^\s*url\s*=\s*(.+?)\s*$", re.MULTILINE)
-_REMOTE_ORIGIN_RE = re.compile(r'\[remote\s+"origin"\]')
+# a fallback. The binding's ``project`` (when set) must normalize to one of them. The
+# readers below delegate to the SHARED contract so preparation and execution answer the
+# identity question with the same rule (broker_contract.identity_verdict).
+
+
+def _project_provenance(git_dir: Path) -> str:
+    """The stamped continuation provenance (``origin:<url>`` / ``git-dir:<path>``), or "".
+
+    Written by ``create_run_clone`` (candidate continuity, 2026-09-16): a run clone's own
+    git dir + local origin path would otherwise read as a DIFFERENT project from the spec
+    repository. The stamp records the canonical identity the clone derives from; a clone of
+    a FOREIGN repository records the foreign identity — the agreement check still refuses it.
+    """
+    return broker_contract.provenance_token(git_dir)
+
+
+def _provenance_identity(token: str) -> str:
+    """The comparable identity a provenance token carries ('' when absent/unusable)."""
+    text = str(token or "").strip()
+    if text.startswith("origin:"):
+        return _normalize_project(text[len("origin:"):])
+    if text.startswith("git-dir:"):
+        return text[len("git-dir:"):]
+    return ""
 
 
 def _git_common_dir(checkout: Path) -> Path | None:
-    """Resolve ``checkout``'s common git dir (handles a linked worktree's ``.git`` FILE)."""
-    git_path = checkout / ".git"
-    if git_path.is_dir():
-        return git_path
-    if not git_path.is_file():
-        return None
-    try:
-        text = git_path.read_text(encoding="utf-8").strip()
-    except OSError:
-        return None
-    if not text.startswith("gitdir:"):
-        return None
-    git_dir = Path(text.split(":", 1)[1].strip())
-    if not git_dir.is_absolute():
-        git_dir = (checkout / git_dir).resolve()
-    commondir = git_dir / "commondir"
-    if commondir.is_file():
-        try:
-            common = Path(commondir.read_text(encoding="utf-8").strip())
-        except OSError:
-            return git_dir
-        if not common.is_absolute():
-            common = (git_dir / common).resolve()
-        return common
-    return git_dir
+    """Resolve ``checkout``'s common git dir — the shared contract's filesystem-only rule."""
+    return broker_contract.git_common_dir(checkout)
 
 
 def _origin_url(git_dir: Path) -> str:
-    """The ``origin`` remote URL recorded in the common git dir's config (or "")."""
-    try:
-        config = (git_dir / "config").read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return ""
-    match = _REMOTE_ORIGIN_RE.search(config)
-    if not match:
-        return ""
-    url_match = _ORIGIN_URL_RE.search(config, match.end())
-    return url_match.group(1).strip() if url_match else ""
+    """The ``origin`` remote URL recorded in the common git dir's config — shared reader."""
+    return broker_contract.origin_url(git_dir)
 
 
 def _normalize_project(value: str) -> str:
-    """Normalize a project identity for comparison: host/path form, no scheme/.git/case."""
-    text = str(value or "").strip().lower().rstrip("/")
-    if text.startswith("git@"):
-        text = text[4:].replace(":", "/", 1)
-    for prefix in ("ssh://git@", "ssh://", "https://", "http://", "git://"):
-        if text.startswith(prefix):
-            text = text[len(prefix):]
-            break
-    if text.endswith(".git"):
-        text = text[:-4]
-    return text
+    """Normalize a project identity for comparison — the SHARED contract's definition.
+
+    Delegates to ``broker_contract.normalize_project`` (one definition for the validator
+    and the fleet-manager's provenance verification).
+    """
+    return broker_contract.normalize_project(value)
 
 
 def _checkout_identity(checkout: Path) -> dict | None:
@@ -978,6 +989,7 @@ def _checkout_identity(checkout: Path) -> dict | None:
         return None
     common = _git_common_dir(checkout)
     origin = _origin_url(common) if common is not None else ""
+    provenance = _project_provenance(common) if common is not None else ""
     canonical = ""
     if common is not None and common.name == ".git":
         canonical = _normalize_project(common.parent.name)
@@ -985,7 +997,11 @@ def _checkout_identity(checkout: Path) -> dict | None:
         "name": _normalize_project(checkout.name),
         "canonical_name": canonical,
         "origin": _normalize_project(origin),
+        #: The RAW origin string — needed to tell a remote URL from a local path when a
+        #: provenance stamp is audited (round-7: a conflicting remote origin defeats it).
+        "origin_raw": origin,
         "common_dir": str(common) if common is not None else "",
+        "provenance": provenance,
         "is_git": common is not None,
     }
 
@@ -1015,10 +1031,31 @@ def _project_agreement(repo_root: Path, workdir: str) -> tuple[set[str], list[st
             and repo["common_dir"] == work["common_dir"]
         ):
             shared = f"git-dir:{repo['common_dir']}"
+        else:
+            # THE SHARED RULE (round-8 repair, 2026-09-16): preparation and execution call
+            # broker_contract.identity_verdict — an explicitly supplied workspace must
+            # receive the same verdict as an automatically prepared one. The verdict
+            # FOLLOWS a resolvable local origin chain (a fork's local origin conflicts even
+            # when a stale canonical stamp claims otherwise); "unknown" (the container
+            # ``/repo`` view, no origin) falls back to the stamp's own evidence.
+            verdict, detail = broker_contract.identity_verdict(repo_root, workdir)
+            provenance = _provenance_identity(work.get("provenance", ""))
+            if verdict == "conflict":
+                return set(), [
+                    "submit: the worktree belongs to a DIFFERENT project than the spec "
+                    f"repository (origin {detail!r} vs "
+                    f"{repo['origin'] or repo['common_dir'] or repo['name']}) — a submit may "
+                    "not cross projects (a shared directory name is not shared identity); an "
+                    "explicitly conflicting origin is never overridden by a provenance stamp"
+                ]
+            if verdict == "match":
+                shared = provenance or repo["origin"] or f"git-dir:{repo['common_dir']}"
+            elif provenance and provenance in (repo["origin"], repo["common_dir"]):
+                shared = provenance  # unknown verdict: the stamp's evidence decides
         if not shared:
             return set(), [
                 "submit: the worktree belongs to a DIFFERENT project than the spec repository "
-                f"(origins {work['origin'] or work['common_dir'] or work['name']} vs "
+                f"(origins {work['origin'] or work.get('provenance') or work['common_dir'] or work['name']} vs "
                 f"{repo['origin'] or repo['common_dir'] or repo['name']}) — a submit may not "
                 "cross projects (a shared directory name is not shared identity)"
             ]
@@ -1075,7 +1112,7 @@ def _deterministic_phase_errors(spec: Any) -> list[str]:
 
 
 def _validate_aio_binding(
-    aio: Any, *, repo_root: Path, workdir: str, strict_budget: bool = False
+    aio: Any, *, repo_root: Path, workdir: str
 ) -> list[str]:
     """The AIO actor's binding gate: resolve + validate the binding BY IDENTITY.
 
@@ -1085,10 +1122,10 @@ def _validate_aio_binding(
     project identities (the reviewer finding: a binding naming an unrelated git project must
     not ride an Agentic Dynamics workflow). Refusals (each named): malformed identity fields,
     an unavailable store, no binding, an agent mismatch, a foreign/stale binding id, a stale
-    task revision, a project mismatch, and a session-capacity verdict that blocks new
-    consequential work (COMPACT / CLOSE / UNJUDGED — where measurable; WARN is ADVISORY and
-    never blocks, per the 2026-09-15 context-policy; ``strict_budget`` gates that cannot
-    reach the session database refuse instead of deferring).
+    task revision, and a project mismatch. Conversation capacity is deliberately NOT a
+    refusal here (2026-09-16 policy): it is advisory diagnostics (``aio_capacity_report``),
+    never an authorization field — a missing chat token measurement is not a missing
+    authorization.
     """
     if not isinstance(aio, dict):
         return [f"submit: aio must be a mapping (got {type(aio).__name__})"]
@@ -1152,24 +1189,13 @@ def _validate_aio_binding(
             f"submitted project ({sorted(agreed) or 'unresolvable'}) — a binding may only "
             "ride work from its own project"
         )
-    verdict, reason, measured_here = _aio_budget_verdict(native_session_id)
-    if measured_here:
-        # The 2026-09-15 capacity policy: WARN is ADVISORY (a session near its effective
-        # limit may still start new work); COMPACT is the native-compaction boundary (let the
-        # runtime reduce the context, then re-submit — the session/task binding continues);
-        # CLOSE is the hard model limit (next request cannot be processed); UNJUDGED is no
-        # measurement — never permission.
-        if verdict in ("COMPACT", "CLOSE", "UNJUDGED"):
-            errors.append(
-                f"submit: AIO session budget verdict is {verdict} — new consequential work is "
-                f"blocked ({reason or 'session at its capacity boundary'})"
-            )
-    elif strict_budget:
-        errors.append(
-            "submit: the AIO session budget cannot be measured at this gate "
-            f"({reason or 'session database unavailable'}) — the host gate must measure it "
-            "before the launch effect"
-        )
+    # Conversation capacity is deliberately NOT consulted here (2026-09-16 policy): the
+    # verdict — even an unavailable one — is a diagnostic about the coordinator's own chat
+    # session, never an authorization for the submit. The report is measured separately
+    # (``aio_capacity_report``, and by the AIO's own turn check) and rides the validation
+    # response as ``aio_capacity``; it never becomes an error. What DOES refuse here: the
+    # identity fields above, the durable binding, the agent/binding revision, and the
+    # project agreement — an unbound or stale submit stays refused regardless of capacity.
     return errors
 
 
@@ -1179,7 +1205,6 @@ def validate_submit_request(
     repo_root: Path | str | None = None,
     phase_scopes: dict[str, str] | None = None,
     path_config: PathConfig | None = None,
-    strict_aio_budget: bool = False,
     require_deterministic: bool = False,
 ) -> list[str]:
     """Validate a ``submit`` request. Empty list = valid; the socket is reached only then.
@@ -1434,7 +1459,8 @@ def validate_submit_request(
 
     # Step 12a — the AIO local-execution exception (Unit D repair): an AIO in-process run is
     # permitted only for a VERIFIED DETERMINISTIC workflow (no agent phases), so the local
-    # mode can never dispatch a consequential agent turn around the durable budget/scope gates.
+    # mode can never dispatch a consequential agent turn around the durable execution path's
+    # scope and admission gates.
     if require_deterministic:
         errors.extend(_deterministic_phase_errors(spec))
 
@@ -1442,10 +1468,11 @@ def validate_submit_request(
     # CONSISTENT: actor=aio demands a complete block (a missing/null block is not a binding),
     # and a block supplied without the actor is an inconsistent declaration. The binding is
     # then resolved + validated BY IDENTITY — including that its project matches the submitted
-    # spec/worktree and (where measurable) that the session budget allows new work. A submit
-    # with NO actor/aio declarations keeps its existing contract: valid non-AIO automation is
-    # never asked to impersonate the coordinator. The broker re-runs this same gate (strictly)
-    # before the launch effect.
+    # spec/worktree. Conversation capacity is NOT part of this gate (2026-09-16 policy): it is
+    # advisory diagnostics (`aio_capacity_report`), reported, never refused on. A submit with
+    # NO actor/aio declarations keeps its existing contract: valid non-AIO automation is never
+    # asked to impersonate the coordinator. The broker re-runs this same gate before the
+    # launch effect.
     actor = str(request.get("actor") or "").strip()
     aio = request.get("aio")
     if actor == "aio" and not isinstance(aio, dict):
@@ -1460,9 +1487,7 @@ def validate_submit_request(
                 "inconsistent declaration (the block declares the AIO actor)"
             )
         errors.extend(
-            _validate_aio_binding(
-                aio, repo_root=repo_root, workdir=workdir, strict_budget=strict_aio_budget
-            )
+            _validate_aio_binding(aio, repo_root=repo_root, workdir=workdir)
         )
 
     return errors
@@ -2427,10 +2452,6 @@ def main(argv: list[str] | None = None) -> int:
         help="validate a submit request (JSON on stdin), including the AIO binding gate",
     )
     p_validate_submit.add_argument(
-        "--strict-aio-budget", action="store_true",
-        help="refuse when the AIO session budget cannot be measured at this gate",
-    )
-    p_validate_submit.add_argument(
         "--require-deterministic", action="store_true",
         help="refuse a spec containing agent phases (the AIO in-process exception)",
     )
@@ -2452,10 +2473,17 @@ def main(argv: list[str] | None = None) -> int:
         request = json.loads(sys.stdin.read())
         errors = validate_submit_request(
             request,
-            strict_aio_budget=args.strict_aio_budget,
             require_deterministic=args.require_deterministic,
         )
-        print(json.dumps({"ok": not errors, "errors": errors}))
+        output: dict[str, Any] = {"ok": not errors, "errors": errors}
+        # The capacity report is ADVISORY (2026-09-16 policy): it rides the response so the
+        # caller can see it, and it never contributes to ``errors``. An unavailable reading
+        # is reported as UNJUDGED with its reason — never a missing authorization.
+        aio = request.get("aio") if isinstance(request.get("aio"), dict) else None
+        native = str((aio or {}).get("native_session_id") or "").strip()
+        if str(request.get("actor") or "").strip() == "aio" and native:
+            output["aio_capacity"] = aio_capacity_report(native)
+        print(json.dumps(output))
         return 0 if not errors else 2
 
     consume_fleet_commands(dry_run=args.dry_run, once=args.once)

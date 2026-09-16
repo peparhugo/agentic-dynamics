@@ -38,6 +38,7 @@ from scripts.session_budget import (
     _resolve_session_id,
     _session_exists,
     main,
+    measure_report,
     measure_verdict,
 )
 
@@ -552,6 +553,61 @@ def test_a_corrupt_database_is_unjudged_and_the_cli_still_emits_json(tmp_path, m
     assert report["verdict"] == "UNJUDGED"
     assert report["reason"]  # named, never silent
     assert measure_verdict("ses_x", db_path=db)[0] == "UNJUDGED"
+
+
+def test_measure_report_distinguishes_backend_availability_from_a_measurement(
+    tmp_path, monkeypatch
+):
+    """Reviewer finding (2026-09-16): ``backend_available`` and ``measured`` are different
+    facts. A corrupt database or a pending-only session REACHES the backend and measures
+    nothing — never a claimed measurement; only a current usable reading reports True."""
+    _hermetic(tmp_path, monkeypatch)
+    db = tmp_path / "opencode.db"
+    sid = _make_session_db(db, turns=5, context=30_000)
+    report = measure_report(sid, db_path=db)
+    assert report["verdict"] == "OK"
+    assert report["backend_available"] is True and report["measured"] is True
+
+    # A missing database: the backend itself is unreachable.
+    report = measure_report(sid, db_path=tmp_path / "absent.db")
+    assert report["verdict"] == "UNJUDGED"
+    assert report["backend_available"] is False and report["measured"] is False
+
+    # A corrupt database: reachable, unreadable — never a claimed measurement.
+    corrupt = tmp_path / "corrupt.db"
+    corrupt.write_bytes(b"this is not a sqlite database" * 100)
+    report = measure_report("ses_x", db_path=corrupt)
+    assert report["verdict"] == "UNJUDGED"
+    assert report["backend_available"] is True and report["measured"] is False
+    assert "not a database" in report["reason"]
+
+    # A pending-only session: reachable, no usable sample.
+    pending = tmp_path / "pending.db"
+    psid = _make_session_db(pending, turns=1, context=1)
+    con = sqlite3.connect(pending)
+    con.execute("DELETE FROM message WHERE session_id=?", (psid,))
+    con.execute(
+        "INSERT INTO message VALUES (?, ?, ?)",
+        (psid, 1, json.dumps({"role": "assistant", "tokens": {"total": 0, "input": 0, "output": 0}})),
+    )
+    con.commit()
+    con.close()
+    report = measure_report(psid, db_path=pending)
+    assert report["verdict"] == "UNJUDGED"
+    assert report["backend_available"] is True and report["measured"] is False
+    assert "no usable measurement" in report["reason"]
+
+    # An initial session: reachable, nothing recorded yet — a named OK, not a measurement.
+    fresh = tmp_path / "fresh.db"
+    fsid = _make_session_db(fresh, turns=0, context=0)
+    report = measure_report(fsid, db_path=fresh)
+    assert report["verdict"] == "OK" and "initial session" in report["reason"]
+    assert report["backend_available"] is True and report["measured"] is False
+
+    # The 3-tuple seam keeps its shape: the third element is BACKEND availability, never a
+    # measurement claim (a caller that needs the distinction uses measure_report).
+    verdict, reason, backend_available = measure_verdict("ses_x", db_path=corrupt)
+    assert verdict == "UNJUDGED" and backend_available is True
 
 
 def test_an_unresolvable_model_is_unjudged_never_ok(tmp_path, monkeypatch):

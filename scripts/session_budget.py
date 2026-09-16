@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""session_budget.py — the AIO's session budget check (capacity-derived, 2026-09-15 policy).
+"""session_budget.py — the AIO's session budget check (capacity-derived; ADVISORY since 2026-09-16).
 
 The 25-hour 2026-09-13 session ran to ~698K context tokens with zero compactions. The first
 repair (decision f987cde9) made the failure class executable against a FIXED policy budget
 (200K tokens / 80 assistant turns). The operator's 2026-09-15 context-policy change replaced
-that constant with the ACTIVE session model's resolved capacity:
+that constant with the ACTIVE session model's resolved capacity. The operator's 2026-09-16
+delivery-path simplification then separated this DIAGNOSTIC from workflow ADMISSION: the
+verdict informs the coordinator's own wrap-up/hand-off discipline and is reported wherever
+it is consumed; it never blocks a valid submission. Native identity, the durable binding,
+project association, source/scope guarantees, and FINANCIAL admission remain the refusals —
+a missing chat token measurement is not a missing authorization.
 
     agentic-dynamics session budget                        # human verdict
     agentic-dynamics session budget --json                 # machine surface: session-budget/v2
@@ -21,24 +26,27 @@ far, TELEMETRY ONLY — message count is never a stopping condition):
   mirrors the runtime and re-measures with the next completed sample.
 * ``WARN``    — at/above 80% of the operative limit: ADVISORY. Informational; not a stopping
   condition; never a reason to refuse new work.
-* ``COMPACT`` — at/above the NATIVE usable boundary: the installed runtime compacts natively
-  on the next request and the SAME session/task continues. Do not close; re-evaluate against
-  the reduced context afterward. (When the runtime's native compaction is disabled, no
-  mechanism can reduce the context and the verdict is CLOSE instead.)
+* ``COMPACT`` — at/above the NATIVE usable boundary: the runtime's own compaction may engage
+  on its next request, and the SAME session/task continues. This check REPORTS the boundary;
+  it does not trigger, prove, or record compaction (only the runtime does that, at its native
+  boundary). Do not close; re-evaluate against the reduced context afterward. (When the
+  runtime's native compaction is disabled, no mechanism can reduce the context and the
+  verdict is CLOSE instead.)
 * ``CLOSE``   — at/over the model's HARD context limit (the next request cannot be processed),
   or at/over a LOCAL POLICY cap below the native boundary (``FINOPS_SESSION_CTX_LIMIT`` —
   a policy cap is not a native trigger, so nothing will reduce the context; close and hand
   off).
-* ``UNJUDGED`` — the session/model/capacity cannot be measured. Exit code 1, deliberately: an
-  unknown budget is never treated as unlimited (the same rule as unknown cost) — and never as
-  a fabricated OK.
+* ``UNJUDGED`` — the session/model/capacity cannot be measured. Exit code 1, deliberately: it
+  is reported as an unavailable ADVISORY with its reason — never a fabricated OK, and never a
+  fabricated refusal (workflow admission no longer consumes this verdict; see the 2026-09-16
+  policy above).
 
 Capacity is resolved by ``agentic_dynamics.core.session_capacity``: the installed runtime's
 own CLI resolution first (``opencode models --verbose``), the catalog+config fallback second —
-the same resolution the capsule (``session_open.py``) and the fleet exec-boundary gate
-(``scripts/fleet/spawn_wrapper.py``) consume, so all three return the SAME judgment. The
-operator override ``FINOPS_SESSION_CTX_LIMIT`` is a clamped LOCAL POLICY cap read by the same
-resolver.
+the same resolution the capsule (``session_open.py``) and the fleet exec-boundary's advisory
+report (``scripts/fleet/spawn_wrapper.py:aio_capacity_report``) consume, so all of them return
+the SAME judgment. The operator override ``FINOPS_SESSION_CTX_LIMIT`` is a clamped LOCAL POLICY
+cap read by the same resolver.
 
 Identity (unchanged): the session under judgment is the EXPLICIT one — ``--session-id``, else
 ``FINOPS_SESSION_ID``. There is NO most-recently-updated fallback; an absent identity and a
@@ -51,9 +59,16 @@ A completed COMPACTION SUMMARY is never a context sample (its usage describes th
 generation call over the old conversation, not the new context); it marks the post-compaction
 state instead.
 
-Exit codes: 0 = OK, 1 = WARN (advisory) / UNJUDGED, 2 = COMPACT (native compaction expected;
+Exit codes: 0 = OK, 1 = WARN (advisory) / UNJUDGED, 2 = COMPACT (at/above the native boundary;
 re-evaluate after), 3 = CLOSE (close now). Every judgment appends one line to the session-budget
 journal (append-only; override the path with ``FINOPS_SESSION_BUDGET_JOURNAL`` for tests).
+
+Programmatic callers use ``measure_report`` for the structured judgment
+(``{verdict, reason, backend_available, measured}``): ``backend_available`` says the session
+database was reachable; ``measured`` says a CURRENT usable reading produced the verdict — a
+corrupt database reports ``backend_available=True`` with ``measured=False``, never a claimed
+measurement. ``measure_verdict`` keeps the 3-tuple shape for existing callers, where the third
+element is backend availability (NOT a measurement).
 
 The verdict is derived from the opencode session database (``~/.local/share/opencode/opencode.db``
 by default; ``FINOPS_OPENCODE_DB`` overrides).
@@ -195,12 +210,17 @@ def _resolve(
         "capacity": None,
         "model": None,
         "reason": "",
+        #: Whether the session DATABASE was reachable to read (the file existed). Distinct
+        #: from a usable measurement: a corrupt database or a pending-only session reaches
+        #: the backend and still measures nothing.
+        "backend_available": False,
     }
     try:
         path = Path(db_path)
         if not path.is_file():
             result["reason"] = f"session db {path} not found"
             return result
+        result["backend_available"] = True
         sid = (session_id or "").strip()
         if not sid:
             result["reason"] = f"no session identity supplied (--session-id or {SESSION_ID_ENV})"
@@ -303,20 +323,66 @@ def _verdict_for(resolved: dict) -> tuple[str, str, dict]:
     return verdict, reason, capacity.as_dict()
 
 
+def _measured(resolved: dict) -> bool:
+    """Whether the verdict rests on a CURRENT usable reading — not merely a reachable backend.
+
+    False for every named non-measurement, even when the database was read: the initial
+    session (no usage recorded yet), an every-sample-pending session (no usable sample), a
+    completed compaction summary (the retained reading is stale BY CONSTRUCTION — measurement
+    resumes with the next completed sample), an unresolvable identity/capacity, and any
+    unreadable database (the shared error boundary lands in ``unresolved``).
+    """
+    return bool(resolved.get("status") == "measured" and not resolved.get("post_compaction"))
+
+
+def measure_report(
+    session_id: str | None,
+    *,
+    db_path: Path | None = None,
+    env: dict | None = None,
+) -> dict:
+    """The structured measurement report: ``{verdict, reason, backend_available, measured}``.
+
+    ``backend_available`` — the session DATABASE was reachable (present at this location).
+    ``measured`` — the verdict rests on a CURRENT usable reading (see :func:`_measured`).
+    The two are deliberately distinct: a corrupt database yields
+    ``UNJUDGED / backend_available=True / measured=False`` (never a claimed measurement), a
+    containerized gate with no host DB mounted yields ``False / False``, and a pending-only
+    session yields ``True / False``. Callers report both; no consumer converts an absent
+    measurement into a refusal (2026-09-16 policy — a missing chat token measurement is not
+    a missing authorization).
+    """
+    try:
+        path = Path(db_path) if db_path else _default_db()
+        resolved = _resolve(session_id or "", db_path=path, env=env)
+        verdict, reason, _ = _verdict_for(resolved)
+        return {
+            "verdict": verdict,
+            "reason": reason,
+            "backend_available": bool(resolved.get("backend_available")),
+            "measured": _measured(resolved),
+        }
+    except Exception as exc:  # noqa: BLE001 — an unreadable budget is UNJUDGED, never OK
+        return {
+            "verdict": "UNJUDGED",
+            "reason": f"{type(exc).__name__}: {exc}",
+            "backend_available": False,
+            "measured": False,
+        }
+
+
 def measure_verdict(
     session_id: str | None,
     *,
     db_path: Path | None = None,
     env: dict | None = None,
 ) -> tuple[str, str, bool]:
-    """The measurement seam for programmatic callers (the AIO exec-boundary gate).
+    """The 3-tuple measurement seam: ``(verdict, reason, backend_available)``.
 
-    Returns ``(verdict, reason, backend_available)``:
+    The third element is BACKEND AVAILABILITY, not a usable measurement — a corrupt database
+    reports it True while measuring nothing. Callers that report the distinction (the
+    exec-boundary advisory) use :func:`measure_report`. Semantics of the verdicts:
 
-    * ``backend_available=False`` — the session DATABASE is not present at this location
-      (the containerized gate has no host DB mounted). The caller must NOT read this as a
-      verdict: a gate that cannot measure defers, and the host-side gate (the broker) —
-      which owns the canonical database — measures before the launch effect.
     * a genuinely INITIAL session (no assistant message recorded yet) is ``OK`` with the
       explicit reason ``"initial session: no usage recorded yet"`` — the one defined
       exception, named rather than silently zero.
@@ -331,18 +397,8 @@ def measure_verdict(
 
     The judged session is the EXPLICIT identity; there is no most-recently-updated fallback.
     """
-    try:
-        path = Path(db_path) if db_path else _default_db()
-        if not path.is_file():
-            return "UNJUDGED", f"session db {path} not found", False
-        sid = (session_id or "").strip()
-        if not sid:
-            return "UNJUDGED", f"no session identity supplied (--session-id or {SESSION_ID_ENV})", True
-        resolved = _resolve(sid, db_path=path, env=env)
-        verdict, reason, _ = _verdict_for(resolved)
-        return verdict, reason, True
-    except Exception as exc:  # noqa: BLE001 — an unreadable budget is UNJUDGED, never OK
-        return "UNJUDGED", f"{type(exc).__name__}: {exc}", True
+    report = measure_report(session_id, db_path=db_path, env=env)
+    return report["verdict"], report["reason"], report["backend_available"]
 
 
 def _append_journal(entry: dict[str, object]) -> None:

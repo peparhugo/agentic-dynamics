@@ -40,8 +40,10 @@ the visibility the bare ``setsid nohup`` workers never had.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import subprocess
 import sys
 import time
 import uuid
@@ -50,6 +52,14 @@ from pathlib import Path
 
 # scripts/fleet/ -> add scripts/ to the path, then reuse the shared bootstrap.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+# The repo root + src/ (the same clean-environment bootstrap spawn_wrapper applies): the
+# preparation path resolves the shared PathConfig so the derived workspace lands under the
+# SAME worktrees root the exec boundary validates against.
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+if str(_REPO_ROOT / "src") not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 import broker_contract  # noqa: E402  (scripts/fleet/ is this module's dir)
 import dlq  # noqa: E402  (scripts/fleet/ is this module's dir)
@@ -68,6 +78,13 @@ COMMANDS_KEY = "fleet:commands"
 #: "launching" at submit time; the orchestrator/downstream tooling would write "running"/
 #: "completed"/"failed" as those are observed), not recomputed wholesale on each watch cycle.
 JOBS_KEY = "fleet:jobs"
+#: The caller-stable request index (2026-09-16 delivery simplification, Unit 2): one hash field
+#: per ``request_key`` -> ``job_id``. A submit that names a request key claims it atomically
+#: with its LPUSH; a RETRY with the same key reconciles to the existing job instead of minting
+#: a second one. The key is explicitly caller-supplied — this is NOT content deduplication
+#: (identical goal text may be an intentional new run); a caller that wants a new run mints a
+#: new key, a caller retrying an ambiguous submit reuses its retained key.
+REQUESTS_KEY = "fleet:requests"
 #: The docs-drift row (``automatic_docs_sync`` p2). Written by
 #: ``scripts/docs_drift_watchdog.py`` on its own cadence and merged into the board snapshot
 #: here, for exactly the reason JOBS_KEY is separate: this watcher rebuilds BOARD_KEY
@@ -173,6 +190,22 @@ def _docs_drift_row(client: redis.Redis) -> dict:
     return row if isinstance(row, dict) else {}
 
 
+def _job_launch_record(command: dict) -> dict:
+    """The board's "launching" record for a submit command (the request key rides along)."""
+    record = {
+        "job_id": command["job_id"],
+        "spec": command["spec"],
+        "model": command["model"],
+        "status": "launching",
+        "ts": command["ts"],
+    }
+    if command.get("request_key"):
+        record["request_key"] = command["request_key"]
+    if command.get("task_identity"):
+        record["task_identity"] = command["task_identity"]
+    return record
+
+
 def record_job_launch(client: redis.Redis, command: dict) -> dict:
     """Write a submitted job's "launching" record onto the board (``fleet:jobs``).
 
@@ -182,15 +215,490 @@ def record_job_launch(client: redis.Redis, command: dict) -> dict:
     not wait for or assume any of that (submit is fire-and-forget onto the queue, matching
     resize/drain/restart's own "LPUSH and return" shape).
     """
-    record = {
-        "job_id": command["job_id"],
-        "spec": command["spec"],
-        "model": command["model"],
-        "status": "launching",
-        "ts": command["ts"],
-    }
+    record = _job_launch_record(command)
     client.hset(JOBS_KEY, mapping={command["job_id"]: json.dumps(record)})
     return record
+
+
+class RequestKeyConflictError(ValueError):
+    """A caller-stable request key was reused for a DIFFERENT submission.
+
+    Reconciliation compares the FULL execution-relevant fingerprint (spec path AND digest,
+    goal, model, worktree, continuation, admission/execution settings) — a key reused with
+    any changed input is a different request and refuses loudly (reviewer finding,
+    2026-09-16: comparing the spec filename alone silently discarded edited requests).
+    """
+
+
+class RequestKeyUnresolvedError(ValueError):
+    """A stored request identity cannot be verified — the evidence is missing/corrupt.
+
+    When the retained entry carries no fingerprint (missing evidence), the retry is neither
+    reconciled nor re-queued: an explicit unresolved state refuses loudly, naming the key.
+    """
+
+
+def request_fingerprint(
+    *,
+    spec: str,
+    goal: str,
+    model: str,
+    workdir: str,
+    image: str | None = None,
+    spec_sha256: str | None = None,
+    resume: bool = False,
+    parent_run_id: str | None = None,
+    admission: dict | None = None,
+    execution: dict | None = None,
+) -> str:
+    """The canonical fingerprint of a submission's EXECUTION-RELEVANT inputs.
+
+    Retained alongside the request identity at claim time and compared at reconcile time: a
+    retry reconciles only when every execution-relevant input matches; any change is a
+    different request. The AIO binding identity is deliberately NOT part of the fingerprint —
+    a legitimate retry after re-binding/compaction carries a newer task revision and must
+    still reconcile. Declared inputs only (the tool always supplies ``spec_sha256``; a caller
+    that omits it cannot see a same-path edit — the digest is what catches that).
+    """
+    payload = {
+        "spec": str(spec or ""),
+        "goal": str(goal or ""),
+        "model": str(model or ""),
+        "workdir": str(workdir or ""),
+        "image": str(image or ""),
+        "spec_sha256": str(spec_sha256 or ""),
+        "resume": bool(resume),
+        "parent_run_id": str(parent_run_id or ""),
+        "admission": admission or {},
+        "execution": execution or {},
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _parse_request_entry(raw: str, key: str) -> dict:
+    """Parse a stored request entry ``{job_id, fingerprint}``; missing evidence refuses.
+
+    An unparseable entry or one without a fingerprint is the explicit UNRESOLVED state — the
+    retry cannot be verified against anything, and silently reconciling it (or silently
+    re-queueing it) would be exactly the ambiguity the request key exists to remove.
+    """
+    try:
+        entry = json.loads(raw)
+    except (TypeError, ValueError) as exc:
+        raise RequestKeyUnresolvedError(
+            f"request key {key!r} has an unreadable stored identity ({exc}) — cannot verify "
+            "this retry; resolve it from the board or mint a new key"
+        ) from exc
+    if (
+        not isinstance(entry, dict)
+        or not entry.get("job_id")
+        or not entry.get("fingerprint")
+        or not entry.get("workdir")
+    ):
+        raise RequestKeyUnresolvedError(
+            f"request key {key!r} carries no stored fingerprint/workspace (missing evidence) "
+            "— cannot verify this retry; resolve it from the board or mint a new key"
+        )
+    return entry
+
+
+# ── The workspace preparation path (Unit 2) ────────────────────────────────────
+#
+# A submit may OMIT --workdir: the preparation path selects/creates the workspace using the
+# existing worktree support, instead of every caller assembling one by hand. The derived
+# name is DETERMINISTIC for the request's pre-workdir identity, so a retry-safe
+# resubmission resolves the SAME candidate path and reconciles by key (no second workspace,
+# no mutation). A pre-existing candidate that is not this repo's CLEAN worktree refuses
+# loudly — never mutated to fit.
+#
+# FRESH submissions are bound to the repo's CURRENT main tip: a compatible workspace
+# (clean, at/ahead of main) is reused; a stale one is never reset — a separate,
+# SHA-suffixed workspace is created beside it. A RETRY must never re-resolve the workspace:
+# the submit path's retry pre-check skips preparation entirely when the key already names a
+# submission (nothing will run, and re-resolving after a main advance could turn the retry
+# into a different request).
+#
+# CONTINUATIONS (--resume --parent-run-id) work from the parent run's PRIVATE CLONE
+# (``runs_root/<parent-id>/repo`` — the repository that actually contains its committed
+# phases) at the parent ledger's candidate SHA, verified before any phase is inherited. The
+# parent's declared workdir is NEVER the continuation base: its commits are not there.
+
+
+def _workspace_identity_digest(
+    *,
+    spec: str,
+    goal: str,
+    model: str,
+    image: str | None = None,
+    spec_sha256: str | None = None,
+    resume: bool = False,
+    parent_run_id: str | None = None,
+    admission: dict | None = None,
+    execution: dict | None = None,
+) -> str:
+    """The PRE-workdir digest that names the derived workspace (stable across a retry)."""
+    payload = {
+        "spec": str(spec or ""), "goal": str(goal or ""), "model": str(model or ""),
+        "image": str(image or ""), "spec_sha256": str(spec_sha256 or ""),
+        "resume": bool(resume), "parent_run_id": str(parent_run_id or ""),
+        "admission": admission or {}, "execution": execution or {},
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _git_run(*args: str, cwd: Path, timeout: int = 120) -> tuple[int, str]:
+    """One git call for the preparation path; a missing/broken git is a named refusal."""
+    try:
+        proc = subprocess.run(  # noqa: S603 — the submission tier owns workspace preparation
+            ["git", *args], cwd=str(cwd), capture_output=True, text=True, timeout=timeout,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return 127, f"git unavailable ({type(exc).__name__}: {exc})"
+    return proc.returncode, ((proc.stdout or "") + (proc.stderr or "")).strip()
+
+
+def _derived_workspace_path(spec: str, digest: str) -> Path:
+    """The deterministic workspace path for a request: worktrees_root/wt_<spec>_<digest8>."""
+    from agentic_dynamics.core.paths import PathConfig
+
+    worktrees_root = Path(PathConfig.from_env(require_existing=False).worktrees_root)
+    stem = "".join(
+        c if (c.isalnum() or c in "-_") else "_" for c in Path(str(spec or "run")).stem
+    )[:48] or "run"
+    return worktrees_root / f"wt_{stem}_{digest[:8]}"
+
+
+def _candidate_workspace_path(
+    *, spec: str, digest: str, resume: bool = False, parent_run_id: str | None = None
+) -> Path:
+    """The candidate workspace for a request, WITHOUT touching anything (the retry probe).
+
+    A continuation's candidate is the parent's private clone (the repository that contains
+    its committed phases); a fresh submission's is the deterministic derived path.
+    """
+    if resume and str(parent_run_id or "").strip():
+        from agentic_dynamics.runtime.run_clone import run_clone_dir
+
+        return run_clone_dir(str(parent_run_id))
+    return _derived_workspace_path(spec, digest)
+
+
+def _main_tip() -> str:
+    """The repo's main tip — the SELECTED SOURCE SHA for a fresh submission ('' if absent)."""
+    rc, out = _git_run("rev-parse", "--verify", "main^{commit}", cwd=Path(_REPO_ROOT))
+    return out.strip() if rc == 0 else ""
+
+
+def _workspace_compatible(path: Path, main_sha: str) -> bool:
+    """Whether an existing workspace can serve a fresh run: at/ahead of main (or unjudged).
+
+    Mirrors the broker's deployment probe: behind/diverged is stale (a fresh submission must
+    not silently reuse it); an unjudgeable state (no main ref, git failure) says nothing and
+    is treated as compatible — a fabricated refusal is worse than none.
+    """
+    if not main_sha:
+        return True
+    rc, _out = _git_run("merge-base", "--is-ancestor", main_sha, "HEAD", cwd=path)
+    if rc == 0:
+        return True
+    # rc==1 is "behind/diverged" (stale); any other failure (127/128…) is unjudgeable — the
+    # broker's probe is equally silent there, and a fabricated refusal is worse than none.
+    return rc != 1
+
+
+def _check_existing_workspace(path: Path) -> list[str]:
+    """The reuse checks for an existing candidate: a real, clean worktree or a refusal."""
+    if not (path / ".git").exists():
+        return [
+            f"submit: the derived workspace {path} exists but is not a git worktree — "
+            "refusing to reuse or overwrite it; pass an explicit --workdir or move it aside"
+        ]
+    rc, out = _git_run("status", "--porcelain", cwd=path)
+    if rc != 0:
+        return [
+            f"submit: the derived workspace {path} is not a readable git worktree "
+            f"({out or 'git status failed'}) — pass an explicit --workdir"
+        ]
+    if out.strip():
+        return [
+            f"submit: the derived workspace {path} has uncommitted changes (a likely "
+            "interrupted run) — refusing to mutate it; inspect it, clean it, or pass an "
+            "explicit --workdir"
+        ]
+    return []
+
+
+def _parent_run_ledger(parent_run_id: str) -> dict | None:
+    """The newest parent-run ledger payload under the workflows results tree, or None."""
+    root = Path(_REPO_ROOT) / "experiments" / "results" / "workflows"
+    try:
+        ledgers = sorted(root.glob(f"*/*_{parent_run_id}.json"))
+    except OSError:
+        return None
+    for ledger in reversed(ledgers):
+        try:
+            data = json.loads(ledger.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, dict):
+            return data
+    return None
+
+
+#: The container-local view of the canonical repository (the compose mount contract:
+#: ``FINOPS_REPO_DIR`` is mounted AT ``/repo`` in every fleet cell).
+_CONTAINER_REPO_VIEWS = frozenset({"/repo"})
+
+
+def _stamped_provenance(clone: Path) -> str:
+    """The clone's stamped project provenance ('' when unstamped) — the shared fs reader."""
+    return broker_contract.provenance_token(broker_contract.git_common_dir(clone))
+
+
+def _canonical_token(repo_root: Path) -> str:
+    """The canonical project's identity token — the shared chain rule's vocabulary."""
+    return broker_contract.origin_chain_identity(repo_root)
+
+
+def _shares_root(clone: Path, repo_root: Path) -> bool:
+    """Whether ANY of the clone's root commits exists in the canonical repository."""
+    rc, roots_out = _git_run("rev-list", "--max-parents=0", "HEAD", cwd=clone)
+    if rc != 0:
+        return False
+    roots = [line.strip() for line in roots_out.splitlines() if line.strip()]
+    return any(
+        _git_run("cat-file", "-e", f"{root}^{{commit}}", cwd=repo_root)[0] == 0
+        for root in roots
+    )
+
+
+def _ensure_clone_provenance(
+    clone: Path, repo_root: Path, *, parent_run_id: str = ""
+) -> list[str]:
+    """Verify a clone's project identity and stamp it when needed — the SHARED rule.
+
+    Preparation and the submission validator both call
+    ``broker_contract.identity_verdict`` (round-8 requirement, 2026-09-16): an explicitly
+    supplied workspace receives the SAME verdict as an automatically prepared one, and a
+    resolvable local origin chain is followed on both sides. This function adds only what
+    is preparation-specific:
+
+    * a CONFLICT refuses (a fork is never accepted; no stamp overrides its own origin);
+    * an ``unknown`` verdict for the container-local view (``/repo``) is established
+      through the run/source relationship — run-clone path under the canonical runs root,
+      the parent run id when supplied — with shared ancestry as CORROBORATION;
+    * any other ``unknown`` verdict (an unresolvable path, a missing origin) lets an
+      existing stamp stand and refuses an unstamped clone (nothing would verify it);
+    * on success an unstamped clone is stamped with the canonical token; nothing else
+      about it is touched — its candidate commits and worktree are preserved.
+    """
+    stamp_present = bool(_stamped_provenance(clone))
+    verdict, detail = broker_contract.identity_verdict(repo_root, clone)
+
+    if verdict == "conflict":
+        return [
+            f"submit: the parent clone {clone} names origin {detail!r}, which CONFLICTS with "
+            "the canonical project — it resolves to a DIFFERENT repository than the "
+            "canonical repository; refusing to continue (a fork is never accepted, and no "
+            "provenance stamp overrides its own origin)"
+        ]
+
+    verified = verdict == "match"
+    if not verified:
+        origin = broker_contract.origin_url(broker_contract.git_common_dir(clone))
+        if origin.rstrip("/") in _CONTAINER_REPO_VIEWS:
+            if stamp_present:
+                verified = True  # the stamp stands; the container view is its expected shape
+            else:
+                from agentic_dynamics.core.paths import PathConfig
+                from agentic_dynamics.runtime.run_clone import run_clone_dir
+
+                cfg = PathConfig.from_env(require_existing=False)
+                if not cfg.is_run_clone_dir(clone):
+                    return [
+                        f"submit: the parent clone {clone} names the container-local origin "
+                        f"{origin!r} but is not a run clone under {cfg.runs_root} — the "
+                        "source relationship cannot be established; refusing"
+                    ]
+                if parent_run_id and run_clone_dir(parent_run_id) != clone:
+                    return [
+                        f"submit: the parent run {parent_run_id!r} does not map to the clone "
+                        f"{clone} — the source relationship cannot be established; refusing"
+                    ]
+                if not _shares_root(clone, repo_root):
+                    return [
+                        f"submit: the parent clone {clone} shares no history with the "
+                        "canonical repository — the container-local origin cannot be "
+                        "corroborated; refusing to continue"
+                    ]
+                verified = True
+        elif stamp_present:
+            verified = True  # nothing contradicts the stamp
+        else:
+            return [
+                f"submit: the parent clone {clone} cannot be verified against the canonical "
+                f"project ({detail}) and carries no provenance stamp — refusing to continue"
+            ]
+
+    if verified and not stamp_present:
+        from agentic_dynamics.runtime.run_clone import PROJECT_PROVENANCE_KEY
+
+        token = _canonical_token(repo_root)
+        if token:
+            _git_run("config", PROJECT_PROVENANCE_KEY, token, cwd=clone)
+    return []
+
+
+def _candidate_present(tree: Path, candidate: str) -> list[str]:
+    """The candidate commit must EXIST in ``tree`` and be reachable from its HEAD.
+
+    "Verify that candidate before inheriting completed phases": a continuation that skips
+    the parent's completed phases must run on a tree that actually contains their commits.
+    """
+    if not candidate:
+        return [
+            "submit: the parent ledger records no candidate SHA — the tree containing its "
+            "completed work cannot be identified; refusing the continuation"
+        ]
+    rc, _out = _git_run("cat-file", "-e", f"{candidate}^{{commit}}", cwd=tree)
+    if rc != 0:
+        return [
+            f"submit: the parent's candidate {candidate[:12]} is not present in {tree} — a "
+            "continuation cannot inherit completed phases from a tree that does not contain "
+            "them"
+        ]
+    rc, _out = _git_run("merge-base", "--is-ancestor", candidate, "HEAD", cwd=tree)
+    if rc != 0:
+        return [
+            f"submit: the parent's candidate {candidate[:12]} is not reachable from {tree}'s "
+            "HEAD — refusing to inherit completed phases from a divergent tree"
+        ]
+    return []
+
+
+def prepare_workspace(
+    *,
+    spec: str,
+    goal: str,
+    model: str,
+    image: str | None = None,
+    spec_sha256: str | None = None,
+    resume: bool = False,
+    parent_run_id: str | None = None,
+    admission: dict | None = None,
+    execution: dict | None = None,
+) -> tuple[Path | None, str, list[str]]:
+    """Resolve the workspace for a submit that omits --workdir: ``(path, note, errors)``.
+
+    A continuation reuses the parent run's workdir (from its ledger). Otherwise the derived
+    path is reused when it is this repo's clean worktree, and CREATED (branch ``wt_<name>``
+    at the repo's main tip — the base the deployment probe requires) when absent. Errors are
+    named refusals; the caller prints them and submits nothing.
+    """
+    if resume and str(parent_run_id or "").strip():
+        ledger = _parent_run_ledger(str(parent_run_id))
+        if ledger is None:
+            return None, "", [
+                f"submit: no ledger found for parent run {parent_run_id!r} — its completed "
+                "phases cannot be established; pass --workdir explicitly for this continuation"
+            ]
+        candidate = str(ledger.get("git_sha") or "").strip()
+        from agentic_dynamics.runtime.run_clone import run_clone_dir
+
+        clone = run_clone_dir(str(parent_run_id))
+        if not (clone / ".git").exists():
+            return None, "", [
+                f"submit: the parent run's private clone {clone} is gone — its completed "
+                f"work lives there, not in the source tree; a continuation cannot be "
+                f"prepared without it (candidate {candidate[:12] or 'unknown'})"
+            ]
+        errors = _candidate_present(clone, candidate)
+        if errors:
+            return None, "", errors
+        # A PRE-FIX clone (created before the provenance stamp) is verified by its origin /
+        # the run-source relationship (shared ancestry only corroborates) and stamped here,
+        # so validation sees the canonical project identity.
+        errors = _ensure_clone_provenance(
+            clone, Path(_REPO_ROOT), parent_run_id=str(parent_run_id)
+        )
+        if errors:
+            return None, "", errors
+        return clone, (
+            f"workspace reused from parent run {parent_run_id}: {clone} "
+            f"(candidate {candidate[:12]})"
+        ), []
+
+    digest = _workspace_identity_digest(
+        spec=spec, goal=goal, model=model, image=image, spec_sha256=spec_sha256,
+        resume=resume, parent_run_id=parent_run_id, admission=admission, execution=execution,
+    )
+    path = _derived_workspace_path(spec, digest)
+    main_sha = _main_tip()
+    if path.exists():
+        errors = _check_existing_workspace(path)
+        if errors:
+            return None, "", errors
+        if _workspace_compatible(path, main_sha):
+            return path, f"workspace reused: {path}", []
+        # STALE relative to the selected source SHA: never reset it — a fresh submission
+        # gets a separate, SHA-suffixed workspace beside it.
+        path = path.with_name(f"{path.name}_{main_sha[:7]}")
+        if path.exists():
+            errors = _check_existing_workspace(path)
+            if errors:
+                return None, "", errors
+            if not _workspace_compatible(path, main_sha):
+                return None, "", [
+                    f"submit: the SHA-suffixed workspace {path} is also behind the main tip "
+                    f"{main_sha[:12]} — refusing to reset existing work; clean or move it aside"
+                ]
+            return path, f"workspace reused: {path} (suffixed for main {main_sha[:7]})", []
+
+    repo_root = Path(_REPO_ROOT)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        return None, "", [f"submit: cannot create the worktrees root {path.parent} ({exc})"]
+    branch = path.name
+    base = main_sha or "main"
+    rc, out = _git_run("worktree", "add", "-b", branch, str(path), base, cwd=repo_root)
+    if rc != 0 and "already exists" in out:
+        # A leftover branch from a removed worktree: check the branch out at the path
+        # instead of resetting it (-B would move the branch under any existing commits).
+        rc, out = _git_run("worktree", "add", str(path), branch, cwd=repo_root)
+    if rc != 0:
+        return None, "", [
+            f"submit: workspace preparation failed ({out or 'git worktree add failed'}) — "
+            "pass an explicit --workdir"
+        ]
+    return path, f"workspace prepared: {path} (branch {branch}, base {base[:12]})", []
+
+
+#: The request-keyed submit, ATOMICALLY (one server-side script): the request->job
+#: association, the command LPUSH, and the board record commit together — a key is either
+#: fully claimed-and-queued, or not claimed at all. A concurrent same-key submitter observes
+#: the winner's identity and reconciles; a retry can never double-queue. Keys[1] stores the
+#: JSON entry ``{job_id, fingerprint}`` (the fingerprint is the reconcile evidence — it must
+#: survive even when the board record does not). Returns ``{first, record_json}``: the NEW
+#: job id on the claim path; the EXISTING entry JSON on the reconcile path (the record follows
+#: separately, empty when the board record is missing/unreadable).
+_SUBMIT_LUA = """
+local existing = redis.call('HGET', KEYS[1], ARGV[1])
+if existing then
+  local ok, entry = pcall(cjson.decode, existing)
+  if ok and type(entry) == 'table' and entry['job_id'] then
+    return {existing, redis.call('HGET', KEYS[3], tostring(entry['job_id'])) or ''}
+  end
+  -- Corrupt/legacy evidence rides back raw; the caller refuses it as UNRESOLVED.
+  return {existing, ''}
+end
+redis.call('HSET', KEYS[1], ARGV[1], ARGV[5])
+redis.call('LPUSH', KEYS[2], ARGV[3])
+redis.call('HSET', KEYS[3], ARGV[2], ARGV[4])
+return {ARGV[2], ARGV[4]}
+"""
 
 
 def record_job_status(client: redis.Redis, job_id: str, status: str, **fields) -> dict:
@@ -288,6 +796,60 @@ def _send_command(client: redis.Redis, action: str, service: str, count: int | N
     return command
 
 
+def _derive_request_key(
+    *,
+    explicit: str | None,
+    retry_safe: bool,
+    task_identity: str,
+    scope_digest: str,
+) -> str | None:
+    """The effective request key: explicit wins; retry-safe derives per LOGICAL TASK.
+
+    The derived key is scoped by the durable TASK identity (the binding's ``task_identity``,
+    passed by the tool) AND the PRE-WORKDIR request digest (spec, goal, model, image, spec
+    digest, continuation, admission/execution — everything except the resolved workspace).
+    The digest deliberately EXCLUDES the workspace: the workspace is resolved by preparation
+    and recorded WITH the submission, so a retry must derive the SAME key no matter how the
+    workspace resolution would answer today (reviewer finding, 2026-09-16: a key over the
+    resolved path changed when main advanced, so a retry could not find its own record). A
+    retry within the same task reconciles; the SAME inputs from a DIFFERENT task/session are
+    a different logical submission and get a DIFFERENT identity; a task identity that is
+    explicit (not the per-session fallback) also survives session changes. Without a task
+    identity (a bare CLI caller), the digest alone scopes the key.
+    """
+    key = str(explicit or "").strip() or None
+    if key is not None:
+        return key
+    if not retry_safe:
+        return None
+    scope = str(task_identity or "").strip()
+    basis = f"{scope}\x1f{scope_digest}" if scope else scope_digest
+    return f"auto:{hashlib.sha256(basis.encode('utf-8')).hexdigest()[:32]}"
+
+
+def _request_entry_lookup(client: redis.Redis, key: str) -> tuple[bool, dict | None]:
+    """The submit path's retry probe: ``(exists, parsed_entry)``.
+
+    A hit means the submission was already claimed: the workspace must NOT be re-prepared —
+    the RETRY resolves the workspace from the retained record (nothing will run; the claim
+    reconciles or refuses the fingerprint mismatch). An entry that cannot be parsed still
+    reports ``exists=True`` so preparation is skipped; the atomic claim refuses it as
+    UNRESOLVED. A Redis error reads as "no entry": the submit itself needs Redis, so it will
+    fail loudly there.
+    """
+    try:
+        raw = client.hget(REQUESTS_KEY, key)
+    except Exception:  # noqa: BLE001 — never invent a new submission on a read blip
+        return False, None
+    if not raw:
+        return False, None
+    try:
+        entry = json.loads(raw)
+    except (TypeError, ValueError):
+        return True, None
+    return True, entry if isinstance(entry, dict) else None
+
+
 def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: str,
                          workdir: str, image: str | None = None,
                          spec_sha256: str | None = None,
@@ -295,7 +857,10 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
                          parent_run_id: str | None = None,
                          admission: dict | None = None,
                          execution: dict | None = None,
-                         aio: dict | None = None) -> dict:
+                         aio: dict | None = None,
+                         request_key: str | None = None,
+                         retry_safe: bool = False,
+                         task_identity: str | None = None) -> dict:
     """LPUSH a submit command onto ``fleet:commands`` and record its "launching" board entry.
 
     The fleet-manager mints the ``job_id`` (the board's join key) but does NOT validate the
@@ -304,6 +869,22 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
     supervisor. Nothing here refuses a concurrent submit for the same or another spec; there is
     no lock (the design's "ZERO refusing of concurrency" rule) — every submit is independently
     LPUSHed and independently validated when it is popped.
+
+    ``request_key`` (2026-09-16, Unit 2) is the caller-stable retry identity: when supplied,
+    the association + LPUSH + board record commit ATOMICALLY (one server-side script). A
+    retry with the SAME key reconciles ONLY when the FULL execution-relevant fingerprint
+    matches — any changed input (spec digest, goal, model, worktree, continuation,
+    admission/execution settings) refuses (:class:`RequestKeyConflictError`), and a stored
+    entry without a fingerprint is an explicit unresolved state
+    (:class:`RequestKeyUnresolvedError`). ``retry_safe=True`` (the ordinary tool path)
+    derives the key from the fingerprint SCOPED TO THE LOGICAL TASK (``task_identity``, the
+    durable binding's task identity) when the caller supplied none, so an identical retry
+    reconciles without the caller having to retain anything — while the SAME inputs from a
+    different task/session are a different logical submission and receive a different
+    identity; an explicit ``request_key`` always wins (that is how a caller FORCES an
+    independent new run of identical inputs). Neither = the caller wants an independent
+    submission (identical goal text may be an intentional new run — this is not content
+    deduplication).
 
     ``image`` (p3_base_image_caching) is the optional per-job image the submitted spec's phase
     cells should run — the fleet-manager passes it through UNCHECKED, same as every other
@@ -348,6 +929,69 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
     if aio:
         command["actor"] = "aio"
         command["aio"] = dict(aio)
+    fingerprint = request_fingerprint(
+        spec=spec, goal=goal, model=model, workdir=workdir, image=image,
+        spec_sha256=spec_sha256, resume=resume, parent_run_id=parent_run_id,
+        admission=admission, execution=execution,
+    )
+    scope_digest = _workspace_identity_digest(
+        spec=spec, goal=goal, model=model, image=image, spec_sha256=spec_sha256,
+        resume=resume, parent_run_id=parent_run_id, admission=admission, execution=execution,
+    )
+    key = _derive_request_key(
+        explicit=request_key, retry_safe=retry_safe,
+        task_identity=str(task_identity or ""), scope_digest=scope_digest,
+    )
+    if str(task_identity or "").strip():
+        command["task_identity"] = str(task_identity).strip()
+    if key:
+        command["request_key"] = key
+    if key:
+        entry = json.dumps({
+            "job_id": command["job_id"],
+            "fingerprint": fingerprint,
+            # The RESOLVED workspace is part of the retained identity (reviewer finding,
+            # 2026-09-16): a retry must reuse exactly the workspace the submission was
+            # assigned — including a SHA-suffixed one — never re-resolve it.
+            "workdir": workdir,
+        })
+        result = client.eval(
+            _SUBMIT_LUA, 3, REQUESTS_KEY, COMMANDS_KEY, JOBS_KEY,
+            key, command["job_id"], json.dumps(command),
+            json.dumps(_job_launch_record(command)), entry,
+        )
+        first = str(result[0] or "")
+        if first and first != command["job_id"]:
+            # The reconcile path: this key already names a job. Never queue a second command
+            # — reconcile ONLY against a matching full fingerprint (any changed input is a
+            # different request), and refuse explicitly when the stored evidence is missing.
+            existing = _parse_request_entry(first, key)
+            if existing["fingerprint"] != fingerprint:
+                raise RequestKeyConflictError(
+                    f"request key {key!r} already maps to job {existing['job_id']} for a "
+                    "DIFFERENT request (the execution-relevant fingerprint changed: spec, "
+                    "digest, goal, model, worktree, continuation, admission, or execution "
+                    "settings) — a request key identifies ONE submission; a changed request "
+                    "needs a new key"
+                )
+            raw_record = str(result[1] or "")
+            try:
+                record = json.loads(raw_record) if raw_record else {}
+            except (TypeError, ValueError):
+                record = {}
+            if not isinstance(record, dict) or not record:
+                # Same request (fingerprint proven), but the board record is gone: reconcile
+                # the identity and say the lifecycle is unknown — never fabricate a status.
+                record = {
+                    "job_id": existing["job_id"],
+                    "status": "unknown",
+                    "board_record": "missing",
+                }
+            record["job_id"] = existing["job_id"]
+            record["request_key"] = key
+            record["reconciled"] = True
+            return record
+        return command
     client.lpush(COMMANDS_KEY, json.dumps(command))
     record_job_launch(client, command)
     return command
@@ -373,7 +1017,18 @@ def main(argv: list[str] | None = None) -> int:
     p_submit.add_argument("--spec", required=True, help="spec path, e.g. workflows/repository/<name>.yaml")
     p_submit.add_argument("--goal", required=True)
     p_submit.add_argument("--model", required=True)
-    p_submit.add_argument("--workdir", required=True, help="a worktree path under FINOPS_WORKTREE_ROOT")
+    p_submit.add_argument("--workdir", default=None,
+                          help="a worktree path under FINOPS_WORKTREE_ROOT; OMITTED, the "
+                               "preparation path selects/creates one (deterministic name, "
+                               "reused across an identical retry; a continuation works from "
+                               "the parent run's private clone at its candidate SHA)")
+    p_submit.add_argument("--task-identity", default=None,
+                          help="the durable TASK identity the submit belongs to (the AIO "
+                               "binding's task_identity): retry-safe keys are scoped by it, "
+                               "so identical inputs from a DIFFERENT task are a different "
+                               "logical submission")
+    p_submit.add_argument("--json", action="store_true",
+                          help="emit the machine result (fleet-submit/v1) instead of human lines")
     p_submit.add_argument("--image", default=None,
                           help="optional per-job image for the spec's phase cells "
                                "(fleet/job-<name>, built via scripts/fleet/build.sh job <name> "
@@ -430,6 +1085,17 @@ def main(argv: list[str] | None = None) -> int:
     p_submit.add_argument("--task-revision", type=int, default=None,
                           help="the binding's task/acceptance context version (stale revisions "
                                "are refused)")
+    p_submit.add_argument("--request-key", default=None,
+                          help="a caller-stable request key: a retry with the SAME key "
+                               "reconciles to the existing job instead of minting a second one "
+                               "(retain the key before sending; reuse it after an ambiguous or "
+                               "lost submit response). Reconciliation compares the FULL "
+                               "execution-relevant fingerprint — a changed request refuses.")
+    p_submit.add_argument("--retry-safe", action="store_true",
+                          help="derive the request key from the submission's execution-"
+                               "relevant inputs (the ordinary tool path sets this when the "
+                               "caller supplied no explicit key): an identical retry "
+                               "reconciles automatically; an explicit --request-key wins")
 
     parser.add_argument("--interval", type=float, default=DEFAULT_INTERVAL)
     parser.add_argument("--once", action="store_true")
@@ -516,14 +1182,102 @@ def main(argv: list[str] | None = None) -> int:
                 "binding_id": args.binding_id or "",
                 "task_revision": args.task_revision,
             }
-        cmd = _send_submit_command(
-            client, spec=args.spec, goal=args.goal, model=args.model, workdir=args.workdir,
-            image=args.image, spec_sha256=args.spec_sha256, resume=args.resume,
-            parent_run_id=args.parent_run_id, admission=admission, execution=execution,
-            aio=aio,
-        )
-        print(f"fleet:commands <- {json.dumps(cmd)}")
-        print(f"fleet:jobs[{cmd['job_id']}] <- launching")
+        # The workspace preparation path (Unit 2): an omitted --workdir is resolved here —
+        # never a caller obligation to assemble one by hand.
+        workdir = str(args.workdir or "").strip()
+        prep_note = ""
+        task_identity = str(args.task_identity or "").strip()
+        if not workdir:
+            # RETRY PROBE FIRST: when the derived key already names a submission, this is a
+            # retry — reconcile against it and never re-prepare (nothing will run, and
+            # re-resolving after a main advance could turn the retry into a different
+            # request instead of a reconciliation).
+            digest = _workspace_identity_digest(
+                spec=args.spec, goal=args.goal, model=args.model, image=args.image,
+                spec_sha256=args.spec_sha256, resume=bool(args.resume),
+                parent_run_id=args.parent_run_id, admission=admission, execution=execution,
+            )
+            candidate = _candidate_workspace_path(
+                spec=args.spec, digest=digest, resume=bool(args.resume),
+                parent_run_id=args.parent_run_id,
+            )
+            probe_key = _derive_request_key(
+                explicit=args.request_key, retry_safe=args.retry_safe,
+                task_identity=task_identity, scope_digest=digest,
+            )
+            probe_exists, probe_entry = (
+                _request_entry_lookup(client, probe_key) if probe_key else (False, None)
+            )
+            if probe_exists:
+                # A RETRY: the workspace comes FROM the retained record — never re-resolved.
+                # Re-resolving would fingerprint a path the submission was NOT assigned (the
+                # reviewer's repro: a SHA-suffixed workspace was recorded, the probe rebuilt
+                # the unsuffixed path, and the retry either conflicted or queued a duplicate
+                # after another main advance). An unreadable retained identity does not
+                # prepare either: the atomic claim refuses it as UNRESOLVED.
+                recorded = str((probe_entry or {}).get("workdir") or "").strip()
+                workdir = recorded or str(candidate)
+                prep_note = (
+                    f"retry: reconciling against the existing request {probe_key} "
+                    f"(workspace {workdir})"
+                )
+            else:
+                resolved, prep_note, prep_errors = prepare_workspace(
+                    spec=args.spec, goal=args.goal, model=args.model, image=args.image,
+                    spec_sha256=args.spec_sha256, resume=bool(args.resume),
+                    parent_run_id=args.parent_run_id, admission=admission,
+                    execution=execution,
+                )
+                if prep_errors:
+                    print(f"fleet:submit refused: {prep_errors[0]}", file=sys.stderr)
+                    return 2
+                workdir = str(resolved)
+        try:
+            cmd = _send_submit_command(
+                client, spec=args.spec, goal=args.goal, model=args.model, workdir=workdir,
+                image=args.image, spec_sha256=args.spec_sha256, resume=args.resume,
+                parent_run_id=args.parent_run_id, admission=admission, execution=execution,
+                aio=aio, request_key=args.request_key, retry_safe=args.retry_safe,
+                task_identity=task_identity,
+            )
+        except (RequestKeyConflictError, RequestKeyUnresolvedError) as exc:
+            print(f"fleet:submit refused: {exc}", file=sys.stderr)
+            return 2
+        if args.json:
+            # The structured result (fleet-submit/v1): job identity, state, resolved
+            # source/spec, request identity, and the prep note — machine-first, so no caller
+            # parses a human log line as the durable interface.
+            print(json.dumps({
+                "schema": "fleet-submit/v1",
+                "job_id": cmd.get("job_id", ""),
+                "reconciled": bool(cmd.get("reconciled")),
+                "status": cmd.get("status") or ("unknown" if cmd.get("reconciled") else "launching"),
+                "request_key": cmd.get("request_key", ""),
+                "task_identity": cmd.get("task_identity", ""),
+                "spec": args.spec,
+                "spec_sha256": args.spec_sha256 or "",
+                "goal": args.goal,
+                "model": args.model,
+                "workdir": workdir,
+                "resume": bool(args.resume),
+                "parent_run_id": args.parent_run_id or "",
+                "prep_note": prep_note,
+            }))
+            return 0
+        if prep_note:
+            print(f"fleet:prep {prep_note}")
+        if cmd.get("reconciled"):
+            # A keyed retry: NOTHING was queued — the existing job is the submission. The
+            # echoed line keeps the tool's ``fleet:jobs[<id>]`` parse working under the same
+            # identity, and the status tells the caller how far the original submit got.
+            print(
+                f"fleet:jobs[{cmd['job_id']}] <- reconciled "
+                f"(status: {cmd.get('status') or 'unknown'}; "
+                f"request key {cmd.get('request_key') or '?'})"
+            )
+        else:
+            print(f"fleet:commands <- {json.dumps(cmd)}")
+            print(f"fleet:jobs[{cmd['job_id']}] <- launching")
         return 0
 
     parser.error(f"unknown command: {args.command}")

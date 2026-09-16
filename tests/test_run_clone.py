@@ -98,6 +98,30 @@ def test_clone_created_at_runs_root_repo_with_expected_head(tmp_path):
     assert (clone.path / ".git").is_dir()
 
 
+def test_a_clone_from_a_parent_clone_carries_its_detached_candidate(tmp_path):
+    """Candidate continuity (reviewer finding, 2026-09-16): a run clone's phase commits land
+    on a DETACHED head; a continuation clone created FROM that clone must still carry the
+    candidate commit. The composition root passes the workspace as the clone source for
+    exactly this reason — cloning the canonical repo would drop the candidate objects."""
+    repo = _make_source_repo(tmp_path)
+    base_sha = _git("rev-parse", "HEAD", cwd=repo)
+    cfg = _make_cfg(tmp_path, repo)
+
+    parent = create_run_clone("run-parent", base_sha, path_config=cfg)
+    # A phase commit on the parent clone's DETACHED head (the runner's real shape).
+    (parent.path / "phase-deliverable.txt").write_text("built")
+    _git("add", ".", cwd=parent.path)
+    _git("commit", "-q", "-m", "[workflow] build", cwd=parent.path)
+    candidate = _git("rev-parse", "HEAD", cwd=parent.path)
+
+    child = create_run_clone(
+        "run-child", candidate, source_repo=parent.path, path_config=cfg
+    )
+    assert child.base_sha == candidate
+    assert _git("rev-parse", "HEAD", cwd=child.path) == candidate
+    assert (child.path / "phase-deliverable.txt").read_text() == "built"
+
+
 def test_two_run_ids_produce_distinct_clones_never_sharing_metadata(tmp_path):
     """(b) two run ids → two distinct clones; a commit in one is invisible to the other."""
     repo = _make_source_repo(tmp_path)
@@ -258,3 +282,42 @@ def test_is_clone_dir_accepts_only_runs_root_run_id_repo(tmp_path):
         str(tmp_path / "outside" / "run-1" / "repo"),  # outside runs_root
     ):
         assert is_clone_dir(bad, path_config=cfg) is False, bad
+
+
+def _provenance(path: Path) -> str:
+    """The clone's stamped project provenance ('' when unstamped)."""
+    proc = subprocess.run(
+        ["git", "-C", str(path), "config", "--get", "agentic-dynamics.project"],
+        capture_output=True, text=True,
+    )
+    return proc.stdout.strip() if proc.returncode == 0 else ""
+
+
+def test_clone_generations_inherit_the_validated_provenance(tmp_path):
+    """Round 5 (2026-09-16): cloning a clone must NOT replace the recorded canonical identity
+    with git's default local origin path — without inheritance, the second continuation of a
+    local-only project failed project validation."""
+    repo = _make_source_repo(tmp_path)  # local-only (no origin remote)
+    cfg = _make_cfg(tmp_path, repo)
+
+    first = create_run_clone("run-a", path_config=cfg)
+    assert _provenance(first.path) == f"git-dir:{(repo / '.git').resolve()}"
+
+    second = create_run_clone("run-b", source_repo=first.path, path_config=cfg)
+    assert _provenance(second.path) == _provenance(first.path)  # inherited, not a local path
+
+    third = create_run_clone("run-c", source_repo=second.path, path_config=cfg)
+    assert _provenance(third.path) == _provenance(first.path)
+
+
+def test_a_remote_origin_provenance_survives_generations(tmp_path):
+    """With an origin remote, the stamp is the canonical URL and passes through clones."""
+    repo = _make_source_repo(tmp_path)
+    _git("remote", "add", "origin", "git@github.com:org/project.git", cwd=repo)
+    cfg = _make_cfg(tmp_path, repo)
+
+    first = create_run_clone("run-a", path_config=cfg)
+    assert _provenance(first.path) == "origin:git@github.com:org/project.git"
+
+    second = create_run_clone("run-b", source_repo=first.path, path_config=cfg)
+    assert _provenance(second.path) == "origin:git@github.com:org/project.git"
