@@ -933,11 +933,9 @@ def aio_capacity_report(native_session_id: str) -> dict[str, Any]:
 # worktree belong to the SAME project. The identity is derived filesystem-only (no
 # subprocess) from the git common dir: the origin URL when one exists (a content identity
 # that is stable across host/container path views), plus the repo/worktree directory names as
-# a fallback. The binding's ``project`` (when set) must normalize to one of them.
-_ORIGIN_URL_RE = re.compile(r"^\s*url\s*=\s*(.+?)\s*$", re.MULTILINE)
-_REMOTE_ORIGIN_RE = re.compile(r'\[remote\s+"origin"\]')
-_AD_SECTION_RE = re.compile(r"\[agentic-dynamics\]")
-_PROVENANCE_RE = re.compile(r"^\s*project\s*=\s*(.+?)\s*$", re.MULTILINE)
+# a fallback. The binding's ``project`` (when set) must normalize to one of them. The
+# readers below delegate to the SHARED contract so preparation and execution answer the
+# identity question with the same rule (broker_contract.identity_verdict).
 
 
 def _project_provenance(git_dir: Path) -> str:
@@ -948,17 +946,7 @@ def _project_provenance(git_dir: Path) -> str:
     repository. The stamp records the canonical identity the clone derives from; a clone of
     a FOREIGN repository records the foreign identity — the agreement check still refuses it.
     """
-    try:
-        config = (git_dir / "config").read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return ""
-    section = _AD_SECTION_RE.search(config)
-    if not section:
-        return ""
-    match = _PROVENANCE_RE.search(config, section.end())
-    if not match:
-        return ""
-    return match.group(1).strip()
+    return broker_contract.provenance_token(git_dir)
 
 
 def _provenance_identity(token: str) -> str:
@@ -972,44 +960,13 @@ def _provenance_identity(token: str) -> str:
 
 
 def _git_common_dir(checkout: Path) -> Path | None:
-    """Resolve ``checkout``'s common git dir (handles a linked worktree's ``.git`` FILE)."""
-    git_path = checkout / ".git"
-    if git_path.is_dir():
-        return git_path
-    if not git_path.is_file():
-        return None
-    try:
-        text = git_path.read_text(encoding="utf-8").strip()
-    except OSError:
-        return None
-    if not text.startswith("gitdir:"):
-        return None
-    git_dir = Path(text.split(":", 1)[1].strip())
-    if not git_dir.is_absolute():
-        git_dir = (checkout / git_dir).resolve()
-    commondir = git_dir / "commondir"
-    if commondir.is_file():
-        try:
-            common = Path(commondir.read_text(encoding="utf-8").strip())
-        except OSError:
-            return git_dir
-        if not common.is_absolute():
-            common = (git_dir / common).resolve()
-        return common
-    return git_dir
+    """Resolve ``checkout``'s common git dir — the shared contract's filesystem-only rule."""
+    return broker_contract.git_common_dir(checkout)
 
 
 def _origin_url(git_dir: Path) -> str:
-    """The ``origin`` remote URL recorded in the common git dir's config (or "")."""
-    try:
-        config = (git_dir / "config").read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return ""
-    match = _REMOTE_ORIGIN_RE.search(config)
-    if not match:
-        return ""
-    url_match = _ORIGIN_URL_RE.search(config, match.end())
-    return url_match.group(1).strip() if url_match else ""
+    """The ``origin`` remote URL recorded in the common git dir's config — shared reader."""
+    return broker_contract.origin_url(git_dir)
 
 
 def _normalize_project(value: str) -> str:
@@ -1075,28 +1032,26 @@ def _project_agreement(repo_root: Path, workdir: str) -> tuple[set[str], list[st
         ):
             shared = f"git-dir:{repo['common_dir']}"
         else:
-            # Continuation provenance (candidate continuity, 2026-09-16): a run clone is an
-            # independent repository with a LOCAL origin path, so it shares neither origin
-            # nor common git dir with the spec repository — but it was cloned FROM it and
-            # carries the stamped source identity. An equal origin or the source's common
-            # git dir proves the derivation; an explicitly conflicting REMOTE origin
-            # defeats a stamp (round-7 repair, 2026-09-16 — the previous upgrader could
-            # write a canonical stamp onto a fork clone; that stale stamp does not override
-            # the fork's own origin), and a foreign clone matches neither and refuses.
-            origin_raw = str(work.get("origin_raw") or "")
-            explicit_remote = bool(origin_raw) and (
-                "://" in origin_raw or origin_raw.startswith("git@")
-            )
+            # THE SHARED RULE (round-8 repair, 2026-09-16): preparation and execution call
+            # broker_contract.identity_verdict — an explicitly supplied workspace must
+            # receive the same verdict as an automatically prepared one. The verdict
+            # FOLLOWS a resolvable local origin chain (a fork's local origin conflicts even
+            # when a stale canonical stamp claims otherwise); "unknown" (the container
+            # ``/repo`` view, no origin) falls back to the stamp's own evidence.
+            verdict, detail = broker_contract.identity_verdict(repo_root, workdir)
             provenance = _provenance_identity(work.get("provenance", ""))
-            if explicit_remote and provenance:
+            if verdict == "conflict":
                 return set(), [
-                    "submit: the worktree's remote origin "
-                    f"{work['origin']} names a DIFFERENT project than the spec repository "
-                    f"({repo['origin'] or repo['common_dir'] or repo['name']}) — an "
+                    "submit: the worktree belongs to a DIFFERENT project than the spec "
+                    f"repository (origin {detail!r} vs "
+                    f"{repo['origin'] or repo['common_dir'] or repo['name']}) — a submit may "
+                    "not cross projects (a shared directory name is not shared identity); an "
                     "explicitly conflicting origin is never overridden by a provenance stamp"
                 ]
-            if provenance and provenance in (repo["origin"], repo["common_dir"]):
-                shared = provenance
+            if verdict == "match":
+                shared = provenance or repo["origin"] or f"git-dir:{repo['common_dir']}"
+            elif provenance and provenance in (repo["origin"], repo["common_dir"]):
+                shared = provenance  # unknown verdict: the stamp's evidence decides
         if not shared:
             return set(), [
                 "submit: the worktree belongs to a DIFFERENT project than the spec repository "

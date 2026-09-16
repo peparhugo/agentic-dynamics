@@ -3111,3 +3111,149 @@ def test_a_stale_canonical_stamp_never_overrides_a_foreign_remote_origin(
         path_config=cfg,
     )
     assert any("DIFFERENT project" in e for e in validation_errors), validation_errors
+
+
+def test_a_foreign_local_origin_with_a_stale_stamp_refuses_the_broker_dry_run(
+    aio_env, tmp_path, monkeypatch
+):
+    """Round-8 finding (2026-09-16): an explicit --workdir skips preparation, so the SHARED
+    identity rule must reach the same verdict as preparation — a local origin pointing at a
+    foreign fork with a stale canonical stamp refuses in the validator AND in the broker's
+    explicit-workdir dry run (the reviewer's `ok: true` surface)."""
+    import launch_broker
+
+    canonical = _git_project(
+        tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git"
+    )
+    fork = _git_project(tmp_path, "fork-src", "git@github.com:other/agentic-dynamics.git")
+    fm, cfg, _clone = _continuation_fixture(tmp_path, monkeypatch, canonical)
+
+    # A canonical-derived clone whose ORIGIN is the fork's LOCAL path (the worktree shares
+    # canonical history — the reviewer's bypass shape) + the stale canonical stamp.
+    workdir = cfg.runs_root / "run-fork" / "repo"
+    workdir.parent.mkdir(parents=True)
+    subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", "--", str(canonical), str(workdir)],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(workdir), "remote", "set-url", "origin", str(fork)], check=True
+    )
+    stale = "origin:git@github.com:peparhugo/agentic-dynamics.git"
+    subprocess.run(
+        ["git", "-C", str(workdir), "config", "agentic-dynamics.project", stale], check=True
+    )
+
+    # The SHARED rule follows the local origin chain: conflict.
+    from scripts.fleet import broker_contract as bc
+
+    verdict, detail = bc.identity_verdict(canonical, workdir)
+    assert verdict == "conflict", (verdict, detail)
+
+    # 1) Explicit-workdir validation refuses despite the stamp.
+    binding_id = _bound_store(aio_env)
+    errors = validate_submit_request(
+        _valid_submit_request(
+            actor="aio", aio=_aio_block(binding_id=binding_id), workdir=str(workdir),
+        ),
+        repo_root=canonical,
+        path_config=cfg,
+    )
+    assert any("DIFFERENT project" in e for e in errors), errors
+
+    # 2) The SAME workspace through AUTOMATIC preparation refuses too (equivalence).
+    head = subprocess.run(
+        ["git", "-C", str(workdir), "rev-parse", "HEAD"], capture_output=True, text=True
+    ).stdout.strip()
+    ledger_dir = canonical / "experiments" / "results" / "workflows" / "demo"
+    (ledger_dir / "20260916T000000000000Z_run-fork.json").write_text(
+        json.dumps({"run_id": "run-fork", "git_sha": head,
+                    "phases": [{"phase": "build", "status": "ok"}]}),
+        encoding="utf-8",
+    )
+    prepared, _note, prep_errors = fm.prepare_workspace(
+        spec="demo", goal="g", model="m", resume=True, parent_run_id="run-fork"
+    )
+    assert prepared is None and prep_errors
+
+    # 3) The BROKER's explicit-workdir dry run refuses (not `ok: true`).
+    monkeypatch.setattr(launch_broker, "admission_required", lambda: False)
+    command = {
+        "action": "submit",
+        "job_id": "abcdef123456",
+        "spec": "workflows/repository/fleet_job_submission.yaml",
+        "goal": "g",
+        "model": "anthropic/claude-sonnet-5",
+        "workdir": str(workdir),
+        "ts": 0.0,
+        "nonce": "0" * 12,
+        "actor": "aio",
+        "aio": {
+            "native_session_id": "ses_aio",
+            "agent": "aio-control",
+            "binding_id": binding_id,
+            "task_revision": 1,
+        },
+    }
+    with pytest.raises(launch_broker.LaunchRequestError) as exc:
+        launch_broker.submit_run(
+            command, repo_root=canonical, path_config=cfg, dry_run=True
+        )
+    assert "DIFFERENT project" in str(exc.value)
+
+
+def test_the_shared_identity_rule_covers_the_verdict_channels(tmp_path):
+    """The ONE rule both preparation and the validator call: same git dir / equal remote /
+    followed local chain → match; conflicting remote / a chain to a foreign origin →
+    conflict; unresolvable or missing origin → unknown (the stamp's evidence decides)."""
+    from scripts.fleet import broker_contract as bc
+
+    canonical = _git_project(tmp_path, "canonical", "git@github.com:org/proj.git")
+
+    # A LINKED WORKTREE of the canonical: same common git dir → match.
+    wt = tmp_path / "wt"
+    subprocess.run(
+        ["git", "-C", str(canonical), "worktree", "add", "-q", str(wt), "-b", "wt-branch"],
+        check=True,
+    )
+    assert bc.identity_verdict(canonical, wt)[0] == "match"
+
+    # An EQUAL remote origin → match; a conflicting remote → conflict.
+    same = tmp_path / "same"
+    subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", "--", str(canonical), str(same)],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(same), "remote", "set-url", "origin",
+         "git@github.com:org/proj.git"],
+        check=True,
+    )
+    assert bc.identity_verdict(canonical, same)[0] == "match"
+    subprocess.run(
+        ["git", "-C", str(same), "remote", "set-url", "origin",
+         "git@github.com:other/proj.git"],
+        check=True,
+    )
+    assert bc.identity_verdict(canonical, same)[0] == "conflict"
+
+    # A local origin chain: to the canonical → match; redirected to a fork → conflict.
+    chain = tmp_path / "chain"
+    subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", "--", str(canonical), str(chain)],
+        check=True,
+    )
+    assert bc.identity_verdict(canonical, chain)[0] == "match"  # origin = canonical path
+    fork = _git_project(tmp_path, "fork-src", "git@github.com:other/proj-fork.git")
+    subprocess.run(
+        ["git", "-C", str(chain), "remote", "set-url", "origin", str(fork)], check=True
+    )
+    assert bc.identity_verdict(canonical, chain)[0] == "conflict"
+
+    # An unresolvable local origin (the container view) and a missing origin → unknown.
+    subprocess.run(
+        ["git", "-C", str(chain), "remote", "set-url", "origin", "/repo"], check=True
+    )
+    assert bc.identity_verdict(canonical, chain)[0] == "unknown"
+    subprocess.run(["git", "-C", str(chain), "remote", "remove", "origin"], check=True)
+    assert bc.identity_verdict(canonical, chain)[0] == "unknown"
