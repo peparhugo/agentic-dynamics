@@ -342,8 +342,10 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
     return false
   }
 
-  /** Read the CURRENT durable context version — the store is the truth, the cache a hint. */
-  async function refreshContextVersion(sessionID: string): Promise<number> {
+  /** Read the CURRENT durable binding + version — the store is the truth, the cache a hint. */
+  async function refreshDurableBinding(
+    sessionID: string,
+  ): Promise<{ version: number; binding: Record<string, unknown> | undefined }> {
     const { report } = await sessionOpenCall([
       "--binding", "--native-session-id", sessionID, "--json",
     ])
@@ -353,28 +355,86 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
       contextVersions.set(sessionID, version)
       rememberIdentity(sessionID, binding)
     }
-    return version
+    return { version, binding }
+  }
+
+  /**
+   * The attachment's PROVIDED fields that differ from the durable binding ([] when the
+   * requested state is already durable). The file's context_version is never used as proof
+   * of content: a recording advances the version WITHOUT containing the attachment's
+   * requested change, and version equality otherwise silently dropped it (round-11 review).
+   */
+  function requestedFieldDiffs(
+    context: Record<string, unknown> | null,
+    durable: Record<string, unknown>,
+  ): string[] {
+    if (!context) return []
+    const diffs: string[] = []
+    const differs = (name: string, requested: unknown, current: unknown) => {
+      const value = String(requested ?? "").trim()
+      if (!value) return // an omitted field requests nothing
+      if (value !== String(current ?? "").trim()) diffs.push(name)
+    }
+    differs("work_unit", context.work_unit, durable.work_unit)
+    differs("next_action", context.next_action, durable.next_action)
+    differs("blocker", context.blocker, durable.blocker)
+    differs("source_revision", context.source_revision, durable.source_revision)
+    differs("project", context.project, durable.project)
+    const acceptance = (durable.acceptance as Record<string, unknown> | null | undefined) ?? null
+    differs("acceptance", context.acceptance, acceptance?.text)
+    differs("acceptance_source", context.acceptance_source, acceptance?.source)
+    differs("acceptance_provenance", context.acceptance_provenance, acceptance?.provenance)
+    const predecessor = (durable.predecessor as Record<string, unknown> | null | undefined) ?? null
+    differs("predecessor", context.predecessor_slug, predecessor?.slug)
+    const requestedIds = Array.isArray(context.knowledge_ids)
+      ? (context.knowledge_ids as unknown[]).map(String).join(",")
+      : ""
+    const durableIds = Array.isArray(predecessor?.knowledge_ids)
+      ? (predecessor?.knowledge_ids as unknown[]).map(String).join(",")
+      : ""
+    if (requestedIds && requestedIds !== durableIds) diffs.push("knowledge_ids")
+    return diffs
   }
 
   async function updateSessionContext(
     sessionID: string,
     fallbackVersion: number,
-    fileVersion: number,
     context: Record<string, unknown> | null,
   ): Promise<boolean> {
-    // RECORDING-AWARE (round-10 review): submission recording advances the durable version
-    // independently of this plugin, so the cached version can be stale — the reviewer
-    // reproduction: the cache says 1, the store is at 2, every update sends the stale
-    // expected_version and fails. Refresh from the durable store FIRST (preserving both the
-    // identity and version checks), apply only a genuinely newer task-context file, and
-    // retry ONCE against the freshly read version when a concurrent write trips the check —
-    // never forced: a second failure is surfaced.
+    // RECORDING-AWARE + CONTENT-DECIDED (rounds 10-11 review): submission recording advances
+    // the durable version independently of this plugin, so the cached version can be stale
+    // AND version equality does not prove the requested change is present. The authoritative
+    // flow: refresh the durable binding → RE-VALIDATE the attachment's identity against the
+    // DURABLE task/project (never overwrite a newer identity with a stale attachment) →
+    // apply only genuinely different requested fields → version-guard the write with the
+    // fresh version, retrying ONCE on a concurrent write; a second failure surfaces.
     for (let attempt = 0; attempt < 2; attempt++) {
-      const durable = await refreshContextVersion(sessionID)
-      const expected = durable > 0 ? durable : fallbackVersion
+      const refreshed = await refreshDurableBinding(sessionID)
+      const durable = refreshed.binding ?? {}
+      const expected = refreshed.version > 0 ? refreshed.version : fallbackVersion
       if (!expected) break
-      if (fileVersion > 0 && durable > 0 && fileVersion <= durable) {
-        failures.delete(sessionID) // the desired state is already durable: nothing to do
+      const durableTask = String(durable.task_identity ?? "").trim()
+      const durableProject = String(durable.project ?? "").trim()
+      const contextTask = String(context?.task ?? "").trim()
+      const contextProject = String(context?.project ?? "").trim()
+      if (durableTask && contextTask && contextTask !== durableTask) {
+        failures.set(
+          sessionID,
+          `task-context not applied: attachment task ${contextTask} does not match the ` +
+            `binding's task ${durableTask}`,
+        )
+        return false
+      }
+      if (durableProject && contextProject && contextProject !== durableProject) {
+        failures.set(
+          sessionID,
+          `task-context not applied: attachment project ${contextProject} does not match ` +
+            `the binding's project ${durableProject} — the attachment is stale`,
+        )
+        return false
+      }
+      if (requestedFieldDiffs(context, durable).length === 0) {
+        failures.delete(sessionID) // the requested state is already durable: nothing to do
         return true
       }
       const { report, error } = await sessionOpenCall([
@@ -449,10 +509,13 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
         // A later message never rebuilds the binding; it can only apply an EXPLICIT,
         // versioned task-context update — and only when the attachment validates against
         // THIS session's task/project identity.
-        const fileVersion = Number(context?.context_version ?? 0)
         const current = contextVersions.get(sessionID) ?? 0
-        if (applicable.applies && fileVersion > current && current > 0) {
-          await updateSessionContext(sessionID, current, fileVersion, context)
+        // The attachment's declared version is NOT the gate (round-11 review): a recording
+        // advances the durable version while a newer attachment may still request changes
+        // the store does not have (version equality silently dropped them). Applicability
+        // and the DURABLE content decide inside updateSessionContext.
+        if (applicable.applies) {
+          await updateSessionContext(sessionID, current, context)
         }
         capsules.delete(sessionID)
         return

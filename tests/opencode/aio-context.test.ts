@@ -786,4 +786,125 @@ describe("aio-context plugin — handoff selection by session (reviewer repair)"
     }
   })
 
+
+  test("a recording-advanced version never silently drops a requested change", async () => {
+    // Round-11 review: the durable version advanced (a submission recording; work_unit still
+    // v1) while the attachment requests a work-unit change at the SAME declared version.
+    // The content decides: the update MUST go out — version equality is not proof of content.
+    const project = tmpDir("aio-sameness-")
+    try {
+      writeTaskContext(project, {
+        native_session_id: "ses_drop", task: "t", work_unit: "v1", context_version: 1,
+      })
+      const { runner, calls } = fakeRunner((mode, args) => {
+        if (mode === "bind") {
+          return {
+            schema: "session-binding/v1", status: "created",
+            binding: {
+              native_session_id: sessionOf(args), context_version: 1,
+              task_identity: "t", project: "", work_unit: "v1",
+            },
+          }
+        }
+        if (mode === "binding") {
+          // The recording advanced the version; the work unit is unchanged.
+          return {
+            schema: "session-binding/v1", status: "found",
+            binding: {
+              native_session_id: sessionOf(args), context_version: 2,
+              task_identity: "t", project: "", work_unit: "v1",
+            },
+          }
+        }
+        if (mode === "capsule") {
+          return { schema: "session-capsule/v1", capsule_status: "composed", capsule: { text: "CAPSULE" } }
+        }
+        if (mode === "update-context") {
+          return {
+            schema: "session-binding/v1", status: "updated",
+            binding: {
+              native_session_id: sessionOf(args), context_version: 3,
+              task_identity: "t", project: "", work_unit: "v2 work",
+            },
+          }
+        }
+        return undefined
+      })
+      const hooks = await makePluginAt(runner, project)
+      await hooks["chat.message"](...Object.values(message("ses_drop", "aio-control", "start")))
+
+      // The attachment declares version 2 — EQUAL to the durable version — and requests v2.
+      writeTaskContext(project, {
+        native_session_id: "ses_drop", task: "t", work_unit: "v2 work", context_version: 2,
+      })
+      await hooks["chat.message"](...Object.values(message("ses_drop", "aio-control", "continue")))
+
+      const update = calls.find((c) => modeOf(c.args) === "update-context")
+      expect(update).toBeDefined() // the silent drop must not happen
+      expect(flagOf(update!.args, "--work-unit")).toBe("v2 work")
+      expect(flagOf(update!.args, "--expected-version")).toBe("2") // the FRESH durable version
+    } finally {
+      rmSync(project, { recursive: true, force: true })
+    }
+  })
+
+  test("a stale attachment never overwrites an externally changed project", async () => {
+    // Round-11 review: the durable project changed externally; the attachment (validated
+    // against the plugin's CACHE) claims the older project. The refresh re-validates against
+    // the DURABLE identity — refuse and surface, never overwrite the newer project.
+    const project = tmpDir("aio-extproject-")
+    try {
+      writeTaskContext(project, {
+        native_session_id: "ses_ext", task: "t", work_unit: "v1", context_version: 1,
+      })
+      const { runner, calls } = fakeRunner((mode, args) => {
+        if (mode === "bind") {
+          return {
+            schema: "session-binding/v1", status: "created",
+            binding: {
+              native_session_id: sessionOf(args), context_version: 1,
+              task_identity: "t", project: "", work_unit: "v1",
+            },
+          }
+        }
+        if (mode === "binding") {
+          // The project changed EXTERNALLY since the plugin's last read.
+          return {
+            schema: "session-binding/v1", status: "found",
+            binding: {
+              native_session_id: sessionOf(args), context_version: 2,
+              task_identity: "t", project: "P2", work_unit: "v1",
+            },
+          }
+        }
+        if (mode === "capsule") {
+          return { schema: "session-capsule/v1", capsule_status: "composed", capsule: { text: "CAPSULE" } }
+        }
+        if (mode === "update-context") {
+          return {
+            schema: "session-binding/v1", status: "updated",
+            binding: { native_session_id: sessionOf(args), context_version: 3, task_identity: "t", project: "P1" },
+          }
+        }
+        return undefined
+      })
+      const hooks = await makePluginAt(runner, project)
+      await hooks["chat.message"](...Object.values(message("ses_ext", "aio-control", "start")))
+
+      // The stale attachment (cached project was empty → it applies at the caller) names P1.
+      writeTaskContext(project, {
+        native_session_id: "ses_ext", task: "t", project: "P1", work_unit: "v2 work", context_version: 2,
+      })
+      await hooks["chat.message"](...Object.values(message("ses_ext", "aio-control", "continue")))
+
+      // NO update call: the durable project P2 must never be overwritten by the stale P1.
+      expect(calls.some((c) => modeOf(c.args) === "update-context")).toBe(false)
+      const rendered = { system: [] as string[] }
+      await hooks["experimental.chat.system.transform"]({ sessionID: "ses_ext" }, rendered)
+      expect(rendered.system.join()).toContain("does not match the binding's project")
+    } finally {
+      rmSync(project, { recursive: true, force: true })
+    }
+  })
+
 })
