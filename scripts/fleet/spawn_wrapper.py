@@ -1169,16 +1169,24 @@ def _validate_aio_binding(
             f"submit: aio.agent {agent!r} does not match the binding's resolved agent "
             f"{binding.get('resolved_agent')!r}"
         )
-    if result.knowledge_id != binding_id:
+    # THE AUTHORIZATION CHECKS (round-9 review): compare against the binding's AUTHORIZATION
+    # identity — never the content-addressed record id or the context version, which every
+    # update necessarily changes. Routine progress recording (next_action / blocker) must
+    # NOT invalidate commands already queued against this task; a genuine task / acceptance /
+    # project change advances the authorization epoch and refuses stale commands as before.
+    current_auth_id = si.binding_authorization_id(binding)
+    if current_auth_id != binding_id:
         errors.append(
-            f"submit: aio.binding_id {binding_id[:12]}… does not match the durable binding "
-            f"record {result.knowledge_id[:12]}… — a claimed id is not proof of binding"
+            f"submit: aio.binding_id {binding_id[:12]}… does not match the binding's "
+            f"authorization identity {current_auth_id[:12]}… — a claimed id is not proof of "
+            "binding (a task-definition change mints a new identity)"
         )
-    current_version = int(binding.get("context_version") or 0)
-    if current_version != int(revision):
+    current_epoch = si.binding_authorization_version(binding)
+    if current_epoch != int(revision):
         errors.append(
-            f"submit: stale task revision: the request cites {revision}, the binding's "
-            f"current context version is {current_version} — re-read the binding"
+            f"submit: stale task revision: the request cites {revision}, the task's "
+            f"authorization is at {current_epoch} — the task definition changed since this "
+            "command was minted; re-read the binding"
         )
     agreed, agreement_errors = _project_agreement(repo_root, workdir)
     errors.extend(agreement_errors)

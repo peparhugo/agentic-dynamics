@@ -77,6 +77,9 @@ const FOUND_BINDING = JSON.stringify({
   schema: "session-binding/v1",
   status: "found",
   knowledge_id: BINDING_ID,
+  // The exec gate's AUTHORIZATION identity (round-9): stable across progress recording.
+  authorization_id: BINDING_ID,
+  authorization_version: 1,
   binding: { context_version: 1, task_identity: "task:demo" },
 })
 
@@ -209,6 +212,8 @@ test("the durable AIO submit carries the identity flags and no --project", async
     // The LOGICAL TASK identity scopes the retry-safe key (reviewer finding, 2026-09-16).
     expect(submit!.args).toContain("--task-identity")
     expect(submit!.args).toContain("task:demo")
+    // The binding's context version rides for the recording write's own guard.
+    expect(submit!.args).toContain("--binding-context-version")
     expect(submit!.args).toContain("--workdir")
     // The structured result is the requested interface.
     expect(submit!.args).toContain("--json")

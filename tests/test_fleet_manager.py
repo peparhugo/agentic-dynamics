@@ -996,7 +996,11 @@ def test_two_successive_continuations_keep_the_canonical_provenance(tmp_path, mo
 
 
 def _binding_store(tmp_path):
-    """A tmp binding store with ONE real binding for ses_aio; returns (store, binding_id)."""
+    """A tmp binding store with ONE real binding for ses_aio.
+
+    Returns ``(store, authorization_id)`` — the exec gate checks the binding's AUTHORIZATION
+    identity (round-9), not the content-addressed record id.
+    """
     from agentic_dynamics.knowledge import session_ingestion as si
 
     store = tmp_path / "kb"
@@ -1012,7 +1016,8 @@ def _binding_store(tmp_path):
         publish=False,
     )
     assert written.status == si.BINDING_STATUS_CREATED
-    return store, written.knowledge_id
+    binding = si.read_binding("ses_aio", artifact_dir=store).binding or {}
+    return store, si.binding_authorization_id(binding)
 
 
 def test_a_submission_records_its_job_into_the_task_state(tmp_path, monkeypatch, capsys):
@@ -1031,6 +1036,7 @@ def test_a_submission_records_its_job_into_the_task_state(tmp_path, monkeypatch,
         "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
         "--aio-session-id", "ses_aio", "--aio-agent", "aio-control",
         "--binding-id", binding_id, "--task-revision", "1",
+        "--binding-context-version", "1",
         "--retry-safe", "--json",
     ])
     assert rc == 0
@@ -1044,6 +1050,10 @@ def test_a_submission_records_its_job_into_the_task_state(tmp_path, monkeypatch,
     assert payload["job_id"] in next_action
     assert payload["request_key"] in next_action
     assert int(binding.binding["context_version"]) == 2
+    # The recording is PROGRESS: the authorization identity and epoch are untouched, so the
+    # command just minted against them stays authorized (round-9).
+    assert si.binding_authorization_id(binding.binding) == binding_id
+    assert si.binding_authorization_version(binding.binding) == 1
 
 
 def test_a_stale_revision_never_overwrites_the_task_state(tmp_path, monkeypatch, capsys):
@@ -1066,6 +1076,7 @@ def test_a_stale_revision_never_overwrites_the_task_state(tmp_path, monkeypatch,
         "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
         "--aio-session-id", "ses_aio", "--aio-agent", "aio-control",
         "--binding-id", binding_id, "--task-revision", "1",
+        "--binding-context-version", "1",
         "--retry-safe", "--json",
     ])
     assert rc == 0  # the submission itself is unaffected (the job is durable)
@@ -1091,3 +1102,151 @@ def test_a_submission_without_a_store_reports_the_missing_task_update(monkeypatc
     assert rc == 0
     payload = json.loads(capsys.readouterr().out.strip())
     assert "task state not updated" in payload["task_note"]
+
+
+# ── Round 9: recording must not invalidate the queued command ─────────────────
+
+
+def _submit_fixture(tmp_path, monkeypatch):
+    """A canonical repo (origin + the submit spec) + the manager on a fake redis —
+    everything the REAL submission validator needs (spec compile + project identity)."""
+    fm = _fleet_manager()
+    repo = tmp_path / "canonical"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "remote", "add", "origin",
+         "git@github.com:peparhugo/agentic-dynamics.git"],
+        check=True,
+    )
+    spec_src = (
+        Path(__file__).resolve().parent.parent
+        / "workflows" / "repository" / "fleet_job_submission.yaml"
+    )
+    spec_dst = repo / "workflows" / "repository" / "fleet_job_submission.yaml"
+    spec_dst.parent.mkdir(parents=True)
+    spec_dst.write_bytes(spec_src.read_bytes())
+    git = ["git", "-C", str(repo), "-c", "user.email=t@t", "-c", "user.name=t"]
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "init"], check=True)
+    workdir = tmp_path / "wt_entry"
+    workdir.mkdir()
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    return fm, repo, r, workdir
+
+
+def _aio_argv(*, auth_id, auth_version, context_version, workdir, extra=()):
+    return [
+        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
+        "--goal", "g", "--model", "anthropic/claude-sonnet-5",
+        "--workdir", str(workdir),
+        "--aio-session-id", "ses_aio", "--aio-agent", "aio-control",
+        "--binding-id", auth_id, "--task-revision", str(auth_version),
+        "--binding-context-version", str(context_version),
+        *extra, "--json",
+    ]
+
+
+def test_a_recorded_submission_still_passes_delayed_consumption(
+    tmp_path, monkeypatch, capsys
+):
+    """Round-9 regression: the submit's own recording must not invalidate the queued command.
+    Mint through the real CLI (which records progress), then validate + dry-run the SAME
+    queued command exactly as the worker and the broker would — binding id and revision
+    checks included."""
+    from scripts.fleet.launch_broker import submit_run
+    from scripts.fleet.spawn_wrapper import validate_submit_request
+
+    fm, repo, r, workdir = _submit_fixture(tmp_path, monkeypatch)
+    store, auth_id = _binding_store(tmp_path)
+    monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(store))
+    monkeypatch.setattr("scripts.fleet.launch_broker.admission_required", lambda: False)
+
+    rc = fm.main(_aio_argv(
+        auth_id=auth_id, auth_version=1, context_version=1, workdir=workdir,
+        extra=("--retry-safe",),
+    ))
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert payload["task_note"] == ""  # the recording happened (context 1 -> 2)
+
+    command = json.loads(r._lists[fm.COMMANDS_KEY][0])
+    # DELAYED CONSUMPTION: the real validator still accepts the queued command.
+    errors = validate_submit_request(command, repo_root=repo)
+    assert errors == [], errors
+    # ... and the broker's dry run reaches the compose decision (the reviewer's surface).
+    outcome = submit_run(command, repo_root=repo, dry_run=True)
+    assert outcome["ok"] is True
+
+
+def test_a_genuine_task_change_still_rejects_its_pending_command(
+    tmp_path, monkeypatch, capsys
+):
+    """The stale-task rejection is preserved for genuine changes: an acceptance update
+    advances the authorization epoch and the previously queued command is refused."""
+    from agentic_dynamics.knowledge import session_ingestion as si
+    from scripts.fleet.spawn_wrapper import validate_submit_request
+
+    fm, repo, r, workdir = _submit_fixture(tmp_path, monkeypatch)
+    store, auth_id = _binding_store(tmp_path)
+    monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(store))
+
+    assert fm.main(_aio_argv(
+        auth_id=auth_id, auth_version=1, context_version=1, workdir=workdir,
+        extra=("--retry-safe",),
+    )) == 0
+    capsys.readouterr()
+    command = json.loads(r._lists[fm.COMMANDS_KEY][0])
+
+    si.update_binding_context(
+        "ses_aio",
+        context={"acceptance": {"text": "the task was redefined", "source": "raw"}},
+        expected_version=2,  # after the recording
+        artifact_dir=store,
+    )
+    # The task definition changed: the queued command's authorization is stale.
+    errors = validate_submit_request(command, repo_root=repo)
+    assert any("stale task revision" in e for e in errors), errors
+
+
+def test_multiple_pending_submissions_survive_progress_recording(
+    tmp_path, monkeypatch, capsys
+):
+    """Progress recording is per-write, not per-command: two commands minted against the
+    same task state both survive each other's recordings — and a repeated reconciliation
+    reuses the first job without disturbing either authorization."""
+    from scripts.fleet.spawn_wrapper import validate_submit_request
+
+    fm, repo, r, workdir = _submit_fixture(tmp_path, monkeypatch)
+    store, auth_id = _binding_store(tmp_path)
+    monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(store))
+
+    assert fm.main(_aio_argv(
+        auth_id=auth_id, auth_version=1, context_version=1, workdir=workdir,
+        extra=("--retry-safe",),
+    )) == 0
+    first = json.loads(capsys.readouterr().out.strip())
+
+    # The second submission reads the POST-recording context version (as the tool would).
+    assert fm.main(_aio_argv(
+        auth_id=auth_id, auth_version=1, context_version=2, workdir=workdir,
+        extra=("--retry-safe", "--task-identity", "second-pending"),
+    )) == 0
+    second = json.loads(capsys.readouterr().out.strip())
+    assert second["job_id"] != first["job_id"]
+
+    commands = [json.loads(raw) for raw in r._lists[fm.COMMANDS_KEY]]
+    assert len(commands) == 2
+    for command in commands:
+        errors = validate_submit_request(command, repo_root=repo)
+        assert errors == [], (command["job_id"], errors)
+
+    # A repeated reconciliation (the FIRST submission retried) returns its original job.
+    assert fm.main(_aio_argv(
+        auth_id=auth_id, auth_version=1, context_version=3, workdir=workdir,
+        extra=("--retry-safe",),
+    )) == 0
+    retry = json.loads(capsys.readouterr().out.strip())
+    assert retry["reconciled"] is True and retry["job_id"] == first["job_id"]
+    assert len(r._lists[fm.COMMANDS_KEY]) == 2  # nothing new queued

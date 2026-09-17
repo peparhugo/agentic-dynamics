@@ -864,10 +864,13 @@ def _record_submission_in_task(*, aio: dict | None, job: dict, spec: str, workdi
     """
     if not aio or not str(aio.get("native_session_id") or "").strip():
         return ""
+    # The recording write's guard is the binding's CONTEXT version at gate-read time (the
+    # optimistic-concurrency token), never the authorization epoch: a stale session still
+    # cannot overwrite newer task state, while the authorization checks stay untouched.
     try:
-        expected_version = int(aio.get("task_revision"))
+        expected_version = int(aio.get("context_version"))
     except (TypeError, ValueError):
-        return "task state not updated (the submit carried no task revision)"
+        return "task state not updated (the submit carried no binding context version)"
     job_id = str(job.get("job_id") or "")
     reconciled = bool(job.get("reconciled"))
     key = str(job.get("request_key") or "")
@@ -1139,8 +1142,12 @@ def main(argv: list[str] | None = None) -> int:
     p_submit.add_argument("--binding-id", default=None,
                           help="the durable AIO binding record id (validated against the store)")
     p_submit.add_argument("--task-revision", type=int, default=None,
-                          help="the binding's task/acceptance context version (stale revisions "
-                               "are refused)")
+                          help="the binding's AUTHORIZATION epoch (stale task definitions are "
+                               "refused; routine progress recording never advances it)")
+    p_submit.add_argument("--binding-context-version", type=int, default=None,
+                          help="the binding's context version at gate-read time: the optimistic "
+                               "guard for the optional task-state recording (a stale session's "
+                               "recording is refused)")
     p_submit.add_argument("--request-key", default=None,
                           help="a caller-stable request key: a retry with the SAME key "
                                "reconciles to the existing job instead of minting a second one "
@@ -1238,6 +1245,8 @@ def main(argv: list[str] | None = None) -> int:
                 "binding_id": args.binding_id or "",
                 "task_revision": args.task_revision,
             }
+            if args.binding_context_version is not None:
+                aio["context_version"] = args.binding_context_version
         # The workspace preparation path (Unit 2): an omitted --workdir is resolved here —
         # never a caller obligation to assemble one by hand.
         workdir = str(args.workdir or "").strip()

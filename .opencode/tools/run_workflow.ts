@@ -59,7 +59,15 @@ export function aioSubmitFlags(
   bindingReport: {
     status?: unknown
     knowledge_id?: unknown
-    binding?: { context_version?: unknown; project?: unknown; task_identity?: unknown } | null
+    authorization_id?: unknown
+    authorization_version?: unknown
+    binding?: {
+      context_version?: unknown
+      project?: unknown
+      task_identity?: unknown
+      authorization_id?: unknown
+      authorization_version?: unknown
+    } | null
   } | null,
 ): { flags: string[]; refuse: string } {
   // The binding gate applies to the AIO actor. A worker / specialized profile keeps the
@@ -86,13 +94,25 @@ export function aioSubmitFlags(
         "binds the session on its first substantive message; refusing to submit unbound.",
     }
   }
-  const bindingID = String(bindingReport.knowledge_id ?? "").trim()
-  const revision = Number(bindingReport.binding?.context_version ?? 0)
+  // THE AUTHORIZATION IDENTITY (round-9): the exec gate checks the binding's stable
+  // authorization id + epoch — never the content-addressed knowledge_id / context_version,
+  // which every update changes (routine progress recording must not invalidate the queued
+  // command it accompanies). A task-definition change advances the epoch and refuses stale
+  // commands at the gate. The context version rides only for the recording write's own
+  // optimistic guard.
+  const bindingPayload = bindingReport.binding ?? {}
+  const contextVersion = Number(bindingPayload.context_version ?? 0)
+  const bindingID =
+    String(bindingReport.authorization_id ?? bindingPayload.authorization_id ?? "").trim() ||
+    String(bindingReport.knowledge_id ?? "").trim() // fallback for an older report shape
+  const revision = Number(
+    bindingReport.authorization_version ?? bindingPayload.authorization_version ?? contextVersion,
+  )
   if (!bindingID || !Number.isInteger(revision) || revision < 1) {
     return {
       flags: [],
       refuse:
-        `the AIO binding for session ${sessionID} carries no record id / task revision — ` +
+        `the AIO binding for session ${sessionID} carries no authorization identity/epoch — ` +
         "refusing to submit unbound.",
     }
   }
@@ -105,6 +125,9 @@ export function aioSubmitFlags(
     "--aio-agent", String(agent ?? ""),
     "--binding-id", bindingID,
     "--task-revision", String(revision),
+    // The CONTEXT version is not authorization: it is the optimistic guard the recording
+    // write uses (a stale session still cannot advance newer task state).
+    "--binding-context-version", String(Number.isInteger(contextVersion) ? contextVersion : 0),
   ]
   // The LOGICAL TASK identity scopes the retry-safe request key (reviewer finding,
   // 2026-09-16): the same inputs from a different task/session are a different logical

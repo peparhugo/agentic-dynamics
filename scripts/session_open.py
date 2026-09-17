@@ -747,13 +747,20 @@ def _open_report(result: si.SessionOpenResult) -> dict:
 
 
 def _binding_report(result: si.BindingResult) -> dict:
+    binding = result.binding or {}
     return {
         "schema": BINDING_SCHEMA,
         "status": result.status,
-        "native_session_id": (result.binding or {}).get("native_session_id", ""),
+        "native_session_id": binding.get("native_session_id", ""),
         "binding": result.binding,
         "path": str(result.path) if result.path else None,
         "knowledge_id": result.knowledge_id,
+        # The AUTHORIZATION identity (round-9): what the exec gate checks — stable across
+        # routine progress recording, advanced only by task-definition changes. Callers
+        # (the run_workflow tool) mint the aio block from THESE, never from the
+        # content-addressed knowledge_id / context_version.
+        "authorization_id": si.binding_authorization_id(binding) if binding else "",
+        "authorization_version": si.binding_authorization_version(binding) if binding else 0,
         "warnings": list(result.warnings),
     }
 

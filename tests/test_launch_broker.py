@@ -995,7 +995,9 @@ def test_a_bound_aio_submit_still_reaches_the_compose_call(tmp_path, monkeypatch
         aio={
             "native_session_id": "ses_aio",
             "agent": "aio-control",
-            "binding_id": written.knowledge_id,
+            "binding_id": si.binding_authorization_id(
+                si.read_binding("ses_aio", artifact_dir=store).binding or {}
+            ),
             "task_revision": 1,
         }
     )
@@ -1084,7 +1086,9 @@ def test_the_complete_submission_path_host_shape(tmp_path, monkeypatch):
         aio={
             "native_session_id": "ses_aio",
             "agent": "aio-control",
-            "binding_id": written.knowledge_id,
+            "binding_id": si.binding_authorization_id(
+                si.read_binding("ses_aio", artifact_dir=store).binding or {}
+            ),
             "task_revision": 1,
         },
     )

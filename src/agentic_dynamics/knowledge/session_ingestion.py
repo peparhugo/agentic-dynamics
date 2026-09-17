@@ -861,6 +861,49 @@ BINDING_CONTEXT_FIELDS = (
 #: Bound on the retained context history (provenance is auditable, not unbounded).
 BINDING_CONTEXT_HISTORY = 10
 
+#: The AUTHORIZATION-relevant task fields: changing one of these changes WHAT the AIO is
+#: authorized to do, so a pending command minted against the old definition is stale and
+#: must be refused. The remaining context fields (``next_action`` / ``blocker``) are
+#: OPERATIONAL PROGRESS: routine recording must never invalidate pending work (round-9
+#: review — one version represented both, so recording a submission's own ``next_action``
+#: invalidated the submission's queued command at its binding-id and revision checks).
+AUTHORIZATION_FIELDS = ("acceptance", "predecessor", "work_unit", "project", "source_revision")
+
+
+def binding_authorization_id(payload: dict[str, Any]) -> str:
+    """The binding's AUTHORIZATION identity: derived from its authorization-relevant fields.
+
+    Stable across progress-only updates (``next_action``/``blocker``); changes when the task
+    definition (acceptance / work_unit / project / source_revision / predecessor) or the
+    session identity changes. The exec gate compares the claimed binding id against THIS —
+    never the content-addressed record id, which every update necessarily changes.
+    """
+    canonical = json.dumps(
+        {
+            "native_session_id": str(payload.get("native_session_id") or ""),
+            "task_identity": str(payload.get("task_identity") or ""),
+            "resolved_agent": str(payload.get("resolved_agent") or ""),
+            "repository_id": str(payload.get("repository_id") or ""),
+            **{field: str(payload.get(field) or "") for field in AUTHORIZATION_FIELDS},
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def binding_authorization_version(payload: dict[str, Any]) -> int:
+    """The binding's authorization epoch (fallback: the context version for older bindings).
+
+    Starts at 1 at creation; :func:`update_binding_context` bumps it ONLY when an
+    authorization-relevant field actually changes. A progress-only update leaves it (and
+    the derived id) untouched, so commands queued against this task stay authorized.
+    """
+    raw = payload.get("authorization_version")
+    if isinstance(raw, int) and not isinstance(raw, bool) and raw >= 1:
+        return raw
+    return int(payload.get("context_version") or 1)
+
 
 def binding_slot_id(native_session_id: str, *, repository_id: str = REPOSITORY_ID) -> str:
     """The deterministic slot id for one native session's binding.
@@ -975,6 +1018,17 @@ def binding_payload(
         "actor": ACTOR,
         "scope": aio_acl_scope(repository_id),
     }
+    # The AUTHORIZATION identity (round-9): a pure function of the authorization-relevant
+    # fields + the session identity, ALWAYS recomputed so payload and checks can never
+    # disagree. The epoch defaults to 1 at creation; update_binding_context bumps it only
+    # when an authorization-relevant field actually changes.
+    payload["authorization_id"] = binding_authorization_id(payload)
+    raw_epoch = binding.get("authorization_version")
+    payload["authorization_version"] = (
+        int(raw_epoch)
+        if isinstance(raw_epoch, int) and not isinstance(raw_epoch, bool) and raw_epoch >= 1
+        else 1
+    )
     return payload
 
 
@@ -1460,6 +1514,14 @@ def _apply_context_update(
     merged.update({
         field: context[field] for field in BINDING_CONTEXT_FIELDS if field in context
     })
+    # AUTHORIZATION vs PROGRESS (round-9 review): the authorization epoch advances ONLY when
+    # an authorization-relevant field actually changes a value — routine progress recording
+    # (next_action / blocker) preserves the authorization of commands already queued against
+    # this task. The context_version above still advances on EVERY update: it is the
+    # optimistic-concurrency guard for writers, never the exec gate's stale-task check.
+    previous_epoch = binding_authorization_version(payload)
+    authorization_changed = binding_authorization_id(merged) != binding_authorization_id(payload)
+    merged["authorization_version"] = previous_epoch + 1 if authorization_changed else previous_epoch
     merged["context_version"] = version + 1
     merged["updated_at"] = (now or datetime.now()).astimezone().isoformat()
     history = list(payload.get("context_history") or [])
