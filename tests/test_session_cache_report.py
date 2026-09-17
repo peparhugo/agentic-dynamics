@@ -79,6 +79,14 @@ def _message(
     )
 
 
+def _user(con: sqlite3.Connection, *, mid: str, created: int, session: str = "ses_a") -> None:
+    """One user message row (the attach join's timeline anchor; no usage)."""
+    con.execute(
+        "INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?,?,?,?,?)",
+        (mid, session, created, created, json.dumps({"role": "user", "time": {"created": created}})),
+    )
+
+
 def _event(at_ms: int, *, session: str = "ses_a", kind: str = "refresh", surface: str = "messages.transform") -> dict:
     return {
         "schema": "aio-context-event/v1",
@@ -99,12 +107,16 @@ def test_formula_and_cohorts_join_the_journal(tmp_path, mod):
     db = tmp_path / "opencode.db"
     con = _make_db(db)
     con.execute("INSERT INTO session (id, time_updated) VALUES ('ses_a', ?)", (BASE,))
-    # m1: refresh (journal), m2: continuation — plus a pending zero block that must be skipped.
+    # The per-turn user-message timeline anchors the attach join.
+    _user(con, mid="u1", created=BASE - 1_000)  # turn 1: no attach (legacy shape)
     _message(con, mid="m1", created=BASE, hit=100, miss=900)
     _message(con, mid="m_pending", created=BASE + 500)  # zero-token block: not measured
+    _user(con, mid="u2", created=BASE + 900)  # turn 2: an attach precedes it
     _message(con, mid="m2", created=BASE + 1_000, hit=1_000, miss=0)
-    # A compaction summary and the post-compaction recovery request.
+    # A compaction summary and the post-compaction recovery request (its synthetic
+    # continuation is a user message with no attach).
     _message(con, mid="m3", created=BASE + 2_000, hit=0, miss=5_000, mode="compaction", summary=True)
+    _user(con, mid="u3", created=BASE + 2_900)
     _message(con, mid="m4", created=BASE + 3_000, hit=200, miss=300)
     # A request outside any journal window: honestly unclassified.
     _message(con, mid="m5", created=BASE + 4_000, hit=500, miss=500)
@@ -115,8 +127,12 @@ def test_formula_and_cohorts_join_the_journal(tmp_path, mod):
     _write_events(
         events,
         [
+            # m1's turn carries no attach: the fallback append classifies it.
             _event(BASE + 50, kind="refresh"),
-            _event(BASE + 1_050, kind="continuation"),
+            # m2's turn: a PERSISTED attach (chat.message) precedes its user message — the
+            # attach wins over any append in the same request window (the ordinary path).
+            _event(BASE + 850, kind="continuation", surface="chat.message"),
+            _event(BASE + 1_050, kind="refresh"),
             # A compaction-hook event is NOT a per-request delivery: it must be ignored.
             _event(BASE + 2_050, kind="compaction", surface="session.compacting"),
         ],
