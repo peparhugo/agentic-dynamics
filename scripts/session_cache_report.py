@@ -260,13 +260,18 @@ def _classify_session(messages: list[dict], events: list[dict]) -> list[dict]:
 
     The join is by IDENTITY (reviewer repair, 2026-09-17): every delivery event journals the
     user message it serves, and the runtime stamps a user message's ``time_created`` BEFORE
-    the ``chat.message`` hook runs — a timestamp-window join misattributes deliveries. The
-    attach for a turn is looked up by the turn's user-message id; the FIRST measured request
-    of the turn carries the delivery cohort, later requests of the same turn are ``reuse``
-    (they read the snapshot the turn already delivered). A turn with no attach (the
-    post-compaction synthetic continuation, restored/legacy messages) falls back to the
-    ``messages.transform`` append whose journaled message id matches the turn user and whose
-    time falls in that request's own window.
+    the ``chat.message`` hook runs — a timestamp-window join misattributes deliveries.
+
+    Classification PRECEDENCE per request (reviewer repair 2026-09-17, round 3):
+
+    1. compaction (the summary call and the first request after it);
+    2. a ``messages.transform`` append in THIS request's own window — the recovery
+       deliveries (a recovered capsule, or its unchanged re-append) classify the request
+       even when the turn carries an attachment (a notice can recover mid-turn);
+    3. the turn's attachment, looked up by the turn user's id: the FIRST measured request of
+       the turn carries its kind; later requests are ``reuse`` (they read the snapshot the
+       turn already delivered);
+    4. unclassified — reported honestly, never folded silently.
     """
     rows: list[dict] = []
     summary_positions = [
@@ -314,35 +319,40 @@ def _classify_session(messages: list[dict], events: list[dict]) -> list[dict]:
             if not turn_users:
                 cohort, detail = "unclassified", "no turn user message joined"
             else:
+                # PRECEDENCE (reviewer repair 2026-09-17): compaction (above) > a
+                # `messages.transform` delivery in THIS request's own window > the turn's
+                # attachment (first request: its kind; later requests: reuse) > unclassified.
+                # The append check must come BEFORE the attach/reuse branch: a turn whose
+                # attachment was an unavailable notice can still receive recovered-capsule
+                # appends on later requests, and those deliveries classify those requests.
                 user_position = turn_users[-1]
                 for_user = events_by_message.get(messages[user_position]["id"], [])
-                attach = next(
-                    (event for event in reversed(for_user) if event["surface"] == "chat.message"),
+                created = message["created"]
+                next_created = messages[index + 1]["created"] if index + 1 < len(messages) else None
+                append = next(
+                    (
+                        event
+                        for event in for_user
+                        if event["surface"] == "messages.transform"
+                        and created < event["at"]
+                        and (next_created is None or event["at"] < next_created)
+                    ),
                     None,
                 )
-                if attach is not None:
-                    if first_measured_after.get(user_position) == index:
-                        cohort, detail = _cohort_for(attach["kind"])
-                    else:
-                        cohort, detail = "reuse", "same-turn reuse (snapshot delivered at turn start)"
+                if append is not None:
+                    cohort, detail = _cohort_for(append["kind"])
                 else:
-                    created = message["created"]
-                    next_created = messages[index + 1]["created"] if index + 1 < len(messages) else None
-                    append = next(
-                        (
-                            event
-                            for event in for_user
-                            if event["surface"] == "messages.transform"
-                            and created < event["at"]
-                            and (next_created is None or event["at"] < next_created)
-                        ),
+                    attach = next(
+                        (event for event in reversed(for_user) if event["surface"] == "chat.message"),
                         None,
                     )
-                    cohort, detail = (
-                        _cohort_for(append["kind"])
-                        if append is not None
-                        else ("unclassified", "no delivery event joined")
-                    )
+                    if attach is not None:
+                        if first_measured_after.get(user_position) == index:
+                            cohort, detail = _cohort_for(attach["kind"])
+                        else:
+                            cohort, detail = "reuse", "same-turn reuse (snapshot delivered at turn start)"
+                    else:
+                        cohort, detail = "unclassified", "no delivery event joined"
         else:
             cohort, detail = "unclassified", "no delivery journal"
         rows.append(

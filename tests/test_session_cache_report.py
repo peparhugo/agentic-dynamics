@@ -181,6 +181,51 @@ def test_formula_and_cohorts_join_the_journal(tmp_path, mod):
     assert report["formula"].startswith("sum(miss_tokens)")
 
 
+def test_recovery_appends_classify_before_the_turn_attachment(mod):
+    """Reviewer regression (2026-09-17, round 3): a turn whose attachment is an UNAVAILABLE
+    notice recovers mid-turn — the recovery appends must classify their requests; the turn's
+    attachment must not shadow them as ``reuse``.
+
+    The combined sequence: unavailable attachment -> recovered-capsule append -> unchanged
+    re-append, all within ONE user turn.
+    """
+    def assistant(mid: str, created: int, hit: int, miss: int) -> dict:
+        return {
+            "id": mid,
+            "created": created,
+            "data": {
+                "role": "assistant",
+                "tokens": {
+                    "total": hit + miss,
+                    "input": miss,
+                    "output": 0,
+                    "reasoning": 0,
+                    "cache": {"read": hit, "write": 0},
+                },
+            },
+        }
+
+    messages = [
+        {"id": "u1", "created": BASE - 1_000, "data": {"role": "user", "time": {"created": BASE - 1_000}}},
+        assistant("m1", BASE, 10, 90),  # the unavailable attachment's first request
+        assistant("m2", BASE + 1_000, 100, 900),  # the recovered-capsule append
+        assistant("m3", BASE + 2_000, 200, 0),  # the unchanged re-append
+    ]
+    events = [
+        {"at": BASE - 900, "kind": "unavailable", "surface": "chat.message", "message": "u1"},
+        {"at": BASE + 1_050, "kind": "refresh", "surface": "messages.transform", "message": "u1"},
+        {"at": BASE + 2_050, "kind": "continuation", "surface": "messages.transform", "message": "u1"},
+    ]
+
+    rows = mod._classify_session(messages, events)
+    assert [row["cohort"] for row in rows] == ["continuation", "refresh", "continuation"]
+    assert [row["detail"] for row in rows] == [
+        "capsule unavailable",
+        "new observation",
+        "unchanged snapshot",
+    ]
+
+
 def test_without_a_journal_everything_is_unclassified_and_noted(tmp_path, mod):
     db = tmp_path / "opencode.db"
     con = _make_db(db)
