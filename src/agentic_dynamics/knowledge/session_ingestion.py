@@ -884,10 +884,14 @@ def binding_authorization_id(payload: dict[str, Any]) -> str:
             "task_identity": str(payload.get("task_identity") or ""),
             "resolved_agent": str(payload.get("resolved_agent") or ""),
             "repository_id": str(payload.get("repository_id") or ""),
-            **{field: str(payload.get(field) or "") for field in AUTHORIZATION_FIELDS},
+            # The auth values are hashed as CANONICAL JSON (round-10): nested structures
+            # (acceptance / predecessor) are key-order-insensitive and default-insensitive,
+            # so re-sending the same effective values never reads as a change.
+            **{field: payload.get(field) for field in AUTHORIZATION_FIELDS},
         },
         sort_keys=True,
         separators=(",", ":"),
+        default=str,
     )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -1519,9 +1523,20 @@ def _apply_context_update(
     # (next_action / blocker) preserves the authorization of commands already queued against
     # this task. The context_version above still advances on EVERY update: it is the
     # optimistic-concurrency guard for writers, never the exec gate's stale-task check.
+    #
+    # NORMALIZE BOTH SIDES before comparing (round-10 review): the comparison runs over the
+    # canonical payload forms, so re-sending identical acceptance/predecessor values — with
+    # reordered keys or omitted defaults — never advances the epoch.
     previous_epoch = binding_authorization_version(payload)
-    authorization_changed = binding_authorization_id(merged) != binding_authorization_id(payload)
-    merged["authorization_version"] = previous_epoch + 1 if authorization_changed else previous_epoch
+    previous_auth_id = binding_authorization_id(
+        binding_payload(payload, repository_id=repository_id)
+    )
+    merged_auth_id = binding_authorization_id(
+        binding_payload(merged, repository_id=repository_id)
+    )
+    merged["authorization_version"] = (
+        previous_epoch + 1 if merged_auth_id != previous_auth_id else previous_epoch
+    )
     merged["context_version"] = version + 1
     merged["updated_at"] = (now or datetime.now()).astimezone().isoformat()
     history = list(payload.get("context_history") or [])

@@ -40,6 +40,27 @@ test("a bound native session yields the exact identity flags", () => {
     "--aio-agent", "aio-control",
     "--binding-id", BINDING_ID,
     "--task-revision", "3",
+    "--binding-context-version", "3",
+  ])
+})
+
+test("the AUTHORIZATION identity is preferred over the record id and context version", () => {
+  // Round-9/10: the gate checks the authorization identity — stable across progress
+  // recording — never the content-addressed record id / context version.
+  const result = aioSubmitFlags("ses_aio", "aio-control", {
+    status: "found",
+    knowledge_id: "b".repeat(64),
+    authorization_id: BINDING_ID,
+    authorization_version: 5,
+    binding: { context_version: 9 },
+  })
+  expect(result.refuse).toBe("")
+  expect(result.flags).toEqual([
+    "--aio-session-id", "ses_aio",
+    "--aio-agent", "aio-control",
+    "--binding-id", BINDING_ID,
+    "--task-revision", "5",
+    "--binding-context-version", "9",
   ])
 })
 
@@ -65,11 +86,11 @@ test("a binding without a record id or a positive revision refuses", () => {
   const noId = aioSubmitFlags("ses_x", "aio-control", {
     status: "found", knowledge_id: "", binding: { context_version: 1 },
   })
-  expect(noId.refuse).toContain("no record id / task revision")
+  expect(noId.refuse).toContain("no authorization identity/epoch")
   const noRevision = aioSubmitFlags("ses_x", "aio-control", {
     status: "found", knowledge_id: BINDING_ID, binding: { context_version: 0 },
   })
-  expect(noRevision.refuse).toContain("no record id / task revision")
+  expect(noRevision.refuse).toContain("no authorization identity/epoch")
 })
 
 

@@ -723,4 +723,67 @@ describe("aio-context plugin — handoff selection by session (reviewer repair)"
       rmSync(project, { recursive: true, force: true })
     }
   })
+
+  test("a recording-advanced durable version is refreshed before a task-context update", async () => {
+    // Round-10 review: submission recording advances the durable version independently of
+    // the plugin's cache. The update must go out against the FRESH durable version — the
+    // reviewer reproduction (cache 1, store 2) failed every attempt against the stale one.
+    const project = tmpDir("aio-stale-")
+    const storeVersion = { value: 2 }
+    try {
+      writeTaskContext(project, {
+        native_session_id: "ses_rec", task: "t", work_unit: "v1", context_version: 1,
+      })
+      const { runner, calls } = fakeRunner((mode, args) => {
+        if (mode === "bind") {
+          return {
+            schema: "session-binding/v1", status: "created",
+            binding: {
+              native_session_id: sessionOf(args), context_version: 1,
+              task_identity: "t", project: "",
+            },
+          }
+        }
+        if (mode === "binding") {
+          return {
+            schema: "session-binding/v1", status: "found",
+            binding: {
+              native_session_id: sessionOf(args), context_version: storeVersion.value,
+              task_identity: "t", project: "",
+            },
+          }
+        }
+        if (mode === "capsule") {
+          return { schema: "session-capsule/v1", capsule_status: "composed", capsule: { text: "CAPSULE" } }
+        }
+        if (mode === "update-context") {
+          return {
+            schema: "session-binding/v1", status: "updated",
+            binding: {
+              native_session_id: sessionOf(args), context_version: storeVersion.value + 1,
+              task_identity: "t", project: "",
+            },
+          }
+        }
+        return undefined
+      })
+      const hooks = await makePluginAt(runner, project)
+      await hooks["chat.message"](...Object.values(message("ses_rec", "aio-control", "start")))
+
+      // The newer file arrives while the plugin's cache still says 1.
+      writeTaskContext(project, {
+        native_session_id: "ses_rec", task: "t", work_unit: "v2 work", context_version: 3,
+      })
+      await hooks["chat.message"](...Object.values(message("ses_rec", "aio-control", "continue")))
+
+      const update = calls.find((c) => modeOf(c.args) === "update-context")
+      expect(update).toBeDefined()
+      // The update goes out against the DURABLE version (2), not the stale cache (1).
+      expect(flagOf(update!.args, "--expected-version")).toBe("2")
+      expect(flagOf(update!.args, "--work-unit")).toBe("v2 work")
+    } finally {
+      rmSync(project, { recursive: true, force: true })
+    }
+  })
+
 })

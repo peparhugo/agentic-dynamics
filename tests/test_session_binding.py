@@ -519,6 +519,54 @@ class TestVersionedContext:
         assert again.binding["context_version"] == 2
         assert again.binding["original_request"] == "ORIGINAL REQUEST"
 
+    def test_unchanged_authorization_values_never_advance_the_epoch(self, tmp_path):
+        """Round-10: re-sending IDENTICAL acceptance/predecessor values — reordered keys,
+        omitted defaults — never advances the authorization epoch, so a queued command's
+        authorization survives progress recording and value-identical updates."""
+        si.write_binding(
+            _binding(
+                acceptance={"text": "tests green", "source": "raw"},
+                predecessor={"slug": "bound-predecessor", "knowledge_ids": ["kb-1", "kb-2"]},
+            ),
+            artifact_dir=tmp_path,
+            connect_fn=_FakeRedis,
+        )
+        first = si.read_binding("ses_test_1", artifact_dir=tmp_path)
+        founding_id = si.binding_authorization_id(first.binding)
+        assert si.binding_authorization_version(first.binding) == 1
+
+        # 1. Progress recording: the epoch is untouched.
+        progress = si.update_binding_context(
+            "ses_test_1", context={"next_action": "observe job X"},
+            expected_version=1, artifact_dir=tmp_path, connect_fn=_FakeRedis,
+        )
+        assert si.binding_authorization_version(progress.binding) == 1
+        assert si.binding_authorization_id(progress.binding) == founding_id
+
+        # 2. The SAME acceptance/predecessor re-sent — reordered keys + omitted defaults: the
+        #    effective values are unchanged, so the epoch stays put (the reviewer repro:
+        #    this used to advance 1 -> 2 and invalidate a queued command).
+        resent = si.update_binding_context(
+            "ses_test_1",
+            context={
+                "acceptance": {"source": "raw", "text": "tests green"},
+                "predecessor": {"knowledge_ids": ["kb-1", "kb-2"], "slug": "bound-predecessor"},
+            },
+            expected_version=2, artifact_dir=tmp_path, connect_fn=_FakeRedis,
+        )
+        assert si.binding_authorization_version(resent.binding) == 1
+        assert si.binding_authorization_id(resent.binding) == founding_id
+        assert int(resent.binding["context_version"]) == 3
+
+        # 3. A GENUINE change advances the epoch (stale-task rejection preserved).
+        changed = si.update_binding_context(
+            "ses_test_1",
+            context={"acceptance": {"text": "different criteria", "source": "raw"}},
+            expected_version=3, artifact_dir=tmp_path, connect_fn=_FakeRedis,
+        )
+        assert si.binding_authorization_version(changed.binding) == 2
+        assert si.binding_authorization_id(changed.binding) != founding_id
+
     def test_capsule_reflects_the_updated_context(self, tmp_path):
         si.write_binding(_binding(), artifact_dir=tmp_path, connect_fn=_FakeRedis)
         si.update_binding_context(

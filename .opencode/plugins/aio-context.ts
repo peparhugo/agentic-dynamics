@@ -342,26 +342,63 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
     return false
   }
 
+  /** Read the CURRENT durable context version — the store is the truth, the cache a hint. */
+  async function refreshContextVersion(sessionID: string): Promise<number> {
+    const { report } = await sessionOpenCall([
+      "--binding", "--native-session-id", sessionID, "--json",
+    ])
+    const binding = report?.binding as Record<string, unknown> | undefined
+    const version = Number(binding?.context_version ?? 0)
+    if (version > 0) {
+      contextVersions.set(sessionID, version)
+      rememberIdentity(sessionID, binding)
+    }
+    return version
+  }
+
   async function updateSessionContext(
     sessionID: string,
-    currentVersion: number,
+    fallbackVersion: number,
+    fileVersion: number,
     context: Record<string, unknown> | null,
   ): Promise<boolean> {
-    const { report, error } = await sessionOpenCall([
-      "--update-context",
-      "--native-session-id", sessionID,
-      "--expected-version", String(currentVersion),
-      ...taskContextFlags(context),
-      "--json",
-    ])
-    if (report?.status === "updated") {
-      const binding = report?.binding as Record<string, unknown> | undefined
-      contextVersions.set(sessionID, Number(binding?.context_version ?? currentVersion + 1))
-      rememberIdentity(sessionID, binding)
-      failures.delete(sessionID) // reconciled: the notice clears
-      return true
+    // RECORDING-AWARE (round-10 review): submission recording advances the durable version
+    // independently of this plugin, so the cached version can be stale — the reviewer
+    // reproduction: the cache says 1, the store is at 2, every update sends the stale
+    // expected_version and fails. Refresh from the durable store FIRST (preserving both the
+    // identity and version checks), apply only a genuinely newer task-context file, and
+    // retry ONCE against the freshly read version when a concurrent write trips the check —
+    // never forced: a second failure is surfaced.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const durable = await refreshContextVersion(sessionID)
+      const expected = durable > 0 ? durable : fallbackVersion
+      if (!expected) break
+      if (fileVersion > 0 && durable > 0 && fileVersion <= durable) {
+        failures.delete(sessionID) // the desired state is already durable: nothing to do
+        return true
+      }
+      const { report, error } = await sessionOpenCall([
+        "--update-context",
+        "--native-session-id", sessionID,
+        "--expected-version", String(expected),
+        ...taskContextFlags(context),
+        "--json",
+      ])
+      if (report?.status === "updated") {
+        const binding = report?.binding as Record<string, unknown> | undefined
+        contextVersions.set(sessionID, Number(binding?.context_version ?? expected + 1))
+        rememberIdentity(sessionID, binding)
+        failures.delete(sessionID) // reconciled: the notice clears
+        return true
+      }
+      if (attempt === 0) continue // re-read and retry once against the fresh version
+      failures.set(sessionID, `context update failed: ${error || String(report?.status ?? "")}`)
+      return false
     }
-    failures.set(sessionID, `context update failed: ${error || String(report?.status ?? "")}`)
+    failures.set(
+      sessionID,
+      "context update failed: no durable context version to apply against",
+    )
     return false
   }
 
@@ -415,7 +452,7 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
         const fileVersion = Number(context?.context_version ?? 0)
         const current = contextVersions.get(sessionID) ?? 0
         if (applicable.applies && fileVersion > current && current > 0) {
-          await updateSessionContext(sessionID, current, context)
+          await updateSessionContext(sessionID, current, fileVersion, context)
         }
         capsules.delete(sessionID)
         return
