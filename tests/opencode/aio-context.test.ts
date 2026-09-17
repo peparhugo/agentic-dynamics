@@ -46,7 +46,8 @@ function fakeRunner(responder: (mode: string, args: string[]) => FakeResponse) {
 async function makePlugin(runner: unknown, options: Record<string, unknown> = {}) {
   return await (AioContextPlugin as unknown as (ctx: unknown, opts: unknown) => Promise<any>)(
     { directory: "/repo", worktree: "/repo" },
-    { commandRunner: runner, capsuleTtlMs: 60_000, ...options },
+    // `eventsPath: null` keeps the suite hermetic; the journal test injects its own path.
+    { commandRunner: runner, capsuleTtlMs: 60_000, eventsPath: null, ...options },
   )
 }
 
@@ -55,6 +56,46 @@ function message(sessionID: string, agent: string, text: string, id = "msg_1") {
     input: { sessionID, messageID: id },
     output: { message: { id, agent }, parts: [{ type: "text", text }] },
   }
+}
+
+/** One outgoing request as the runtime assembles it: storage-derived messages (a FRESH copy
+ *  each request — the runtime does not persist transformed entries) + the transform output. */
+function requestMessages(sessionID: string, texts: string[]) {
+  return {
+    messages: texts.map((text, index) => ({
+      info: { id: `msg_${index + 1}`, sessionID, role: "user", time: { created: index + 1 } },
+      parts: [{ type: "text", text }],
+    })),
+  }
+}
+
+/** The trailing snapshot text appended by `messages.transform` ("" when none was appended). */
+function appendedSnapshot(
+  out: { messages: Array<{ parts: Array<{ type: string; text?: string }> }> },
+  baseCount: number,
+): string {
+  if (out.messages.length <= baseCount) return ""
+  const entry = out.messages[out.messages.length - 1]
+  const part = entry.parts.find((candidate) => candidate.type === "text")
+  return part?.text ?? ""
+}
+
+/** Deliver one request through the messages transform; returns the outgoing list + appended text. */
+async function deliver(
+  hooks: any,
+  sessionID: string,
+  texts: string[] = ["do the task"],
+): Promise<{ out: any; appended: string }> {
+  const out = requestMessages(sessionID, texts)
+  await hooks["experimental.chat.messages.transform"]({}, out)
+  return { out, appended: appendedSnapshot(out, texts.length) }
+}
+
+/** The system array the transform emits for one request. */
+async function systemLines(hooks: any, sessionID: string): Promise<string[]> {
+  const out = { system: [] as string[] }
+  await hooks["experimental.chat.system.transform"]({ sessionID }, out)
+  return out.system
 }
 
 /** A standard responder: bind succeeds, binding is found once bound, capsule names the session. */
@@ -90,15 +131,14 @@ describe("aio-context plugin", () => {
     const hooks = await makePlugin(runner)
 
     await hooks["chat.message"](...Object.values(message("ses_a", "aio-control", "do the task")))
-    const first = { system: [] as string[] }
-    await hooks["experimental.chat.system.transform"]({ sessionID: "ses_a" }, first)
+    const first = await deliver(hooks, "ses_a")
     // A second request (the shape a post-compaction request takes: same session, no new
-    // chat.message) still receives the capsule.
-    const second = { system: [] as string[] }
-    await hooks["experimental.chat.system.transform"]({ sessionID: "ses_a" }, second)
+    // chat.message) still receives a fresh trailing snapshot.
+    const second = await deliver(hooks, "ses_a")
 
-    expect(first.system).toEqual(["CAPSULE:ses_a"])
-    expect(second.system).toEqual(["CAPSULE:ses_a"])
+    expect(first.appended).toContain("CAPSULE:ses_a")
+    expect(second.appended).toContain("CAPSULE:ses_a")
+    expect(first.appended).toContain("[aio-context] snapshot")
     // The capsule request is identity-scoped — never a "latest close" read.
     const capsuleCalls = calls.filter((c) => modeOf(c.args) === "capsule")
     expect(capsuleCalls.length).toBeGreaterThan(0)
@@ -108,6 +148,41 @@ describe("aio-context plugin", () => {
     }
   })
 
+  test("the system prompt is byte-stable across requests while the snapshot changes", async () => {
+    // The 2026-09-17 review defect: a capsule (with an observation timestamp) inserted into
+    // the system prompt changed the request PREFIX and re-billed the entire context. The
+    // system array must now be identical on every request, whatever the capsule says.
+    let counter = 0
+    const { runner } = fakeRunner((mode, args) => {
+      if (mode === "bind") {
+        return { schema: "session-binding/v1", status: "created", native_session_id: sessionOf(args) }
+      }
+      if (mode === "capsule") {
+        counter += 1
+        return {
+          schema: "session-capsule/v1",
+          capsule_status: "composed",
+          capsule: { text: `CAPSULE observed-at t${counter}: budget 1/2` },
+        }
+      }
+      return undefined
+    })
+    const hooks = await makePlugin(runner, { capsuleTtlMs: 0 })
+    await hooks["chat.message"](...Object.values(message("ses_stable", "aio-control", "task")))
+
+    const first = await systemLines(hooks, "ses_stable")
+    const before = await deliver(hooks, "ses_stable") // observation t1
+    const after = await deliver(hooks, "ses_stable") // a NEW observation (ttl 0) — t2
+    const second = await systemLines(hooks, "ses_stable")
+
+    expect(first).toEqual(second) // byte-stable: no timestamp, no counters, no capsule
+    expect(first.join()).not.toContain("CAPSULE")
+    expect(first.join()).not.toContain("observed-at")
+    expect(first.join()).not.toContain("budget")
+    expect(before.appended).toContain("CAPSULE observed-at t1")
+    expect(after.appended).toContain("CAPSULE observed-at t2")
+  })
+
   test("two concurrent tasks do not exchange capsules", async () => {
     const bound = new Set<string>()
     const { runner } = fakeRunner(happyResponder(bound))
@@ -115,21 +190,19 @@ describe("aio-context plugin", () => {
 
     await hooks["chat.message"](...Object.values(message("ses_one", "aio-control", "task one")))
     await hooks["chat.message"](...Object.values(message("ses_two", "aio-control", "task two")))
-    const one = { system: [] as string[] }
-    const two = { system: [] as string[] }
-    await hooks["experimental.chat.system.transform"]({ sessionID: "ses_one" }, one)
-    await hooks["experimental.chat.system.transform"]({ sessionID: "ses_two" }, two)
+    const one = await deliver(hooks, "ses_one")
+    const two = await deliver(hooks, "ses_two")
 
-    expect(one.system).toEqual(["CAPSULE:ses_one"])
-    expect(two.system).toEqual(["CAPSULE:ses_two"])
-    expect(one.system.join()).not.toContain("ses_two")
-    expect(two.system.join()).not.toContain("ses_one")
+    expect(one.appended).toContain("CAPSULE:ses_one")
+    expect(two.appended).toContain("CAPSULE:ses_two")
+    expect(one.appended).not.toContain("ses_two")
+    expect(two.appended).not.toContain("ses_one")
   })
 
   test("an unrelated newer close is never requested or injected", async () => {
     // The plugin passes ONLY the bound session identity to the composer; the composer's
     // predecessor resolution is by the binding's explicit slug (Python-tested). Here we
-    // assert the two properties the plugin owns: no slug/latest read, verbatim injection.
+    // assert the two properties the plugin owns: no slug/latest read, verbatim delivery.
     const bound = new Set(["ses_a"])
     const { runner, calls } = fakeRunner((mode, args) => {
       if (mode === "capsule") {
@@ -143,11 +216,10 @@ describe("aio-context plugin", () => {
       return happyResponder(bound)(mode, args)
     })
     const hooks = await makePlugin(runner)
-    const out = { system: [] as string[] }
-    await hooks["experimental.chat.system.transform"]({ sessionID: "ses_a" }, out)
+    const delivered = await deliver(hooks, "ses_a")
 
     expect(calls.some((c) => c.args.includes("--slug"))).toBe(false)
-    expect(out.system).toEqual(["predecessor: bound-task (sha abc) — no newer-close content"])
+    expect(delivered.appended).toContain("predecessor: bound-task (sha abc) — no newer-close content")
   })
 
   test("worker sessions receive no private coordinator capsule", async () => {
@@ -156,10 +228,11 @@ describe("aio-context plugin", () => {
     const hooks = await makePlugin(runner)
 
     await hooks["chat.message"](...Object.values(message("ses_w", "build", "implement it")))
-    const out = { system: [] as string[] }
-    await hooks["experimental.chat.system.transform"]({ sessionID: "ses_w" }, out)
+    const lines = await systemLines(hooks, "ses_w")
+    const delivered = await deliver(hooks, "ses_w")
 
-    expect(out.system).toEqual([])
+    expect(lines).toEqual([])
+    expect(delivered.appended).toBe("")
     expect(calls.some((c) => modeOf(c.args) === "capsule")).toBe(false)
     expect(calls.some((c) => modeOf(c.args) === "bind")).toBe(false)
   })
@@ -173,10 +246,10 @@ describe("aio-context plugin", () => {
 
     // A fresh plugin instance (a coordinator restart): no process-local map survives.
     const second = await makePlugin(runner)
-    const out = { system: [] as string[] }
-    await second["experimental.chat.system.transform"]({ sessionID: "ses_r" }, out)
+    const out = requestMessages("ses_r", ["post-restart request"])
+    await second["experimental.chat.messages.transform"]({}, out)
 
-    expect(out.system).toEqual(["CAPSULE:ses_r"])
+    expect(appendedSnapshot(out, 1)).toContain("CAPSULE:ses_r")
     expect(calls.filter((c) => modeOf(c.args) === "capsule").length).toBeGreaterThan(before)
   })
 
@@ -194,7 +267,7 @@ describe("aio-context plugin", () => {
     expect(binds[0].stdin).toContain("ORIGINAL")
   })
 
-  test("missing store differs from a missing binding, and a dependency failure is explicit", async () => {
+  test("missing store differs from a missing binding, never a fabricated capsule", async () => {
     const { runner } = fakeRunner((mode, args) => {
       if (mode !== "capsule") return undefined
       const session = sessionOf(args)
@@ -207,9 +280,14 @@ describe("aio-context plugin", () => {
     const hooks = await makePlugin(runner)
 
     for (const session of ["ses_store", "ses_bad", "ses_missing"]) {
-      const out = { system: [] as string[] }
-      await hooks["experimental.chat.system.transform"]({ sessionID: session }, out)
-      expect(out.system).toEqual([]) // never a fabricated capsule, never a crash
+      const lines = await systemLines(hooks, session)
+      // Unknown (never-observed) sessions get the static orientation line and nothing else:
+      // no fabricated capsule, no invented notice, never a crash.
+      expect(lines.length).toBe(1)
+      expect(lines[0]).toContain("[aio-context]")
+      expect(lines[0]).not.toContain("capsule unavailable")
+      const delivered = await deliver(hooks, session)
+      expect(delivered.appended).toBe("")
     }
   })
 
@@ -224,15 +302,13 @@ describe("aio-context plugin", () => {
         : undefined,
     )
     const hooks = await makePlugin(runner, { capsuleMaxChars: 100 })
-    const out = { system: [] as string[] }
-    await hooks["experimental.chat.system.transform"]({ sessionID: "ses_big" }, out)
+    const delivered = await deliver(hooks, "ses_big")
 
-    const injected = out.system.join()
     // The plugin floors a tiny custom limit at MIN_CAPSULE_CHARS (600) so the protected
     // tail can never be cut; the oversized capsule is still truncated explicitly.
-    expect(injected.length).toBeLessThan(750)
-    expect(injected.length).toBeGreaterThan(600)
-    expect(injected).toContain("[capsule truncated by the plugin:")
+    expect(delivered.appended.length).toBeLessThan(900)
+    expect(delivered.appended.length).toBeGreaterThan(600)
+    expect(delivered.appended).toContain("[capsule truncated by the plugin:")
   })
 
   test("a wrong/reused profile is observed honestly: build never binds, a changed agent does", async () => {
@@ -292,14 +368,246 @@ describe("aio-context plugin", () => {
     const out = { system: [] as string[] }
     await hooks["experimental.chat.system.transform"]({}, out)
     expect(out.system).toEqual([])
+
+    const messages = { messages: [] as unknown[] }
+    await hooks["experimental.chat.messages.transform"]({}, messages)
+    expect(messages.messages).toEqual([])
     expect(calls.length).toBe(0)
+  })
+})
+
+// ── The cache discipline (2026-09-17 review repair): append-only trailing snapshots ─────────
+
+describe("aio-context plugin — append-only trailing snapshots (cache repair)", () => {
+  test("ordinary turns, tool loops and refreshes keep earlier messages byte-identical", async () => {
+    // The reviewer's reproduction: a capsule in the SYSTEM prompt changed the request prefix
+    // and re-billed the whole conversation. The repair delivers it as a trailing message; the
+    // request sequence across turns/tool loops/refreshes must stay append-only: earlier
+    // messages byte-identical, only the new suffix growing.
+    let capsuleText = "CAPSULE v1"
+    const { runner } = fakeRunner((mode, args) => {
+      if (mode === "bind") {
+        return { schema: "session-binding/v1", status: "created", native_session_id: sessionOf(args) }
+      }
+      if (mode === "capsule") {
+        return {
+          schema: "session-capsule/v1",
+          capsule_status: "composed",
+          capsule: { text: capsuleText },
+        }
+      }
+      return undefined
+    })
+    const hooks = await makePlugin(runner, { capsuleTtlMs: 0 })
+    await hooks["chat.message"](...Object.values(message("ses_seq", "aio-control", "start")))
+
+    // The runtime rebuilds the outgoing list from STORAGE on every model call (transformed
+    // entries are NOT persisted). We model storage explicitly and hand each request a FRESH,
+    // FROZEN copy — a transform that rewrote an earlier message would throw here.
+    type Entry = {
+      info: { id: string; sessionID: string; role: string; time: { created: number } }
+      parts: Array<{ type: string; text: string }>
+    }
+    const storage: Entry[] = []
+    const push = (id: string, role: string, text: string) => {
+      storage.push({
+        info: { id, sessionID: "ses_seq", role, time: { created: storage.length + 1 } },
+        parts: [{ type: "text", text }],
+      })
+    }
+    const asRequest = () => ({
+      messages: storage.map((entry) => {
+        const parts = entry.parts.map((part) => Object.freeze({ ...part }))
+        return Object.freeze({ info: Object.freeze({ ...entry.info }), parts: Object.freeze(parts) })
+      }),
+    })
+    const sent: Array<{ base: number; out: { messages: Entry[] } }> = []
+    const call = async () => {
+      const out = asRequest()
+      await hooks["experimental.chat.messages.transform"]({}, out)
+      sent.push({ base: storage.length, out })
+    }
+
+    push("u1", "user", "first request") //                   ordinary turn 1
+    await call()
+    push("a1", "assistant", "tool call") //                  tool loop, same turn
+    push("t1", "user", "tool result")
+    await call()
+    capsuleText = "CAPSULE v2 (new observation)" //          a capsule refresh between requests
+    await call()
+    push("u2", "user", "second request") //                  ordinary turn 2
+    await call()
+
+    for (let index = 0; index < sent.length; index++) {
+      const { base, out } = sent[index]
+      // Exactly one appended snapshot, at the tail.
+      expect(out.messages.length).toBe(base + 1)
+      const appended = appendedSnapshot(out, base)
+      expect(appended).toContain("[aio-context] snapshot")
+      expect(appended).toContain("CAPSULE")
+      if (index === 0) continue
+      const previous = sent[index - 1]
+      // EVERY earlier message byte-identical to its counterpart in the previous request —
+      // the prefix a provider cache matches on.
+      for (let position = 0; position < previous.base; position++) {
+        expect(JSON.stringify(out.messages[position])).toBe(
+          JSON.stringify(previous.out.messages[position]),
+        )
+      }
+      // The previous request's snapshot never reappears as carried-forward base content: the
+      // base is storage, unchanged; a fresh snapshot lives only at the tail.
+      const previousSnapshot = appendedSnapshot(previous.out, previous.base)
+      expect(previousSnapshot).toContain("[aio-context] snapshot")
+      for (let position = 0; position < base; position++) {
+        const text = out.messages[position].parts
+          .map((part) => (typeof part.text === "string" ? part.text : ""))
+          .join("\n")
+        expect(text).not.toBe(previousSnapshot)
+      }
+    }
+
+    // The refresh became a NEW entry carrying the new observation; the earlier request's
+    // appended bytes are exactly what they were.
+    expect(appendedSnapshot(sent[1].out, sent[1].base)).toContain("CAPSULE v1")
+    expect(appendedSnapshot(sent[2].out, sent[2].base)).toContain("CAPSULE v2")
+  })
+
+  test("a tail that already carries the current snapshot is never duplicated", async () => {
+    let capsuleText = "CAPSULE v1"
+    const { runner } = fakeRunner((mode, args) => {
+      if (mode === "bind") {
+        return { schema: "session-binding/v1", status: "created", native_session_id: sessionOf(args) }
+      }
+      if (mode === "capsule") {
+        return {
+          schema: "session-capsule/v1",
+          capsule_status: "composed",
+          capsule: { text: capsuleText },
+        }
+      }
+      return undefined
+    })
+    const hooks = await makePlugin(runner, { capsuleTtlMs: 0 })
+    await hooks["chat.message"](...Object.values(message("ses_idem", "aio-control", "task")))
+
+    const out = requestMessages("ses_idem", ["first"])
+    await hooks["experimental.chat.messages.transform"]({}, out)
+    const once = out.messages.length
+    const firstTail = JSON.parse(JSON.stringify(out.messages[once - 1]))
+    expect(appendedSnapshot(out, 1)).toContain("CAPSULE v1")
+
+    // The same observation twice: nothing new to say — no duplicate entry.
+    await hooks["experimental.chat.messages.transform"]({}, out)
+    expect(out.messages.length).toBe(once)
+
+    // A genuinely new observation on a persisted tail: a NEW entry is appended and the
+    // earlier snapshot stays byte-identical (append-only, never a rewrite).
+    capsuleText = "CAPSULE v2"
+    await hooks["experimental.chat.messages.transform"]({}, out)
+    expect(out.messages.length).toBe(once + 1)
+    expect(JSON.parse(JSON.stringify(out.messages[once - 1]))).toEqual(firstTail)
+    expect(appendedSnapshot(out, once)).toContain("CAPSULE v2")
+  })
+
+  test("compaction carries the capsule into the summary and the continuation gets a fresh snapshot", async () => {
+    const { runner } = fakeRunner((mode, args) => {
+      if (mode === "bind") {
+        return { schema: "session-binding/v1", status: "created", native_session_id: sessionOf(args) }
+      }
+      if (mode === "capsule") {
+        return {
+          schema: "session-capsule/v1",
+          capsule_status: "composed",
+          capsule: { text: `CAPSULE:${sessionOf(args)}` },
+        }
+      }
+      return undefined
+    })
+    const hooks = await makePlugin(runner)
+    await hooks["chat.message"](...Object.values(message("ses_comp", "aio-control", "start")))
+
+    // The compaction prompt must carry the durable session state (recovery).
+    const compactionContext = { context: [] as string[] }
+    await hooks["experimental.session.compacting"]({ sessionID: "ses_comp" }, compactionContext)
+    expect(compactionContext.context.join("\n")).toContain("CAPSULE:ses_comp")
+
+    // The synthetic continuation turn stays enabled for the coordinator…
+    const continuation = { enabled: false }
+    await hooks["experimental.compaction.autocontinue"]({ sessionID: "ses_comp" }, continuation)
+    expect(continuation.enabled).toBe(true)
+
+    // …while a worker keeps the runtime's own setting.
+    await hooks["chat.message"](...Object.values(message("ses_comp_worker", "build", "task")))
+    const workerContinuation = { enabled: false }
+    await hooks["experimental.compaction.autocontinue"](
+      { sessionID: "ses_comp_worker" },
+      workerContinuation,
+    )
+    expect(workerContinuation.enabled).toBe(false)
+
+    // The first post-compaction request (the summary + preserved tail) still receives a
+    // fresh trailing snapshot — delivery is automatic; nothing to remember.
+    const post = requestMessages("ses_comp", ["summary of what we did so far"])
+    await hooks["experimental.chat.messages.transform"]({}, post)
+    expect(appendedSnapshot(post, 1)).toContain("CAPSULE:ses_comp")
+  })
+
+  test("the delivery journal records refresh vs continuation vs unavailable", async () => {
+    const dir = tmpDir("aio-journal-")
+    try {
+      const eventsPath = path.join(dir, "events.jsonl")
+      let capsuleText = "CAPSULE one"
+      let failing = false
+      const { runner } = fakeRunner((mode, args) => {
+        if (mode === "bind") {
+          return { schema: "session-binding/v1", status: "created", native_session_id: sessionOf(args) }
+        }
+        if (mode === "capsule") {
+          if (failing) return undefined
+          return {
+            schema: "session-capsule/v1",
+            capsule_status: "composed",
+            capsule: { text: capsuleText },
+          }
+        }
+        return undefined
+      })
+      const hooks = await makePlugin(runner, { capsuleTtlMs: 0, eventsPath })
+      await hooks["chat.message"](...Object.values(message("ses_j", "aio-control", "task")))
+
+      await deliver(hooks, "ses_j") // 1: the first observation — refresh
+      await deliver(hooks, "ses_j") // 2: unchanged bytes — continuation
+      capsuleText = "CAPSULE two"
+      await deliver(hooks, "ses_j") // 3: a new observation — refresh
+      failing = true
+      await deliver(hooks, "ses_j") // 4: the composer is down — unavailable
+
+      const lines = readFileSync(eventsPath, "utf-8")
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line))
+      expect(lines.map((line) => line.kind)).toEqual([
+        "refresh",
+        "continuation",
+        "refresh",
+        "unavailable",
+      ])
+      for (const line of lines) {
+        expect(line.schema).toBe("aio-context-event/v1")
+        expect(line.session).toBe("ses_j")
+        expect(line.surface).toBe("messages.transform")
+        expect(typeof line.chars).toBe("number")
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 
 // ── Unit C repairs: handoff attachment, versioned updates, explicit unavailability ──────────
 
 import { execFileSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
@@ -320,7 +628,7 @@ function writeTaskContext(projectDir: string, context: Record<string, unknown>) 
 function makePluginAt(runner: unknown, projectDir: string, options: Record<string, unknown> = {}) {
   return (AioContextPlugin as unknown as (ctx: unknown, opts: unknown) => Promise<any>)(
     { directory: projectDir, worktree: projectDir },
-    { commandRunner: runner, capsuleTtlMs: 60_000, ...options },
+    { commandRunner: runner, capsuleTtlMs: 60_000, eventsPath: null, ...options },
   )
 }
 
@@ -408,7 +716,7 @@ describe("aio-context plugin — handoff attachment and versioned context", () =
     }
   })
 
-  test("a dependency failure injects an explicit unavailable notice for the AIO session", async () => {
+  test("a dependency failure appends an explicit unavailable notice for the AIO session", async () => {
     const { runner } = fakeRunner((mode, args) => {
       if (mode === "bind") {
         return { schema: "session-binding/v1", status: "store_missing", warnings: ["root absent"] }
@@ -421,16 +729,19 @@ describe("aio-context plugin — handoff attachment and versioned context", () =
     const hooks = await makePlugin(runner)
     const context = message("ses_fail", "aio-control", "do it")
     await hooks["chat.message"](...Object.values(context))
-    const out = { system: [] as string[] }
-    await hooks["experimental.chat.system.transform"]({ sessionID: "ses_fail" }, out)
-    expect(out.system.join()).toContain("[aio-context] capsule unavailable:")
-    expect(out.system.join()).toContain("store_missing")
+    const delivered = await deliver(hooks, "ses_fail")
+    expect(delivered.appended).toContain("[aio-context] capsule unavailable:")
+    expect(delivered.appended).toContain("store_missing")
+    // The system prompt stays static in the failure case too — the notice must not leak in.
+    const lines = await systemLines(hooks, "ses_fail")
+    expect(lines.join()).not.toContain("store_missing")
 
     // A worker session gets no such notice (it is not the AIO boundary).
     await hooks["chat.message"](...Object.values(message("ses_worker2", "build", "task")))
-    const workerOut = { system: [] as string[] }
-    await hooks["experimental.chat.system.transform"]({ sessionID: "ses_worker2" }, workerOut)
-    expect(workerOut.system).toEqual([])
+    const workerLines = await systemLines(hooks, "ses_worker2")
+    const workerDelivered = await deliver(hooks, "ses_worker2")
+    expect(workerLines).toEqual([])
+    expect(workerDelivered.appended).toBe("")
   })
 
   test("the REAL runner enforces its deadline and surfaces the timeout", async () => {
@@ -443,10 +754,9 @@ describe("aio-context plugin — handoff attachment and versioned context", () =
         { python: "bash", sessionOpen: hang, commandTimeoutMs: 300, capsuleTtlMs: 0 },
       )
       await hooks["chat.message"](...Object.values(message("ses_hang", "aio-control", "task")))
-      const out = { system: [] as string[] }
-      await hooks["experimental.chat.system.transform"]({ sessionID: "ses_hang" }, out)
-      expect(out.system.join()).toContain("[aio-context] capsule unavailable:")
-      expect(out.system.join()).toContain("timed out after 300ms")
+      const delivered = await deliver(hooks, "ses_hang")
+      expect(delivered.appended).toContain("[aio-context] capsule unavailable:")
+      expect(delivered.appended).toContain("timed out after 300ms")
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -454,7 +764,7 @@ describe("aio-context plugin — handoff attachment and versioned context", () =
 })
 
 describe("aio-context plugin — full native path (real CLI, temporary knowledge store)", () => {
-  test("a selected finding and predecessor reach the injected system text", async () => {
+  test("a selected finding and predecessor reach the delivered snapshot text", async () => {
     const root = tmpDir("aio-integration-")
     const store = path.join(root, "kb")
     const project = path.join(root, "project")
@@ -544,9 +854,9 @@ describe("aio-context plugin — full native path (real CLI, temporary knowledge
       await hooks["chat.message"](
         ...Object.values(message("ses_integration", "aio-control", "Execute Unit C repairs.")),
       )
-      const out = { system: [] as string[] }
-      await hooks["experimental.chat.system.transform"]({ sessionID: "ses_integration" }, out)
-      const injected = out.system.join("\n")
+      const out = requestMessages("ses_integration", ["Execute Unit C repairs."])
+      await hooks["experimental.chat.messages.transform"]({}, out)
+      const injected = appendedSnapshot(out, 1)
 
       expect(injected).toContain("CONSTRAINT-FROM-FINDING: never deploy on Fridays")
       expect(injected).toContain("NEVER DEPLOY IN PRODUCTION")
@@ -671,25 +981,22 @@ describe("aio-context plugin — handoff selection by session (reviewer repair)"
         native_session_id: "ses_r", task: "t", work_unit: "v2", context_version: 2,
       })
       await hooks["chat.message"](...Object.values(message("ses_r", "aio-control", "continue")))
-      const failed = { system: [] as string[] }
-      await hooks["experimental.chat.system.transform"]({ sessionID: "ses_r" }, failed)
-      expect(failed.system.join()).toContain("CAPSULE")
-      expect(failed.system.join()).toContain("context update failed")
-      expect(failed.system.join()).toContain("context version 1 remains active")
+      const failed = await deliver(hooks, "ses_r")
+      expect(failed.appended).toContain("CAPSULE")
+      expect(failed.appended).toContain("context update failed")
+      expect(failed.appended).toContain("context version 1 remains active")
 
       // A second request within the cache lifetime must warn TOO (reviewer repair).
-      const cachedRequest = { system: [] as string[] }
-      await hooks["experimental.chat.system.transform"]({ sessionID: "ses_r" }, cachedRequest)
-      expect(cachedRequest.system.join()).toContain("CAPSULE")
-      expect(cachedRequest.system.join()).toContain("context version 1 remains active")
+      const cachedRequest = await deliver(hooks, "ses_r")
+      expect(cachedRequest.appended).toContain("CAPSULE")
+      expect(cachedRequest.appended).toContain("context version 1 remains active")
 
       // Reconciliation: the same update now succeeds — the notice clears.
       updateShouldFail = false
       await hooks["chat.message"](...Object.values(message("ses_r", "aio-control", "continue again")))
-      const recovered = { system: [] as string[] }
-      await hooks["experimental.chat.system.transform"]({ sessionID: "ses_r" }, recovered)
-      expect(recovered.system.join()).toContain("CAPSULE")
-      expect(recovered.system.join()).not.toContain("context update failed")
+      const recovered = await deliver(hooks, "ses_r")
+      expect(recovered.appended).toContain("CAPSULE")
+      expect(recovered.appended).not.toContain("context update failed")
     } finally {
       rmSync(project, { recursive: true, force: true })
     }
@@ -715,9 +1022,8 @@ describe("aio-context plugin — handoff selection by session (reviewer repair)"
         const bind = calls.filter((c) => modeOf(c.args) === "bind").find((c) => sessionOf(c.args) === session)!
         expect(bind.args).not.toContain("--acceptance")
         expect(bind.args).not.toContain("--predecessor-slug")
-        const out = { system: [] as string[] }
-        await hooks["experimental.chat.system.transform"]({ sessionID: session }, out)
-        expect(out.system.join()).toContain("an initial handoff must name the native session id")
+        const delivered = await deliver(hooks, session)
+        expect(delivered.appended).toContain("an initial handoff must name the native session id")
       }
     } finally {
       rmSync(project, { recursive: true, force: true })
@@ -899,9 +1205,8 @@ describe("aio-context plugin — handoff selection by session (reviewer repair)"
 
       // NO update call: the durable project P2 must never be overwritten by the stale P1.
       expect(calls.some((c) => modeOf(c.args) === "update-context")).toBe(false)
-      const rendered = { system: [] as string[] }
-      await hooks["experimental.chat.system.transform"]({ sessionID: "ses_ext" }, rendered)
-      expect(rendered.system.join()).toContain("does not match the binding's project")
+      const rendered = await deliver(hooks, "ses_ext")
+      expect(rendered.appended).toContain("does not match the binding's project")
     } finally {
       rmSync(project, { recursive: true, force: true })
     }
@@ -969,9 +1274,9 @@ describe("aio-context plugin — handoff selection by session (reviewer repair)"
         // "continue" with the UNCHANGED attachment: the durable's progress stands.
         await hooks["chat.message"](...Object.values(message("ses_fresh", "aio-control", "continue")))
         expect(calls.some((c) => modeOf(c.args) === "update-context")).toBe(false)
-        const rendered = { system: [] as string[] }
-        await hooks["experimental.chat.system.transform"]({ sessionID: "ses_fresh" }, rendered)
-        expect(rendered.system.join()).not.toContain("context update failed")
+        const rendered = await deliver(hooks, "ses_fresh")
+        expect(rendered.appended).toContain("[aio-context] snapshot")
+        expect(rendered.appended).not.toContain("context update failed")
       } finally {
         rmSync(project, { recursive: true, force: true })
       }
@@ -1053,9 +1358,8 @@ describe("aio-context plugin — handoff selection by session (reviewer repair)"
       calls.length = 0
       await second["chat.message"](...Object.values(message("ses_conf", "aio-control", "continue")))
       expect(calls.some((c) => modeOf(c.args) === "update-context")).toBe(false)
-      const rendered = { system: [] as string[] }
-      await second["experimental.chat.system.transform"]({ sessionID: "ses_conf" }, rendered)
-      expect(rendered.system.join()).toContain("not replaying stale fields")
+      const rendered = await deliver(second, "ses_conf")
+      expect(rendered.appended).toContain("not replaying stale fields")
     } finally {
       rmSync(project, { recursive: true, force: true })
     }
@@ -1118,16 +1422,14 @@ describe("aio-context plugin — handoff selection by session (reviewer repair)"
       await hooks["chat.message"](...Object.values(message("ses_conc", "aio-control", "continue")))
       // attempt 0 reads auth-1 → conflict; attempt 1 reads auth-2 → SURFACE, no second write.
       expect(calls.filter((c) => modeOf(c.args) === "update-context").length).toBe(1)
-      const rendered = { system: [] as string[] }
-      await hooks["experimental.chat.system.transform"]({ sessionID: "ses_conc" }, rendered)
-      expect(rendered.system.join()).toContain("changed concurrently")
+      const rendered = await deliver(hooks, "ses_conc")
+      expect(rendered.appended).toContain("changed concurrently")
       // The conflict stays VISIBLE and is not retried on the next message either.
       calls.length = 0
       await hooks["chat.message"](...Object.values(message("ses_conc", "aio-control", "continue")))
       expect(calls.filter((c) => modeOf(c.args) === "update-context").length).toBe(0)
-      const again = { system: [] as string[] }
-      await hooks["experimental.chat.system.transform"]({ sessionID: "ses_conc" }, again)
-      expect(again.system.join()).toContain("changed concurrently")
+      const again = await deliver(hooks, "ses_conc")
+      expect(again.appended).toContain("changed concurrently")
     } finally {
       rmSync(project, { recursive: true, force: true })
     }
@@ -1190,9 +1492,9 @@ describe("aio-context plugin — handoff selection by session (reviewer repair)"
       const updateCalls = calls.filter((c) => modeOf(c.args) === "update-context")
       expect(updateCalls.length).toBe(2) // attempted, conflicted, retried
       expect(flagOf(updateCalls[1].args, "--expected-version")).toBe("3") // the fresh version
-      const rendered = { system: [] as string[] }
-      await hooks["experimental.chat.system.transform"]({ sessionID: "ses_prog" }, rendered)
-      expect(rendered.system.join()).not.toContain("context update failed")
+      const rendered = await deliver(hooks, "ses_prog")
+      expect(rendered.appended).toContain("[aio-context] snapshot")
+      expect(rendered.appended).not.toContain("context update failed")
     } finally {
       rmSync(project, { recursive: true, force: true })
     }
@@ -1254,9 +1556,8 @@ describe("aio-context plugin — handoff selection by session (reviewer repair)"
       calls.length = 0
       await second["chat.message"](...Object.values(message("ses_nv", "aio-control", "continue")))
       expect(calls.some((c) => modeOf(c.args) === "update-context")).toBe(false)
-      const rendered = { system: [] as string[] }
-      await second["experimental.chat.system.transform"]({ sessionID: "ses_nv" }, rendered)
-      expect(rendered.system.join()).toContain("not replaying stale fields")
+      const rendered = await deliver(second, "ses_nv")
+      expect(rendered.appended).toContain("not replaying stale fields")
     } finally {
       rmSync(project, { recursive: true, force: true })
     }
@@ -1333,9 +1634,8 @@ describe("aio-context plugin — handoff selection by session (reviewer repair)"
       const before = writes.n
       await second["chat.message"](...Object.values(message("ses_cr", "aio-control", "continue")))
       expect(writes.n).toBe(before) // the stale attachment stays rejected
-      const rendered = { system: [] as string[] }
-      await second["experimental.chat.system.transform"]({ sessionID: "ses_cr" }, rendered)
-      expect(rendered.system.join()).toContain("changed concurrently")
+      const rendered = await deliver(second, "ses_cr")
+      expect(rendered.appended).toContain("changed concurrently")
     } finally {
       rmSync(project, { recursive: true, force: true })
     }

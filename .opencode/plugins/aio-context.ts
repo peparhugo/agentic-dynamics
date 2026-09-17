@@ -19,12 +19,34 @@
  *    Worker sessions are observed honestly and never bound.
  *
  *  - `experimental.chat.system.transform` — receives an optional `sessionID` (no agent).
- *    With identity and a durable binding, compose the capsule (`session_open.py --capsule`)
- *    and append it to `output.system`. Auxiliary calls without identity are skipped, and a
- *    known worker session is skipped without a store read. The hook runs on every request, so
- *    a post-compaction request re-appends the capsule from the durable binding. For a known
- *    AIO session whose capsule cannot be composed, a short explicit UNAVAILABLE notice is
- *    injected instead of silence (a dependency failure must not disappear).
+ *    The system prompt is DURABLE TEXT ONLY: this hook adds ONE static line. Everything
+ *    volatile — the capsule snapshot (observation timestamp, budget counters, control
+ *    packet), context-update failures, unavailability notices — is delivered as a TRAILING
+ *    MESSAGE (`experimental.chat.messages.transform`). A system prompt that changes between
+ *    requests invalidates the provider's prefix cache for the ENTIRE conversation (DeepSeek
+ *    matches prefixes; the 2026-09-17 review measured the volatile capsule breaking the
+ *    cache ~41 characters in), while a trailing snapshot costs only its own tokens.
+ *
+ *  - `experimental.chat.messages.transform` — `input` carries no session id; it is derived
+ *    from the message `info`. With identity and an unknown-or-AIO agent, compose the capsule
+ *    (`session_open.py --capsule`) and APPEND one trailing entry (role `user`, explicitly
+ *    marked machine-injected). Earlier messages are never rewritten or removed: a new
+ *    observation becomes a new entry, so the outgoing request sequence stays append-only and
+ *    the cached prefix keeps matching. Auxiliary calls without identity and known worker
+ *    sessions are skipped. For a known AIO session whose capsule cannot be composed, a short
+ *    explicit UNAVAILABLE notice is appended instead of silence (a dependency failure must
+ *    not disappear).
+ *
+ *  - `experimental.session.compacting` — the capsule joins the compaction prompt context so
+ *    the resulting summary carries the durable session state; and
+ *    `experimental.compaction.autocontinue` keeps the synthetic continuation turn enabled
+ *    for a known coordinator session (the first post-compaction request then receives a
+ *    fresh trailing snapshot automatically).
+ *
+ *  - The append journal (`.opencode/aio-context-events.jsonl`, best-effort) records every
+ *    delivery (refresh | continuation | unavailable | compaction) so the session-DB cache
+ *    report can join prompt composition with provider cache accounting — the one measurement
+ *    that keeps this defect from coming back unseen.
  *
  *  - `tool.execute.before` — the early consequential-submit check: an AIO session with no
  *    binding refuses `run_workflow` with an explicit message. Convenience + early warning
@@ -61,6 +83,22 @@ const CAPSULE_MAX_CHARS = 16_000
  *  preservation. Small custom limits are raised to the floor. */
 const MIN_CAPSULE_CHARS = 600
 
+/** The event journal: one line per delivery, written beside the plugin's other runtime
+ *  state. Append-only; ~200 bytes per model call. */
+const EVENTS_FILE = ".opencode/aio-context-events.jsonl"
+
+/** The ONE line the system prompt carries — byte-stable on every request, every session.
+ *  Nothing volatile may precede the conversation: the provider's prefix cache matches from
+ *  the first token, so a changing system prompt re-bills the ENTIRE context. */
+const SYSTEM_NOTICE =
+  "[aio-context] Machine-injected session snapshots arrive as trailing messages (not " +
+  "operator input); the newest one is current state. This system prompt is intentionally " +
+  "static so provider prefix caches keep matching."
+
+/** The marker every trailing snapshot entry starts with (identification + orientation). */
+const SNAPSHOT_HEADER =
+  "[aio-context] snapshot — machine-injected session state (not operator input)"
+
 /** Hard deadline for ONE companion command (a hung child must not hang the session). */
 const COMMAND_TIMEOUT_MS = 15_000
 
@@ -91,6 +129,8 @@ type AioContextOptions = {
   capsuleMaxChars?: number
   commandTimeoutMs?: number
   maxOutputBytes?: number
+  /** The append journal path; `null` disables journaling (tests). */
+  eventsPath?: string | null
   commandRunner?: CommandRunner
 }
 
@@ -173,6 +213,11 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
   const failures = new Map<string, string>()
   /** Per-session composed capsule (or a negative result + notice) with a TTL. */
   const capsules = new Map<string, { text: string | null; notice: string | null; at: number }>()
+  /** The snapshot body delivered for the session's PREVIOUS request — the journal's
+   *  refresh-vs-continuation discriminator (in-process; a restart re-classifies once). */
+  const lastDelivery = new Map<string, string>()
+  /** Monotone id source for the synthetic snapshot entries (ids are not persisted). */
+  let snapshotSeq = 0
 
   function baseArgs(): string[] {
     const args = [python, sessionOpen]
@@ -658,6 +703,119 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
     return { text, notice: null }
   }
 
+  /** Best-effort append to the delivery journal — the composition record the session-DB
+   *  cache report joins against. A failed write never blocks delivery. */
+  async function journalEvent(
+    sessionID: string,
+    event: string,
+    kind: string,
+    chars: number,
+    surface = "messages.transform",
+  ): Promise<void> {
+    if (opts.eventsPath === null) return
+    try {
+      const { appendFileSync, mkdirSync } = await import("node:fs")
+      const path = opts.eventsPath ?? `${ctx.worktree ?? ctx.directory}/${EVENTS_FILE}`
+      mkdirSync(path.slice(0, path.lastIndexOf("/")), { recursive: true })
+      appendFileSync(
+        path,
+        JSON.stringify({
+          schema: "aio-context-event/v1",
+          at: new Date().toISOString(),
+          session: sessionID,
+          event,
+          kind,
+          chars,
+          surface,
+        }) + "\n",
+      )
+    } catch {
+      // Best-effort: the journal is diagnostics, never a delivery dependency.
+    }
+  }
+
+  /** The bounded snapshot body for one request: the composed capsule (or its explicit
+   *  unavailability) plus any retained context-update failure. Volatile text lives HERE and
+   *  nowhere else — never in the system prompt. */
+  function snapshotBody(
+    text: string | null,
+    notice: string | null,
+    failure: string | undefined,
+    version: number | undefined,
+    isKnownAio: boolean,
+  ): string {
+    const lines: string[] = []
+    if (text) {
+      lines.push(`${SNAPSHOT_HEADER}\n${text}`)
+      if (failure) {
+        lines.push(
+          `[aio-context] context update failed: ${failure} — context version ` +
+            `${version ?? "unknown"} remains active`,
+        )
+      }
+    } else if (isKnownAio) {
+      lines.push(
+        `[aio-context] capsule unavailable: ` +
+          `${notice ?? failure ?? "no durable binding for this session"}`,
+      )
+    }
+    return lines.join("\n")
+  }
+
+  /** Compose (or reuse the TTL-cached) snapshot body for one session. */
+  async function deliverSnapshot(sessionID: string, isKnownAio: boolean): Promise<string> {
+    const cached = capsules.get(sessionID)
+    if (cached && Date.now() - cached.at < ttlMs) {
+      return snapshotBody(
+        cached.text,
+        cached.notice,
+        failures.get(sessionID),
+        contextVersions.get(sessionID),
+        isKnownAio,
+      )
+    }
+    const composed = await composeCapsuleText(sessionID)
+    const notice = composed.notice || failures.get(sessionID) || null
+    capsules.set(sessionID, { text: composed.text, notice, at: Date.now() })
+    return snapshotBody(
+      composed.text,
+      notice,
+      failures.get(sessionID),
+      contextVersions.get(sessionID),
+      isKnownAio,
+    )
+  }
+
+  /** The session id the messages belong to (the transform's input carries none). */
+  function sessionIdOf(messages: Array<{ info?: { sessionID?: unknown } }>): string {
+    for (let index = messages.length - 1; index >= 0; index--) {
+      const id = String(messages[index]?.info?.sessionID ?? "").trim()
+      if (id) return id
+    }
+    return ""
+  }
+
+  /** The text of an entry's first text part ("" when it has none). */
+  function snapshotTextOf(entry: { parts?: Array<{ type?: string; text?: unknown }> }): string {
+    const part = (entry.parts ?? []).find((candidate) => candidate?.type === "text")
+    return part && typeof part.text === "string" ? part.text : ""
+  }
+
+  /** One trailing snapshot entry (role `user`; the runtime converts `info.id`/`role` and
+   *  text parts to a user message — verified against the deployed 1.18.15 bundle). */
+  function snapshotEntry(sessionID: string, text: string) {
+    snapshotSeq += 1
+    return {
+      info: {
+        id: `aio-capsule-${snapshotSeq}`,
+        sessionID,
+        role: "user",
+        time: { created: Date.now() },
+      },
+      parts: [{ type: "text", text }],
+    }
+  }
+
   return {
     "chat.message": async (input, output) => {
       const sessionID = input.sessionID
@@ -714,40 +872,71 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
       const sessionID = input?.sessionID
       if (!sessionID) return // auxiliary call without identity — never inject
       if (!Array.isArray(output?.system)) return
-      // A session already observed as a worker gets no coordinator capsule, no store read.
+      // A session already observed as a worker gets nothing.
       const knownAgent = agents.get(sessionID)
       if (knownAgent && knownAgent !== aioAgent) return
-      const emit = (text: string | null, notice: string | null) => {
-        if (text) {
-          output.system.push(text)
-          // The failure notice rides BOTH the fresh and the cached paths, until a
-          // reconciliation succeeds (reviewer repair: a cached request dropped the warning).
-          const failure = failures.get(sessionID)
-          if (failure) {
-            const active = contextVersions.get(sessionID)
-            output.system.push(
-              `[aio-context] context update failed: ${failure} — context version ` +
-                `${active ?? "unknown"} remains active`,
-            )
-          }
-        } else if (knownAgent === aioAgent) {
-          // Dependency failures must not disappear: a known AIO session gets an explicit,
-          // short unavailable notice instead of an empty system prompt.
-          output.system.push(
-            `[aio-context] capsule unavailable: ${notice ?? "no durable binding for this session"}`,
-          )
-        }
-      }
-      const cached = capsules.get(sessionID)
-      if (cached && Date.now() - cached.at < ttlMs) {
-        emit(cached.text, cached.notice)
-        return
-      }
-      const { text, notice } = await composeCapsuleText(sessionID)
-      const failure = failures.get(sessionID)
-      const effectiveNotice = notice || failure || null
-      capsules.set(sessionID, { text, notice: effectiveNotice, at: Date.now() })
-      emit(text, effectiveNotice)
+      // DURABLE TEXT ONLY (2026-09-17 cache repair): the capsule, its observation timestamp,
+      // budget counters, the control packet, and every notice live in the TRAILING snapshot
+      // message. One constant line orients the model; it never changes, so it can never
+      // invalidate the provider's prefix cache.
+      output.system.push(SYSTEM_NOTICE)
+    },
+
+    "experimental.chat.messages.transform": async (_input, output) => {
+      if (!Array.isArray(output?.messages) || output.messages.length === 0) return
+      const sessionID = sessionIdOf(output.messages)
+      if (!sessionID) return
+      // Worker sessions (and only workers) are excluded — same boundary as the capsule.
+      const knownAgent = agents.get(sessionID)
+      if (knownAgent && knownAgent !== aioAgent) return
+      const body = await deliverSnapshot(sessionID, knownAgent === aioAgent)
+      if (!body) return
+      // APPEND-ONLY DISCIPLINE (the cache property this repair exists for): the snapshot is
+      // ADDED as a new trailing entry; no earlier message is rewritten or removed. A runtime
+      // that persisted transformed messages keeps every earlier snapshot untouched — a
+      // current tail is left alone, a new observation becomes a NEW entry.
+      const tail = output.messages[output.messages.length - 1]
+      if (tail && snapshotTextOf(tail) === body) return
+      output.messages.push(
+        snapshotEntry(sessionID, body) as unknown as (typeof output.messages)[number],
+      )
+      const previous = lastDelivery.get(sessionID)
+      lastDelivery.set(sessionID, body)
+      const kind =
+        previous === body
+          ? "continuation"
+          : body.startsWith(SNAPSHOT_HEADER)
+            ? "refresh"
+            : "unavailable"
+      await journalEvent(sessionID, "append", kind, body.length)
+    },
+
+    "experimental.session.compacting": async (input, output) => {
+      const sessionID = input?.sessionID
+      if (!sessionID) return
+      if (!Array.isArray(output?.context)) return
+      const knownAgent = agents.get(sessionID)
+      if (knownAgent && knownAgent !== aioAgent) return
+      // Post-compaction recovery: the capsule joins the compaction prompt so the summary
+      // carries the durable session state; the synthetic continuation request (below) then
+      // receives a fresh trailing snapshot from `messages.transform`.
+      const body = await deliverSnapshot(sessionID, knownAgent === aioAgent)
+      if (!body) return
+      output.context.push(
+        "[aio-context] durable session state at compaction (machine-injected; the " +
+          `compaction summary must carry it):\n${body}`,
+      )
+      await journalEvent(sessionID, "compaction", "compaction", body.length, "session.compacting")
+    },
+
+    "experimental.compaction.autocontinue": async (input, output) => {
+      const sessionID = input?.sessionID
+      if (!sessionID) return
+      if (agents.get(sessionID) !== aioAgent) return
+      // The coordinator's continuity must not silently park on compaction: keep the synthetic
+      // continuation turn enabled (the default) explicitly for a known AIO session. Workers
+      // and unknown sessions keep the runtime's own setting.
+      output.enabled = true
     },
 
     "tool.execute.before": async (input) => {
