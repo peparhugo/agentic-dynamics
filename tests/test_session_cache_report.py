@@ -87,16 +87,26 @@ def _user(con: sqlite3.Connection, *, mid: str, created: int, session: str = "se
     )
 
 
-def _event(at_ms: int, *, session: str = "ses_a", kind: str = "refresh", surface: str = "messages.transform") -> dict:
-    return {
+def _event(
+    at_ms: int,
+    *,
+    session: str = "ses_a",
+    kind: str = "refresh",
+    surface: str = "messages.transform",
+    message: str = "",
+) -> dict:
+    event = {
         "schema": "aio-context-event/v1",
         "at": _iso(at_ms),
         "session": session,
-        "event": "append",
+        "event": "attach" if surface == "chat.message" else "append",
         "kind": kind,
         "chars": 120,
         "surface": surface,
     }
+    if message:
+        event["message"] = message
+    return event
 
 
 def _write_events(path: Path, events: list[dict]) -> None:
@@ -107,19 +117,26 @@ def test_formula_and_cohorts_join_the_journal(tmp_path, mod):
     db = tmp_path / "opencode.db"
     con = _make_db(db)
     con.execute("INSERT INTO session (id, time_updated) VALUES ('ses_a', ?)", (BASE,))
-    # The per-turn user-message timeline anchors the attach join.
+    # The per-turn user-message ids anchor the identity join. NOTE the ordering the runtime
+    # actually produces: `time.created` is stamped BEFORE the chat.message hook runs, so a
+    # delivery event's `at` is GREATER than its user message's created (reviewer repair).
     _user(con, mid="u1", created=BASE - 1_000)  # turn 1: no attach (legacy shape)
-    _message(con, mid="m1", created=BASE, hit=100, miss=900)
+    _message(con, mid="m1", created=BASE, hit=100, miss=900)  # first request of the turn
+    _message(con, mid="m1b", created=BASE + 100, hit=10, miss=10)  # later tool-loop request
     _message(con, mid="m_pending", created=BASE + 500)  # zero-token block: not measured
-    _user(con, mid="u2", created=BASE + 900)  # turn 2: an attach precedes it
-    _message(con, mid="m2", created=BASE + 1_000, hit=1_000, miss=0)
+    _user(con, mid="u2", created=BASE + 900)  # turn 2: an attach follows its creation
+    _message(con, mid="m2", created=BASE + 1_000, hit=1_000, miss=0)  # first request
+    _message(con, mid="m2b", created=BASE + 1_100, hit=20, miss=20)  # later request: reuse
     # A compaction summary and the post-compaction recovery request (its synthetic
     # continuation is a user message with no attach).
     _message(con, mid="m3", created=BASE + 2_000, hit=0, miss=5_000, mode="compaction", summary=True)
     _user(con, mid="u3", created=BASE + 2_900)
     _message(con, mid="m4", created=BASE + 3_000, hit=200, miss=300)
-    # A request outside any journal window: honestly unclassified.
+    # A request whose turn has no delivery event: honestly unclassified.
     _message(con, mid="m5", created=BASE + 4_000, hit=500, miss=500)
+    # A continuation turn (no attach) whose fallback append carries the delivery.
+    _user(con, mid="u4", created=BASE + 4_900)
+    _message(con, mid="m6", created=BASE + 5_000, hit=50, miss=50)
     con.commit()
     con.close()
 
@@ -127,14 +144,16 @@ def test_formula_and_cohorts_join_the_journal(tmp_path, mod):
     _write_events(
         events,
         [
-            # m1's turn carries no attach: the fallback append classifies it.
-            _event(BASE + 50, kind="refresh"),
-            # m2's turn: a PERSISTED attach (chat.message) precedes its user message — the
-            # attach wins over any append in the same request window (the ordinary path).
-            _event(BASE + 850, kind="continuation", surface="chat.message"),
-            _event(BASE + 1_050, kind="refresh"),
+            # Turn u1 carries no attach: the fallback append (journaled with the user id)
+            # classifies its FIRST request; the later request is unclassified (no delivery).
+            _event(BASE + 50, kind="refresh", message="u1"),
+            # Turn u2: a PERSISTED attach follows the user message — joined by IDENTITY, so
+            # the first request is the continuation, and the later request is `reuse`.
+            _event(BASE + 950, kind="continuation", surface="chat.message", message="u2"),
             # A compaction-hook event is NOT a per-request delivery: it must be ignored.
             _event(BASE + 2_050, kind="compaction", surface="session.compacting"),
+            # Turn u4: the recovery fallback appends (journaled with the user id).
+            _event(BASE + 5_050, kind="refresh", message="u4"),
         ],
     )
 
@@ -142,20 +161,22 @@ def test_formula_and_cohorts_join_the_journal(tmp_path, mod):
         db, events, session_ids=["ses_a"], recent=0, everything=False, big_miss_tokens=5_000
     )
     cohorts = report["cohorts"]
-    assert report["overall"]["requests"] == 5  # the pending block is skipped
-    assert cohorts["refresh"]["requests"] == 1
-    assert cohorts["refresh"]["miss_tokens"] == 900
-    assert cohorts["refresh"]["hit_tokens"] == 100
-    assert cohorts["continuation"]["requests"] == 1
+    assert report["overall"]["requests"] == 8  # the pending block is skipped
+    assert cohorts["refresh"]["requests"] == 2  # m1 (append) + m6 (append)
+    assert cohorts["refresh"]["hit_tokens"] == 150
+    assert cohorts["refresh"]["miss_tokens"] == 950
+    assert cohorts["continuation"]["requests"] == 1  # m2 (the attach, first request of u2)
     assert cohorts["continuation"]["miss_rate"] == 0.0
+    assert cohorts["reuse"]["requests"] == 1  # m2b — same-turn reuse, not a delivery
+    assert cohorts["reuse"]["miss_rate"] == 0.5
     assert cohorts["compaction"]["requests"] == 2  # the summary + the recovery request
     assert cohorts["compaction"]["miss_tokens"] == 5_300
     assert cohorts["compaction"]["big_misses"] == 1  # the summary call (5,000 >= threshold)
-    assert cohorts["unclassified"]["requests"] == 1
+    assert cohorts["unclassified"]["requests"] == 2  # m1b (no delivery) + m5 (no turn event)
     # The formula, token-weighted: sum(miss) / (sum(hit) + sum(miss)).
-    assert report["overall"]["hit_tokens"] == 1_800
-    assert report["overall"]["miss_tokens"] == 6_700
-    assert report["overall"]["miss_rate"] == pytest.approx(6_700 / 8_500)
+    assert report["overall"]["hit_tokens"] == 1_880
+    assert report["overall"]["miss_tokens"] == 6_780
+    assert report["overall"]["miss_rate"] == pytest.approx(6_780 / 8_660)
     assert report["sessions"][0]["session_id"] == "ses_a"
     assert report["formula"].startswith("sum(miss_tokens)")
 

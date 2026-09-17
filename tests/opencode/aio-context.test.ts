@@ -558,6 +558,54 @@ describe("aio-context plugin — append-only trailing snapshots (cache repair)",
     expect(continuation.messages.length).toBe(3)
   })
 
+  test("a transient capsule failure recovers automatically — no new user message required", async () => {
+    // The reviewer's finding (2026-09-17): an unavailable notice is NOT a delivered
+    // snapshot. It must not block the recovery attempt — the next request in the same
+    // autonomous turn composes again and appends the recovered capsule.
+    let failing = true
+    const { runner } = fakeRunner((mode, args) => {
+      if (mode === "bind") {
+        return { schema: "session-binding/v1", status: "created", native_session_id: sessionOf(args) }
+      }
+      if (mode === "capsule") {
+        if (failing) return undefined
+        return {
+          schema: "session-capsule/v1",
+          capsule_status: "composed",
+          capsule: { text: "CAPSULE:recovered" },
+        }
+      }
+      return undefined
+    })
+    const hooks = await makePlugin(runner, { capsuleTtlMs: 0 })
+
+    // The user message arrives while the composer is DOWN: its part carries the notice.
+    const attached = await attach(hooks, "ses_rec", "aio-control", "start", "m1")
+    expect(attached.attached).toContain("capsule unavailable")
+
+    const withPersistedParts = () => ({
+      messages: [
+        {
+          info: { id: "m1", sessionID: "ses_rec", role: "user", time: { created: 1 } },
+          parts: attached.parts.map((part: any) => ({ ...part })),
+        },
+      ],
+    })
+
+    // While still failing: the retry runs, the already-delivered notice is not duplicated.
+    const stillFailing = withPersistedParts()
+    await hooks["experimental.chat.messages.transform"]({}, stillFailing)
+    expect(stillFailing.messages.length).toBe(1)
+
+    // The backend recovers. The NEXT request of the SAME turn (no new user message)
+    // appends the recovered capsule automatically.
+    failing = false
+    const recovered = withPersistedParts()
+    await hooks["experimental.chat.messages.transform"]({}, recovered)
+    expect(recovered.messages.length).toBe(2)
+    expect(appendedSnapshot(recovered, 1)).toContain("CAPSULE:recovered")
+  })
+
   test("compaction carries the capsule into the summary and the continuation gets a fresh snapshot", async () => {
     const { runner } = fakeRunner((mode, args) => {
       if (mode === "bind") {
@@ -653,6 +701,9 @@ describe("aio-context plugin — append-only trailing snapshots (cache repair)",
         "chat.message",
         "messages.transform",
       ])
+      // Every delivery journals the user message it serves — the identity the cache report
+      // joins on (the attach for m1..m4; the fallback append for the request's msg_1).
+      expect(lines.map((line) => line.message)).toEqual(["m1", "m2", "m3", "m4", "msg_1"])
       for (const line of lines) {
         expect(line.schema).toBe("aio-context-event/v1")
         expect(line.session).toBe("ses_j")

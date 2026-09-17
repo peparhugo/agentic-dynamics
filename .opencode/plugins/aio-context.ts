@@ -39,11 +39,13 @@
  *
  *  - `experimental.chat.messages.transform` — the RECOVERY fallback. `input` carries no
  *    session id; it is derived from the message `info`. When the request's latest user message
- *    already carries a snapshot part (the ordinary path), the outgoing list is left byte-pure
- *    — exactly the stored conversation. Only when it does NOT (the post-compaction synthetic
- *    continuation, a restored pre-compaction message, or legacy history) a single trailing
- *    snapshot entry is appended, so recovery never depends on the summary alone. Auxiliary
- *    calls without identity and known worker sessions are skipped.
+ *    carries a SUCCESSFUL snapshot part (the ordinary path), the outgoing list is left
+ *    byte-pure — exactly the stored conversation. Otherwise (the post-compaction synthetic
+ *    continuation, a restored pre-compaction message, legacy history, or an UNAVAILABILITY
+ *    notice left by a transient compose failure) the capsule is composed again: a recovered
+ *    capsule is appended automatically — no new user message required — while a still-failing
+ *    compose surfaces at most one notice per turn. Auxiliary calls without identity and known
+ *    worker sessions are skipped.
  *
  *  - `experimental.session.compacting` — the capsule joins the compaction prompt context so
  *    the resulting summary carries the durable session state; and
@@ -719,6 +721,7 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
     kind: string,
     chars: number,
     surface = "messages.transform",
+    messageID = "",
   ): Promise<void> {
     if (opts.eventsPath === null) return
     try {
@@ -735,6 +738,10 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
           kind,
           chars,
           surface,
+          // The turn's user message id: the cache report joins deliveries by IDENTITY, not
+          // by timestamp (the runtime stamps `time.created` BEFORE the chat.message hook
+          // runs — the reviewer's reproduction, 2026-09-17).
+          ...(messageID ? { message: messageID } : {}),
         }) + "\n",
       )
     } catch {
@@ -747,14 +754,19 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
     return text.startsWith("[aio-context]")
   }
 
-  /** Whether a message entry already carries a persisted snapshot part (the fallback gate:
-   *  when it does, the transform must not add anything — the stored conversation IS the
-   *  request, which is the cache property this repair exists for). */
-  function entryHasSnapshot(entry: { parts?: Array<{ type?: string; text?: unknown }> }): boolean {
-    return (entry.parts ?? []).some(
-      (part) =>
-        part?.type === "text" && typeof part.text === "string" && isAioContextText(part.text),
-    )
+  /** What a message already carries: a SUCCESSFUL snapshot part, an unavailability notice,
+   *  or nothing. The fallback gate must distinguish them (reviewer finding, 2026-09-17): a
+   *  successful snapshot makes the request byte-pure, but an UNAVAILABILITY notice must NOT
+   *  block automatic recovery — the next request retries and appends the recovered capsule. */
+  function snapshotStateOf(
+    entry: { parts?: Array<{ type?: string; text?: unknown }> },
+  ): "capsule" | "unavailable" | "none" {
+    const texts = (entry.parts ?? [])
+      .filter((part) => part?.type === "text" && typeof part.text === "string")
+      .map((part) => part.text as string)
+    if (texts.some((text) => text.startsWith(SNAPSHOT_HEADER))) return "capsule"
+    if (texts.some((text) => isAioContextText(text))) return "unavailable"
+    return "none"
   }
 
   /** One persisted snapshot part for a user message (the reviewer's "persisted context
@@ -789,7 +801,7 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
     lastDelivery.set(sessionID, body)
     const kind =
       previous === body ? "continuation" : body.startsWith(SNAPSHOT_HEADER) ? "refresh" : "unavailable"
-    await journalEvent(sessionID, "attach", kind, body.length, "chat.message")
+    await journalEvent(sessionID, "attach", kind, body.length, "chat.message", messageID)
   }
 
   /** The bounded snapshot body for one request: the composed capsule (or its explicit
@@ -820,10 +832,12 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
     return lines.join("\n")
   }
 
-  /** Compose (or reuse the TTL-cached) snapshot body for one session. */
+  /** Compose (or reuse a TTL-cached SUCCESS) the snapshot body for one session. A cached
+   *  FAILURE is never served: the next request composes again, so a transient outage
+   *  recovers automatically — no new user message required (reviewer finding, 2026-09-17). */
   async function deliverSnapshot(sessionID: string, isKnownAio: boolean): Promise<string> {
     const cached = capsules.get(sessionID)
-    if (cached && Date.now() - cached.at < ttlMs) {
+    if (cached?.text && Date.now() - cached.at < ttlMs) {
       return snapshotBody(
         cached.text,
         cached.notice,
@@ -949,18 +963,26 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
       // Worker sessions (and only workers) are excluded — same boundary as the capsule.
       const knownAgent = agents.get(sessionID)
       if (knownAgent && knownAgent !== aioAgent) return
-      // RECOVERY FALLBACK ONLY (2026-09-17 repair v2). The snapshot is normally PERSISTED on
-      // the user message (`chat.message` attaches a synthetic part); when the latest user
-      // message carries one, the outgoing list is left byte-pure — exactly the stored
-      // conversation, the strongest prefix-cache property. Only a request whose latest user
-      // message has no snapshot (the post-compaction synthetic continuation, a restored
-      // pre-compaction message, legacy history) gets ONE trailing snapshot appended here.
+      // RECOVERY FALLBACK + AUTOMATIC RECOVERY (2026-09-17 repair v3). The snapshot is
+      // normally PERSISTED on the user message (`chat.message` attaches a synthetic part):
+      // when that part is a SUCCESSFUL snapshot the outgoing list is left byte-pure —
+      // exactly the stored conversation, the strongest prefix-cache property. When the
+      // latest user message carries NOTHING (the post-compaction synthetic continuation, a
+      // restored message, legacy history) or only an UNAVAILABILITY notice, the capsule is
+      // composed again here: a recovered capsule is appended (automatic recovery — no new
+      // user message required, reviewer finding 2026-09-17), while a still-failing compose
+      // never duplicates a notice the message already carries.
       const lastUser = [...output.messages]
         .reverse()
         .find((entry) => (entry as { info?: { role?: string } })?.info?.role === "user")
-      if (lastUser && entryHasSnapshot(lastUser)) return
+      const attached = lastUser
+        ? snapshotStateOf(lastUser as { parts?: Array<{ type?: string; text?: unknown }> })
+        : "none"
+      if (attached === "capsule") return
       const body = await deliverSnapshot(sessionID, knownAgent === aioAgent)
       if (!body) return
+      const recovered = body.startsWith(SNAPSHOT_HEADER)
+      if (!recovered && attached === "unavailable") return
       const tail = output.messages[output.messages.length - 1]
       if (tail && snapshotTextOf(tail) === body) return
       output.messages.push(
@@ -968,13 +990,11 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
       )
       const previous = lastDelivery.get(sessionID)
       lastDelivery.set(sessionID, body)
-      const kind =
-        previous === body
-          ? "continuation"
-          : body.startsWith(SNAPSHOT_HEADER)
-            ? "refresh"
-            : "unavailable"
-      await journalEvent(sessionID, "append", kind, body.length)
+      const kind = previous === body ? "continuation" : recovered ? "refresh" : "unavailable"
+      const lastUserId = String(
+        (lastUser as { info?: { id?: unknown } } | undefined)?.info?.id ?? "",
+      )
+      await journalEvent(sessionID, "append", kind, body.length, "messages.transform", lastUserId)
     },
 
     "experimental.session.compacting": async (input, output) => {

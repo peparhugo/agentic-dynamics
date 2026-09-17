@@ -23,25 +23,36 @@ with a COMPLETED usage sample: ``tokens.input`` is the cache-miss input (DeepSee
 A message whose usage is still the pending zero block is skipped, never counted as a miss.
 
 Cohorts, grouped by what the PLUGIN did (the delivery journal the repair adds,
-``.opencode/aio-context-events.jsonl`` — one line per ``messages.transform`` delivery):
+``.opencode/aio-context-events.jsonl`` — one line per conversation delivery: a
+``chat.message`` ATTACH of the persisted snapshot part, or a ``messages.transform`` APPEND
+for the recovery fallback):
 
 * ``refresh``      — the request carried a NEW capsule observation (journal kind ``refresh``);
-* ``continuation`` — the request re-delivered an unchanged snapshot (journal kind
-                     ``continuation``) or the capsule was unavailable (kind ``unavailable``);
+* ``continuation`` — the request carried an unchanged snapshot (kind ``continuation``) or the
+                     capsule was unavailable (kind ``unavailable``);
+* ``reuse``        — a later request of the SAME turn: it read the snapshot the turn already
+                     delivered; no new delivery was made for it;
 * ``compaction``   — the compaction summary generation call, plus the first request after it
                      (the post-compaction recovery request), classified from the session DB
                      itself (``mode == "compaction"`` / a preceding summary);
 * ``unclassified`` — no journal event could be joined (pre-repair traffic, or a missing
                      journal file) — reported honestly, never silently folded in.
 
-The join is a heuristic over delivery events from the two plugin surfaces that place the
-snapshot into a conversation: a ``chat.message`` ATTACH (the persisted part on the incoming
-user message — written just before that message's assistant request) and a
-``messages.transform`` APPEND (the post-compaction recovery fallback — written just before
-the model call it accompanies). For each measured request, the LAST attach in the window
-ending at its assistant-message creation classifies it; only if none exists, the FIRST
-append in the window after that creation is used. Events emitted by the compaction hook
-(``session.compacting``) are excluded — they are not conversation deliveries.
+The join is by IDENTITY, not by timestamp (reviewer repair, 2026-09-17: the runtime stamps a
+user message's ``time_created`` BEFORE the ``chat.message`` hook runs, so a time-window join
+attributes a delivery to the wrong turn — a refresh read as unclassified, a continuation as
+the previous turn's refresh). Every delivery event journals the user message it serves:
+
+* the ATTACH for a turn is looked up by the turn's user-message id;
+* the FIRST measured request of the turn carries the delivery cohort (``refresh`` /
+  ``continuation``); later requests of the same turn are ``reuse`` — they read the snapshot
+  the turn already delivered, they did not receive a new one;
+* a turn with no attach (the post-compaction synthetic continuation, restored/legacy
+  messages) falls back to the ``messages.transform`` APPEND whose journaled message id
+  matches the turn user and whose time falls in that request's own window.
+
+Events emitted by the compaction hook (``session.compacting``) are excluded — they are not
+conversation deliveries.
 
     agentic-dynamics session cache-report                          # the recent sessions
     agentic-dynamics session cache-report --session ses_... --json # one session, machine form
@@ -82,17 +93,13 @@ EVENTS_ENV = "FINOPS_AIO_CONTEXT_EVENTS"
 #: A request at/above this miss count is a FULL-CONTEXT miss — the defect's signature.
 BIG_MISS_TOKENS = 50_000
 
-#: A delivery event older than this does not classify a request (the join is a window
-#: heuristic; a stale attach from a much earlier turn must not lend its cohort).
-_JOIN_WINDOW_MS = 30 * 60 * 1000
-
 #: The journal each report appends to (append-only; a measurement is never rewritten).
 REPORT_JOURNAL_DEFAULT = (
     Path(__file__).resolve().parent.parent
     / "experiments" / "results" / "control" / "session_cache_reports.jsonl"
 )
 
-COHORT_ORDER = ("refresh", "compaction", "continuation", "unclassified")
+COHORT_ORDER = ("refresh", "compaction", "continuation", "reuse", "unclassified")
 
 
 def _default_db() -> Path:
@@ -168,7 +175,12 @@ def _read_events(path: Path) -> dict[str, list[dict]]:
             if not session or at is None:
                 continue
             per_session.setdefault(session, []).append(
-                {"at": at, "kind": str(event.get("kind") or ""), "surface": surface}
+                {
+                    "at": at,
+                    "kind": str(event.get("kind") or ""),
+                    "surface": surface,
+                    "message": str(event.get("message") or "").strip(),
+                }
             )
     for events in per_session.values():
         events.sort(key=lambda item: item["at"])
@@ -232,15 +244,29 @@ def _load_session(db: Path, session_id: str) -> list[dict]:
     return messages
 
 
+def _cohort_for(kind: str) -> tuple[str, str]:
+    """The (cohort, detail) a delivery kind maps to (unknown kinds stay unclassified)."""
+    if kind == "refresh":
+        return "refresh", "new observation"
+    if kind == "continuation":
+        return "continuation", "unchanged snapshot"
+    if kind == "unavailable":
+        return "continuation", "capsule unavailable"
+    return "unclassified", "no delivery event joined"
+
+
 def _classify_session(messages: list[dict], events: list[dict]) -> list[dict]:
     """One row per measured request: (created, hit, miss, cohort, detail).
 
-    The attach join is anchored on the per-turn USER message: an attach is written just
-    before its turn's user message is saved, so the turn's delivery event is the last
-    ``chat.message`` event in (previous user message, this user message]. Every request of
-    the turn — including tool-loop steps — inherits that turn's cohort. A request whose
-    turn carries no attach (the post-compaction synthetic continuation, a restored message,
-    legacy history) falls back to the first ``messages.transform`` append in its own window.
+    The join is by IDENTITY (reviewer repair, 2026-09-17): every delivery event journals the
+    user message it serves, and the runtime stamps a user message's ``time_created`` BEFORE
+    the ``chat.message`` hook runs — a timestamp-window join misattributes deliveries. The
+    attach for a turn is looked up by the turn's user-message id; the FIRST measured request
+    of the turn carries the delivery cohort, later requests of the same turn are ``reuse``
+    (they read the snapshot the turn already delivered). A turn with no attach (the
+    post-compaction synthetic continuation, restored/legacy messages) falls back to the
+    ``messages.transform`` append whose journaled message id matches the turn user and whose
+    time falls in that request's own window.
     """
     rows: list[dict] = []
     summary_positions = [
@@ -257,6 +283,21 @@ def _classify_session(messages: list[dict], events: list[dict]) -> list[dict]:
     user_positions = [
         index for index, message in enumerate(messages) if message["data"].get("role") == "user"
     ]
+    measured_positions = [
+        index
+        for index, message in enumerate(messages)
+        if message["data"].get("role") == "assistant" and _usage_of(message["data"]) is not None
+    ]
+    first_measured_after: dict[int, int] = {}
+    for user_position in user_positions:
+        later = [position for position in measured_positions if position > user_position]
+        if later:
+            first_measured_after[user_position] = later[0]
+    events_by_message: dict[str, list[dict]] = {}
+    for event in events:
+        if event["message"]:
+            events_by_message.setdefault(event["message"], []).append(event)
+
     for index, message in enumerate(messages):
         if message["data"].get("role") != "assistant":
             continue
@@ -265,43 +306,43 @@ def _classify_session(messages: list[dict], events: list[dict]) -> list[dict]:
             continue
         hit, miss = usage
         if index in summary_positions:
-            cohort = "compaction"
-            detail = "summary generation"
+            cohort, detail = "compaction", "summary generation"
         elif index in post_compaction:
-            cohort = "compaction"
-            detail = "post-compaction request"
+            cohort, detail = "compaction", "post-compaction request"
         elif events:
-            created = message["created"]
-            next_created = messages[index + 1]["created"] if index + 1 < len(messages) else None
             turn_users = [position for position in user_positions if position < index]
-            attaches: list[dict] = []
-            if turn_users:
-                user_position = turn_users[-1]
-                user_created = messages[user_position]["created"]
-                earlier_users = [position for position in turn_users if position < user_position]
-                lower = messages[earlier_users[-1]]["created"] if earlier_users else user_created - _JOIN_WINDOW_MS
-                attaches = [
-                    event
-                    for event in events
-                    if event["surface"] == "chat.message"
-                    and lower < event["at"] <= user_created
-                ]
-            appends = [
-                event
-                for event in events
-                if event["surface"] == "messages.transform"
-                and created < event["at"]
-                and (next_created is None or event["at"] < next_created)
-            ]
-            kind = attaches[-1]["kind"] if attaches else (appends[0]["kind"] if appends else "")
-            if kind == "refresh":
-                cohort, detail = "refresh", "new observation"
-            elif kind == "continuation":
-                cohort, detail = "continuation", "unchanged snapshot"
-            elif kind == "unavailable":
-                cohort, detail = "continuation", "capsule unavailable"
+            if not turn_users:
+                cohort, detail = "unclassified", "no turn user message joined"
             else:
-                cohort, detail = "unclassified", "no delivery event joined"
+                user_position = turn_users[-1]
+                for_user = events_by_message.get(messages[user_position]["id"], [])
+                attach = next(
+                    (event for event in reversed(for_user) if event["surface"] == "chat.message"),
+                    None,
+                )
+                if attach is not None:
+                    if first_measured_after.get(user_position) == index:
+                        cohort, detail = _cohort_for(attach["kind"])
+                    else:
+                        cohort, detail = "reuse", "same-turn reuse (snapshot delivered at turn start)"
+                else:
+                    created = message["created"]
+                    next_created = messages[index + 1]["created"] if index + 1 < len(messages) else None
+                    append = next(
+                        (
+                            event
+                            for event in for_user
+                            if event["surface"] == "messages.transform"
+                            and created < event["at"]
+                            and (next_created is None or event["at"] < next_created)
+                        ),
+                        None,
+                    )
+                    cohort, detail = (
+                        _cohort_for(append["kind"])
+                        if append is not None
+                        else ("unclassified", "no delivery event joined")
+                    )
         else:
             cohort, detail = "unclassified", "no delivery journal"
         rows.append(
@@ -450,7 +491,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="agentic-dynamics session cache-report",
         description="Join the AIO capsule delivery journal with the opencode session DB and "
         "report the token-weighted provider cache-miss rate "
-        "(sum(miss)/sum(hit+miss)), grouped by refresh / compaction / continuation.",
+        "(sum(miss)/sum(hit+miss)), grouped by refresh / compaction / continuation / reuse.",
     )
     parser.add_argument("--db", default=None, help=f"opencode session db (default: {_default_db()})")
     parser.add_argument(

@@ -27,11 +27,13 @@ synthetic TEXT PART attached to the incoming user message (`chat.message` → `o
 which the runtime persists with the message — a persisted context message that every later
 request re-sends byte-identically (verified end-to-end against the deployed runtime). The
 system prompt carries ONE static line; `experimental.chat.messages.transform` appends a
-trailing snapshot only when the request's latest user message has no snapshot (the
-post-compaction synthetic continuation, restored messages, legacy histories), and
+trailing snapshot when the request's latest user message has no SUCCESSFUL snapshot — the
+post-compaction synthetic continuation, restored messages, legacy histories, or an
+UNAVAILABILITY notice from a transient failure (which must not block automatic recovery: the
+next request retries and appends the recovered capsule) — and
 `experimental.session.compacting` carries the capsule into the compaction prompt. Every
-delivery is journaled to `.opencode/aio-context-events.jsonl` for
-`agentic-dynamics session cache-report`.
+delivery is journaled to `.opencode/aio-context-events.jsonl` (including the user message id
+it serves) for `agentic-dynamics session cache-report`.
 
 **Enforcement status.** The plugin's `tool.execute.before` refusal is a convenience and an
 early warning only — it is not the safety property. The REQUIRED enforcement — refusing an
