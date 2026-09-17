@@ -1059,7 +1059,7 @@ def test_the_complete_submission_path_host_shape(tmp_path, monkeypatch):
 
     store = tmp_path / "kb"
     si.init_binding_store(store)
-    written = si.write_binding(
+    si.write_binding(
         {
             "native_session_id": "ses_aio",
             "resolved_agent": "aio-control",
