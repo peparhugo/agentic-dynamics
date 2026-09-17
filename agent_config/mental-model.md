@@ -592,23 +592,28 @@ each subcommand forwards argv to its backing script; the CLI composes, never re-
 
 ```
 agentic-dynamics
-├─ experiment run|sweep-parallel|sweep-silent|batch|remaining|multi-phase
+├─ experiment run|sweep-parallel|sweep-silent|batch|remaining|multi-phase|cap-grit-grid|cap-grit-measure|cap-2c-grid|cap-2c-score|cap-2d-grid|cap-2d-score|cap-2e-grid|cap-2e-score|cap-2f-grid|cap-2f-score|delta-entropy|coordination-overhead
 ├─ story       run|batch
-├─ workflow    run|discard-tree|promote|new|lint|plan   # new/lint/plan = the authoring surface (a3)
+├─ workflow    run|discard-tree|approve|promote|new|lint|plan   # new/lint/plan = the authoring surface (a3)
 ├─ queue       enqueue|worker|monitor|reinterleave|analysis-enqueue|analysis-worker
-├─ analyze     worktrees|trajectories|stories|lab <name>
-├─ data        build|sync|manifest|inventory
-├─ knowledge   ingest|sources|worker
+├─ analyze     worktrees|trajectories|stories|session-routing|workflow-metrics|lab <name>
+├─ data        build|sync|manifest|inventory|bundle
+├─ knowledge   ingest|sources|facts|worker|context-report|shadow-report|arm-comparison
 ├─ graph       build|wall|preverify
 ├─ registry    query|show|lineage
 ├─ review      all|stories|trigger|enqueue|finalize
 ├─ spec        status|pipeline
-├─ validate    session|tests
-├─ supervise   [claude-agents|orphans]
-├─ control     status            # the ONE control packet (--json = control-status/v1)
+├─ validate    session|tests|prereq|preexisting|render
+├─ supervise   [claude-agents|orphans|leases]
+├─ control     status|drain-outbox|sweep-zombies|recording-sweep   # status = the ONE control packet (--json = control-status/v1)
+├─ session     open|close|budget|cache-report   # the AIO spine: session records, capacity budget, provider cache accounting
+├─ decision    record            # a decision recorded at the moment of the act
+├─ scoreboard                    # the measured scoreboard, recomputed from wave-verdict records
+├─ reflect                       # the accumulated reflection series (read)
+├─ publish     release           # the ONE publication transaction (P0; needs the operator)
+├─ release     check-protection
 ├─ surfaces    sync|snapshot     # regenerate the derived surfaces / the L0 game board
 ├─ docs        scan|watch|gate   # the docs-drift rail (zero model calls)
-├─ release     check-protection
 └─ usage                         # subscription window usage
 ```
 
