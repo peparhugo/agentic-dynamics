@@ -282,6 +282,81 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
     if (project) projects.set(sessionID, project)
   }
 
+  // ── Attachment freshness (round-12 review) ─────────────────────────────────────────
+  //
+  // Whether an attachment is genuinely NEW or already APPLIED is tracked here, SEPARATELY
+  // from the binding's concurrency version: a submission recording advances the durable
+  // version without containing the attachment's fields, and an unchanged attachment must
+  // never overwrite that subsequent progress. The marker is persisted beside the attachment
+  // (survives plugin restarts); without a marker, freshness is UNKNOWN and the version rule
+  // applies — an attachment at/behind the durable that differs is surfaced as a conflict,
+  // never replayed.
+
+  const STATE_FILE = ".opencode/aio-context-state.json"
+  let appliedLoaded = false
+  const appliedAttachments = new Map<string, string>()
+
+  function statePath(): string {
+    return `${ctx.worktree ?? ctx.directory}/${STATE_FILE}`
+  }
+
+  /** A stable digest of the attachment's APPLICABLE fields (never the file's version). */
+  function attachmentDigest(context: Record<string, unknown> | null): string {
+    if (!context) return ""
+    const ids = Array.isArray(context.knowledge_ids)
+      ? (context.knowledge_ids as unknown[]).map(String).join(",")
+      : ""
+    return [
+      `task=${String(context.task ?? "").trim()}`,
+      `predecessor=${String(context.predecessor_slug ?? "").trim()}`,
+      `knowledge_ids=${ids}`,
+      `acceptance=${String(context.acceptance ?? "").trim()}`,
+      `acceptance_source=${String(context.acceptance_source ?? "").trim()}`,
+      `acceptance_provenance=${String(context.acceptance_provenance ?? "").trim()}`,
+      `project=${String(context.project ?? "").trim()}`,
+      `source_revision=${String(context.source_revision ?? "").trim()}`,
+      `work_unit=${String(context.work_unit ?? "").trim()}`,
+      `next_action=${String(context.next_action ?? "").trim()}`,
+      `blocker=${String(context.blocker ?? "").trim()}`,
+    ].join("\u0000")
+  }
+
+  async function loadAppliedState(): Promise<void> {
+    if (appliedLoaded) return
+    appliedLoaded = true
+    try {
+      const { readFileSync } = await import("node:fs")
+      const parsed = JSON.parse(readFileSync(statePath(), "utf8"))
+      const applied = (parsed?.applied ?? {}) as Record<string, unknown>
+      for (const [session, digest] of Object.entries(applied)) {
+        const value = String(digest ?? "").trim()
+        if (value) appliedAttachments.set(session, value)
+      }
+    } catch {
+      // Absent/corrupt marker: freshness is UNKNOWN — the version fallback decides, and a
+      // differing attachment that is not newer surfaces as a conflict rather than replaying.
+    }
+  }
+
+  async function rememberApplied(sessionID: string, digest: string): Promise<void> {
+    if (!digest) return
+    appliedAttachments.set(sessionID, digest)
+    try {
+      const { mkdirSync, writeFileSync } = await import("node:fs")
+      const path = statePath()
+      mkdirSync(path.slice(0, path.lastIndexOf("/")), { recursive: true })
+      writeFileSync(
+        path,
+        JSON.stringify({
+          schema: "aio-context-state/v1",
+          applied: Object.fromEntries(appliedAttachments),
+        }),
+      )
+    } catch {
+      // Best-effort: the in-memory marker still guards this process lifetime.
+    }
+  }
+
   /** The task-context flags shared by --bind and --update-context. */
   function taskContextFlags(context: Record<string, unknown> | null): string[] {
     if (!context) return []
@@ -332,6 +407,12 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
       const binding = report?.binding as Record<string, unknown> | undefined
       contextVersions.set(sessionID, Number(binding?.context_version ?? 1))
       rememberIdentity(sessionID, binding)
+      if (status === "created" && context) {
+        // The binding was CREATED from this attachment: it IS applied. Mark it so later
+        // messages never replay it over progress the durable accumulates (round-12).
+        await loadAppliedState()
+        await rememberApplied(sessionID, attachmentDigest(context))
+      }
       failures.delete(sessionID)
       return true
     }
@@ -401,13 +482,23 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
     fallbackVersion: number,
     context: Record<string, unknown> | null,
   ): Promise<boolean> {
-    // RECORDING-AWARE + CONTENT-DECIDED (rounds 10-11 review): submission recording advances
-    // the durable version independently of this plugin, so the cached version can be stale
-    // AND version equality does not prove the requested change is present. The authoritative
-    // flow: refresh the durable binding → RE-VALIDATE the attachment's identity against the
-    // DURABLE task/project (never overwrite a newer identity with a stale attachment) →
-    // apply only genuinely different requested fields → version-guard the write with the
-    // fresh version, retrying ONCE on a concurrent write; a second failure surfaces.
+    // RECORDING-AWARE + CONTENT-DECIDED + FRESHNESS-TRACKED (rounds 10-12 review): the
+    // durable version advances for reasons other than this attachment (submission recording,
+    // external updates), so neither the version nor a content difference alone tells whether
+    // the attachment is a NEW instruction. The applied-attachment marker answers that,
+    // SEPARATELY from the version; then: refresh the durable binding → re-validate identity
+    // against the DURABLE task/project → no-op when the requested fields are already durable
+    // → apply a genuinely new instruction (fresh version, one retry) → surface the conflict
+    // when an UNKNOWN-freshness attachment at/behind the durable would replay stale fields.
+    await loadAppliedState()
+    const digest = attachmentDigest(context)
+    const declaredVersion = Number(context?.context_version ?? 0)
+    if (digest && appliedAttachments.get(sessionID) === digest) {
+      // UNCHANGED attachment already applied: the durable's later progress (the recording's
+      // pending-job reference, a newer work unit) stands. Silent — nothing conflicts.
+      failures.delete(sessionID)
+      return true
+    }
     for (let attempt = 0; attempt < 2; attempt++) {
       const refreshed = await refreshDurableBinding(sessionID)
       const durable = refreshed.binding ?? {}
@@ -434,8 +525,25 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
         return false
       }
       if (requestedFieldDiffs(context, durable).length === 0) {
-        failures.delete(sessionID) // the requested state is already durable: nothing to do
+        await rememberApplied(sessionID, digest)
+        failures.delete(sessionID) // the requested state is already durable
         return true
+      }
+      // The requested fields differ from the durable. With NO known prior application
+      // (fresh plugin state, marker absent) an attachment at/behind the durable version may
+      // be stale — surface the conflict instead of replaying stale fields. A CHANGED file
+      // (a prior application exists with a different digest) is an explicit new
+      // instruction and proceeds.
+      const knownPriorApplication = appliedAttachments.has(sessionID)
+      const genuinelyNew = declaredVersion === 0 || declaredVersion > refreshed.version
+      if (!knownPriorApplication && !genuinelyNew) {
+        failures.set(
+          sessionID,
+          `task-context conflict: the attachment (v${declaredVersion}) is not newer than ` +
+            `the binding (v${refreshed.version}) and its fields differ — not replaying ` +
+            "stale fields; update the attachment to re-assert intent",
+        )
+        return false
       }
       const { report, error } = await sessionOpenCall([
         "--update-context",
@@ -448,6 +556,7 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
         const binding = report?.binding as Record<string, unknown> | undefined
         contextVersions.set(sessionID, Number(binding?.context_version ?? expected + 1))
         rememberIdentity(sessionID, binding)
+        await rememberApplied(sessionID, digest)
         failures.delete(sessionID) // reconciled: the notice clears
         return true
       }

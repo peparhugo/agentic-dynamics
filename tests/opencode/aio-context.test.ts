@@ -907,4 +907,158 @@ describe("aio-context plugin — handoff selection by session (reviewer repair)"
     }
   })
 
+
+  // ── Attachment freshness (round-12): an unchanged attachment never overwrites progress ──
+
+  function freshnessResponder(durable: Record<string, unknown>, binds: { n: number }) {
+    return (mode: string, args: string[]) => {
+      if (mode === "bind") {
+        binds.n += 1
+        const created = binds.n === 1
+        return {
+          schema: "session-binding/v1", status: created ? "created" : "existing",
+          binding: {
+            native_session_id: sessionOf(args),
+            context_version: created ? 1 : 2,
+            task_identity: "t", project: "",
+            work_unit: created ? "w1" : durable.work_unit,
+            next_action: created ? "submit workflow" : durable.next_action,
+          },
+        }
+      }
+      if (mode === "binding") {
+        return {
+          schema: "session-binding/v1", status: "found",
+          binding: {
+            native_session_id: sessionOf(args), context_version: 2,
+            task_identity: "t", project: "", ...durable,
+          },
+        }
+      }
+      if (mode === "capsule") {
+        return { schema: "session-capsule/v1", capsule_status: "composed", capsule: { text: "CAPSULE" } }
+      }
+      if (mode === "update-context") {
+        return {
+          schema: "session-binding/v1", status: "updated",
+          binding: {
+            native_session_id: sessionOf(args), context_version: 3,
+            task_identity: "t", project: "",
+          },
+        }
+      }
+      return undefined
+    }
+  }
+
+  for (const [caseName, durable] of [
+    ["a submission recording", { work_unit: "w1", next_action: "[auto] submitted job abc123 — observe it" }],
+    ["a newer work-unit update", { work_unit: "w2-direct", next_action: "submit workflow" }],
+  ] as [string, Record<string, unknown>][]) {
+    test(`an unchanged attachment after ${caseName} never overwrites it`, async () => {
+      const project = tmpDir("aio-fresh-")
+      try {
+        writeTaskContext(project, {
+          native_session_id: "ses_fresh", task: "t", work_unit: "w1",
+          next_action: "submit workflow", context_version: 1,
+        })
+        const { runner, calls } = fakeRunner(freshnessResponder(durable, { n: 0 }))
+        const hooks = await makePluginAt(runner, project)
+        await hooks["chat.message"](...Object.values(message("ses_fresh", "aio-control", "start")))
+        calls.length = 0
+        // "continue" with the UNCHANGED attachment: the durable's progress stands.
+        await hooks["chat.message"](...Object.values(message("ses_fresh", "aio-control", "continue")))
+        expect(calls.some((c) => modeOf(c.args) === "update-context")).toBe(false)
+        const rendered = { system: [] as string[] }
+        await hooks["experimental.chat.system.transform"]({ sessionID: "ses_fresh" }, rendered)
+        expect(rendered.system.join()).not.toContain("context update failed")
+      } finally {
+        rmSync(project, { recursive: true, force: true })
+      }
+    })
+
+    test(`an unchanged attachment after ${caseName} never overwrites it (plugin restart)`, async () => {
+      const project = tmpDir("aio-fresh-restart-")
+      try {
+        writeTaskContext(project, {
+          native_session_id: "ses_fresh", task: "t", work_unit: "w1",
+          next_action: "submit workflow", context_version: 1,
+        })
+        const { runner, calls } = fakeRunner(freshnessResponder(durable, { n: 0 }))
+        const first = await makePluginAt(runner, project)
+        await first["chat.message"](...Object.values(message("ses_fresh", "aio-control", "start")))
+        // RESTART: a fresh plugin instance over the same project — the applied marker is on
+        // disk, so freshness survives the process boundary.
+        const second = await makePluginAt(runner, project)
+        await second["chat.message"](...Object.values(message("ses_fresh", "aio-control", "resume")))
+        calls.length = 0
+        await second["chat.message"](...Object.values(message("ses_fresh", "aio-control", "continue")))
+        expect(calls.some((c) => modeOf(c.args) === "update-context")).toBe(false)
+      } finally {
+        rmSync(project, { recursive: true, force: true })
+      }
+    })
+  }
+
+  test("a stale attachment without a prior application surfaces the conflict", async () => {
+    // Unknown freshness (marker absent, e.g. cleared): an attachment at/behind the durable
+    // that differs is NOT replayed — the conflict is surfaced instead of silently dropping
+    // or overwriting.
+    const project = tmpDir("aio-conflict-")
+    try {
+      writeTaskContext(project, {
+        native_session_id: "ses_conf", task: "t", work_unit: "w1", context_version: 1,
+      })
+      const binds = { n: 0 }
+      const { runner, calls } = fakeRunner((mode, args) => {
+        if (mode === "bind") {
+          binds.n += 1
+          return {
+            schema: "session-binding/v1", status: binds.n === 1 ? "created" : "existing",
+            binding: {
+              native_session_id: sessionOf(args), context_version: 1,
+              task_identity: "t", project: "", work_unit: "w1",
+            },
+          }
+        }
+        if (mode === "binding") {
+          return {
+            schema: "session-binding/v1", status: "found",
+            binding: {
+              native_session_id: sessionOf(args), context_version: 2,
+              task_identity: "t", project: "", work_unit: "w2-direct",
+            },
+          }
+        }
+        if (mode === "capsule") {
+          return { schema: "session-capsule/v1", capsule_status: "composed", capsule: { text: "CAPSULE" } }
+        }
+        if (mode === "update-context") {
+          return {
+            schema: "session-binding/v1", status: "updated",
+            binding: {
+              native_session_id: sessionOf(args), context_version: 3,
+              task_identity: "t", project: "",
+            },
+          }
+        }
+        return undefined
+      })
+      const first = await makePluginAt(runner, project)
+      await first["chat.message"](...Object.values(message("ses_conf", "aio-control", "start")))
+      // The applied marker disappears (fresh state, unknown freshness).
+      rmSync(path.join(project, ".opencode", "aio-context-state.json"), { force: true })
+      const second = await makePluginAt(runner, project)
+      await second["chat.message"](...Object.values(message("ses_conf", "aio-control", "resume")))
+      calls.length = 0
+      await second["chat.message"](...Object.values(message("ses_conf", "aio-control", "continue")))
+      expect(calls.some((c) => modeOf(c.args) === "update-context")).toBe(false)
+      const rendered = { system: [] as string[] }
+      await second["experimental.chat.system.transform"]({ sessionID: "ses_conf" }, rendered)
+      expect(rendered.system.join()).toContain("not replaying stale fields")
+    } finally {
+      rmSync(project, { recursive: true, force: true })
+    }
+  })
+
 })

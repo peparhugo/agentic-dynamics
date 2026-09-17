@@ -92,3 +92,6 @@ experiments/results/kb/
 # All experiment results/registry/kb/control data lives in the ignored working tree
 # (future: FINOPS_RESULTS_DIR data root). Keep NO tracked content under here.
 experiments/results/
+
+# The aio-context plugin's applied-attachment marker (runtime state; round-12 freshness).
+.opencode/aio-context-state.json
