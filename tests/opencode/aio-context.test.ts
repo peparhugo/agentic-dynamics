@@ -1061,4 +1061,205 @@ describe("aio-context plugin — handoff selection by session (reviewer repair)"
     }
   })
 
+
+  test("a concurrent task change is surfaced, never overwritten by the retry", async () => {
+    // Round-13 review: the first write conflicts with a concurrent ACCEPTANCE change; the
+    // retry must NOT restore the old acceptance. The authorization id/epoch distinguishes a
+    // task change from progress — the conflict stays visible until the attachment is refreshed.
+    const project = tmpDir("aio-conc-")
+    try {
+      writeTaskContext(project, {
+        native_session_id: "ses_conc", task: "t", work_unit: "w1",
+        acceptance: "old criteria", acceptance_source: "raw", context_version: 1,
+      })
+      const reads = { n: 0 }
+      const { runner, calls } = fakeRunner((mode, args) => {
+        if (mode === "bind") {
+          return {
+            schema: "session-binding/v1", status: "created",
+            binding: {
+              native_session_id: sessionOf(args), context_version: 1,
+              task_identity: "t", project: "", work_unit: "w1",
+              authorization_id: "auth-1", authorization_version: 1,
+            },
+          }
+        }
+        if (mode === "binding") {
+          reads.n += 1
+          const concurrentTaskChange = reads.n >= 2
+          return {
+            schema: "session-binding/v1", status: "found",
+            binding: {
+              native_session_id: sessionOf(args),
+              context_version: concurrentTaskChange ? 3 : 2,
+              task_identity: "t", project: "", work_unit: "w1",
+              acceptance: {
+                text: concurrentTaskChange ? "new criteria" : "old criteria",
+                source: "raw",
+              },
+              authorization_id: concurrentTaskChange ? "auth-2" : "auth-1",
+              authorization_version: concurrentTaskChange ? 2 : 1,
+            },
+          }
+        }
+        if (mode === "capsule") {
+          return { schema: "session-capsule/v1", capsule_status: "composed", capsule: { text: "CAPSULE" } }
+        }
+        return undefined // update-context: the concurrent task change wins the race
+      })
+      const hooks = await makePluginAt(runner, project)
+      await hooks["chat.message"](...Object.values(message("ses_conc", "aio-control", "start")))
+      // A CHANGED attachment (work_unit w2) so the apply path — not the marker no-op — runs.
+      writeTaskContext(project, {
+        native_session_id: "ses_conc", task: "t", work_unit: "w2",
+        acceptance: "old criteria", acceptance_source: "raw", context_version: 2,
+      })
+      calls.length = 0
+      await hooks["chat.message"](...Object.values(message("ses_conc", "aio-control", "continue")))
+      // attempt 0 reads auth-1 → conflict; attempt 1 reads auth-2 → SURFACE, no second write.
+      expect(calls.filter((c) => modeOf(c.args) === "update-context").length).toBe(1)
+      const rendered = { system: [] as string[] }
+      await hooks["experimental.chat.system.transform"]({ sessionID: "ses_conc" }, rendered)
+      expect(rendered.system.join()).toContain("changed concurrently")
+      // The conflict stays VISIBLE and is not retried on the next message either.
+      calls.length = 0
+      await hooks["chat.message"](...Object.values(message("ses_conc", "aio-control", "continue")))
+      expect(calls.filter((c) => modeOf(c.args) === "update-context").length).toBe(0)
+      const again = { system: [] as string[] }
+      await hooks["experimental.chat.system.transform"]({ sessionID: "ses_conc" }, again)
+      expect(again.system.join()).toContain("changed concurrently")
+    } finally {
+      rmSync(project, { recursive: true, force: true })
+    }
+  })
+
+  test("a progress-only conflict is retried against the fresh version", async () => {
+    const project = tmpDir("aio-prog-")
+    try {
+      writeTaskContext(project, {
+        native_session_id: "ses_prog", task: "t", work_unit: "w1", context_version: 1,
+      })
+      const reads = { n: 0 }
+      const writes = { n: 0 }
+      const { runner, calls } = fakeRunner((mode, args) => {
+        if (mode === "bind") {
+          return {
+            schema: "session-binding/v1", status: "created",
+            binding: {
+              native_session_id: sessionOf(args), context_version: 1,
+              task_identity: "t", project: "", work_unit: "w1",
+              authorization_id: "auth-1", authorization_version: 1,
+            },
+          }
+        }
+        if (mode === "binding") {
+          reads.n += 1
+          return {
+            schema: "session-binding/v1", status: "found",
+            binding: {
+              native_session_id: sessionOf(args),
+              context_version: reads.n >= 2 ? 3 : 2,
+              task_identity: "t", project: "", work_unit: "w1",
+              authorization_id: "auth-1", authorization_version: 1, // PROGRESS-ONLY bump
+            },
+          }
+        }
+        if (mode === "capsule") {
+          return { schema: "session-capsule/v1", capsule_status: "composed", capsule: { text: "CAPSULE" } }
+        }
+        if (mode === "update-context") {
+          writes.n += 1
+          if (writes.n === 1) return undefined // the recording wins the first race
+          return {
+            schema: "session-binding/v1", status: "updated",
+            binding: {
+              native_session_id: sessionOf(args), context_version: 4,
+              task_identity: "t", project: "",
+            },
+          }
+        }
+        return undefined
+      })
+      const hooks = await makePluginAt(runner, project)
+      await hooks["chat.message"](...Object.values(message("ses_prog", "aio-control", "start")))
+      writeTaskContext(project, {
+        native_session_id: "ses_prog", task: "t", work_unit: "w2", context_version: 2,
+      })
+      calls.length = 0
+      await hooks["chat.message"](...Object.values(message("ses_prog", "aio-control", "continue")))
+      const updateCalls = calls.filter((c) => modeOf(c.args) === "update-context")
+      expect(updateCalls.length).toBe(2) // attempted, conflicted, retried
+      expect(flagOf(updateCalls[1].args, "--expected-version")).toBe("3") // the fresh version
+      const rendered = { system: [] as string[] }
+      await hooks["experimental.chat.system.transform"]({ sessionID: "ses_prog" }, rendered)
+      expect(rendered.system.join()).not.toContain("context update failed")
+    } finally {
+      rmSync(project, { recursive: true, force: true })
+    }
+  })
+
+  test("an unversioned attachment with unknown freshness is surfaced, never replayed", async () => {
+    // Round-13 review: an EXISTING binding + NO applied marker + NO declared version =
+    // UNKNOWN freshness (the upgrade case) — preserve durable state, surface the conflict.
+    const project = tmpDir("aio-noversion-")
+    try {
+      writeTaskContext(project, {
+        native_session_id: "ses_nv", task: "t", work_unit: "w1", // no context_version
+      })
+      const binds = { n: 0 }
+      const { runner, calls } = fakeRunner((mode, args) => {
+        if (mode === "bind") {
+          binds.n += 1
+          const created = binds.n === 1
+          return {
+            schema: "session-binding/v1", status: created ? "created" : "existing",
+            binding: {
+              native_session_id: sessionOf(args), context_version: created ? 1 : 2,
+              task_identity: "t", project: "",
+              work_unit: created ? "w1" : "w2-direct",
+              next_action: created ? "" : "[auto] submitted job abc123",
+            },
+          }
+        }
+        if (mode === "binding") {
+          return {
+            schema: "session-binding/v1", status: "found",
+            binding: {
+              native_session_id: sessionOf(args), context_version: 2,
+              task_identity: "t", project: "", work_unit: "w2-direct",
+              next_action: "[auto] submitted job abc123",
+            },
+          }
+        }
+        if (mode === "capsule") {
+          return { schema: "session-capsule/v1", capsule_status: "composed", capsule: { text: "CAPSULE" } }
+        }
+        if (mode === "update-context") {
+          return {
+            schema: "session-binding/v1", status: "updated",
+            binding: {
+              native_session_id: sessionOf(args), context_version: 3,
+              task_identity: "t", project: "",
+            },
+          }
+        }
+        return undefined
+      })
+      const first = await makePluginAt(runner, project)
+      await first["chat.message"](...Object.values(message("ses_nv", "aio-control", "start")))
+      // The upgrade shape: the applied marker is absent.
+      rmSync(path.join(project, ".opencode", "aio-context-state.json"), { force: true })
+      const second = await makePluginAt(runner, project)
+      await second["chat.message"](...Object.values(message("ses_nv", "aio-control", "resume")))
+      calls.length = 0
+      await second["chat.message"](...Object.values(message("ses_nv", "aio-control", "continue")))
+      expect(calls.some((c) => modeOf(c.args) === "update-context")).toBe(false)
+      const rendered = { system: [] as string[] }
+      await second["experimental.chat.system.transform"]({ sessionID: "ses_nv" }, rendered)
+      expect(rendered.system.join()).toContain("not replaying stale fields")
+    } finally {
+      rmSync(project, { recursive: true, force: true })
+    }
+  })
+
 })

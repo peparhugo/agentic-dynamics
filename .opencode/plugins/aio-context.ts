@@ -295,6 +295,9 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
   const STATE_FILE = ".opencode/aio-context-state.json"
   let appliedLoaded = false
   const appliedAttachments = new Map<string, string>()
+  /** Session → the attachment digest whose application hit a TASK conflict (round-13):
+   *  surfaced on every message until the attachment is refreshed. */
+  const conflictedAttachments = new Map<string, string>()
 
   function statePath(): string {
     return `${ctx.worktree ?? ctx.directory}/${STATE_FILE}`
@@ -499,11 +502,46 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
       failures.delete(sessionID)
       return true
     }
+    if (digest && conflictedAttachments.get(sessionID) === digest) {
+      // A TASK conflict stays VISIBLE until the attachment itself is refreshed (round-13):
+      // the same stale content is not retried against the durable on every message.
+      failures.set(
+        sessionID,
+        "task-context conflict: the task changed concurrently (acceptance / task definition) " +
+          "— not retrying the update; refresh the attachment to re-assert intent",
+      )
+      return false
+    }
+    let previousAuthorization = ""
     for (let attempt = 0; attempt < 2; attempt++) {
       const refreshed = await refreshDurableBinding(sessionID)
       const durable = refreshed.binding ?? {}
       const expected = refreshed.version > 0 ? refreshed.version : fallbackVersion
       if (!expected) break
+      // CONFLICT CLASSIFICATION (round-13 review): a conflict is retried ONLY when the
+      // concurrent change was PROGRESS-ONLY. The binding's authorization id/epoch moves when
+      // the task definition (acceptance / work unit / project) changes — retrying over THAT
+      // would overwrite the concurrent writer's acceptance criteria. Task conflicts stay
+      // visible until the attachment itself is refreshed (a new digest).
+      const authId = String(durable.authorization_id ?? "").trim()
+      const authEpoch = Number(durable.authorization_version ?? 0)
+      const currentAuthorization =
+        authId || (authEpoch > 0 ? `epoch:${authEpoch}` : "")
+      if (
+        attempt > 0 &&
+        previousAuthorization &&
+        currentAuthorization &&
+        currentAuthorization !== previousAuthorization
+      ) {
+        if (digest) conflictedAttachments.set(sessionID, digest)
+        failures.set(
+          sessionID,
+          "task-context conflict: the task changed concurrently (acceptance / task " +
+            "definition) — not retrying the update; refresh the attachment to re-assert intent",
+        )
+        return false
+      }
+      previousAuthorization = currentAuthorization
       const durableTask = String(durable.task_identity ?? "").trim()
       const durableProject = String(durable.project ?? "").trim()
       const contextTask = String(context?.task ?? "").trim()
@@ -530,18 +568,19 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
         return true
       }
       // The requested fields differ from the durable. With NO known prior application
-      // (fresh plugin state, marker absent) an attachment at/behind the durable version may
-      // be stale — surface the conflict instead of replaying stale fields. A CHANGED file
-      // (a prior application exists with a different digest) is an explicit new
-      // instruction and proceeds.
+      // (fresh plugin state, marker absent) an attachment at/behind the durable version — OR
+      // with NO declared version at all (round-13: missing version + missing marker means
+      // UNKNOWN freshness) — may be stale: surface the conflict instead of replaying stale
+      // fields. A CHANGED file (a prior application exists with a different digest) is an
+      // explicit new instruction and proceeds.
       const knownPriorApplication = appliedAttachments.has(sessionID)
-      const genuinelyNew = declaredVersion === 0 || declaredVersion > refreshed.version
+      const genuinelyNew = declaredVersion > 0 && declaredVersion > refreshed.version
       if (!knownPriorApplication && !genuinelyNew) {
         failures.set(
           sessionID,
-          `task-context conflict: the attachment (v${declaredVersion}) is not newer than ` +
-            `the binding (v${refreshed.version}) and its fields differ — not replaying ` +
-            "stale fields; update the attachment to re-assert intent",
+          `task-context conflict: the attachment (v${declaredVersion || "no version"}) is ` +
+            `not newer than the binding (v${refreshed.version}) and its fields differ — ` +
+            "not replaying stale fields; update the attachment to re-assert intent",
         )
         return false
       }
