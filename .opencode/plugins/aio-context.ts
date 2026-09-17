@@ -27,15 +27,23 @@
  *    matches prefixes; the 2026-09-17 review measured the volatile capsule breaking the
  *    cache ~41 characters in), while a trailing snapshot costs only its own tokens.
  *
- *  - `experimental.chat.messages.transform` — `input` carries no session id; it is derived
- *    from the message `info`. With identity and an unknown-or-AIO agent, compose the capsule
- *    (`session_open.py --capsule`) and APPEND one trailing entry (role `user`, explicitly
- *    marked machine-injected). Earlier messages are never rewritten or removed: a new
- *    observation becomes a new entry, so the outgoing request sequence stays append-only and
- *    the cached prefix keeps matching. Auxiliary calls without identity and known worker
- *    sessions are skipped. For a known AIO session whose capsule cannot be composed, a short
- *    explicit UNAVAILABLE notice is appended instead of silence (a dependency failure must
- *    not disappear).
+ *  - `chat.message` (the ATTACH half of the cache repair) — after the binding/update logic,
+ *    the composed snapshot is delivered as a synthetic TEXT PART on the incoming user message.
+ *    The part PERSISTS with the message (verified against the deployed runtime end-to-end: a
+ *    plugin-pushed `{type:"text", synthetic:true}` part survives validation, is stored with
+ *    the message, and reaches every later request unchanged). New observations attach to NEW
+ *    messages; an earlier message's part is never rewritten or removed — the request sequence
+ *    stays append-only and the provider's prefix cache keeps matching. For a known AIO session
+ *    whose capsule cannot be composed, the same part carries an explicit UNAVAILABLE notice
+ *    instead of silence (a dependency failure must not disappear).
+ *
+ *  - `experimental.chat.messages.transform` — the RECOVERY fallback. `input` carries no
+ *    session id; it is derived from the message `info`. When the request's latest user message
+ *    already carries a snapshot part (the ordinary path), the outgoing list is left byte-pure
+ *    — exactly the stored conversation. Only when it does NOT (the post-compaction synthetic
+ *    continuation, a restored pre-compaction message, or legacy history) a single trailing
+ *    snapshot entry is appended, so recovery never depends on the summary alone. Auxiliary
+ *    calls without identity and known worker sessions are skipped.
  *
  *  - `experimental.session.compacting` — the capsule joins the compaction prompt context so
  *    the resulting summary carries the durable session state; and
@@ -734,6 +742,56 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
     }
   }
 
+  /** Whether a text is one of ours (the persisted snapshot or its unavailability). */
+  function isAioContextText(text: string): boolean {
+    return text.startsWith("[aio-context]")
+  }
+
+  /** Whether a message entry already carries a persisted snapshot part (the fallback gate:
+   *  when it does, the transform must not add anything — the stored conversation IS the
+   *  request, which is the cache property this repair exists for). */
+  function entryHasSnapshot(entry: { parts?: Array<{ type?: string; text?: unknown }> }): boolean {
+    return (entry.parts ?? []).some(
+      (part) =>
+        part?.type === "text" && typeof part.text === "string" && isAioContextText(part.text),
+    )
+  }
+
+  /** One persisted snapshot part for a user message (the reviewer's "persisted context
+   *  message", verified against the deployed runtime: plugin-pushed, schema-valid, stored
+   *  with the message and re-sent unchanged on every later request). */
+  function snapshotPart(sessionID: string, messageID: string, text: string) {
+    snapshotSeq += 1
+    return {
+      id: `prt_aio_${snapshotSeq.toString(36)}${Date.now().toString(36)}`,
+      sessionID,
+      messageID,
+      type: "text",
+      text,
+      synthetic: true,
+      time: { start: Date.now(), end: Date.now() },
+    }
+  }
+
+  /** Attach the composed snapshot to the incoming user message. Composes FRESH (the bind or
+   *  context update just landed); a delivery failure never blocks the message. */
+  async function attachSnapshot(
+    sessionID: string,
+    messageID: string,
+    parts: unknown[] | undefined,
+  ): Promise<void> {
+    if (!Array.isArray(parts)) return
+    capsules.delete(sessionID) // compose against the just-updated durable state
+    const body = await deliverSnapshot(sessionID, true)
+    if (!body) return
+    parts.push(snapshotPart(sessionID, messageID, body) as unknown as (typeof parts)[number])
+    const previous = lastDelivery.get(sessionID)
+    lastDelivery.set(sessionID, body)
+    const kind =
+      previous === body ? "continuation" : body.startsWith(SNAPSHOT_HEADER) ? "refresh" : "unavailable"
+    await journalEvent(sessionID, "attach", kind, body.length, "chat.message")
+  }
+
   /** The bounded snapshot body for one request: the composed capsule (or its explicit
    *  unavailability) plus any retained context-update failure. Volatile text lives HERE and
    *  nowhere else — never in the system prompt. */
@@ -822,6 +880,7 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
       if (!sessionID) return
       const agent = String(output?.message?.agent ?? input.agent ?? "")
       agents.set(sessionID, agent)
+      const messageID = String(output?.message?.id ?? input.messageID ?? "")
       // Workers and special profiles are never bound to the AIO spine.
       if (agent !== aioAgent) return
       const context = await readTaskContext()
@@ -843,7 +902,7 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
         if (applicable.applies) {
           await updateSessionContext(sessionID, current, context)
         }
-        capsules.delete(sessionID)
+        await attachSnapshot(sessionID, messageID, output?.parts)
         return
       }
       const parts = Array.isArray(output?.parts) ? output.parts : []
@@ -853,7 +912,6 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
         .join("\n")
         .trim()
       if (!request) return
-      const messageID = String(output?.message?.id ?? input.messageID ?? "")
       // The attachment is attached only if it applies to THIS session (or carries a
       // task reference on a first bind); otherwise the request alone is bound and the
       // mismatch is surfaced, never silently mixed in.
@@ -865,7 +923,9 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
         // The bind itself succeeded; the ATTACHMENT is what could not be applied — say so.
         failures.set(sessionID, `task-context not applied: ${applicable.reason}`)
       }
-      capsules.delete(sessionID)
+      // Attach for EVERY AIO message — including a FAILED bind: the snapshot body then
+      // carries the explicit unavailable notice (a dependency failure must not disappear).
+      await attachSnapshot(sessionID, messageID, output?.parts)
     },
 
     "experimental.chat.system.transform": async (input, output) => {
@@ -889,12 +949,18 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
       // Worker sessions (and only workers) are excluded — same boundary as the capsule.
       const knownAgent = agents.get(sessionID)
       if (knownAgent && knownAgent !== aioAgent) return
+      // RECOVERY FALLBACK ONLY (2026-09-17 repair v2). The snapshot is normally PERSISTED on
+      // the user message (`chat.message` attaches a synthetic part); when the latest user
+      // message carries one, the outgoing list is left byte-pure — exactly the stored
+      // conversation, the strongest prefix-cache property. Only a request whose latest user
+      // message has no snapshot (the post-compaction synthetic continuation, a restored
+      // pre-compaction message, legacy history) gets ONE trailing snapshot appended here.
+      const lastUser = [...output.messages]
+        .reverse()
+        .find((entry) => (entry as { info?: { role?: string } })?.info?.role === "user")
+      if (lastUser && entryHasSnapshot(lastUser)) return
       const body = await deliverSnapshot(sessionID, knownAgent === aioAgent)
       if (!body) return
-      // APPEND-ONLY DISCIPLINE (the cache property this repair exists for): the snapshot is
-      // ADDED as a new trailing entry; no earlier message is rewritten or removed. A runtime
-      // that persisted transformed messages keeps every earlier snapshot untouched — a
-      // current tail is left alone, a new observation becomes a NEW entry.
       const tail = output.messages[output.messages.length - 1]
       if (tail && snapshotTextOf(tail) === body) return
       output.messages.push(

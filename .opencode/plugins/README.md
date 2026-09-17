@@ -22,6 +22,17 @@ valid for UPDATES, where the session's bound identity is there to compare agains
 The file is the EXPLICIT selection — the plugin never invents one. Raise `context_version`
 to apply an update; the original request is immutable and no update can replace it.
 
+**The snapshot delivery (2026-09-17 cache repair).** The capsule snapshot is delivered as a
+synthetic TEXT PART attached to the incoming user message (`chat.message` → `output.parts`),
+which the runtime persists with the message — a persisted context message that every later
+request re-sends byte-identically (verified end-to-end against the deployed runtime). The
+system prompt carries ONE static line; `experimental.chat.messages.transform` appends a
+trailing snapshot only when the request's latest user message has no snapshot (the
+post-compaction synthetic continuation, restored messages, legacy histories), and
+`experimental.session.compacting` carries the capsule into the compaction prompt. Every
+delivery is journaled to `.opencode/aio-context-events.jsonl` for
+`agentic-dynamics session cache-report`.
+
 **Enforcement status.** The plugin's `tool.execute.before` refusal is a convenience and an
 early warning only — it is not the safety property. The REQUIRED enforcement — refusing an
 unbound consequential submit at the backend itself (submit contract, admission, promote
