@@ -1262,4 +1262,83 @@ describe("aio-context plugin — handoff selection by session (reviewer repair)"
     }
   })
 
+
+  test("an unresolved conflict survives a plugin restart", async () => {
+    // Round-14 review: conflict state persists like applied state — after a restart, the
+    // stale attachment stays REJECTED until the file itself is refreshed.
+    const project = tmpDir("aio-conc-restart-")
+    try {
+      writeTaskContext(project, {
+        native_session_id: "ses_cr", task: "t", work_unit: "w1",
+        acceptance: "old criteria", acceptance_source: "raw", context_version: 1,
+      })
+      const binds = { n: 0 }
+      const reads = { n: 0 }
+      const writes = { n: 0 }
+      const { runner, calls } = fakeRunner((mode, args) => {
+        if (mode === "bind") {
+          binds.n += 1
+          const created = binds.n === 1
+          return {
+            schema: "session-binding/v1", status: created ? "created" : "existing",
+            binding: {
+              native_session_id: sessionOf(args), context_version: created ? 1 : 3,
+              task_identity: "t", project: "", work_unit: "w1",
+              authorization_id: created ? "auth-1" : "auth-2",
+              authorization_version: created ? 1 : 2,
+            },
+          }
+        }
+        if (mode === "binding") {
+          reads.n += 1
+          const concurrentTaskChange = reads.n >= 2
+          return {
+            schema: "session-binding/v1", status: "found",
+            binding: {
+              native_session_id: sessionOf(args),
+              context_version: concurrentTaskChange ? 3 : 2,
+              task_identity: "t", project: "", work_unit: "w1",
+              acceptance: {
+                text: concurrentTaskChange ? "new criteria" : "old criteria",
+                source: "raw",
+              },
+              authorization_id: concurrentTaskChange ? "auth-2" : "auth-1",
+              authorization_version: concurrentTaskChange ? 2 : 1,
+            },
+          }
+        }
+        if (mode === "capsule") {
+          return { schema: "session-capsule/v1", capsule_status: "composed", capsule: { text: "CAPSULE" } }
+        }
+        if (mode === "update-context") {
+          writes.n += 1
+          return undefined // never accepted in this scenario
+        }
+        return undefined
+      })
+      const first = await makePluginAt(runner, project)
+      await first["chat.message"](...Object.values(message("ses_cr", "aio-control", "start")))
+      // The conflict: a CHANGED attachment applied against a concurrent acceptance change.
+      writeTaskContext(project, {
+        native_session_id: "ses_cr", task: "t", work_unit: "w2",
+        acceptance: "old criteria", acceptance_source: "raw", context_version: 2,
+      })
+      await first["chat.message"](...Object.values(message("ses_cr", "aio-control", "continue")))
+      expect(writes.n).toBe(1) // attempt 0 only; attempt 1 surfaced instead of retrying
+
+      // RESTART the plugin (fresh instance over the same project).
+      const second = await makePluginAt(runner, project)
+      // The reviewer's sequence: "resume", then "continue".
+      await second["chat.message"](...Object.values(message("ses_cr", "aio-control", "resume")))
+      const before = writes.n
+      await second["chat.message"](...Object.values(message("ses_cr", "aio-control", "continue")))
+      expect(writes.n).toBe(before) // the stale attachment stays rejected
+      const rendered = { system: [] as string[] }
+      await second["experimental.chat.system.transform"]({ sessionID: "ses_cr" }, rendered)
+      expect(rendered.system.join()).toContain("changed concurrently")
+    } finally {
+      rmSync(project, { recursive: true, force: true })
+    }
+  })
+
 })

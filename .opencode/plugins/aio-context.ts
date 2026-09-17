@@ -330,10 +330,19 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
     try {
       const { readFileSync } = await import("node:fs")
       const parsed = JSON.parse(readFileSync(statePath(), "utf8"))
-      const applied = (parsed?.applied ?? {}) as Record<string, unknown>
-      for (const [session, digest] of Object.entries(applied)) {
+      for (const [session, digest] of Object.entries(
+        (parsed?.applied ?? {}) as Record<string, unknown>,
+      )) {
         const value = String(digest ?? "").trim()
         if (value) appliedAttachments.set(session, value)
+      }
+      // UNRESOLVED CONFLICTS survive restarts too (round-14): an attachment rejected for a
+      // task conflict stays rejected until the attachment itself is refreshed.
+      for (const [session, digest] of Object.entries(
+        (parsed?.conflicted ?? {}) as Record<string, unknown>,
+      )) {
+        const value = String(digest ?? "").trim()
+        if (value) conflictedAttachments.set(session, value)
       }
     } catch {
       // Absent/corrupt marker: freshness is UNKNOWN — the version fallback decides, and a
@@ -341,9 +350,7 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
     }
   }
 
-  async function rememberApplied(sessionID: string, digest: string): Promise<void> {
-    if (!digest) return
-    appliedAttachments.set(sessionID, digest)
+  async function persistState(): Promise<void> {
     try {
       const { mkdirSync, writeFileSync } = await import("node:fs")
       const path = statePath()
@@ -353,11 +360,24 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
         JSON.stringify({
           schema: "aio-context-state/v1",
           applied: Object.fromEntries(appliedAttachments),
+          conflicted: Object.fromEntries(conflictedAttachments),
         }),
       )
     } catch {
-      // Best-effort: the in-memory marker still guards this process lifetime.
+      // Best-effort: the in-memory state still guards this process lifetime.
     }
+  }
+
+  async function rememberApplied(sessionID: string, digest: string): Promise<void> {
+    if (!digest) return
+    appliedAttachments.set(sessionID, digest)
+    conflictedAttachments.delete(sessionID) // an applied attachment supersedes its conflict
+    await persistState()
+  }
+
+  async function rememberConflict(sessionID: string, digest: string): Promise<void> {
+    if (digest) conflictedAttachments.set(sessionID, digest)
+    await persistState()
   }
 
   /** The task-context flags shared by --bind and --update-context. */
@@ -533,7 +553,7 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
         currentAuthorization &&
         currentAuthorization !== previousAuthorization
       ) {
-        if (digest) conflictedAttachments.set(sessionID, digest)
+        await rememberConflict(sessionID, digest)
         failures.set(
           sessionID,
           "task-context conflict: the task changed concurrently (acceptance / task " +
