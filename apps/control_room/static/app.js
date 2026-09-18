@@ -3063,13 +3063,16 @@
     const degraded = data.degraded || []
     const lag = data.projection_lag || {}
 
+    // A degraded control DB means every count derived from it reads "unavailable", never 0
+    // (the payload is a legitimate HTTP 200 with empty arrays plus a named degradation).
+    const dbDegraded = degraded.some((entry) => entry.surface === "control_db")
     const summary = element("div", "metric-grid")
     const cards = [
       ["Control epoch", String(source.control_epoch ?? "—")],
       ["Repo head", (source.repo_head_sha || "—").slice(0, 9)],
-      ["Active runs", String(active.length)],
-      ["Decisions owed", String(attention.length)],
-      ["Promotable runs", String(promotable.length)],
+      ["Active runs", dbDegraded ? "unavailable" : String(active.length)],
+      ["Decisions owed", dbDegraded ? "unavailable" : String(attention.length)],
+      ["Promotable runs", dbDegraded ? "unavailable" : String(promotable.length)],
       ["Unhealthy workers", String((data.unhealthy_workers || []).length)],
     ]
     cards.forEach(([label, value]) => {
@@ -3095,7 +3098,11 @@
 
     const attentionBlock = element("section", "surface-block")
     attentionBlock.appendChild(element("h3", "", "Attention"))
-    if (attention.length === 0) {
+    if (dbDegraded) {
+      attentionBlock.appendChild(
+        paragraph("Decisions owed unavailable — the control database could not be read."),
+      )
+    } else if (attention.length === 0) {
       attentionBlock.appendChild(paragraph("No decisions owed."))
     } else {
       attentionBlock.appendChild(
@@ -3119,7 +3126,11 @@
     const runsBlock = element("section", "surface-block")
     runsBlock.appendChild(element("h3", "", "Active + promotable runs"))
     const runs = active.concat(promotable)
-    if (runs.length === 0) {
+    if (dbDegraded) {
+      runsBlock.appendChild(
+        paragraph("Active and promotable runs unavailable — the control database could not be read."),
+      )
+    } else if (runs.length === 0) {
       runsBlock.appendChild(paragraph("No active or promotable runs."))
     } else {
       runsBlock.appendChild(
@@ -3155,6 +3166,13 @@
     try {
       const response = await fetch(`/api/runs/${encodeURIComponent(runId)}`)
       const data = await response.json()
+      // The read model answers a refused/unreadable detail with an HTTP-200 error envelope;
+      // render the named error instead of falling into the renderer (which would crash on
+      // missing numeric fields — the review's toFixed finding).
+      if (data && data.error) {
+        content.replaceChildren(paragraph(`Run detail unavailable: ${data.error}`))
+        return
+      }
       if (!response.ok) throw new Error(data.error || "run unavailable")
       renderRunDetail(data)
     } catch (error) {
