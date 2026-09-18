@@ -461,7 +461,14 @@
 
   // ── R4a address + R4d step timings ────────────────────────────────────────────────────────
 
-  /** R4a: the identity/scope facts for the selected run. */
+  /**
+   * R4a: the identity/scope facts for the selected run.
+   *
+   * CONTENT FIT: this is the run row's keyboard-reachable full-text disclosure. It carries every
+   * roster field in full, so a value the resting row ever has to shorten is still readable here
+   * after Enter/Space on the focused row. Values are read straight off the payload — never
+   * derived or guessed — and a missing one stays the literal `unknown`.
+   */
   function renderAddress(run) {
     var host = document.getElementById("dock-address-region");
     if (!host) return;
@@ -476,7 +483,12 @@
       ["phase", run["phase.progress"]],
       ["lifecycle", run["lifecycle.state"]],
       ["live", run["run.live"]],
+      ["commit", run["source.commit"]],
       ["cost", run["cost.provenance"]],
+      ["attention", run["attention.state"]],
+      ["said", run["evidence.advisory"]],
+      ["measured", run["evidence.measured"]],
+      ["source", run["evidence.source"]],
       ["eligibility", run["decision.eligibility"]],
       ["receipt", run["decision.receipt"]],
     ];
