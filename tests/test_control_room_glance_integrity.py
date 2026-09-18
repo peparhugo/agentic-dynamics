@@ -298,14 +298,14 @@ def _read(name: str) -> str:
 def test_dock_binding_never_guesses_an_id() -> None:
     """The dock uses the explicit cell binding only; no fabricated workspace fallback."""
     parity = _read("parity.js")
-    match = parity[parity.index("function cellIdFor("):]
+    match = parity[parity.index("function cellIdFor(") :]
     match = match[: match.index("\n  }") + 4]
     assert 'run["spec.cell"]' in match
     assert "terminal.target" not in match
     assert "session.identity" not in match
     # The stream target the operator sees is the binding (or an explicit unbound marker).
     assert '"unbound"' in parity
-    assert 'data-event-ts' in parity  # recorded event timestamps reach the feed rows
+    assert "data-event-ts" in parity  # recorded event timestamps reach the feed rows
 
 
 def test_visual_verify_node_never_greens_an_unknown_measured_token() -> None:
@@ -330,12 +330,12 @@ def test_client_fallback_declares_unknown_instead_of_all_clear() -> None:
     """A failed projection renders `unknown`; no client-side zero/none/all-clear copy."""
     app = _read("app.js")
     assert "function unavailableGlance(" in app
-    fallback = app[app.index("function unavailableGlance("):]
+    fallback = app[app.index("function unavailableGlance(") :]
     fallback = fallback[: fallback.index("\n  }") + 4]
     assert 'state: "unknown"' in fallback
     assert "running: null" in fallback
     assert "all-clear" not in fallback
-    assert "state: \"none\"" not in fallback
+    assert 'state: "none"' not in fallback
 
 
 def test_client_handles_stream_disconnect_and_age() -> None:
@@ -351,3 +351,81 @@ def test_client_handles_stream_disconnect_and_age() -> None:
         "pollStreamAge",
     ):
         assert anchor in app, anchor
+
+
+# ── the run-journey repairs: ledger resolution + cost/verdict fidelity ─────────────────────
+
+
+def test_recorded_ledger_resolves_the_container_spelled_path(tmp_path, monkeypatch):
+    """The run's ledger pointer is spelled /repo/... (the container mount) while the room runs
+    on the host. Without the mapping, every ledger-derived field silently rendered unknown."""
+    ledger = {"workdir": "/tmp/wt_x", "total_cost_usd": 0.5, "phases": []}
+    target = tmp_path / "experiments" / "results" / "workflows" / "spec" / "run.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(ledger), encoding="utf-8")
+    import agentic_dynamics.core.paths as paths_mod
+
+    monkeypatch.setattr(paths_mod, "PROJECT_ROOT", tmp_path)
+    detail = {"run": {"ledger_path": "/repo/experiments/results/workflows/spec/run.json"}}
+    assert glance._recorded_ledger(detail) == ledger
+    # An unresolvable pointer stays None (unknown), never a fabricated read.
+    assert glance._recorded_ledger({"run": {"ledger_path": "/repo/nope.json"}}) is None
+
+
+def test_cost_provenance_reports_recorded_spend_or_unknown():
+    assert (
+        glance._cost_provenance({}, {"run": {"cost_usd": 0.027517302}}, None)
+        == "$0.0275 · recorded"
+    )
+    assert (
+        glance._cost_provenance(
+            {}, {"run": {"cost_usd": 0.5}}, {"phases": [{"cost_source": "estimated"}]}
+        )
+        == "$0.5000 · estimated"
+    )
+    assert glance._cost_provenance({"cost_usd": 0.25}, None, None) == "$0.2500 · recorded"
+    assert (
+        glance._cost_provenance(
+            {}, {"run": {"cost_usd": 0.25}}, {"phases": [{"cost_source": "unknown"}]}
+        )
+        == "$0.2500 · source unknown"
+    )
+    assert glance._cost_provenance({}, {"run": {"cost_usd": 0.0}}, None) == "unknown"
+    assert glance._cost_provenance({}, None, None) == "unknown"
+
+
+def test_measured_state_names_independent_verification():
+    independent = {
+        "phases": [{"kind": "test", "test_executed_success": True, "evaluator_independent": True}]
+    }
+    assert glance._measured_state(None, independent) == "independent tests passed"
+    failed = {
+        "phases": [{"kind": "test", "test_executed_success": False, "evaluator_independent": True}]
+    }
+    assert glance._measured_state(None, failed) == "independent tests failed"
+    participant = {"phases": [{"kind": "test", "test_executed_success": True}]}
+    assert glance._measured_state(None, participant) == "tests passed"
+    assert glance._measured_state(None, {"phases": []}) == "no test recorded"
+
+
+def test_run_detail_drawer_escape_is_drawer_first() -> None:
+    """An open drawer consumes Escape before the workbench: the workbench handler delegates to
+    the registered drawer closer when the drawer is visible, and the drawer stops its own
+    Escape from bubbling (no double-close)."""
+    parity = _read("parity.js")
+    assert "activeRunDetailClose" in parity
+    # The workbench Escape branch consults the drawer's visibility BEFORE closing the workbench.
+    workbench_handler = parity[parity.index("function trapFocus(") :]
+    workbench_handler = workbench_handler[: workbench_handler.index("\n  }") + 4]
+    assert "run-detail-drawer" in workbench_handler
+    assert "activeRunDetailClose()" in workbench_handler
+    assert workbench_handler.index("activeRunDetailClose()") < workbench_handler.index(
+        "closeWorkbench()"
+    )
+    # The drawer's own Escape stops propagation so it never reaches the workbench handler.
+    assert "stopPropagation" in parity
+    # The drawer close control is addressable and the opened detail takes focus (reachability).
+    assert 'id: "run-detail-close"' in parity
+    open_detail = parity[parity.index("function openRunDetail(") :]
+    open_detail = open_detail[: open_detail.index("\n  }") + 4]
+    assert "run-detail-close" in open_detail
