@@ -37,15 +37,14 @@ services:
       - ANONYMIZED_TELEMETRY=False
     volumes:
       - chroma_data:/data
-    # No healthcheck existed: a wedged server looked identical to a busy one. The heartbeat
-    # endpoint is cheap and version-stable.
+    # No healthcheck existed: a wedged server looked identical to a busy one. The image ships
+    # no curl/wget/python (dash is its only tool), so the check reads /proc/net/tcp for the
+    # listening port (0x1F40 = 8000) — a real liveness signal with zero in-container deps.
     healthcheck:
       test:
         [
-          "CMD",
-          "python",
-          "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v2/heartbeat', timeout=3)",
+          "CMD-SHELL",
+          'while read l; do case "$l" in *":1F40 00000000:0000"*) exit 0;; esac; done < /proc/net/tcp; exit 1',
         ]
       interval: 30s
       timeout: 5s
