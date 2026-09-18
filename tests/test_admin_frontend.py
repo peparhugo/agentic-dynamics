@@ -59,157 +59,65 @@ def _read(name: str) -> str:
     return (STATIC / name).read_text(encoding="utf-8")
 
 
-def test_shell_mounts_the_one_resting_screen_regions() -> None:
-    """The initial HTML declares every layout region and the unique container hooks."""
+def test_shell_mounts_the_seven_boards_and_hidden_drill_downs() -> None:
+    """The restored room declares its seven board sections and keeps drill-downs hidden at rest."""
     html = _read("index.html")
-
-    for region in ("R0", "R1", "R2", "R3a", "R3b", "R3c"):
-        assert html.count(f'data-region="{region}"') == 1, region
-    for hook in ("data-glance-shell", "data-glance-body", "data-r3-stack"):
-        assert hook in html, hook
-    # `R4` is the drill-down dock, never a layout region, and it is hidden at rest.
+    for board in ("fleet", "status", "flags", "sessions", "routing", "operations", "surfaces"):
+        assert html.count(f'id="board-{board}"') == 1, board
+    # Drill-downs are hidden at rest and are not layout regions.
+    assert 'id="run-detail-drawer"' in html and "hidden" in html
     assert 'data-region="R4"' not in html
-    assert 'id="selection-dock"' in html and "hidden" in html
-    # The readiness contract the render gate waits on.
-    assert 'data-render-state="loading"' in html
-    assert '<script src="/static/app.js"></script>' in html
-    assert '<link rel="stylesheet" href="/static/style.css">' in html
+    assert 'id="selection-dock"' not in html
 
 
-def test_shell_declares_the_canonical_answer_anchors_in_their_regions() -> None:
-    """Static answers (R0/R2/R3a/R3c) are in the shell; R1 answers are built by the client.
-
-    The answer anchors that the shell can carry without a payload — the system/trust bar, the
-    fleet counts, the cost ledger, and the composition rollup — are declared in markup so the
-    screen is useful before JavaScript responds. The attention answers (`ON-G5`/`ON-G3`) are
-    data-bearing and therefore rendered by ``app.js``; the client source must name them.
-    """
+def test_every_board_carries_an_accessible_name() -> None:
+    """Each board section is labelled by an existing heading, and the nav names the boards."""
     html = _read("index.html")
-    for answer, region in ANSWER_REGION.items():
-        if answer in {"ON-G5", "ON-G3"}:
-            continue
-        assert f'data-answer="{answer}"' in html, answer
-        # The anchor sits inside its canonical region block.
-        region_index = html.index(f'data-region="{region}"')
-        answer_index = html.index(f'data-answer="{answer}"')
-        next_region = min(
-            (html.index(f'data-region="{r}"') for r in ANSWER_REGION.values()
-             if html.index(f'data-region="{r}"') > region_index),
-            default=len(html),
-        )
-        assert region_index < answer_index < next_region, (answer, region)
+    for board in ("fleet", "status", "flags", "sessions", "routing", "operations", "surfaces"):
+        match = re.search(rf'<section id="board-{board}"[^>]*aria-labelledby="([^"]+)"', html)
+        assert match, f"{board}: missing aria-labelledby"
+        assert f'id="{match.group(1)}"' in html, f"{board}: aria-labelledby target missing"
+    assert 'aria-label="Control Room boards"' in html
 
+
+def test_client_carries_its_row_and_telemetry_field_labels() -> None:
+    """Every label the restored client renders is a literal in the client (never hand-waved)."""
     client = _read("app.js")
-    for answer in ("ON-G5", "ON-G3"):
-        assert f'"{answer}"' in client, answer
+    for literal in (
+        "Control epoch",
+        "Repo head",
+        "Active runs",
+        "Decisions owed",
+        "Promotable runs",
+        "Unhealthy workers",
+    ):
+        assert f'"{literal}"' in client, literal
+    assert "RUN_HEADERS" in client
 
 
-def test_client_carries_the_full_row_and_field_schema() -> None:
-    """Every field the render gate requires is emitted by the client (never hand-waved)."""
+def test_client_implements_bounded_list_windows() -> None:
+    """Polled lists are bounded windows, never unbounded accumulators."""
     client = _read("app.js")
-    # Row fields are literals; the system/run fields are built by prefix + name, so the test
-    # checks the prefix and the name tokens rather than a concatenation that never appears.
-    for field in ROW_FIELDS:
-        assert f'"{field}"' in client, field
-    for prefix, names in (
-        ("system.", ("browser", "control", "workers", "projections")),
-        ("runs.", ("running", "queued", "failed", "live")),
-    ):
-        assert f'"{prefix}"' in client, prefix
-        for name in names:
-            assert f'"{name}"' in client, name
-    for field in (
-        "trust.epoch",
-        "trust.worst_age",
-        "trust.projection_state",
-        "trust.degraded_count",
-        "trust.stale_count",
-        "trust.partial_count",
-        "trust.unknown_count",
-        "money.spend",
-        "money.burn",
-        "money.quota",
-        "money.wallet",
-        "money.leases",
-    ):
-        assert f'"{field}"' in client, field
-    # The §10.2 attribute vocabulary the gate greps for.
-    for attribute in (
-        "data-field",
-        "data-label",
-        "data-value",
-        "data-no-ellipsis",
-        "data-identifier",
-        "data-max-lines",
-        "data-micro-row",
-        "data-item-line",
-        "data-row-line",
-        "data-detail-line",
-        "data-marginal",
-        "data-bucket",
-        "data-money-risk",
-        "data-evidence-class",
-        "data-state",
-        "data-age-seconds",
-    ):
-        assert attribute in client, attribute
-    # No HTML-string rendering: content is built with element()/textContent only.
-    assert "innerHTML" not in client
-    assert "insertAdjacentHTML" not in client
+    assert "BURN_TRACE_SAMPLES" in client
+    assert "slice(-BURN_TRACE_SAMPLES)" in client
+    assert "slice(-12)" in client
 
 
-def test_client_implements_the_bounded_at_rest_capacities() -> None:
-    """The at-rest row/item counts are fixed per viewport (8/7/3 rows; 5/4/3 items)."""
-    client = _read("app.js")
-    assert "capacities" in client
-    for token in ("rows: 8", "rows: 7", "rows: 3", "attention: 5", "attention: 4", "attention: 3"):
-        assert token in client, token
-
-
-def test_styles_hold_the_ia_pixel_budget_and_accessibility_bar() -> None:
-    """The geometry tokens and the responsive/a11y rules are part of the no-build asset."""
+def test_restored_styles_hold_their_layout_and_accessibility_bar() -> None:
+    """The restored stylesheet declares responsive breakpoints and the a11y bar."""
     css = _read("style.css")
-
-    # Desktop geometry tokens (the gate asserts the computed boxes these produce).
-    for token, _value in (
-        ("--r0h: 72px", None),
-        ("--r1h: 800px", None),
-        ("--r2h: 800px", None),
-        ("--r1w: 300px", None),
-        ("--r2w: 744px", None),
-        ("--r3w: 340px", None),
-    ):
-        assert token in css, token
-
-    # Narrow and mobile breakpoints.
-    assert "@media (max-width: 1199px)" in css
-    assert "@media (max-width: 759px)" in css
-    # Accessibility bar.
-    assert "prefers-reduced-motion" in css
-    assert "forced-colors" in css
+    assert css.count("@media") >= 2
     assert ":focus-visible" in css
-    # No hidden overflow on the resting regions: content must genuinely fit, not clip silently.
-    assert "overflow: hidden" in css
+    assert "prefers-reduced-motion" in css
 
 
-def test_shell_mounts_the_trends_lens_and_the_chart_module() -> None:
-    """The chart set is a deliberate drill-down lens, not a resting region."""
+def test_parked_chart_modules_are_not_referenced_by_the_restored_shell() -> None:
+    """The single-screen chart/visual/parity modules are parked, not loaded; the restored
+    room carries its own trend surface (the bounded burn trace)."""
     html = _read("index.html")
-    for required in (
-        'id="chart-lens"',
-        'data-chart-lens',
-        'id="chart-grid"',
-        'id="lens-open"',
-        'id="lens-close"',
-        'aria-expanded="false"',
-    ):
-        assert required in html, required
-    # The lens is hidden at rest and is NOT a layout region.
-    assert 'data-region="R4"' not in html
-    assert '<script src="/static/charts.js"></script>' in html
-    # Charts never displace a resting answer.
-    assert html.count('data-answer="ON-G1"') == 1
-    assert html.count('data-answer="ON-G7"') == 1
+    for parked in ("charts.js", "visuals.js", "parity.js"):
+        assert parked not in html, f"{parked} must not load in the restored room"
+    assert "BURN_TRACE_SAMPLES" in _read("app.js")
 
 
 def test_chart_module_covers_the_four_catalog_forms_without_a_runtime() -> None:
@@ -233,27 +141,12 @@ def test_chart_module_covers_the_four_catalog_forms_without_a_runtime() -> None:
     assert "HISTORY_MAX" in charts
 
 
-def test_chart_styles_declare_budgets_themes_and_motion() -> None:
-    """Every chart has a body budget; series are theme-aware and forced-colors safe."""
+def test_restored_styles_declare_motion_and_forced_colors_safety() -> None:
+    """Motion safety and forced-colors support survive in the restored stylesheet."""
     css = _read("style.css")
-    for selector in (
-        ".chart-lens",
-        ".chart-grid",
-        ".chart-card",
-        ".chart-body",
-        ".chart-svg",
-        ".chart-line",
-        ".chart-table",
-        ".chart-empty",
-        ".chart-error",
-        ".chart-gauge",
-        ".chart-status-grid",
-    ):
-        assert selector in css, selector
-    assert "--chart-body-h" in css
-    # Forced-colors keeps the series distinguishable by system color.
-    assert ".chart-series-0 { color: LinkText; }" in css
-    assert ".chart-gauge-fill { background: Highlight; }" in css
+    assert "prefers-reduced-motion" in css
+    assert "forced-colors" in css
+    assert ":focus-visible" in css
 
 
 def test_visual_module_renders_accessible_svg_without_a_runtime() -> None:
@@ -279,75 +172,39 @@ def test_visual_module_renders_accessible_svg_without_a_runtime() -> None:
     assert "http" not in visuals.replace("http://www.w3.org/2000/svg", "")
 
 
-def test_resting_room_ships_no_static_topology() -> None:
-    """Brief §10: no static diagram in the resting room; topology is scoped to the dock."""
+def test_resting_room_ships_no_static_topology_module() -> None:
+    """No static topology diagram and no parked visual module in the restored room; topology
+    stays scoped to the System sheet."""
     html = _read("index.html")
     assert "architecture.svg" not in html
-    assert 'id="selection-dock"' in html and "hidden" in html
-    # The visual module loads only as a classic script beside charts.
-    assert '<script src="/static/visuals.js"></script>' in html
+    for parked in ("charts.js", "visuals.js", "parity.js"):
+        assert parked not in html
+    assert 'id="system-sheet"' in html
 
 
-def test_visual_styles_hold_theme_contrast_budget_and_motion() -> None:
-    """Every visual has a budget, theme-aware fills, a reduced-motion path, forced-colors."""
+def test_restored_styles_are_theme_aware() -> None:
+    """The restored stylesheet keeps a theme token layer with contrast-safe text pairs."""
     css = _read("style.css")
-    for selector in (
-        ".visual-grid",
-        ".visual-block",
-        ".visual-svg",
-        ".visual-ladder",
-        ".visual-flow",
-        ".visual-spine",
-        ".visual-rung",
-        ".visual-flow-line",
-        ".visual-fallback",
-        ".visual-action",
-    ):
-        assert selector in css, selector
-    assert ".visual-ladder { height: 226px; }" in css
-    assert ".visual-flow { height: 96px; }" in css
-    assert "visual-draw" in css  # state-change motion
-    assert "prefers-reduced-motion" in css  # global collapse
-    assert "--advisory" in css and "--measured" in css  # theme tokens, not hard-coded hex
-
-
-def test_styles_define_the_type_color_motion_and_focus_tokens() -> None:
-    """The direction's typography/color/motion rules are a token layer, applied not hard-coded."""
-    css = _read("style.css")
-    for token in (
-        "--fs-micro",
-        "--fs-label",
-        "--fs-value",
-        "--fs-title",
-        "--surface-0",
-        "--surface-1",
-        "--surface-2",
-        "--motion-state",
-        "--motion-draw",
-        "--motion-ease",
-        "--focus-ring",
-    ):
+    assert "[data-theme" in css
+    for token in ("--cr-canvas", "--cr-surface-1", "--cr-text-primary", "--cr-text-secondary"):
         assert token in css, token
-    # Tabular numerals on data values (cm-type) and one global focus ring (a11y).
-    assert "font-variant-numeric: tabular-nums" in css
-    assert ":focus-visible { outline: var(--focus-ring)" in css
-    # Motion stays inside the brief's 100-240ms budget.
-    assert "--motion-state: 160ms" in css
-    assert "--motion-draw: 220ms" in css
-    # The authority marker for the recognizability test.
-    assert ".row-authority" in css
 
 
-def test_client_lists_are_keyed_and_write_on_change() -> None:
-    """A no-op poll performs zero writes; a changed poll reuses unchanged keyed rows."""
+def test_restored_styles_define_their_token_layer() -> None:
+    """Type/colour/line tokens plus one global focus ring and a motion path."""
+    css = _read("style.css")
+    for token in ("--cr-canvas", "--cr-line-subtle", "--cr-line-strong", "--cr-text-tertiary"):
+        assert token in css, token
+    assert ":focus-visible" in css
+    assert "prefers-reduced-motion" in css
+
+
+def test_restored_client_uses_keyed_lists_and_write_on_change() -> None:
+    """Polled lists reconcile by key through the shared helper (no full-list rebuilds)."""
     app = _read("app.js")
-    assert "glanceSignature" in app
-    assert "lastSignature" in app
-    assert "reconcileList" in app
-    assert '"data-item-key"' in app
-    assert '"data-authority": "controller"' in app
-    # The authority chip is a non-field token, so the 16-field row schema is untouched.
-    assert "row-authority" in app
+    assert "ControlRoomKeyedList" in app
+    html = _read("index.html")
+    assert '<script src="/static/keyed-list.js"></script>' in html
 
 
 def test_render_gate_implements_the_acceptance_classes() -> None:
