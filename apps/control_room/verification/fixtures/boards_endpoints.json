@@ -1,0 +1,303 @@
+{
+  "_note": "Deterministic wire payloads for the restored-board acceptance classes (navigation, loading, degraded, scrolling, keyboard). No live Redis/clock/network (waiver W2). Run rows are expanded from run_seed + active_count/promotable_count by scripts/verify_control_room_rendering.py:build_operations_payload(), so every id is stable and the list is long enough to scroll.",
+  "operations": {
+    "source": {
+      "control_epoch": 812,
+      "repo_head_sha": "bc2c728633273947d278f285c2e8929946aaa082"
+    },
+    "run_seed": {
+      "spec_name": "control_room_followups",
+      "state": "promotable",
+      "phases_completed": 2,
+      "phases_total": 2,
+      "model": "deepseek/deepseek-v4-flash",
+      "candidate_sha": "bc2c728633273947d278f285c2e8929946aaa082",
+      "started_at": "2026-09-18T19:18:09Z"
+    },
+    "active_count": 6,
+    "promotable_count": 12,
+    "attention": [
+      {
+        "kind": "approval",
+        "run_id": "run-fixture-0007",
+        "spec_name": "control_room_followups",
+        "gate_id": "gate-fixture",
+        "candidate_sha": "bc2c728633273947d278f285c2e8929946aaa082",
+        "purpose": "operator signature owed before the run may proceed"
+      },
+      {
+        "kind": "promotion",
+        "run_id": "run-fixture-0001",
+        "spec_name": "control_room_followups",
+        "gate_id": "",
+        "candidate_sha": "bc2c728633273947d278f285c2e8929946aaa082",
+        "purpose": "candidate verified; awaiting the permanence decision"
+      }
+    ],
+    "projection_lag": {
+      "chroma": 0,
+      "ledger": 1,
+      "neo4j": 1,
+      "registry": 0
+    },
+    "unhealthy_workers": [
+      {
+        "session_id": "ses_fixture_stale",
+        "age_seconds": 845
+      }
+    ]
+  },
+  "operations_degraded": {
+    "source": {
+      "control_epoch": 812,
+      "repo_head_sha": "bc2c728633273947d278f285c2e8929946aaa082"
+    },
+    "active_count": 0,
+    "promotable_count": 0,
+    "attention": [],
+    "degraded": [
+      {
+        "surface": "control_db",
+        "reason": "control database not found"
+      }
+    ],
+    "projection_lag": {},
+    "unhealthy_workers": []
+  },
+  "run_detail": {
+    "run": {
+      "spec_name": "control_room_followups",
+      "state": "promotable",
+      "model": "deepseek/deepseek-v4-flash",
+      "candidate_sha": "bc2c728633273947d278f285c2e8929946aaa082",
+      "started_at": "2026-09-18T19:18:09Z",
+      "cost_usd": 1.23
+    },
+    "attempts": [
+      {
+        "attempt_number": 1,
+        "phase": "build",
+        "model": "deepseek/deepseek-v4-flash",
+        "status": "ok",
+        "first_pass": true,
+        "accepted": true,
+        "cost_usd": 0.41
+      },
+      {
+        "attempt_number": 2,
+        "phase": "verify",
+        "model": "deepseek/deepseek-v4-flash",
+        "status": "ok",
+        "first_pass": false,
+        "accepted": true,
+        "retry_reason": "test_first",
+        "cost_usd": 0.82
+      }
+    ],
+    "gates": [
+      {
+        "gate_id": "gate-fixture",
+        "candidate_sha": "bc2c7286",
+        "status": "awaiting_approval",
+        "verdict": "pending",
+        "created_at": "2026-09-18T19:40:00Z"
+      }
+    ],
+    "approvals": [
+      {
+        "gate_id": "gate-fixture",
+        "candidate_sha": "bc2c7286",
+        "purpose": "browser acceptance retarget",
+        "operator": "fixture",
+        "created_at": "2026-09-18T19:45:00Z"
+      }
+    ],
+    "commands": [
+      {
+        "verb": "promote",
+        "state": "proposed",
+        "actor": "aio-control",
+        "rationale": "fixture",
+        "candidate_sha": "bc2c7286",
+        "created_at": "2026-09-18T19:46:00Z"
+      }
+    ]
+  },
+  "design_sessions": {
+    "sessions": [
+      {
+        "portal_id": "portal-fixture-1",
+        "kind": "workflow",
+        "title": "Control Room follow-ups",
+        "draft_state": "in_review",
+        "revision": 3,
+        "model": "deepseek/deepseek-v4-flash",
+        "workdir_label": "wt/control-room-followups",
+        "workdir": "/tmp/wt_cr_followups",
+        "draft_name": "control-room-followups"
+      }
+    ]
+  },
+  "surfaces": {
+    "quality": {
+      "population": {
+        "eligible_cells": 12,
+        "resolved_cells": 10,
+        "exclusions": {
+          "pending": 2
+        }
+      },
+      "models": [
+        {
+          "model": "deepseek-v4-flash",
+          "grit": {
+            "overall": {
+              "grit": 0.71,
+              "n": 42,
+              "insufficient_support": false
+            }
+          },
+          "first_pass": {
+            "first_pass_rate": 0.62,
+            "accepted_rate": 0.81,
+            "explanation_ratio": 0.34,
+            "n_eligible": 42,
+            "n_total": 45
+          }
+        }
+      ],
+      "degraded": [
+        {
+          "surface": "chroma"
+        }
+      ]
+    },
+    "value": {
+      "formula": "accepted outcomes per dollar",
+      "bvi": 1.5,
+      "rows": [
+        {
+          "run": "run-fixture-0001",
+          "arm": "baseline",
+          "accepted_outcomes": 8,
+          "total_cost_usd": 12.4,
+          "cost_per_accepted": 1.55,
+          "cost_captured_records": 8,
+          "outcomes_total": 8
+        }
+      ]
+    },
+    "arms": {
+      "state": "measured",
+      "state_reason": "fixture",
+      "comparison": {
+        "best_arm": "flash",
+        "arms": {
+          "flash": {
+            "n": 12,
+            "eligible": true,
+            "weighted_loss": 0.31,
+            "coverage": {
+              "cost": {
+                "n": 12,
+                "of": 12
+              }
+            }
+          }
+        }
+      },
+      "n_outcomes": 12
+    },
+    "sla": {
+      "queue": {
+        "depth": 3
+      },
+      "burn": {
+        "burn_per_h": 1.2,
+        "span_h": 6
+      },
+      "sla": {
+        "horizon": 24,
+        "twice_depth_rule": {
+          "threshold_jobs": 6,
+          "basis": "p95"
+        },
+        "breach_rate": {
+          "state": "measured",
+          "value": {
+            "timeout_breaches": 1,
+            "total_phases_with_breach_fields": 20,
+            "gate_breaches": 0
+          }
+        }
+      },
+      "recent_completions": {
+        "rows": [
+          {
+            "cell_id": "cell-fixture",
+            "status": "done",
+            "queue_wait_ms": 1200,
+            "service_time_ms": 45000,
+            "deadline_slack_ms": 30000
+          }
+        ]
+      }
+    },
+    "escalations": {
+      "armed": false,
+      "armed_note": "shadow only",
+      "events": [
+        {
+          "from": "flash",
+          "to": "pro",
+          "reason": "confidence low",
+          "cost_usd": 0.4
+        }
+      ],
+      "e_x": {
+        "state": "measured",
+        "value": 11.47,
+        "class": "measured"
+      }
+    },
+    "batch": {
+      "measurable": false,
+      "reason": "no marker",
+      "scanned_jobs": 30,
+      "modeled": {
+        "discount": 0.5,
+        "horizon_h": 24,
+        "class": "scenario"
+      }
+    },
+    "energy": {
+      "energy_model": {
+        "per_prompt_token_j": 0.2,
+        "per_output_token_j": 0.5,
+        "per_reasoning_token_j": 0.3,
+        "class": "estimated"
+      },
+      "epm": {
+        "state": "published",
+        "baseline": {
+          "value": 1.1
+        },
+        "aggressive": {
+          "value": 0.8
+        },
+        "class": "scenario"
+      },
+      "energy_ranking": {
+        "models": [
+          {
+            "id": "deepseek-v4-flash",
+            "avg_energy_j": 12.3,
+            "avg_energy_j_per_loc": 0.4
+          }
+        ]
+      },
+      "measured_session_energy": "unknown",
+      "flip_horizon": "unknown"
+    }
+  }
+}

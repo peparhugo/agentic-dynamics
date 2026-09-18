@@ -1,38 +1,46 @@
 #!/usr/bin/env python3
-"""verify_control_room_rendering.py — the Control Room facelift render gate.
+"""verify_control_room_rendering.py — the Control Room rendering gate.
 
-The gate is the executable form of ``docs/research/control_room_ia.md`` §10: it serves the real
-Flask shell, intercepts every ``/api/*`` request with a committed fixture, captures screenshots
-at the three claimed breakpoints (1440x900, 1024x768, 390x844), and asserts the canonical glance
-contract — all seven ``ON-G1..G7`` answers present, unique, inside their one canonical region,
-above the fold, on scrollable pages with no horizontal overflow (the 2026-09-13 re-baseline,
-decision ``9f357fce``: the controller's room scrolls vertically; the no-page-scroll era is
-superseded), on WCAG-AA contrast, and with the bounded row / item / marginal counts per viewport.
+Two targets live in this file, and the distinction is load-bearing:
 
-Classes implemented (p5 IA8: a screenshot must not be asked to prove what only the network can):
-  * G geometry     — present/unique, in-viewport, non-zero box, no horizontal overflow, contrast, schemas
-  * semantics      — every ON-G1..G7 answer's RENDERED value/state/enum vs FIXTURE truth, plus the
-                     B-class carriers: presence is not proof, so the gate compares content
-  * fixtures       — deterministic F-0..F-7 payloads, no live Redis/clock/network (waiver W2)
-  * A a11y         — accessible names/roles, true hidden state, and the keyboard open/close path
-                     with focus containment (``--a11y``)
-  * E state        — epoch consistency and saturated-inbox reservation (folded into semantics)
-  * P feature-parity (u5) — every ``parity_inventory.json`` surface placed on the closed palette;
-                     each workbench lens requests its endpoint (wired) and renders non-empty data;
-                     the R4b per-worker event stream + action band and the R4d step timings are
-                     present, non-empty and structurally legal (``--parity``)
+* The SERVED room (2026-09-18 restoration, PR #84) is the seven-board destination shell:
+  ``index.html`` loads control-room-core.js, keyed-list.js, board-fleet.js, shell.js,
+  detail-sheet.js, app.js. The RESTORED classes accept it — board navigation, first-visit
+  loading (including a reload with each lazy board saved), degraded responses, scrolling, and
+  the keyboard run journey — and they are the gate's default and its ``--profile acceptance``
+  roster. Every capture the controller reviews comes from these classes.
+* The PARKED single-screen workbench (``parity.js`` / ``charts.js`` / ``visuals.js``) is
+  retained in-tree but no longer served. The LEGACY classes below (geometry/semantics, charts,
+  visuals, style, a11y, parity, live, interactions) still target its selectors
+  (``data-region``/``data-answer``/``#workbench``/``#selection-dock``). They are explicitly
+  invoked only (``--geometry``/``--charts``/``--visuals``/``--style``/``--a11y``/``--parity``/
+  ``--live``/``--interactions``) and can never pass against the served page; their retirement
+  is the controller's call once the parked modules go.
 
-The event/state E class is otherwise named in the IA; this gate implements what it can automate
-deterministically. The adversaries (``docs/reviews/control_room_facelift_{design,ia}.md``) read
-the screenshots this gate writes.
+Both targets share the gate's posture: serve the real Flask shell, intercept every ``/api/*``
+request with committed deterministic fixtures (no live Redis/clock/network — waiver W2),
+capture screenshots (a run with zero captures is a structural FAIL), bind ``--candidate`` and
+the ``--base``/``--preview`` target into the report (every served static artifact is hashed
+against the committed candidate), and reject a missing required class rather than silently
+skipping it.
+
+Restored classes:
+  * navigation — the seven destinations: one visible board at a time, aria-current, no
+                 horizontal overflow, the board scroller
+  * loading    — first-visit lazy load for Operations/Surfaces/Routing, including a RELOAD
+                 with each board saved (the 2026-09-18 review's zero-load reproduction)
+  * degraded   — a degraded control db reads "unavailable", never a fabricated 0; one failed
+                 read model renders its named reason and URL while its siblings still render
+  * scrolling  — the board scroller overflows below the fold and a board switch resets it
+  * keyboard   — Enter on a run row opens the drawer with focus on its close control; Escape
+                 closes it and returns focus to the originating row
 
 Usage:
-  python3 scripts/verify_control_room_rendering.py                 # full gate (needs Chromium)
-  python3 scripts/verify_control_room_rendering.py --check-fixtures  # no browser: validate fixtures
-  python3 scripts/verify_control_room_rendering.py --a11y             # + accessibility class
-  python3 scripts/verify_control_room_rendering.py --parity           # + feature-parity class
+  python3 scripts/verify_control_room_rendering.py                    # restored boards (default)
+  python3 scripts/verify_control_room_rendering.py --check-fixtures   # no browser: validate fixtures
+  python3 scripts/verify_control_room_rendering.py --profile acceptance --candidate <sha>
   python3 scripts/verify_control_room_rendering.py --out DIR --json PATH --report PATH
-  python3 scripts/verify_control_room_rendering.py --fixtures F-0,F-5 --no-screenshot
+  python3 scripts/verify_control_room_rendering.py --geometry --fixtures F-0,F-5  # legacy parked
 
 Exit code 0 = PASS, 1 = FAIL, 2 = browser unavailable.
 """
@@ -94,21 +102,49 @@ FIELDS = {
     },
 }
 ROW_FIELDS = {
-    "session.identity", "spec.cell", "terminal.target", "command.current", "model.provider",
-    "attempt.number", "phase.progress", "lifecycle.state", "run.live", "source.commit",
-    "cost.provenance", "attention.state", "evidence.advisory", "evidence.measured",
-    "evidence.source", "decision.eligibility", "decision.receipt",
+    "session.identity",
+    "spec.cell",
+    "terminal.target",
+    "command.current",
+    "model.provider",
+    "attempt.number",
+    "phase.progress",
+    "lifecycle.state",
+    "run.live",
+    "source.commit",
+    "cost.provenance",
+    "attention.state",
+    "evidence.advisory",
+    "evidence.measured",
+    "evidence.source",
+    "decision.eligibility",
+    "decision.receipt",
 }
 EXPECTED_BOXES = {
-    "desktop": {"R0": (16, 0, 1408, 72), "R1": (16, 84, 300, 800),
-                "R2": (328, 84, 744, 800), "R3a": (1084, 84, 340, 220),
-                "R3b": (1084, 312, 340, 180), "R3c": (1084, 500, 340, 140)},
-    "narrow": {"R0": (12, 0, 1000, 60), "R1": (12, 68, 224, 692),
-               "R2": (244, 68, 472, 692), "R3a": (724, 68, 288, 160),
-               "R3b": (724, 236, 288, 132), "R3c": (724, 376, 288, 116)},
-    "mobile": {"R0": (12, 0, 366, 72), "R1": (12, 80, 366, 144),
-               "R2": (12, 232, 366, 284), "R3a": (12, 524, 366, 92),
-               "R3b": (12, 624, 366, 68), "R3c": (12, 700, 366, 60)},
+    "desktop": {
+        "R0": (16, 0, 1408, 72),
+        "R1": (16, 84, 300, 800),
+        "R2": (328, 84, 744, 800),
+        "R3a": (1084, 84, 340, 220),
+        "R3b": (1084, 312, 340, 180),
+        "R3c": (1084, 500, 340, 140),
+    },
+    "narrow": {
+        "R0": (12, 0, 1000, 60),
+        "R1": (12, 68, 224, 692),
+        "R2": (244, 68, 472, 692),
+        "R3a": (724, 68, 288, 160),
+        "R3b": (724, 236, 288, 132),
+        "R3c": (724, 376, 288, 116),
+    },
+    "mobile": {
+        "R0": (12, 0, 366, 72),
+        "R1": (12, 80, 366, 144),
+        "R2": (12, 232, 366, 284),
+        "R3a": (12, 524, 366, 92),
+        "R3b": (12, 624, 366, 68),
+        "R3c": (12, 700, 366, 60),
+    },
 }
 ROW_COUNT = {"desktop": 8, "narrow": 7, "mobile": 3}
 ATTENTION_COUNT = {"desktop": 5, "narrow": 4, "mobile": 3}
@@ -176,8 +212,14 @@ FIXTURE_DELTAS: dict[str, dict[str, Any]] = {
         "run_counts": {"running": 80, "queued": 60, "failed": 40, "live": 20},
     },
     "F-3": {
-        "cost": {"spend": "$48.10", "burn": "$2.40/h", "quota": "96%", "wallet": "$1.60",
-                 "leases": "$9.90", "money_risk": True},
+        "cost": {
+            "spend": "$48.10",
+            "burn": "$2.40/h",
+            "quota": "96%",
+            "wallet": "$1.60",
+            "leases": "$9.90",
+            "money_risk": True,
+        },
     },
     "F-4": {
         "provider_unknown": True,
@@ -225,8 +267,7 @@ def _apply_delta(seed: dict[str, Any], fixture_id: str) -> dict[str, Any]:
     if delta.get("provider_unknown"):
         payload["composition"]["provider"] = {"top": "openai 5", "other": "0", "unknown": "2"}
         payload["trust"]["unknown_count"] = 2
-        payload["cost"] = {key: "unknown" for key in
-                           ("spend", "burn", "quota", "wallet", "leases")}
+        payload["cost"] = {key: "unknown" for key in ("spend", "burn", "quota", "wallet", "leases")}
         payload["cost"]["money_risk"] = False
     if delta.get("stale_projection"):
         payload["system"]["projections"] = {"state": "degraded", "age_seconds": 901}
@@ -238,8 +279,12 @@ def _apply_delta(seed: dict[str, Any], fixture_id: str) -> dict[str, Any]:
         payload["system"]["browser"] = {"state": "down", "age_seconds": 7}
     if delta.get("empty_queues"):
         payload["attention"]["decision"] = {
-            "state": "none", "target": "none", "kind": "none", "epoch": 42,
-            "authority": "none", "eligibility": "none",
+            "state": "none",
+            "target": "none",
+            "kind": "none",
+            "epoch": 42,
+            "authority": "none",
+            "eligibility": "none",
         }
         payload["attention"]["risk"] = {"identity": "none", "state": "all-clear", "action": "none"}
     return payload
@@ -307,23 +352,32 @@ def check_fixtures() -> int:
             # Facelift repair A5-D2: every actionable row must carry the lease/cost facets, so a
             # stranger can identify spend against a hard budget from the row alone (the F-0 seed
             # supplies a known $5.00 cap and an over-cap row).
-            for facet in ("budget.reserved", "budget.settled", "budget.cap",
-                          "budget.headroom", "budget.settlement"):
+            for facet in (
+                "budget.reserved",
+                "budget.settled",
+                "budget.cap",
+                "budget.headroom",
+                "budget.settlement",
+            ):
                 if row.get(facet) in (None, ""):
                     problems.append(f"{fixture_id}: row {row.get('id')} missing {facet}")
-        if fixture_id == "F-0" and not any(row.get("budget.headroom") == 0
-                                           for row in wire["run_sample"]):
+        if fixture_id == "F-0" and not any(
+            row.get("budget.headroom") == 0 for row in wire["run_sample"]
+        ):
             problems.append("F-0: needs an over-cap row (budget.headroom == 0)")
         for name in ("model", "condition", "provider", "lifecycle"):
             marginal = wire["composition"][name]
             if not {"top", "other", "unknown"} <= set(marginal):
                 problems.append(f"{fixture_id}: {name} marginal schema")
+    # The restored-board fixture rides the same check: the served room's classes cannot be
+    # acceptance-tested against a fixture that does not describe the wire payloads they read.
+    problems.extend(check_boards_fixtures())
     if problems:
         print("fixture check FAIL")
         for problem in problems:
             print("  ", problem)
         return 1
-    print("fixture check PASS (F-0..F-7)")
+    print("fixture check PASS (F-0..F-7 legacy + boards)")
     return 0
 
 
@@ -369,8 +423,9 @@ def _attach_console(page: Any) -> list[str]:
     by the listeners, so the caller reads it after the page has settled.
     """
     errors: list[str] = []
-    page.on("console", lambda message: errors.append(message.text)
-            if message.type == "error" else None)
+    page.on(
+        "console", lambda message: errors.append(message.text) if message.type == "error" else None
+    )
     page.on("pageerror", lambda error: errors.append(str(error)))
     return errors
 
@@ -816,18 +871,54 @@ def _chart_history(base: dict[str, Any]) -> list[dict[str, Any]]:
         {"running": 5, "queued": 1, "failed": 1, "live": 3},
     ]
     costs = [
-        {"spend": "$8.00", "burn": "$0.40/h", "quota": "44%", "wallet": "$11.00",
-         "leases": "$1.00", "money_risk": False},
-        {"spend": "$9.10", "burn": "$0.55/h", "quota": "50%", "wallet": "$10.10",
-         "leases": "$1.20", "money_risk": False},
-        {"spend": "$10.20", "burn": "$0.70/h", "quota": "55%", "wallet": "$9.00",
-         "leases": "$1.50", "money_risk": False},
-        {"spend": "$11.10", "burn": "$0.78/h", "quota": "58%", "wallet": "$8.20",
-         "leases": "$1.80", "money_risk": False},
-        {"spend": "$12.00", "burn": "$0.80/h", "quota": "60%", "wallet": "$7.80",
-         "leases": "$2.00", "money_risk": False},
-        {"spend": "$12.40", "burn": "$0.82/h", "quota": "61%", "wallet": "$7.60",
-         "leases": "$2.10", "money_risk": False},
+        {
+            "spend": "$8.00",
+            "burn": "$0.40/h",
+            "quota": "44%",
+            "wallet": "$11.00",
+            "leases": "$1.00",
+            "money_risk": False,
+        },
+        {
+            "spend": "$9.10",
+            "burn": "$0.55/h",
+            "quota": "50%",
+            "wallet": "$10.10",
+            "leases": "$1.20",
+            "money_risk": False,
+        },
+        {
+            "spend": "$10.20",
+            "burn": "$0.70/h",
+            "quota": "55%",
+            "wallet": "$9.00",
+            "leases": "$1.50",
+            "money_risk": False,
+        },
+        {
+            "spend": "$11.10",
+            "burn": "$0.78/h",
+            "quota": "58%",
+            "wallet": "$8.20",
+            "leases": "$1.80",
+            "money_risk": False,
+        },
+        {
+            "spend": "$12.00",
+            "burn": "$0.80/h",
+            "quota": "60%",
+            "wallet": "$7.80",
+            "leases": "$2.00",
+            "money_risk": False,
+        },
+        {
+            "spend": "$12.40",
+            "burn": "$0.82/h",
+            "quota": "61%",
+            "wallet": "$7.60",
+            "leases": "$2.10",
+            "money_risk": False,
+        },
     ]
     samples = []
     for index in range(6):
@@ -844,18 +935,24 @@ def _sse_frames(payloads: list[dict[str, Any]], *, with_transitions: bool) -> st
     first = payloads[0]
     frames = (
         "event: snapshot\n"
-        + "data: " + json.dumps({"control_epoch": first["control_epoch"]}, separators=(",", ":"))
+        + "data: "
+        + json.dumps({"control_epoch": first["control_epoch"]}, separators=(",", ":"))
         + "\n\n"
         + "event: replay_complete\n"
-        + "data: " + json.dumps({"control_epoch": first["control_epoch"]}, separators=(",", ":"))
+        + "data: "
+        + json.dumps({"control_epoch": first["control_epoch"]}, separators=(",", ":"))
         + "\n\n"
     )
     if with_transitions:
         for payload in payloads[1:]:
             frames += (
                 "event: transition\n"
-                + "data: " + json.dumps({"control_epoch": payload["control_epoch"],
-                                         "glance": payload}, separators=(",", ":")) + "\n\n"
+                + "data: "
+                + json.dumps(
+                    {"control_epoch": payload["control_epoch"], "glance": payload},
+                    separators=(",", ":"),
+                )
+                + "\n\n"
             )
     return frames
 
@@ -886,8 +983,11 @@ def run_chart_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], 
                 for name, (width, height) in VIEWPORTS.items():
                     label = f"{name}/{case}"
                     context = browser.new_context(
-                        viewport={"width": width, "height": height}, timezone_id="UTC",
-                        locale="en-US", reduced_motion="reduce", color_scheme="dark",
+                        viewport={"width": width, "height": height},
+                        timezone_id="UTC",
+                        locale="en-US",
+                        reduced_motion="reduce",
+                        color_scheme="dark",
                     )
                     context.add_init_script(
                         "try{localStorage.setItem('control-room-theme','dark')}catch(e){}"
@@ -907,12 +1007,10 @@ def run_chart_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], 
                             timeout=5000,
                         )
                     page.click("#lens-open")
-                    page.locator('[data-chart-lens]:not([hidden])').wait_for(timeout=5000)
+                    page.locator("[data-chart-lens]:not([hidden])").wait_for(timeout=5000)
                     probe = page.evaluate(CHART_PROBE_JS)
                     _check_charts(label, name, case, probe, errors)
-                    contrast_failures = page.evaluate(
-                        CONTRAST_JS, ["[data-chart-lens]", 4.5, 3.0]
-                    )
+                    contrast_failures = page.evaluate(CONTRAST_JS, ["[data-chart-lens]", 4.5, 3.0])
                     for failure in contrast_failures:
                         _row(errors, label, case, "chart-contrast", json.dumps(failure))
                     if screenshots and case == "history":
@@ -925,8 +1023,11 @@ def run_chart_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], 
             frames = _sse_frames([fixture], with_transitions=False)
             for name, (width, height) in VIEWPORTS.items():
                 context = browser.new_context(
-                    viewport={"width": width, "height": height}, timezone_id="UTC",
-                    locale="en-US", reduced_motion="reduce", color_scheme="dark",
+                    viewport={"width": width, "height": height},
+                    timezone_id="UTC",
+                    locale="en-US",
+                    reduced_motion="reduce",
+                    color_scheme="dark",
                 )
                 page = context.new_page()
                 page.route("**/api/glance", lambda route: route.abort())
@@ -934,7 +1035,7 @@ def run_chart_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], 
                 page.goto(url, wait_until="domcontentloaded")
                 page.wait_for_timeout(2500)  # the 2s ready fallback when no replay boundary
                 page.click("#lens-open")
-                page.locator('[data-chart-lens]:not([hidden])').wait_for(timeout=5000)
+                page.locator("[data-chart-lens]:not([hidden])").wait_for(timeout=5000)
                 probe = page.evaluate(CHART_PROBE_JS)
                 _check_charts(f"{name}/error", name, "error", probe, errors)
                 context.close()
@@ -945,8 +1046,9 @@ def run_chart_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], 
     return results, errors
 
 
-def _check_charts(label: str, viewport: str, case: str, probe: dict[str, Any],
-                  errors: list[str]) -> None:
+def _check_charts(
+    label: str, viewport: str, case: str, probe: dict[str, Any], errors: list[str]
+) -> None:
     """Assert one lens probe: presence, budget, marks/empty/error, a11y name, no horizontal page overflow."""
     if not probe.get("open"):
         _row(errors, label, case, "chart", "lens did not open")
@@ -961,20 +1063,29 @@ def _check_charts(label: str, viewport: str, case: str, probe: dict[str, Any],
             _row(errors, label, case, "chart", f"{chart['id']} body {body}")
             continue
         if body["height"] > max_height + 2:
-            _row(errors, label, case, "chart-budget",
-                 f"{chart['id']} body height {body['height']:.0f} > {max_height}")
+            _row(
+                errors,
+                label,
+                case,
+                "chart-budget",
+                f"{chart['id']} body height {body['height']:.0f} > {max_height}",
+            )
         if not chart.get("table"):
             _row(errors, label, case, "chart-table", f"{chart['id']} missing textual equivalent")
         if case == "history":
             if chart["id"] == "dependency":
                 # Dependency health is gauges + a status grid, not a time-series SVG.
                 if chart.get("gauges", 0) < 2 or chart.get("statusCells", 0) < 4:
-                    _row(errors, label, case, "chart-blank",
-                         f"dependency gauges={chart.get('gauges')} "
-                         f"status={chart.get('statusCells')}")
+                    _row(
+                        errors,
+                        label,
+                        case,
+                        "chart-blank",
+                        f"dependency gauges={chart.get('gauges')} "
+                        f"status={chart.get('statusCells')}",
+                    )
             elif not chart.get("hasSvg") or not chart.get("viewBox") or not chart.get("aria"):
-                _row(errors, label, case, "chart-svg",
-                     f"{chart['id']} svg/viewBox/aria incomplete")
+                _row(errors, label, case, "chart-svg", f"{chart['id']} svg/viewBox/aria incomplete")
             elif chart.get("marks", 0) <= 0:
                 _row(errors, label, case, "chart-blank", f"{chart['id']} has no marks")
             if chart.get("empty") or chart.get("error"):
@@ -988,8 +1099,13 @@ def _check_charts(label: str, viewport: str, case: str, probe: dict[str, Any],
     # Re-baseline (2026-09-13, decision 9f357fce): pages scroll vertically. Horizontal page
     # overflow is the defect this class still refuses.
     if probe["scrollWidth"] > probe["innerWidth"] + 1:
-        _row(errors, label, case, "chart-page-h-overflow",
-             f"page scrollWidth {probe['scrollWidth']} > {probe['innerWidth']}")
+        _row(
+            errors,
+            label,
+            case,
+            "chart-page-h-overflow",
+            f"page scrollWidth {probe['scrollWidth']} > {probe['innerWidth']}",
+        )
 
 
 #: Probe the SVG visuals inside the open R4 dock.
@@ -1089,8 +1205,7 @@ def _check_visuals(label: str, viewport: str, probe: dict[str, Any], errors: lis
             _row(errors, label, "a2", "visual", f"{visual} not rendered")
             continue
         if not info.get("viewBox") or info.get("role") != "img" or not info.get("aria"):
-            _row(errors, label, "a2", "visual-a11y",
-                 f"{visual} viewBox/role/aria incomplete")
+            _row(errors, label, "a2", "visual-a11y", f"{visual} viewBox/role/aria incomplete")
         if not info.get("hasTitle") or not info.get("hasDesc"):
             _row(errors, label, "a2", "visual-a11y", f"{visual} missing title/desc")
         if info.get("textNodes", 0) <= 0:
@@ -1101,14 +1216,24 @@ def _check_visuals(label: str, viewport: str, probe: dict[str, Any], errors: lis
         if box.get("width", 0) <= 0 or box.get("height", 0) <= 0:
             _row(errors, label, "a2", "visual-box", f"{visual} zero box {box}")
         elif viewport != "mobile" and box["height"] > VISUAL_BUDGET[visual] + 4:
-            _row(errors, label, "a2", "visual-budget",
-                 f"{visual} height {box['height']:.0f} > {VISUAL_BUDGET[visual]}")
+            _row(
+                errors,
+                label,
+                "a2",
+                "visual-budget",
+                f"{visual} height {box['height']:.0f} > {VISUAL_BUDGET[visual]}",
+            )
     if not probe.get("affected") or not probe.get("action"):
         _row(errors, label, "a2", "visual-action", "affected record/action missing")
     # Re-baseline (decision 9f357fce): vertical page scroll is allowed; horizontal overflow is not.
     if probe["scrollWidth"] > probe["innerWidth"] + 1:
-        _row(errors, label, "a2", "visual-page-h-overflow",
-             f"page scrollWidth {probe['scrollWidth']} > {probe['innerWidth']}")
+        _row(
+            errors,
+            label,
+            "a2",
+            "visual-page-h-overflow",
+            f"page scrollWidth {probe['scrollWidth']} > {probe['innerWidth']}",
+        )
 
 
 def run_visual_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], list[str]]:
@@ -1131,8 +1256,11 @@ def run_visual_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]],
                 for name, (width, height) in VIEWPORTS.items():
                     label = f"{name}/{theme}"
                     context = browser.new_context(
-                        viewport={"width": width, "height": height}, timezone_id="UTC",
-                        locale="en-US", reduced_motion="reduce", color_scheme=theme,
+                        viewport={"width": width, "height": height},
+                        timezone_id="UTC",
+                        locale="en-US",
+                        reduced_motion="reduce",
+                        color_scheme=theme,
                     )
                     context.add_init_script(
                         f"try{{localStorage.setItem('control-room-theme','{theme}')}}catch(e){{}}"
@@ -1157,15 +1285,14 @@ def run_visual_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]],
                     )
                     probe = page.evaluate(VISUAL_PROBE_JS)
                     _check_visuals(label, name, probe, errors)
-                    for failure in page.evaluate(
-                        SVG_TEXT_CONTRAST_JS, ["[data-visual]", 4.5, 3.0]
-                    ):
+                    for failure in page.evaluate(SVG_TEXT_CONTRAST_JS, ["[data-visual]", 4.5, 3.0]):
                         _row(errors, label, "a2", "visual-contrast", json.dumps(failure))
                     if screenshots and theme == "dark":
                         shot = out / f"visuals_{name}_dark_{width}x{height}.png"
                         page.screenshot(path=str(shot), full_page=False)
-                        results.append({"case": "visuals", "viewport": name,
-                                        "screenshot": str(shot)})
+                        results.append(
+                            {"case": "visuals", "viewport": name, "screenshot": str(shot)}
+                        )
                     context.close()
             browser.close()
     finally:
@@ -1262,8 +1389,10 @@ def run_style_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], 
             browser = playwright.chromium.launch(args=["--no-sandbox"])
             for name, (width, height) in VIEWPORTS.items():
                 context = browser.new_context(
-                    viewport={"width": width, "height": height}, timezone_id="UTC",
-                    locale="en-US", color_scheme="dark",
+                    viewport={"width": width, "height": height},
+                    timezone_id="UTC",
+                    locale="en-US",
+                    color_scheme="dark",
                 )
                 context.add_init_script(
                     "try{localStorage.setItem('control-room-theme','dark')}catch(e){}"
@@ -1292,8 +1421,11 @@ def run_style_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], 
                 context.close()
 
                 reduced = browser.new_context(
-                    viewport={"width": width, "height": height}, timezone_id="UTC",
-                    locale="en-US", color_scheme="dark", reduced_motion="reduce",
+                    viewport={"width": width, "height": height},
+                    timezone_id="UTC",
+                    locale="en-US",
+                    color_scheme="dark",
+                    reduced_motion="reduce",
                 )
                 rpage = reduced.new_page()
                 rpage.route("**/api/**", lambda route: route.abort())
@@ -1361,8 +1493,11 @@ def run_a11y_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], l
             browser = playwright.chromium.launch(args=["--no-sandbox"])
             for name, (width, height) in (("desktop", (1440, 900)), ("mobile", (390, 844))):
                 context = browser.new_context(
-                    viewport={"width": width, "height": height}, timezone_id="UTC",
-                    locale="en-US", reduced_motion="reduce", color_scheme="dark",
+                    viewport={"width": width, "height": height},
+                    timezone_id="UTC",
+                    locale="en-US",
+                    reduced_motion="reduce",
+                    color_scheme="dark",
                 )
                 context.add_init_script(
                     "try{localStorage.setItem('control-room-theme','dark')}catch(e){}"
@@ -1391,7 +1526,8 @@ def run_a11y_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], l
                     _row(errors, name, "a11y", "A-6", "could not reach a run row by keyboard")
                 else:
                     origin = page.evaluate(
-                        "() => document.activeElement.getAttribute('data-run-id')")
+                        "() => document.activeElement.getAttribute('data-run-id')"
+                    )
                     page.keyboard.press("Enter")
                     try:
                         page.locator("#selection-dock:not([hidden])").wait_for(timeout=3000)
@@ -1406,14 +1542,21 @@ def run_a11y_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], l
                         _row(errors, name, "a11y", "A-1", "focus escaped the selection dock")
                     page.keyboard.press("Escape")
                     if not page.evaluate(
-                        "() => Boolean(document.getElementById('selection-dock').hidden)"):
+                        "() => Boolean(document.getElementById('selection-dock').hidden)"
+                    ):
                         _row(errors, name, "a11y", "A-5", "Escape did not close the dock")
                     returned = page.evaluate(
                         "() => document.activeElement && document.activeElement.getAttribute"
-                        " ? document.activeElement.getAttribute('data-run-id') : null")
+                        " ? document.activeElement.getAttribute('data-run-id') : null"
+                    )
                     if returned != origin:
-                        _row(errors, name, "a11y", "A-6",
-                             f"focus returned to {returned!r}, not origin {origin!r}")
+                        _row(
+                            errors,
+                            name,
+                            "a11y",
+                            "A-6",
+                            f"focus returned to {returned!r}, not origin {origin!r}",
+                        )
                 if screenshots:
                     shot = out / f"a11y_{name}_dark_{width}x{height}.png"
                     page.screenshot(path=str(shot), full_page=False)
@@ -1449,8 +1592,11 @@ def _row(errors: list[str], viewport: str, fixture: str, check: str, detail: str
 
 
 def run_browser_gate(
-    fixture_ids: list[str], out: Path, screenshots: bool,
-    themes: tuple[str, ...] = THEMES, screenshot_themes: tuple[str, ...] = ("dark",),
+    fixture_ids: list[str],
+    out: Path,
+    screenshots: bool,
+    themes: tuple[str, ...] = THEMES,
+    screenshot_themes: tuple[str, ...] = ("dark",),
 ) -> tuple[list[dict[str, Any]], list[str]]:
     """Render every fixture at every viewport in every theme; run the geometry class.
 
@@ -1471,11 +1617,16 @@ def run_browser_gate(
                 wire = build_fixture(fixture_id)
                 frames = (
                     "event: snapshot\n"
-                    + "data: " + json.dumps({"control_epoch": wire["control_epoch"],
-                                             "fixture": fixture_id}, separators=(",", ":")) + "\n\n"
+                    + "data: "
+                    + json.dumps(
+                        {"control_epoch": wire["control_epoch"], "fixture": fixture_id},
+                        separators=(",", ":"),
+                    )
+                    + "\n\n"
                     + "event: replay_complete\n"
-                    + "data: " + json.dumps({"control_epoch": wire["control_epoch"]},
-                                            separators=(",", ":")) + "\n\n"
+                    + "data: "
+                    + json.dumps({"control_epoch": wire["control_epoch"]}, separators=(",", ":"))
+                    + "\n\n"
                 )
                 for theme in themes:
                     for name, (width, height) in VIEWPORTS.items():
@@ -1483,14 +1634,20 @@ def run_browser_gate(
                         if theme == "forced-colors":
                             context = browser.new_context(
                                 viewport={"width": width, "height": height},
-                                timezone_id="UTC", locale="en-US", reduced_motion="reduce",
-                                color_scheme="dark", forced_colors="active",
+                                timezone_id="UTC",
+                                locale="en-US",
+                                reduced_motion="reduce",
+                                color_scheme="dark",
+                                forced_colors="active",
                             )
                         else:
                             context = browser.new_context(
                                 viewport={"width": width, "height": height},
-                                timezone_id="UTC", locale="en-US", reduced_motion="reduce",
-                                color_scheme=theme, forced_colors="none",
+                                timezone_id="UTC",
+                                locale="en-US",
+                                reduced_motion="reduce",
+                                color_scheme=theme,
+                                forced_colors="none",
                             )
                             context.add_init_script(
                                 f"try{{localStorage.setItem('control-room-theme', '{theme}')}}"
@@ -1501,9 +1658,15 @@ def run_browser_gate(
                         # Bind the sink into each handler (B023): the loop rebinds
                         # ``console_errors`` every iteration, and a closure over the bare
                         # name would append into whatever list the cell points at LATER.
-                        page.on("console", lambda message, sink=console_errors: sink.append(message.text)
-                                if message.type == "error" else None)
-                        page.on("pageerror", lambda error, sink=console_errors: sink.append(str(error)))
+                        page.on(
+                            "console",
+                            lambda message, sink=console_errors: (
+                                sink.append(message.text) if message.type == "error" else None
+                            ),
+                        )
+                        page.on(
+                            "pageerror", lambda error, sink=console_errors: sink.append(str(error))
+                        )
 
                         # Playwright resolves the LAST matching handler first, so the catch-all
                         # abort must be registered BEFORE the two fixture routes it must not
@@ -1530,8 +1693,14 @@ def run_browser_gate(
                         if screenshots and theme in screenshot_themes:
                             shot = out / f"{fixture_id}_{name}_{theme}_{width}x{height}.png"
                             page.screenshot(path=str(shot), full_page=False)
-                            results.append({"fixture": fixture_id, "viewport": name,
-                                            "theme": theme, "screenshot": str(shot)})
+                            results.append(
+                                {
+                                    "fixture": fixture_id,
+                                    "viewport": name,
+                                    "theme": theme,
+                                    "screenshot": str(shot),
+                                }
+                            )
                         context.close()
             browser.close()
     finally:
@@ -1556,21 +1725,41 @@ def _check_ia_core(label: str, viewport: str, probe: dict[str, Any], errors: lis
         _row(errors, label, "live", "ia-answers", f"answers={sorted(probe['answers'])}")
     # Re-baseline (decision 9f357fce): vertical page scroll is allowed. Horizontal overflow is not.
     if probe["scrollWidth"] > width + 1:
-        _row(errors, label, "live", "ia-page-h-overflow",
-             f"scrollWidth {probe['scrollWidth']} > {width}")
+        _row(
+            errors,
+            label,
+            "live",
+            "ia-page-h-overflow",
+            f"scrollWidth {probe['scrollWidth']} > {width}",
+        )
     for region in REGIONS:
         info = probe["regions"].get(region)
         if not info:
             continue
         box = info["rect"]
         if not info["visible"] or box["width"] <= 0 or box["height"] <= 0:
-            _row(errors, label, "live", "ia-region-box", f"{region} box={box} visible={info['visible']}")
-        elif (box["top"] < -0.5 or box["bottom"] > height + 0.5
-              or box["left"] < -0.5 or box["right"] > width + 0.5):
+            _row(
+                errors,
+                label,
+                "live",
+                "ia-region-box",
+                f"{region} box={box} visible={info['visible']}",
+            )
+        elif (
+            box["top"] < -0.5
+            or box["bottom"] > height + 0.5
+            or box["left"] < -0.5
+            or box["right"] > width + 0.5
+        ):
             _row(errors, label, "live", "ia-region-fold", f"{region} box={box}")
         if info["scrollW"] > info["clientW"] + 1:
-            _row(errors, label, "live", "ia-region-h-scroll",
-                 f"{region} scrollW {info['scrollW']} > {info['clientW']}")
+            _row(
+                errors,
+                label,
+                "live",
+                "ia-region-h-scroll",
+                f"{region} scrollW {info['scrollW']} > {info['clientW']}",
+            )
     for answer, region in ANSWER_REGION.items():
         info = probe["answers"].get(answer)
         if not info:
@@ -1609,14 +1798,20 @@ def run_live_gate(
                     label = f"{name}/{theme}"
                     if theme == "forced-colors":
                         context = browser.new_context(
-                            viewport={"width": width, "height": height}, timezone_id="UTC",
-                            locale="en-US", reduced_motion="reduce", color_scheme="dark",
+                            viewport={"width": width, "height": height},
+                            timezone_id="UTC",
+                            locale="en-US",
+                            reduced_motion="reduce",
+                            color_scheme="dark",
                             forced_colors="active",
                         )
                     else:
                         context = browser.new_context(
-                            viewport={"width": width, "height": height}, timezone_id="UTC",
-                            locale="en-US", reduced_motion="reduce", color_scheme=theme,
+                            viewport={"width": width, "height": height},
+                            timezone_id="UTC",
+                            locale="en-US",
+                            reduced_motion="reduce",
+                            color_scheme=theme,
                             forced_colors="none",
                         )
                         context.add_init_script(
@@ -1636,8 +1831,7 @@ def run_live_gate(
                     if screenshots and theme == "dark":
                         shot = out / f"live_{name}_dark_{width}x{height}.png"
                         page.screenshot(path=str(shot), full_page=False)
-                        results.append({"case": "live", "viewport": name,
-                                        "screenshot": str(shot)})
+                        results.append({"case": "live", "viewport": name, "screenshot": str(shot)})
                     context.close()
             browser.close()
     finally:
@@ -1646,21 +1840,34 @@ def run_live_gate(
     return results, errors
 
 
-#: The required acceptance profile's class roster (AIO remediation 2026-09-14). The profile is
-#: the enumerated contract for a candidate's acceptance: every class must be requested, run,
-#: and reported — an omission is a FAIL, named. The INTERACTIONS class is the slice-level proof:
-#: attention activation, run selection by keyboard, below-fold reachability, stale/unknown
-#: honesty, and the governed action→result flow — the behaviors a screenshot count alone can
-#: never establish.
+#: The required acceptance profile's class roster (2026-09-18 retarget). The profile is the
+#: enumerated contract for a candidate's acceptance: every class must be requested, run, and
+#: reported — an omission is a FAIL, named. These five are the restored served room's
+#: behaviors (see ``run_boards_gate``); a screenshot count alone could never establish them.
 ACCEPTANCE_PROFILE = "acceptance"
 PROFILE_CLASSES: tuple[str, ...] = (
-    "geometry", "charts", "visuals", "style", "a11y", "parity", "live", "interactions",
+    "navigation",
+    "loading",
+    "degraded",
+    "scrolling",
+    "keyboard",
+)
+#: The parked single-screen workbench's legacy classes, retained for the parked modules. They
+#: target selectors the served page does not have (data-region/data-answer/#workbench), so
+#: they are explicitly invoked and are never part of the restored acceptance profile.
+PARKED_CLASSES: tuple[str, ...] = (
+    "geometry",
+    "charts",
+    "visuals",
+    "style",
+    "a11y",
+    "parity",
+    "live",
+    "interactions",
 )
 
 
-def _canonical_preview_target(
-    base: str | None, preview: str | None
-) -> tuple[str, str]:
+def _canonical_preview_target(base: str | None, preview: str | None) -> tuple[str, str]:
     """Resolve the ONE target the browser and the identity checks both use.
 
     Reviewer finding (2026-09-14): the browsers rendered ``--base`` while the identity checks
@@ -1676,6 +1883,7 @@ def _canonical_preview_target(
 
     Returns ``(target, error)``; ``error`` non-empty means refuse (exit 2).
     """
+
     def norm(value: str) -> str:
         return value.rstrip("/")
 
@@ -1705,7 +1913,9 @@ def _compare_served_assets(base: str) -> dict[str, bool]:
 
     listing = subprocess.run(
         ["git", "ls-tree", "-r", "--name-only", "HEAD", "apps/control_room/static"],
-        capture_output=True, text=True, timeout=15,
+        capture_output=True,
+        text=True,
+        timeout=15,
     )
     if listing.returncode != 0:
         return {}
@@ -1719,7 +1929,9 @@ def _compare_served_assets(base: str) -> dict[str, bool]:
 
     def committed_hash(path: str) -> str | None:
         blob = subprocess.run(
-            ["git", "show", f"HEAD:{path}"], capture_output=True, timeout=15,
+            ["git", "show", f"HEAD:{path}"],
+            capture_output=True,
+            timeout=15,
         )
         if blob.returncode != 0:
             return None
@@ -1744,9 +1956,7 @@ def _compare_served_assets(base: str) -> dict[str, bool]:
     return results
 
 
-def _exercise_refresh_action(
-    page: Any, theme: str
-) -> tuple[list[dict[str, Any]], list[str]]:
+def _exercise_refresh_action(page: Any, theme: str) -> tuple[list[dict[str, Any]], list[str]]:
     """The governed refresh action — require the control, observe the request, verify the result.
 
     Reviewer finding (2026-09-14): a missing button was silently skipped and an inert button
@@ -1804,9 +2014,15 @@ def _exercise_refresh_action(
             "— the action did nothing"
         )
         return results, errors
-    results.append({"case": "interactions", "viewport": "desktop",
-                    "check": "governed-action-refresh",
-                    "screenshot": "", "theme": theme})
+    results.append(
+        {
+            "case": "interactions",
+            "viewport": "desktop",
+            "check": "governed-action-refresh",
+            "screenshot": "",
+            "theme": theme,
+        }
+    )
     return results, errors
 
 
@@ -1834,8 +2050,11 @@ def run_acceptance_interactions(
             browser = playwright.chromium.launch(args=["--no-sandbox"])
             for theme in ("dark", "light"):
                 context = browser.new_context(
-                    viewport={"width": 1440, "height": 900}, timezone_id="UTC",
-                    locale="en-US", reduced_motion="reduce", color_scheme=theme,
+                    viewport={"width": 1440, "height": 900},
+                    timezone_id="UTC",
+                    locale="en-US",
+                    reduced_motion="reduce",
+                    color_scheme=theme,
                 )
                 context.add_init_script(
                     f"try{{localStorage.setItem('control-room-theme','{theme}')}}catch(e){{}}"
@@ -1848,24 +2067,34 @@ def run_acceptance_interactions(
                 # surface carrying the attention/decision rows and the run list.
                 opener = page.locator("button:has-text('Open the workbench')")
                 if not opener.count():
-                    errors.append("interactions: the workbench opener is missing — the "
-                                  "attention/run surface cannot be activated")
+                    errors.append(
+                        "interactions: the workbench opener is missing — the "
+                        "attention/run surface cannot be activated"
+                    )
                 else:
                     opener.first.click()
                     tab = page.locator('#workbench-nav [data-lens-target="operations"]')
                     tab.wait_for(timeout=20000)
                     tab.first.click()
                     page.locator("#operations-run-finder").wait_for(timeout=20000)
-                    results.append({"case": "interactions", "viewport": "desktop",
-                                    "check": "attention-activation",
-                                    "screenshot": "", "theme": theme})
+                    results.append(
+                        {
+                            "case": "interactions",
+                            "viewport": "desktop",
+                            "check": "attention-activation",
+                            "screenshot": "",
+                            "theme": theme,
+                        }
+                    )
 
                 # 1b. The run FINDER must actually filter (the requested-run path): type a
                 # real run id and assert the visible rows are exactly the matching ones.
                 finder = page.locator("#operations-run-finder")
                 if not finder.count():
-                    errors.append("interactions: the run finder is missing — the requested-run "
-                                  "path cannot be exercised")
+                    errors.append(
+                        "interactions: the run finder is missing — the requested-run "
+                        "path cannot be exercised"
+                    )
                 else:
                     all_rows = page.locator("tr[data-run-id]")
                     total = all_rows.count()
@@ -1886,21 +2115,31 @@ def run_acceptance_interactions(
                                 "interactions: the run finder left a non-matching row visible"
                             )
                         else:
-                            results.append({"case": "interactions", "viewport": "desktop",
-                                            "check": "run-finder-filter",
-                                            "screenshot": "", "theme": theme})
+                            results.append(
+                                {
+                                    "case": "interactions",
+                                    "viewport": "desktop",
+                                    "check": "run-finder-filter",
+                                    "screenshot": "",
+                                    "theme": theme,
+                                }
+                            )
                         finder.fill("")
                     else:
-                        errors.append("interactions: no run rows to filter — the finder "
-                                      "could not be exercised")
+                        errors.append(
+                            "interactions: no run rows to filter — the finder "
+                            "could not be exercised"
+                        )
 
                 # 2. Run selection by KEYBOARD: focus the finder, type a filter, focus the first
                 # run row, press Enter — the drawer must open with content.
                 rows = page.locator("tr[data-run-id]")
                 if not rows.count():
-                    errors.append("interactions: no run rows to select — the run-selection "
-                                  "check could not be exercised (a control DB with zero runs "
-                                  "is not an acceptance state for this slice)")
+                    errors.append(
+                        "interactions: no run rows to select — the run-selection "
+                        "check could not be exercised (a control DB with zero runs "
+                        "is not an acceptance state for this slice)"
+                    )
                 else:
                     first = rows.first
                     first.focus()
@@ -1911,22 +2150,40 @@ def run_acceptance_interactions(
                     # The detail fetch is async — wait for the RENDERED surface, not merely
                     # the drawer element (a "Loading…" drawer is not the slice working).
                     page.locator("#run-detail-content table").first.wait_for(
-                        state="visible", timeout=20000)
+                        state="visible", timeout=20000
+                    )
                     text = page.locator("#run-detail-content").inner_text()
-                    for surface in ("ATTEMPTS", "GOVERNED ACTION", "STEP TIMINGS",
-                                    "APPROVALS", "COMMAND JOURNAL"):
+                    for surface in (
+                        "ATTEMPTS",
+                        "GOVERNED ACTION",
+                        "STEP TIMINGS",
+                        "APPROVALS",
+                        "COMMAND JOURNAL",
+                    ):
                         if surface not in text:
                             errors.append(
                                 f"interactions: the run-detail drawer is missing the "
                                 f"{surface!r} surface — the observed-result chain is incomplete"
                             )
                     if "ATTEMPTS" in text and "GOVERNED ACTION" in text:
-                        results.append({"case": "interactions", "viewport": "desktop",
-                                        "check": "receipt-surfaces",
-                                        "screenshot": "", "theme": theme})
-                    results.append({"case": "interactions", "viewport": "desktop",
-                                    "check": "keyboard-run-selection",
-                                    "screenshot": "", "theme": theme})
+                        results.append(
+                            {
+                                "case": "interactions",
+                                "viewport": "desktop",
+                                "check": "receipt-surfaces",
+                                "screenshot": "",
+                                "theme": theme,
+                            }
+                        )
+                    results.append(
+                        {
+                            "case": "interactions",
+                            "viewport": "desktop",
+                            "check": "keyboard-run-selection",
+                            "screenshot": "",
+                            "theme": theme,
+                        }
+                    )
                     # Close via the drawer's own close control (Escape also closes the
                     # workbench — the check below needs it open).
                     page.locator('button[aria-label="Close run detail"]').first.click()
@@ -1942,7 +2199,7 @@ def run_acceptance_interactions(
                 # the workbench's BODY (the deliberate drill-down's scrolling container) carries
                 # content below the fold, and a long run-detail drawer scrolls inside its own
                 # container.
-                page.locator('#workbench').wait_for(state="visible", timeout=20000)
+                page.locator("#workbench").wait_for(state="visible", timeout=20000)
                 wb = page.locator(".wb-body")
                 wb_metrics = wb.evaluate(
                     "(el) => ({scrollHeight: el.scrollHeight, clientHeight: el.clientHeight})"
@@ -1950,15 +2207,23 @@ def run_acceptance_interactions(
                 wb.evaluate("(el) => { el.scrollTop = el.scrollHeight; }")
                 wb_scrolled = wb.evaluate("(el) => el.scrollTop")
                 if wb_metrics["scrollHeight"] <= wb_metrics["clientHeight"] or wb_scrolled <= 0:
-                    errors.append("interactions: the workbench body does not scroll below the "
-                                  f"fold (scrollHeight {wb_metrics['scrollHeight']}, "
-                                  f"clientHeight {wb_metrics['clientHeight']}, "
-                                  f"scrollTop {wb_scrolled}) — below-fold content is not "
-                                  "reachable")
+                    errors.append(
+                        "interactions: the workbench body does not scroll below the "
+                        f"fold (scrollHeight {wb_metrics['scrollHeight']}, "
+                        f"clientHeight {wb_metrics['clientHeight']}, "
+                        f"scrollTop {wb_scrolled}) — below-fold content is not "
+                        "reachable"
+                    )
                 else:
-                    results.append({"case": "interactions", "viewport": "desktop",
-                                    "check": "below-fold-scroll",
-                                    "screenshot": "", "theme": theme})
+                    results.append(
+                        {
+                            "case": "interactions",
+                            "viewport": "desktop",
+                            "check": "below-fold-scroll",
+                            "screenshot": "",
+                            "theme": theme,
+                        }
+                    )
 
                 # 4. Stale/unknown honesty: the room must render an explicit age/unknown marker
                 # somewhere on the operational surface — a stale value reading as all-clear is
@@ -1967,15 +2232,27 @@ def run_acceptance_interactions(
                     '[data-state="unknown"], [data-state="stale"], .age-chip, .state-unknown'
                 )
                 if not honest.count():
-                    results.append({"case": "interactions", "viewport": "desktop",
-                                    "check": "stale-unknown-marker",
-                                    "screenshot": "", "theme": theme,
-                                    "note": "no stale/unknown markers rendered on the "
-                                            "operational surface at this instant"})
+                    results.append(
+                        {
+                            "case": "interactions",
+                            "viewport": "desktop",
+                            "check": "stale-unknown-marker",
+                            "screenshot": "",
+                            "theme": theme,
+                            "note": "no stale/unknown markers rendered on the "
+                            "operational surface at this instant",
+                        }
+                    )
                 else:
-                    results.append({"case": "interactions", "viewport": "desktop",
-                                    "check": "stale-unknown-marker",
-                                    "screenshot": "", "theme": theme})
+                    results.append(
+                        {
+                            "case": "interactions",
+                            "viewport": "desktop",
+                            "check": "stale-unknown-marker",
+                            "screenshot": "",
+                            "theme": theme,
+                        }
+                    )
 
                 # 5. The below-fold capture (dark + light) — the rendered proof of the
                 # content a viewport-height shot can never see: the workbench is a fixed
@@ -1984,9 +2261,15 @@ def run_acceptance_interactions(
                 if screenshots:
                     shot = out / f"acceptance_belowfold_bottom_{theme}_1440x900.png"
                     page.locator(".wb-body").screenshot(path=str(shot))
-                    results.append({"case": "interactions", "viewport": "desktop",
-                                    "check": "below-fold-capture",
-                                    "screenshot": str(shot), "theme": theme})
+                    results.append(
+                        {
+                            "case": "interactions",
+                            "viewport": "desktop",
+                            "check": "below-fold-capture",
+                            "screenshot": str(shot),
+                            "theme": theme,
+                        }
+                    )
 
                 # 6. Keyboard run-journey (browser regression, reviewer finding P3): the
                 # drawer-first Escape must be exercised as BEHAVIOR — the source-string check
@@ -2038,9 +2321,15 @@ def run_acceptance_interactions(
                                 f"after Escape (focus={state['focus']!r})"
                             )
                         if not errors:
-                            results.append({"case": "interactions", "viewport": "desktop",
-                                            "check": "drawer-first-escape",
-                                            "screenshot": "", "theme": theme})
+                            results.append(
+                                {
+                                    "case": "interactions",
+                                    "viewport": "desktop",
+                                    "check": "drawer-first-escape",
+                                    "screenshot": "",
+                                    "theme": theme,
+                                }
+                            )
                         page.keyboard.press("Escape")
                         page.wait_for_timeout(300)
                         if not page.evaluate(
@@ -2048,9 +2337,15 @@ def run_acceptance_interactions(
                         ):
                             errors.append("interactions: a second Escape must close the workbench")
                         else:
-                            results.append({"case": "interactions", "viewport": "desktop",
-                                            "check": "second-escape-closes-workbench",
-                                            "screenshot": "", "theme": theme})
+                            results.append(
+                                {
+                                    "case": "interactions",
+                                    "viewport": "desktop",
+                                    "check": "second-escape-closes-workbench",
+                                    "screenshot": "",
+                                    "theme": theme,
+                                }
+                            )
                         # Inactive-panel scope: reopen, open a drawer, switch to Health, Escape —
                         # the hidden drawer must not swallow the key.
                         page.locator("#workbench-open").click()
@@ -2073,10 +2368,885 @@ def run_acceptance_interactions(
                                 "must not consume it"
                             )
                         else:
-                            results.append({"case": "interactions", "viewport": "desktop",
-                                            "check": "inactive-panel-escape",
-                                            "screenshot": "", "theme": theme})
+                            results.append(
+                                {
+                                    "case": "interactions",
+                                    "viewport": "desktop",
+                                    "check": "inactive-panel-escape",
+                                    "screenshot": "",
+                                    "theme": theme,
+                                }
+                            )
                 context.close()
+            browser.close()
+    finally:
+        if httpd is not None:
+            httpd.shutdown()
+    return results, errors
+
+
+# ── Restored boards (the served room; 2026-09-18 retarget) ───────────────────────────────────
+#
+# The room the server serves is the seven-board destination shell (PR #84). Every class above
+# this section targets the parked single-screen workbench (data-region/data-answer/#workbench/
+# #selection-dock) and cannot exercise the served page; the classes here are the served page's
+# acceptance contract. One shared probe feeds all five checks, so each reads the same snapshot
+# vocabulary (sections, destinations, scroll, drawer, focus, rendered content) instead of five
+# nearly-equal JS fragments.
+
+#: The restored-board fixture (deterministic payloads; see the file's ``_note``).
+BOARDS_FIXTURE = FIXTURE_DIR / "boards_endpoints.json"
+#: The seven served destinations, in shell.js's order.
+RESTORED_BOARDS: tuple[str, ...] = (
+    "fleet",
+    "status",
+    "flags",
+    "sessions",
+    "routing",
+    "operations",
+    "surfaces",
+)
+#: Fixture surface key -> the read-model path the Surfaces board actually fetches.
+BOARD_SURFACE_PATHS: dict[str, str] = {
+    "quality": "/api/quality",
+    "value": "/api/value",
+    "arms": "/api/arms/compare",
+    "sla": "/api/queue/sla",
+    "escalations": "/api/escalations",
+    "batch": "/api/batch",
+    "energy": "/api/energy",
+}
+#: The read boards whose first visit lazy-loads, and the endpoints that visit must request.
+LAZY_BOARD_CASES: dict[str, tuple[str, ...]] = {
+    "operations": ("/api/operations",),
+    "surfaces": tuple(BOARD_SURFACE_PATHS.values()),
+    "routing": ("/api/routing",),
+}
+
+#: The shared restored-board probe: one snapshot of everything the five checks assert.
+BOARDS_PROBE_JS = r"""
+() => {
+  const sections = {};
+  document.querySelectorAll('.board[data-board]').forEach((section) => {
+    sections[section.dataset.board] = { hidden: section.hidden,
+      scrollH: section.scrollHeight, clientH: section.clientHeight,
+      scrollW: section.scrollWidth, clientW: section.clientWidth };
+  });
+  const destinations = Array.from(document.querySelectorAll('.destination[data-board]'))
+    .map((node) => ({ board: node.dataset.board, current: node.getAttribute('aria-current') }));
+  const scroller = document.getElementById('boards');
+  const drawer = document.getElementById('run-detail-drawer');
+  const active = document.activeElement;
+  const text = (selector) => {
+    const el = document.querySelector(selector);
+    return el ? (el.innerText || el.textContent || '').trim() : '';
+  };
+  const metrics = {};
+  document.querySelectorAll('#operations-content .metric-card').forEach((card) => {
+    const label = card.querySelector('.metric-label');
+    const value = card.querySelector('.metric-value');
+    if (label && value) metrics[(label.textContent || '').trim()] = (value.textContent || '').trim();
+  });
+  const surfacePanels = {};
+  document.querySelectorAll('#surfaces-content .surface-panel').forEach((panel) => {
+    surfacePanels[panel.dataset.surface || '?'] =
+      (panel.innerText || panel.textContent || '').trim().slice(0, 400);
+  });
+  return {
+    board: document.body.dataset.board || '',
+    sections: sections,
+    destinations: destinations,
+    scrollTop: scroller ? scroller.scrollTop : null,
+    scrollH: scroller ? scroller.scrollHeight : null,
+    clientH: scroller ? scroller.clientHeight : null,
+    scrollerW: scroller ? scroller.scrollWidth : null,
+    scrollerCW: scroller ? scroller.clientWidth : null,
+    pageScrollW: document.scrollingElement ? document.scrollingElement.scrollWidth : null,
+    innerW: window.innerWidth,
+    drawerHidden: drawer ? drawer.hidden : null,
+    activeTag: active ? active.tagName : '',
+    activeId: active ? (active.id || '') : '',
+    activeRunId: active && active.getAttribute
+      ? (active.getAttribute('data-run-id') || '') : '',
+    metrics: metrics,
+    operationsLoaded: (() => { const el = document.getElementById('operations-content');
+      return el ? el.dataset.loaded : null; })(),
+    operationsText: text('#operations-content'),
+    surfacesLoaded: (() => { const el = document.getElementById('surfaces-content');
+      return el ? el.dataset.loaded : null; })(),
+    surfacePanels: surfacePanels,
+    routingHidden: (() => { const el = document.getElementById('routing-drawer');
+      return el ? el.hidden : null; })(),
+    routingText: text('#routing-content'),
+    runRows: document.querySelectorAll('tr[data-run-id]').length,
+    readyState: document.readyState,
+  };
+}
+"""
+
+
+def load_boards_fixture() -> dict[str, Any]:
+    """Load the restored-board fixture (the committed seeds, no ``_note`` keys)."""
+    raw = json.loads(BOARDS_FIXTURE.read_text(encoding="utf-8"))
+    return {key: value for key, value in raw.items() if not key.startswith("_")}
+
+
+def build_operations_payload(degraded: bool = False) -> dict[str, Any]:
+    """Expand the committed seed into the exact ``/api/operations`` wire payload.
+
+    Deterministic: run ids are positional, so the attention rows and the keyboard check name
+    rows that always exist, and the list is long enough to overflow the board scroller.
+    """
+    fixture = load_boards_fixture()
+    seed = fixture["operations_degraded"] if degraded else fixture["operations"]
+    payload = {key: copy.deepcopy(value) for key, value in seed.items() if key != "run_seed"}
+    if degraded:
+        payload.setdefault("active_runs", [])
+        payload.setdefault("promotable_runs", [])
+        payload.setdefault("attention", [])
+        return payload
+    run_seed = seed["run_seed"]
+    active_count = int(seed.get("active_count", 0))
+    promotable_count = int(seed.get("promotable_count", 0))
+    runs = []
+    for index in range(1, active_count + promotable_count + 1):
+        row = copy.deepcopy(run_seed)
+        row["run_id"] = f"run-fixture-{index:04d}"
+        row["state"] = "running" if index <= active_count else "promotable"
+        runs.append(row)
+    payload["active_runs"] = runs[:active_count]
+    payload["promotable_runs"] = runs[active_count:]
+    return payload
+
+
+def check_boards_fixtures() -> list[str]:
+    """Validate the restored fixture deterministically (no browser): schema + coverage."""
+    try:
+        fixture = load_boards_fixture()
+    except Exception as error:  # noqa: BLE001 — report, never crash the fixture check
+        return [f"boards fixture unreadable: {error}"]
+    problems: list[str] = []
+    for key in ("operations", "operations_degraded", "run_detail", "design_sessions", "surfaces"):
+        if key not in fixture:
+            problems.append(f"boards fixture missing {key!r}")
+    if problems:
+        return problems
+    normal = build_operations_payload(False)
+    rows = normal.get("active_runs", []) + normal.get("promotable_runs", [])
+    if len(rows) < 12:
+        problems.append(
+            "boards fixture: fewer than 12 run rows — the scroll check needs a long board"
+        )
+    ids = {row["run_id"] for row in rows}
+    for item in normal.get("attention", []):
+        if item.get("run_id") not in ids:
+            problems.append(
+                f"boards fixture: attention references unknown run {item.get('run_id')!r}"
+            )
+    degraded = build_operations_payload(True)
+    if not degraded.get("degraded"):
+        problems.append("boards fixture: the degraded variant carries no degraded surfaces")
+    for name in BOARD_SURFACE_PATHS:
+        if name not in fixture["surfaces"]:
+            problems.append(f"boards fixture: surfaces missing {name!r}")
+    return problems
+
+
+def _boards_router(
+    records: list[dict[str, str]],
+    *,
+    degraded: bool = False,
+    surface_failures: tuple[str, ...] = (),
+):
+    """One Playwright route handler for the restored-board classes.
+
+    Records every request (the loading evidence); serves the board fixture plus the old-room
+    parity fixtures the restored app's startup pollers need; fulfils a named surface failure
+    with an HTTP 503 + error object so the panel renders the service's own reason. Anything
+    unmapped aborts: a missing endpoint is a visible request, never a silent pass.
+    """
+    fixture = load_boards_fixture()
+    payloads: dict[str, Any] = {
+        path: fixture["surfaces"][name] for name, path in BOARD_SURFACE_PATHS.items()
+    }
+    # The restored design-session row renderer reads title/draft_state/revision — the parity
+    # fixture predates it and would throw on draft_state.replaceAll. The board fixture wins.
+    payloads["/api/design-sessions"] = fixture["design_sessions"]
+    for path, payload in load_parity_fixtures().items():
+        payloads.setdefault(path, payload)
+
+    def handler(route: Any) -> None:
+        request = route.request
+        path = urlparse(request.url).path
+        records.append({"method": request.method, "path": path})
+        if request.method != "GET":
+            route.abort()
+            return
+        if path == "/api/operations":
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps(build_operations_payload(degraded=degraded)),
+            )
+        elif path == "/api/status":
+            # The status rail's EventSource. A real HTTP-200 event-stream frame (rather than an
+            # abort) keeps the page console-clean; the stream ends and the rail reconnects,
+            # which is the app's documented degraded behavior, not an error.
+            route.fulfill(status=200, content_type="text/event-stream", body="data: {}\n\n")
+        elif path.startswith("/api/events/"):
+            # The selected cell's replay stream (the matrix fixture selects a live cell). Same
+            # posture as /api/status: a served frame, never an abort.
+            route.fulfill(status=200, content_type="text/event-stream", body="data: {}\n\n")
+        elif path.startswith("/api/runs/"):
+            route.fulfill(
+                status=200, content_type="application/json", body=json.dumps(fixture["run_detail"])
+            )
+        elif path in surface_failures:
+            name = path.rsplit("/", 1)[-1]
+            route.fulfill(
+                status=503,
+                content_type="application/json",
+                body=json.dumps({"error": f"{name} read model is down"}),
+            )
+        elif path in payloads:
+            route.fulfill(
+                status=200, content_type="application/json", body=json.dumps(payloads[path])
+            )
+        else:
+            route.abort()
+
+    return handler
+
+
+def _board_ready_js(board: str) -> str:
+    """The JS predicate that says a lazy board's first-visit load has settled."""
+    if board == "operations":
+        return (
+            "() => { const el = document.getElementById('operations-content');"
+            " return Boolean(el && el.dataset.loaded === 'true'); }"
+        )
+    if board == "surfaces":
+        return (
+            "() => { const el = document.getElementById('surfaces-content');"
+            " return Boolean(el && el.dataset.loaded === 'true'); }"
+        )
+    return (
+        "() => { const el = document.getElementById('routing-drawer');"
+        " return Boolean(el && !el.hidden); }"
+    )
+
+
+def _boards_page(
+    browser: Any,
+    url: str,
+    width: int,
+    height: int,
+    *,
+    theme: str = "dark",
+    board: str | None = None,
+    router: Any = None,
+):
+    """Open one restored-room page: pinned theme, optional saved board, fixture routes."""
+    context = browser.new_context(
+        viewport={"width": width, "height": height},
+        timezone_id="UTC",
+        locale="en-US",
+        reduced_motion="reduce",
+        color_scheme=theme,
+    )
+    init = f"try{{localStorage.setItem('control-room-theme','{theme}')}}catch(e){{}}"
+    if board:
+        init += f";try{{localStorage.setItem('control-room-board','{board}')}}catch(e){{}}"
+    context.add_init_script(init)
+    page = context.new_page()
+    console_errors = _attach_console(page)
+    if router is not None:
+        page.route("**/api/**", router)
+    page.goto(url, wait_until="domcontentloaded")
+    return context, page, console_errors
+
+
+def _settle(page: Any, milliseconds: int = 300) -> None:
+    """Give the page a bounded moment to finish the renders a probe will read."""
+    try:
+        page.wait_for_timeout(milliseconds)
+    except Exception:  # noqa: BLE001 — a page that cannot wait is reported by its probes
+        pass
+
+
+def _check_board_navigation(
+    browser: Any,
+    url: str,
+    results: list[dict[str, Any]],
+    errors: list[str],
+    *,
+    screenshots: bool,
+    out: Path,
+) -> None:
+    """The seven destinations: one visible board at a time, aria-current, no overflow."""
+    for name in ("desktop", "narrow"):
+        width, height = VIEWPORTS[name]
+        records: list[dict[str, str]] = []
+        context, page, console_errors = _boards_page(
+            browser, url, width, height, router=_boards_router(records)
+        )
+        _settle(page)
+        label = f"{name}/boards"
+        probe = page.evaluate(BOARDS_PROBE_JS)
+        if probe["board"] != "fleet":
+            _row(
+                errors,
+                label,
+                "navigation",
+                "home",
+                f"the room did not rest on the fleet board (board={probe['board']!r})",
+            )
+        for board in RESTORED_BOARDS:
+            page.click(f'.destination[data-board="{board}"]')
+            _settle(page, 150)
+            probe = page.evaluate(BOARDS_PROBE_JS)
+            if probe["board"] != board:
+                _row(
+                    errors,
+                    label,
+                    "navigation",
+                    "activate",
+                    f"clicking {board!r} left body board={probe['board']!r}",
+                )
+            for section, info in probe["sections"].items():
+                if bool(info["hidden"]) == (section == board):
+                    _row(
+                        errors,
+                        label,
+                        "navigation",
+                        "visibility",
+                        f"{board!r} active but section {section!r} hidden={info['hidden']}",
+                    )
+            current = [
+                entry["board"] for entry in probe["destinations"] if entry["current"] == "page"
+            ]
+            if current != [board]:
+                _row(
+                    errors,
+                    label,
+                    "navigation",
+                    "aria-current",
+                    f"active destination markers {current} want [{board!r}]",
+                )
+            if probe["pageScrollW"] and probe["pageScrollW"] > probe["innerW"] + 1:
+                _row(
+                    errors,
+                    label,
+                    "navigation",
+                    "h-overflow",
+                    f"{board!r} page scrollWidth {probe['pageScrollW']} > {probe['innerW']}",
+                )
+            capture = screenshots and (
+                name == "desktop" or board in ("operations", "surfaces", "routing")
+            )
+            if capture:
+                shot = out / f"boards_{board}_{name}_dark_{width}x{height}.png"
+                page.screenshot(path=str(shot), full_page=False)
+                results.append(
+                    {
+                        "case": "boards-navigation",
+                        "viewport": name,
+                        "screenshot": str(shot),
+                        "theme": "dark",
+                        "board": board,
+                    }
+                )
+        _settle(page)
+        for message in console_errors:
+            _row(errors, label, "navigation", "console", message[:200])
+        results.append(
+            {
+                "case": "boards-navigation",
+                "viewport": name,
+                "check": "seven-boards",
+                "screenshot": "",
+            }
+        )
+        context.close()
+
+
+def _check_board_loading(
+    browser: Any,
+    url: str,
+    results: list[dict[str, Any]],
+    errors: list[str],
+    *,
+    screenshots: bool,
+    out: Path,
+) -> None:
+    """A reload with each lazy board saved must load it — the review's zero-load regression.
+
+    The first load is the ordinary fleet home; the board is then persisted exactly as the
+    shell persists a visit, and the page is RELOADED. Before the fix, the shell restored the
+    board before app.js's handlers existed, its automatic load click was a no-op, and zero
+    load requests followed (reproduced by the 2026-09-18 review); now each endpoint is
+    requested exactly once and the board reaches its loaded state.
+    """
+    label = "desktop/boards"
+    for board, expected_paths in LAZY_BOARD_CASES.items():
+        records: list[dict[str, str]] = []
+        context, page, console_errors = _boards_page(
+            browser, url, 1440, 900, router=_boards_router(records)
+        )
+        _settle(page, 400)  # the first load's own pollers
+        records.clear()  # only the reload's requests are the evidence
+        page.evaluate("(board) => localStorage.setItem('control-room-board', board)", board)
+        page.reload(wait_until="domcontentloaded")
+        try:
+            page.wait_for_function(_board_ready_js(board), timeout=8000)
+            loaded = True
+        except Exception:  # noqa: BLE001 — the failed state is the finding
+            loaded = False
+        paths = [record["path"] for record in records]
+        for path in expected_paths:
+            count = paths.count(path)
+            if count == 0:
+                _row(
+                    errors,
+                    label,
+                    "loading",
+                    board,
+                    f"reload with {board!r} saved produced NO {path} request — the restored "
+                    "board was left unloaded",
+                )
+            elif count > 1:
+                _row(
+                    errors,
+                    label,
+                    "loading",
+                    board,
+                    f"{path} was requested {count}x on one reload — the initializer double-loads",
+                )
+        if not loaded:
+            _row(
+                errors,
+                label,
+                "loading",
+                board,
+                f"{board} never reached its loaded state after the reload",
+            )
+        probe = page.evaluate(BOARDS_PROBE_JS)
+        if board == "operations" and not probe["operationsText"]:
+            _row(errors, label, "loading", board, "the operations board rendered no content")
+        if board == "surfaces" and not probe["surfacePanels"]:
+            _row(errors, label, "loading", board, "the surfaces board rendered no panels")
+        if board == "routing" and not probe["routingText"]:
+            _row(errors, label, "loading", board, "the routing drawer rendered no content")
+        if screenshots and board == "operations":
+            shot = out / "boards_loading_operations_reload_desktop_dark_1440x900.png"
+            page.screenshot(path=str(shot), full_page=False)
+            results.append(
+                {
+                    "case": "boards-loading",
+                    "viewport": "desktop",
+                    "screenshot": str(shot),
+                    "theme": "dark",
+                    "board": board,
+                }
+            )
+        _settle(page, 200)
+        for message in console_errors:
+            _row(errors, label, "loading", "console", message[:200])
+        results.append(
+            {"case": "boards-loading", "viewport": "desktop", "check": board, "screenshot": ""}
+        )
+        context.close()
+
+
+def _check_board_degraded(
+    browser: Any,
+    url: str,
+    results: list[dict[str, Any]],
+    errors: list[str],
+    *,
+    screenshots: bool,
+    out: Path,
+) -> None:
+    """A degraded control db reads 'unavailable', never 0; one failed read model names itself."""
+    label = "desktop/boards"
+    # 1. Operations over a degraded control database.
+    records: list[dict[str, str]] = []
+    context, page, console_errors = _boards_page(
+        browser, url, 1440, 900, board="operations", router=_boards_router(records, degraded=True)
+    )
+    try:
+        page.wait_for_function(_board_ready_js("operations"), timeout=8000)
+    except Exception:  # noqa: BLE001 — the failed state is the finding
+        _row(
+            errors,
+            label,
+            "degraded",
+            "operations-load",
+            "the degraded operations payload never reached its loaded state",
+        )
+    _settle(page, 200)
+    probe = page.evaluate(BOARDS_PROBE_JS)
+    for metric in ("Active runs", "Decisions owed", "Promotable runs"):
+        value = probe["metrics"].get(metric)
+        if value != "unavailable":
+            _row(
+                errors,
+                label,
+                "degraded",
+                "operations-zero",
+                f"{metric!r} rendered {value!r} on a degraded control db — an unreadable "
+                "database must read 'unavailable', never a fabricated 0",
+            )
+    if "control database not found" not in probe["operationsText"]:
+        _row(
+            errors,
+            label,
+            "degraded",
+            "operations-reason",
+            "the degraded surface's named reason was not rendered",
+        )
+    if "could not be read" not in probe["operationsText"]:
+        _row(
+            errors,
+            label,
+            "degraded",
+            "operations-attention",
+            "the attention/runs sections must say the database could not be read",
+        )
+    if screenshots:
+        shot = out / "boards_degraded_operations_desktop_dark_1440x900.png"
+        page.screenshot(path=str(shot), full_page=False)
+        results.append(
+            {
+                "case": "boards-degraded",
+                "viewport": "desktop",
+                "screenshot": str(shot),
+                "theme": "dark",
+                "board": "operations",
+            }
+        )
+    for message in console_errors:
+        _row(errors, label, "degraded", "operations-console", message[:200])
+    results.append(
+        {
+            "case": "boards-degraded",
+            "viewport": "desktop",
+            "check": "degraded-operations",
+            "screenshot": "",
+        }
+    )
+    context.close()
+
+    # 2. Surfaces with one failing read model: the failed panel names its reason + URL while
+    #    its siblings still render (panel independence).
+    records = []
+    context, page, console_errors = _boards_page(
+        browser,
+        url,
+        1440,
+        900,
+        board="surfaces",
+        router=_boards_router(records, surface_failures=("/api/quality",)),
+    )
+    try:
+        page.wait_for_function(_board_ready_js("surfaces"), timeout=8000)
+    except Exception:  # noqa: BLE001 — the failed state is the finding
+        _row(
+            errors,
+            label,
+            "degraded",
+            "surfaces-load",
+            "the surfaces board never reached its loaded state",
+        )
+    _settle(page, 200)
+    probe = page.evaluate(BOARDS_PROBE_JS)
+    quality = probe["surfacePanels"].get("quality", "")
+    if "unavailable —" not in quality or "/api/quality" not in quality:
+        _row(
+            errors,
+            label,
+            "degraded",
+            "surface-failure",
+            "the failed quality panel must render the service's named reason and its URL "
+            f"(rendered {quality[:120]!r})",
+        )
+    batch = probe["surfacePanels"].get("batch", "")
+    if "not measurable" not in batch:
+        _row(
+            errors,
+            label,
+            "degraded",
+            "surface-independence",
+            "a sibling panel must still render while one read model fails "
+            f"(batch rendered {batch[:120]!r})",
+        )
+    for message in console_errors:
+        # The 503 is this check's OWN setup (the failing read model), not an app defect: the
+        # browser logs a resource error for the deliberately failed request.
+        if "503 (Service Unavailable)" in message:
+            continue
+        _row(errors, label, "degraded", "surfaces-console", message[:200])
+    results.append(
+        {
+            "case": "boards-degraded",
+            "viewport": "desktop",
+            "check": "surface-failure",
+            "screenshot": "",
+        }
+    )
+    context.close()
+
+
+def _check_board_scrolling(
+    browser: Any,
+    url: str,
+    results: list[dict[str, Any]],
+    errors: list[str],
+    *,
+    screenshots: bool,
+    out: Path,
+) -> None:
+    """The board scroller overflows below the fold, has no horizontal overflow, and resets."""
+    label = "desktop/boards"
+    records: list[dict[str, str]] = []
+    context, page, console_errors = _boards_page(
+        browser, url, 1440, 900, board="operations", router=_boards_router(records)
+    )
+    try:
+        page.wait_for_function(_board_ready_js("operations"), timeout=8000)
+    except Exception:  # noqa: BLE001 — the failed state is the finding
+        _row(
+            errors,
+            label,
+            "scrolling",
+            "operations-load",
+            "the operations board never reached its loaded state",
+        )
+    _settle(page, 250)
+    probe = page.evaluate(BOARDS_PROBE_JS)
+    if not probe["scrollH"] or not probe["clientH"] or probe["scrollH"] <= probe["clientH"]:
+        _row(
+            errors,
+            label,
+            "scrolling",
+            "below-fold",
+            "the restored board scroller does not overflow "
+            f"(scrollHeight {probe['scrollH']}, clientHeight {probe['clientH']}) — "
+            "below-fold content is not reachable",
+        )
+    else:
+        page.evaluate(
+            "() => { const el = document.getElementById('boards');"
+            " el.scrollTop = el.scrollHeight; }"
+        )
+        scrolled = page.evaluate("() => document.getElementById('boards').scrollTop")
+        if scrolled <= 0:
+            _row(
+                errors,
+                label,
+                "scrolling",
+                "below-fold",
+                "the board scroller did not move to the bottom",
+            )
+        else:
+            results.append(
+                {
+                    "case": "boards-scrolling",
+                    "viewport": "desktop",
+                    "check": "below-fold",
+                    "screenshot": "",
+                }
+            )
+    if probe["scrollerW"] and probe["scrollerCW"] and probe["scrollerW"] > probe["scrollerCW"] + 1:
+        _row(
+            errors,
+            label,
+            "scrolling",
+            "h-overflow",
+            f"the board scroller overflows horizontally ({probe['scrollerW']} > "
+            f"{probe['scrollerCW']})",
+        )
+    # A board switch is a navigation: it must reset the scroller, not inherit the offset.
+    page.click('.destination[data-board="fleet"]')
+    _settle(page, 150)
+    page.click('.destination[data-board="operations"]')
+    _settle(page, 150)
+    reset = page.evaluate("() => document.getElementById('boards').scrollTop")
+    if reset != 0:
+        _row(
+            errors,
+            label,
+            "scrolling",
+            "scroll-reset",
+            f"returning to the operations board kept scrollTop={reset}; a board switch must "
+            "start at the board's own top",
+        )
+    else:
+        results.append(
+            {
+                "case": "boards-scrolling",
+                "viewport": "desktop",
+                "check": "scroll-reset",
+                "screenshot": "",
+            }
+        )
+    _settle(page, 200)
+    for message in console_errors:
+        _row(errors, label, "scrolling", "console", message[:200])
+    context.close()
+
+
+def _check_board_keyboard(
+    browser: Any,
+    url: str,
+    results: list[dict[str, Any]],
+    errors: list[str],
+    *,
+    screenshots: bool,
+    out: Path,
+) -> None:
+    """Enter opens the run drawer with focus inside it; Escape closes and returns focus."""
+    label = "desktop/boards"
+    for theme in ("dark", "light"):
+        records: list[dict[str, str]] = []
+        context, page, console_errors = _boards_page(
+            browser, url, 1440, 900, board="operations", theme=theme, router=_boards_router(records)
+        )
+        try:
+            page.wait_for_function(_board_ready_js("operations"), timeout=8000)
+        except Exception:  # noqa: BLE001 — the failed state is the finding
+            _row(
+                errors,
+                label,
+                "keyboard",
+                "operations-load",
+                "the operations board never reached its loaded state",
+            )
+        _settle(page, 200)
+        rows = page.locator("tr[data-run-id]")
+        if rows.count() == 0:
+            _row(
+                errors,
+                label,
+                "keyboard",
+                "no-rows",
+                "no run rows exist — the keyboard run journey cannot be exercised",
+            )
+            results.append(
+                {
+                    "case": "boards-keyboard",
+                    "viewport": "desktop",
+                    "check": f"{theme}-enter-escape",
+                    "screenshot": "",
+                }
+            )
+            context.close()
+            continue
+        origin = rows.first.get_attribute("data-run-id") or ""
+        rows.first.focus()
+        page.keyboard.press("Enter")
+        try:
+            page.locator("#run-detail-drawer:not([hidden])").wait_for(timeout=5000)
+            opened = True
+        except Exception:  # noqa: BLE001 — the failed state is the finding
+            opened = False
+        if not opened:
+            _row(
+                errors,
+                label,
+                "keyboard",
+                "enter-opens",
+                "Enter on a run row did not open the run drawer",
+            )
+        else:
+            _settle(page, 250)
+            probe = page.evaluate(BOARDS_PROBE_JS)
+            if probe["activeId"] != "run-detail-close":
+                _row(
+                    errors,
+                    label,
+                    "keyboard",
+                    "drawer-focus",
+                    f"after Enter, focus is on {probe['activeId']!r} — it must move to the "
+                    "drawer's close control so the drawer-scoped Escape is reachable",
+                )
+            try:
+                page.locator("#run-detail-content table").first.wait_for(timeout=5000)
+            except Exception:  # noqa: BLE001 — a named missing render, not a crash
+                _row(
+                    errors,
+                    label,
+                    "keyboard",
+                    "drawer-content",
+                    "the run detail drawer never rendered its content",
+                )
+            if screenshots:
+                shot = out / f"boards_keyboard_drawer_{theme}_1440x900.png"
+                page.screenshot(path=str(shot), full_page=False)
+                results.append(
+                    {
+                        "case": "boards-keyboard",
+                        "viewport": "desktop",
+                        "screenshot": str(shot),
+                        "theme": theme,
+                        "check": "drawer-open",
+                    }
+                )
+            page.keyboard.press("Escape")
+            _settle(page, 250)
+            probe = page.evaluate(BOARDS_PROBE_JS)
+            if probe["drawerHidden"] is not True:
+                _row(
+                    errors,
+                    label,
+                    "keyboard",
+                    "escape-closes",
+                    "Escape did not close the drawer — focus never reached the drawer-scoped "
+                    "handler",
+                )
+            if probe["activeRunId"] != origin:
+                _row(
+                    errors,
+                    label,
+                    "keyboard",
+                    "focus-return",
+                    f"focus returned to {probe['activeRunId']!r}, not the originating row "
+                    f"{origin!r}",
+                )
+        _settle(page, 200)
+        for message in console_errors:
+            _row(errors, label, "keyboard", "console", message[:200])
+        results.append(
+            {
+                "case": "boards-keyboard",
+                "viewport": "desktop",
+                "check": f"{theme}-enter-escape",
+                "screenshot": "",
+            }
+        )
+        context.close()
+
+
+def run_boards_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], list[str]]:
+    """Run the restored-room classes: navigation, loading, degraded, scrolling, keyboard.
+
+    Fixture-driven like every other class (waiver W2): no live Redis, clock, or network. The
+    screenshots this class writes are the served room's acceptance evidence — a run with zero
+    captures fails structurally in ``write_report``.
+    """
+    from playwright.sync_api import sync_playwright
+
+    url, httpd = _serve()
+    results: list[dict[str, Any]] = []
+    errors: list[str] = []
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(args=["--no-sandbox"])
+            _check_board_navigation(browser, url, results, errors, screenshots=screenshots, out=out)
+            _check_board_loading(browser, url, results, errors, screenshots=screenshots, out=out)
+            _check_board_degraded(browser, url, results, errors, screenshots=screenshots, out=out)
+            _check_board_scrolling(browser, url, results, errors, screenshots=screenshots, out=out)
+            _check_board_keyboard(browser, url, results, errors, screenshots=screenshots, out=out)
             browser.close()
     finally:
         if httpd is not None:
@@ -2111,15 +3281,30 @@ def _check_parity_inventory(inventory: dict[str, Any], errors: list[str]) -> Non
         for record in inventory.get(group, []):
             surface = record.get("surface")
             if surface not in palette:
-                _row(errors, "static", "parity", "placement",
-                     f"{group}:{record.get('id')} surface {surface!r} not in palette")
+                _row(
+                    errors,
+                    "static",
+                    "parity",
+                    "placement",
+                    f"{group}:{record.get('id')} surface {surface!r} not in palette",
+                )
     for capability in inventory.get("capabilities", []):
         if not capability.get("surface"):
-            _row(errors, "static", "parity", "capability-surface",
-                 f"capability {capability.get('id')} has no surface")
+            _row(
+                errors,
+                "static",
+                "parity",
+                "capability-surface",
+                f"capability {capability.get('id')} has no surface",
+            )
         if not capability.get("member_ids"):
-            _row(errors, "static", "parity", "capability-members",
-                 f"capability {capability.get('id')} has no member ids")
+            _row(
+                errors,
+                "static",
+                "parity",
+                "capability-members",
+                f"capability {capability.get('id')} has no member ids",
+            )
 
 
 def _parity_router(
@@ -2145,8 +3330,13 @@ def _parity_router(
             route.fulfill(
                 status=200,
                 content_type="application/json",
-                body=json.dumps({"ok": True, "action": path.rstrip("/").rsplit("/", 1)[-1],
-                                 "note": "recorded by the parity gate"}),
+                body=json.dumps(
+                    {
+                        "ok": True,
+                        "action": path.rstrip("/").rsplit("/", 1)[-1],
+                        "note": "recorded by the parity gate",
+                    }
+                ),
             )
             return
         if path == "/api/glance":
@@ -2156,17 +3346,16 @@ def _parity_router(
         elif path.startswith("/api/events/"):
             route.fulfill(status=200, content_type="text/event-stream", body=event_frames)
         elif path in fixtures:
-            route.fulfill(status=200, content_type="application/json",
-                          body=json.dumps(fixtures[path]))
+            route.fulfill(
+                status=200, content_type="application/json", body=json.dumps(fixtures[path])
+            )
         else:
             route.abort()
 
     return handler
 
 
-def run_parity_gate(
-    out: Path, screenshots: bool
-) -> tuple[list[dict[str, Any]], list[str]]:
+def run_parity_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], list[str]]:
     """Run the FEATURE-PARITY + per-worker surface class (u5).
 
     Deterministic and fixture-driven like the rest of the gate (waiver W2):
@@ -2193,31 +3382,52 @@ def run_parity_gate(
                 epoch = wire["control_epoch"]
                 glance_frames = (
                     "event: snapshot\n"
-                    + "data: " + json.dumps({"control_epoch": epoch}, separators=(",", ":")) + "\n\n"
+                    + "data: "
+                    + json.dumps({"control_epoch": epoch}, separators=(",", ":"))
+                    + "\n\n"
                     + "event: replay_complete\n"
-                    + "data: " + json.dumps({"control_epoch": epoch}, separators=(",", ":")) + "\n\n"
+                    + "data: "
+                    + json.dumps({"control_epoch": epoch}, separators=(",", ":"))
+                    + "\n\n"
                 )
                 # A few real per-cell frames so the R4b feed has live-shaped content, ending with
                 # the replay boundary the client keys its stream state off.
                 event_frames = (
-                    "data: " + json.dumps({"type": "step_start",
-                                           "part": {"name": "build"}}) + "\n\n"
-                    + "data: " + json.dumps({"type": "tool_use",
-                                             "part": {"name": "bash", "state": {"status": "completed"}}}) + "\n\n"
-                    + "data: " + json.dumps({"type": "step_finish",
-                                             "part": {"cost": 0.01,
-                                                      "tokens": {"input": 120, "output": 40}}}) + "\n\n"
+                    "data: "
+                    + json.dumps({"type": "step_start", "part": {"name": "build"}})
+                    + "\n\n"
+                    + "data: "
+                    + json.dumps(
+                        {
+                            "type": "tool_use",
+                            "part": {"name": "bash", "state": {"status": "completed"}},
+                        }
+                    )
+                    + "\n\n"
+                    + "data: "
+                    + json.dumps(
+                        {
+                            "type": "step_finish",
+                            "part": {"cost": 0.01, "tokens": {"input": 120, "output": 40}},
+                        }
+                    )
+                    + "\n\n"
                     + "event: replay_complete\ndata: {}\n\n"
                 )
                 context = browser.new_context(
-                    viewport={"width": width, "height": height}, timezone_id="UTC",
-                    locale="en-US", reduced_motion="reduce", color_scheme="dark",
+                    viewport={"width": width, "height": height},
+                    timezone_id="UTC",
+                    locale="en-US",
+                    reduced_motion="reduce",
+                    color_scheme="dark",
                 )
                 page = context.new_page()
                 records: list[dict[str, str]] = []
                 console_errors = _attach_console(page)
-                page.route("**/api/**",
-                           _parity_router(records, wire, glance_frames, event_frames, fixtures))
+                page.route(
+                    "**/api/**",
+                    _parity_router(records, wire, glance_frames, event_frames, fixtures),
+                )
                 page.goto(url, wait_until="domcontentloaded")
                 page.locator('[data-render-state="ready"]').wait_for(timeout=20000)
 
@@ -2225,8 +3435,7 @@ def run_parity_gate(
                 for region in PARITY_RESTING_REGIONS:
                     count = page.locator(f'[data-region="{region}"]').count()
                     if count != 1:
-                        _row(errors, name, "parity", "resting-region",
-                             f"{region} count={count}")
+                        _row(errors, name, "parity", "resting-region", f"{region} count={count}")
 
                 # 3. the workbench lenses: wired + non-empty.
                 page.click("#workbench-open")
@@ -2243,7 +3452,8 @@ def run_parity_gate(
                               const el = document.querySelector(sel);
                               return el && !el.querySelector('[data-panel-state="loading"]');
                             }""",
-                            arg=f"#wb-{panel}", timeout=5000,
+                            arg=f"#wb-{panel}",
+                            timeout=5000,
                         )
                     got = {record["path"] for record in records}
                     for path in expected:
@@ -2267,28 +3477,46 @@ def run_parity_gate(
                     if not probe or probe["content"] == 0:
                         _row(errors, name, "parity-nonempty", panel, f"panel empty: {probe}")
                     elif probe["state"] == "error":
-                        _row(errors, name, "parity-nonempty", panel,
-                             "panel rendered an explicit error state")
+                        _row(
+                            errors,
+                            name,
+                            "parity-nonempty",
+                            panel,
+                            "panel rendered an explicit error state",
+                        )
                     # One representative mutation-wiring probe: the attention lens' steer chip
                     # must POST to the flags route (the handler fulfills it).
                     if panel == "attention":
                         records.clear()
                         steer = page.locator("#wb-attention [data-action='steer']")
                         if steer.count() == 0:
-                            _row(errors, name, "parity-action", "steer",
-                                 "attention flag rendered no steer action")
+                            _row(
+                                errors,
+                                name,
+                                "parity-action",
+                                "steer",
+                                "attention flag rendered no steer action",
+                            )
                         else:
                             steer.first.click()
                             page.wait_for_timeout(250)
-                            if not any(r["method"] == "POST" and r["path"].endswith("/steer")
-                                       for r in records):
-                                _row(errors, name, "parity-action", "steer",
-                                     "steer click did not POST to the flags route")
+                            if not any(
+                                r["method"] == "POST" and r["path"].endswith("/steer")
+                                for r in records
+                            ):
+                                _row(
+                                    errors,
+                                    name,
+                                    "parity-action",
+                                    "steer",
+                                    "steer click did not POST to the flags route",
+                                )
                 if screenshots:
                     shot = out / f"parity_workbench_{name}.png"
                     page.screenshot(path=str(shot), full_page=False)
-                    results.append({"case": "parity-workbench", "viewport": name,
-                                    "screenshot": str(shot)})
+                    results.append(
+                        {"case": "parity-workbench", "viewport": name, "screenshot": str(shot)}
+                    )
                 page.click("#workbench-close")
 
                 # 4. the R4 dock: per-worker event/action + step timings.
@@ -2301,18 +3529,26 @@ def run_parity_gate(
                         _row(errors, name, "parity-dock", sub, "sub-region missing/duplicate")
                 got = {record["path"] for record in records}
                 if not any(path.startswith("/api/events/") for path in got):
-                    _row(errors, name, "parity-dock", "worker-stream",
-                         "no per-worker /api/events/<cell> request")
+                    _row(
+                        errors,
+                        name,
+                        "parity-dock",
+                        "worker-stream",
+                        "no per-worker /api/events/<cell> request",
+                    )
                 entries = page.locator(
-                    "#selection-dock [data-dock-region='worker'] [data-feed-entry]").count()
+                    "#selection-dock [data-dock-region='worker'] [data-feed-entry]"
+                ).count()
                 if entries < 1:
                     _row(errors, name, "parity-dock", "worker-feed", f"{entries} event entries")
                 actions = page.locator(
-                    "#selection-dock [data-dock-region='worker'] [data-action]").count()
+                    "#selection-dock [data-dock-region='worker'] [data-action]"
+                ).count()
                 if actions < 1:
                     _row(errors, name, "parity-dock", "worker-actions", "no [data-action] chips")
                 timings = page.locator(
-                    "#selection-dock [data-dock-region='timing'] [data-timing]").count()
+                    "#selection-dock [data-dock-region='timing'] [data-timing]"
+                ).count()
                 if timings < 1:
                     _row(errors, name, "parity-dock", "step-timings", "no [data-timing] rows")
                 states = page.eval_on_selector_all(
@@ -2325,8 +3561,9 @@ def run_parity_gate(
                 if screenshots:
                     shot = out / f"parity_dock_{name}.png"
                     page.screenshot(path=str(shot), full_page=False)
-                    results.append({"case": "parity-dock", "viewport": name,
-                                    "screenshot": str(shot)})
+                    results.append(
+                        {"case": "parity-dock", "viewport": name, "screenshot": str(shot)}
+                    )
                 for message in console_errors:
                     _row(errors, name, "parity", "console", message[:200])
                 context.close()
@@ -2387,8 +3624,13 @@ def _check_geometry(
         box = geometry["regions"][region]["rect"]
         got = (box["x"], box["y"], box["width"], box["height"])
         if any(abs(a - b) > 1 for a, b in zip(got, want, strict=True)):
-            _row(errors, label, fixture_id, "G-7",
-                 f"{region} box {tuple(round(v,1) for v in got)} want {want}")
+            _row(
+                errors,
+                label,
+                fixture_id,
+                "G-7",
+                f"{region} box {tuple(round(v, 1) for v in got)} want {want}",
+            )
 
     # G-13 row schema; G-14 row count + line clamps + fixed capacities.
     row_count = ROW_COUNT[name]
@@ -2396,52 +3638,102 @@ def _check_geometry(
         _row(errors, label, fixture_id, "G-14", f"{len(geometry['rows'])} rows want {row_count}")
     for index, row in enumerate(geometry["rows"]):
         if set(row["fields"]) != ROW_FIELDS:
-            _row(errors, label, fixture_id, "G-13",
-                 f"row {index} fields {sorted(set(row['fields']) ^ ROW_FIELDS)}")
+            _row(
+                errors,
+                label,
+                fixture_id,
+                "G-13",
+                f"row {index} fields {sorted(set(row['fields']) ^ ROW_FIELDS)}",
+            )
     attention = ATTENTION_COUNT[name]
     if geometry["attentionItems"] != attention:
-        _row(errors, label, fixture_id, "G-14",
-             f"{geometry['attentionItems']} attention items want {attention}")
+        _row(
+            errors,
+            label,
+            fixture_id,
+            "G-14",
+            f"{geometry['attentionItems']} attention items want {attention}",
+        )
     if geometry["attentionLines"] != attention * 2:
-        _row(errors, label, fixture_id, "G-14",
-             f"{geometry['attentionLines']} item-lines want {attention * 2}")
+        _row(
+            errors,
+            label,
+            fixture_id,
+            "G-14",
+            f"{geometry['attentionLines']} item-lines want {attention * 2}",
+        )
     if geometry["rowLines"] != row_count * 3:
-        _row(errors, label, fixture_id, "G-14",
-             f"{geometry['rowLines']} row-lines want {row_count * 3}")
+        _row(
+            errors,
+            label,
+            fixture_id,
+            "G-14",
+            f"{geometry['rowLines']} row-lines want {row_count * 3}",
+        )
     if geometry["detailLines"] != 2:
         _row(errors, label, fixture_id, "G-14", f"{geometry['detailLines']} detail-lines want 2")
     for entry in geometry["lineBearing"]:
         if entry["lines"] > entry["max"]:
-            _row(errors, label, fixture_id, "G-14",
-                 f"{entry['where']} renders {entry['lines']} lines > max {entry['max']}")
+            _row(
+                errors,
+                label,
+                fixture_id,
+                "G-14",
+                f"{entry['where']} renders {entry['lines']} lines > max {entry['max']}",
+            )
 
     # G-5 type floors; G-6 non-empty required values; no missing data-no-ellipsis.
     value_floor = 12.0 if name == "mobile" else 13.0
     for entry in geometry["valueSizes"]:
         if entry["size"] < value_floor - 0.01:
-            _row(errors, label, fixture_id, "G-5",
-                 f"{entry['region']} value font {entry['size']} < {value_floor}")
+            _row(
+                errors,
+                label,
+                fixture_id,
+                "G-5",
+                f"{entry['region']} value font {entry['size']} < {value_floor}",
+            )
     for entry in geometry["labelSizes"]:
         if entry["size"] < 11.0 - 0.01:
-            _row(errors, label, fixture_id, "G-5",
-                 f"{entry['region']} label font {entry['size']} < 11")
+            _row(
+                errors,
+                label,
+                fixture_id,
+                "G-5",
+                f"{entry['region']} label font {entry['size']} < 11",
+            )
     for key, value in geometry["valueTexts"].items():
         if not value:
             _row(errors, label, fixture_id, "G-6", f"empty value {key}")
     if geometry["noEllipsisMissing"]:
-        _row(errors, label, fixture_id, "G-6",
-             f"{geometry['noEllipsisMissing']} required values lack data-no-ellipsis")
+        _row(
+            errors,
+            label,
+            fixture_id,
+            "G-6",
+            f"{geometry['noEllipsisMissing']} required values lack data-no-ellipsis",
+        )
 
     # Exact schemas: answer field sets, money risk marker, bounded composition.
     for answer, expected in FIELDS.items():
         actual = geometry["answerFields"].get(answer, [])
         if len(actual) != len(set(actual)) or set(actual) != expected:
-            _row(errors, label, fixture_id, "schema",
-                 f"{answer} fields {sorted(set(actual) ^ expected)}")
+            _row(
+                errors,
+                label,
+                fixture_id,
+                "schema",
+                f"{answer} fields {sorted(set(actual) ^ expected)}",
+            )
     expected_risk = 1 if fixture_id == "F-3" else 0
     if geometry["moneyRiskCount"] != expected_risk:
-        _row(errors, label, fixture_id, "G-10",
-             f"money-risk markers {geometry['moneyRiskCount']} want {expected_risk}")
+        _row(
+            errors,
+            label,
+            fixture_id,
+            "G-10",
+            f"money-risk markers {geometry['moneyRiskCount']} want {expected_risk}",
+        )
     marginals = geometry["marginals"]
     names = [entry["name"] for entry in marginals]
     if sorted(names) != ["condition", "lifecycle", "model", "provider"]:
@@ -2480,10 +3772,17 @@ def _check_semantics(
             continue
         if not box["visible"] or box["width"] <= 0 or box["height"] <= 0:
             fail("SEM-box", f"{answer} box {box['width']}x{box['height']} visible={box['visible']}")
-        elif (box["top"] < -0.5 or box["bottom"] > height + 0.5
-              or box["left"] < -0.5 or box["right"] > width + 0.5):
-            fail("SEM-fold", f"{answer} box "
-                 f"{tuple(round(box[k], 1) for k in ('left', 'top', 'right', 'bottom'))}")
+        elif (
+            box["top"] < -0.5
+            or box["bottom"] > height + 0.5
+            or box["left"] < -0.5
+            or box["right"] > width + 0.5
+        ):
+            fail(
+                "SEM-fold",
+                f"{answer} box "
+                f"{tuple(round(box[k], 1) for k in ('left', 'top', 'right', 'bottom'))}",
+            )
         if box["scrollH"] > box["clientH"] + 1 or box["scrollW"] > box["clientW"] + 1:
             fail("SEM-answer-scroll", f"{answer} scrolls")
 
@@ -2501,8 +3800,11 @@ def _check_semantics(
         if got["age"] is None or got["age"] < 0:
             fail("SEM-G1", f"{field} non-numeric age {got['age']!r}")
         if got["state"] != want["state"] or got["age"] != want["age_seconds"]:
-            fail("SEM-G1", f"{field} rendered {got['state']}/{got['age']} "
-                 f"fixture {want['state']}/{want['age_seconds']}")
+            fail(
+                "SEM-G1",
+                f"{field} rendered {got['state']}/{got['age']} "
+                f"fixture {want['state']}/{want['age_seconds']}",
+            )
 
     # ── ON-G2 counts: exact fixture equality ──────────────────────────────────────────────
     for key in ("running", "queued", "failed", "live"):
@@ -2522,13 +3824,20 @@ def _check_semantics(
         if risk.get("risk.identity") != "none" or risk.get("risk.action") != "none":
             fail("SEM-G3", f"all-clear must render identity/action none: {risk}")
     elif risk.get("risk.identity") != want_risk["identity"]:
-        fail("SEM-G3", f"risk.identity {risk.get('risk.identity')!r} "
-             f"fixture {want_risk['identity']!r}")
+        fail(
+            "SEM-G3",
+            f"risk.identity {risk.get('risk.identity')!r} fixture {want_risk['identity']!r}",
+        )
 
     # ── ON-G4 money: five exact values, marker count, visible provenance ─────────────────
     want_cost = wire["cost"]
-    for field, key in (("money.spend", "spend"), ("money.burn", "burn"), ("money.quota", "quota"),
-                       ("money.wallet", "wallet"), ("money.leases", "leases")):
+    for field, key in (
+        ("money.spend", "spend"),
+        ("money.burn", "burn"),
+        ("money.quota", "quota"),
+        ("money.wallet", "wallet"),
+        ("money.leases", "leases"),
+    ):
         got = probe["money"].get(field)
         if got != str(want_cost.get(key, "unknown")):
             fail("SEM-G4", f"{field} rendered {got!r} fixture {want_cost.get(key)!r}")
@@ -2546,13 +3855,21 @@ def _check_semantics(
     if decision.get("decision.eligibility") not in ELIGIBILITY_STATES:
         fail("SEM-G5", f"illegal eligibility {decision.get('decision.eligibility')!r}")
     if want_decision["state"] == "none":
-        for field in ("decision.target", "decision.kind", "decision.authority",
-                      "decision.eligibility"):
+        for field in (
+            "decision.target",
+            "decision.kind",
+            "decision.authority",
+            "decision.eligibility",
+        ):
             if decision.get(field) != "none":
-                fail("SEM-G5", f"none-decision must render {field}=none, got {decision.get(field)!r}")
+                fail(
+                    "SEM-G5", f"none-decision must render {field}=none, got {decision.get(field)!r}"
+                )
     else:
-        if (decision.get("decision.target") != want_decision["target"]
-                or decision.get("decision.kind") != want_decision["kind"]):
+        if (
+            decision.get("decision.target") != want_decision["target"]
+            or decision.get("decision.kind") != want_decision["kind"]
+        ):
             fail("SEM-G5", f"decision rendered {decision} fixture {want_decision}")
 
     # ── ON-G6 trust: legal enum, integer counts, epoch + unknown-count truth ──────────────
@@ -2568,11 +3885,13 @@ def _check_semantics(
         except (TypeError, ValueError):
             fail("SEM-G6", f"{key} not a non-negative integer: {raw!r}")
     if str(trust.get("trust.epoch")) != str(want_trust["epoch"]):
-        fail("SEM-G6", f"trust.epoch {trust.get('trust.epoch')!r} "
-             f"fixture {want_trust['epoch']!r}")
+        fail("SEM-G6", f"trust.epoch {trust.get('trust.epoch')!r} fixture {want_trust['epoch']!r}")
     if str(trust.get("trust.unknown_count")) != str(want_trust["unknown_count"]):
-        fail("SEM-G6", f"unknown_count {trust.get('trust.unknown_count')!r} "
-             f"fixture {want_trust['unknown_count']!r}")
+        fail(
+            "SEM-G6",
+            f"unknown_count {trust.get('trust.unknown_count')!r} "
+            f"fixture {want_trust['unknown_count']!r}",
+        )
 
     # ── ON-G7 composition: four marginals, three explicit legible buckets, fixture truth ──
     marginals = {entry["name"]: entry for entry in probe["marginals"]}
@@ -2587,16 +3906,21 @@ def _check_semantics(
         for bucket_name, bucket in buckets.items():
             # The VISIBLE label must be the full bucket word (never 't'/'o'/'u' shorthand).
             if bucket["label"] != bucket_name:
-                fail("SEM-G7", f"{marginal_name}.{bucket_name} label {bucket['label']!r} not legible")
+                fail(
+                    "SEM-G7", f"{marginal_name}.{bucket_name} label {bucket['label']!r} not legible"
+                )
             want_value = str(wire["composition"][marginal_name][bucket_name])
             if bucket["value"] != want_value:
-                fail("SEM-G7", f"{marginal_name}.{bucket_name} rendered {bucket['value']!r} "
-                     f"fixture {want_value!r}")
+                fail(
+                    "SEM-G7",
+                    f"{marginal_name}.{bucket_name} rendered {bucket['value']!r} "
+                    f"fixture {want_value!r}",
+                )
         if not buckets.get("top", {}).get("category"):
             fail("SEM-G7", f"{marginal_name} top bucket lacks data-category")
 
     # ── R2 rows: spec/cell, paired evidence, receipt, budget facets, authority ────────────
-    expected_rows = wire["run_sample"][:len(probe["rows"])]
+    expected_rows = wire["run_sample"][: len(probe["rows"])]
 
     def unmark(value: Any) -> str:
         """Strip the compact viewport's explicit semantic mark (`spec:` / `cmd:` / `said:`...).
@@ -2614,8 +3938,11 @@ def _check_semantics(
         if not row["values"].get("spec.cell"):
             fail("SEM-R2", f"row {row['id']} missing spec/cell")
         elif unmark(row["values"].get("spec.cell")) != str(expected.get("spec.cell")):
-            fail("SEM-R2", f"row {row['id']} spec {row['values'].get('spec.cell')!r} "
-                 f"fixture {expected.get('spec.cell')!r}")
+            fail(
+                "SEM-R2",
+                f"row {row['id']} spec {row['values'].get('spec.cell')!r} "
+                f"fixture {expected.get('spec.cell')!r}",
+            )
         if row["values"].get("evidence.advisory") == row["values"].get("evidence.measured"):
             fail("SEM-R2", f"row {row['id']} ADVISORY claim equals MEASURED proof")
         for field in ("decision.eligibility", "decision.receipt", "cost.provenance"):
@@ -2625,8 +3952,7 @@ def _check_semantics(
         for facet in ("reserved", "cap", "headroom", "settlement"):
             if not budget.get(facet):
                 fail("SEM-R2", f"row {row['id']} budget.{facet} missing")
-        if (row["values"].get("decision.eligibility") in GOVERNED_STATES
-                and not row["hasAuthority"]):
+        if row["values"].get("decision.eligibility") in GOVERNED_STATES and not row["hasAuthority"]:
             fail("SEM-R2", f"row {row['id']} governed decision lacks controller authority")
 
     # ── R1 attention: reserved slots + non-increasing severity ranking ────────────────────
@@ -2684,13 +4010,21 @@ def _verify_captures(results: list[dict[str, Any]]) -> list[str]:
     return errors
 
 
-def write_report(results: list[dict[str, Any]], errors: list[str], report_path: Path,
-                 json_path: Path, check_fixtures_exit: int, *,
-                 requested_classes: list[str] | None = None,
-                 candidate: str = "", candidate_verified: bool = False,
-                 preview: str = "", preview_verified: bool = False,
-                 preview_exercised: bool = False,
-                 preview_serves_candidate: bool = False) -> int:
+def write_report(
+    results: list[dict[str, Any]],
+    errors: list[str],
+    report_path: Path,
+    json_path: Path,
+    check_fixtures_exit: int,
+    *,
+    requested_classes: list[str] | None = None,
+    candidate: str = "",
+    candidate_verified: bool = False,
+    preview: str = "",
+    preview_verified: bool = False,
+    preview_exercised: bool = False,
+    preview_serves_candidate: bool = False,
+) -> int:
     """Write the markdown + JSON reports; return the exit code.
 
     The report is the gate's artifact (the website gate's pattern): status, the classes that
@@ -2705,10 +4039,15 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
     """
     requested = list(requested_classes or ["geometry"])
     executed: list[str] = []
+
     # The per-class evidence keys the runners actually record (the gates' own case/fixture
     # vocabulary — the executed roster derives from THESE, never from a parallel guess).
     def _class_of(result: dict[str, Any]) -> str:
         case = str(result.get("case") or result.get("fixture") or "")
+        if case.startswith("boards-"):
+            # boards-navigation / boards-loading / boards-degraded / boards-scrolling /
+            # boards-keyboard -> the restored class each result proves.
+            return case.split("-", 1)[1]
         if case.startswith("F-"):
             return "geometry"
         if case == "live":
@@ -2720,6 +4059,7 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
         if case.startswith("parity"):
             return "parity"
         return ""
+
     for result in results:
         klass = _class_of(result)
         if klass and klass not in executed:
@@ -2733,16 +4073,19 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
     status = "PASS" if not errors and check_fixtures_exit == 0 else "FAIL"
     # Zero-captures rejection (remediation closed-loop, decision f987cde9): acceptance is a
     # RENDERED artifact. A gate run that produces no screenshot — the 2026-09-13 failure class
-    # ("PASS, Screenshots: 0") — is a FAIL, structurally, whatever the fixture checks say.
-    if not results:
+    # ("PASS, Screenshots: 0") — is a FAIL, structurally, whatever the fixture checks say. A
+    # capture is a result that recorded a screenshot PATH: behavior rows with no capture are
+    # evidence rows, never screenshots, and cannot satisfy the rule.
+    captures = [result for result in results if str(result.get("screenshot") or "")]
+    if not captures:
         errors.append(
             "GATE-CAPTURES: zero screenshots recorded — acceptance requires rendered proof; "
             "a PASS with no captures is structurally impossible"
         )
         status = "FAIL"
-    # Roll the screenshots up by class so the report says what each capture proves.
+    # Roll the captures up by class so the report says what each capture proves.
     by_class: dict[str, int] = {}
-    for result in results:
+    for result in captures:
         key = result.get("case") or result.get("fixture") or "resting"
         by_class[key] = by_class.get(key, 0) + 1
     rollup = ", ".join(f"{key} {count}" for key, count in sorted(by_class.items())) or "none"
@@ -2750,21 +4093,24 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
         "# Control Room render gate",
         "",
         f"**Status:** {status}",
-        "**Classes:** geometry (IA §10.3 G-1..G-15) · semantics (IA §10 G/B: rendered vs fixture) · "
-        "charts (a1) · visuals (a2) · style (a3) · a11y (IA §10.5 A) · live IA-core · "
-        "feature-parity (u5) · interactions (the acceptance slice)",
+        "**Classes:** navigation · loading · degraded · scrolling · keyboard (the restored "
+        "served boards) · legacy parked: geometry/semantics (IA §10.3/§10) · charts · visuals · "
+        "style · a11y · feature-parity (u5) · live IA-core · interactions",
         f"**Requested classes:** {', '.join(requested)}",
         f"**Executed classes:** {', '.join(executed) or 'none'}",
         f"**Omitted classes:** {', '.join(c for c in requested if c not in executed) or 'none'}",
-        "**Fixtures:** F-0..F-7 (deterministic; no live Redis/clock/network — waiver W2)",
+        "**Fixtures:** boards (restored) + F-0..F-7 (legacy parked; deterministic, no live "
+        "Redis/clock/network — waiver W2)",
         f"**Viewports:** {', '.join(f'{k} {w}x{h}' for k, (w, h) in VIEWPORTS.items())}",
         f"**Themes:** {', '.join(THEMES)}",
         "**Primitives:** present/unique · in-viewport · non-zero box · scrollable pages "
         "(vertical) · no horizontal overflow · WCAG-AA contrast · first-paint · console-clean",
     ]
     if candidate:
-        label = "verified against the checkout HEAD" if candidate_verified else (
-            "UNVERIFIED (does not match the checkout HEAD)"
+        label = (
+            "verified against the checkout HEAD"
+            if candidate_verified
+            else ("UNVERIFIED (does not match the checkout HEAD)")
         )
         lines.append(f"**Candidate:** {candidate} ({label})")
     if preview:
@@ -2773,16 +4119,17 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
             if preview_verified and candidate:
                 label += (
                     ", serves the candidate's bytes"
-                    if preview_serves_candidate else
-                    ", SERVES A DIFFERENT TREE (asset hash mismatch)"
+                    if preview_serves_candidate
+                    else ", SERVES A DIFFERENT TREE (asset hash mismatch)"
                 )
         else:
-            label = ("NOT exercised — the gate served its own instance "
-                     "(pass --base to target a preview)")
+            label = (
+                "NOT exercised — the gate served its own instance (pass --base to target a preview)"
+            )
         lines.append(f"**Preview target:** {preview} ({label})")
     lines += [
         "",
-        f"**Screenshots:** {len(results)} ({rollup})",
+        f"**Screenshots:** {len(captures)} ({rollup})",
         "",
     ]
     if errors:
@@ -2794,7 +4141,7 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
     lines.append("")
     lines.append("## Captures")
     lines.append("")
-    for result in results:
+    for result in captures:
         rel = result.get("screenshot", "")
         key = result.get("case") or result.get("fixture") or "resting"
         lines.append(f"- `{rel}` — {key}/{result.get('viewport', '?')}")
@@ -2802,19 +4149,22 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text("\n".join(lines), encoding="utf-8")
     json_path.write_text(
-        json.dumps({
-            "status": status,
-            "requested_classes": requested,
-            "executed_classes": executed,
-            "candidate": candidate,
-            "candidate_verified": bool(candidate_verified),
-            "preview": preview,
-            "preview_verified": bool(preview_verified),
-            "preview_exercised": bool(preview_exercised),
-            "preview_serves_candidate": bool(preview_serves_candidate),
-            "screenshots": results,
-            "errors": errors,
-        }, indent=2),
+        json.dumps(
+            {
+                "status": status,
+                "requested_classes": requested,
+                "executed_classes": executed,
+                "candidate": candidate,
+                "candidate_verified": bool(candidate_verified),
+                "preview": preview,
+                "preview_verified": bool(preview_verified),
+                "preview_exercised": bool(preview_exercised),
+                "preview_serves_candidate": bool(preview_serves_candidate),
+                "screenshots": results,
+                "errors": errors,
+            },
+            indent=2,
+        ),
         encoding="utf-8",
     )
     print("\n".join(lines))
@@ -2828,38 +4178,82 @@ def main() -> int:
     parser.add_argument("--json", default=None, dest="json_path")
     parser.add_argument("--fixtures", default="F-0")
     parser.add_argument("--no-screenshot", action="store_true")
-    parser.add_argument("--screenshot-themes", default="dark",
-                        help="comma-separated themes to screenshot (contrast runs all themes)")
-    parser.add_argument("--check-fixtures", action="store_true",
-                        help="validate deterministic fixtures without a browser")
-    parser.add_argument("--charts", action="store_true",
-                        help="also run the trends-lens chart class (a1)")
-    parser.add_argument("--visuals", action="store_true",
-                        help="also run the R4 SVG visual class (a2)")
-    parser.add_argument("--style", action="store_true",
-                        help="also run the styling/a11y class (a3)")
-    parser.add_argument("--a11y", action="store_true",
-                        help="also run the accessibility class (IA §10.5 A: names/roles/hidden/"
-                             "keyboard)")
-    parser.add_argument("--parity", action="store_true",
-                        help="also run the FEATURE-PARITY class (u5): every parity_inventory "
-                             "surface present, endpoints wired, workbench lenses non-empty, and "
-                             "the R4b per-worker event/action + R4d step-timing checks")
-    parser.add_argument("--live", action="store_true",
-                        help="run the IA-core class against the live /api/* (no fixtures)")
-    parser.add_argument("--profile", choices=[ACCEPTANCE_PROFILE], default=None,
-                        help="the required acceptance profile: all classes (geometry, charts, "
-                             "visuals, style, a11y, parity, live, interactions), all three "
-                             "viewports, dark + light screenshots, below-fold full-page "
-                             "captures, and the interaction checks (keyboard run selection, "
-                             "scrolling, stale/unknown states, action→result) — each required "
-                             "class enumerated in the report; an omission is a named FAIL")
-    parser.add_argument("--candidate", default=None,
-                        help="the candidate SHA under review — bound into the report")
-    parser.add_argument("--preview", default=None,
-                        help="the preview target (URL) under review — bound into the report")
-    parser.add_argument("--base", default=None,
-                        help="render an already-running portal at this URL instead of starting one")
+    parser.add_argument(
+        "--screenshot-themes",
+        default="dark",
+        help="comma-separated themes to screenshot (contrast runs all themes)",
+    )
+    parser.add_argument(
+        "--check-fixtures",
+        action="store_true",
+        help="validate deterministic fixtures without a browser",
+    )
+    parser.add_argument(
+        "--boards",
+        action="store_true",
+        help="run the restored-board classes (navigation, loading, degraded, scrolling, "
+        "keyboard) — the served room; the default when no legacy class flag is given",
+    )
+    parser.add_argument(
+        "--geometry",
+        action="store_true",
+        help="legacy parked class: the single-screen geometry/semantics gate (F-0..F-7)",
+    )
+    parser.add_argument(
+        "--charts",
+        action="store_true",
+        help="legacy parked class: the trends-lens chart class (a1)",
+    )
+    parser.add_argument(
+        "--visuals",
+        action="store_true",
+        help="legacy parked class: the R4 SVG visual class (a2)",
+    )
+    parser.add_argument(
+        "--style", action="store_true", help="legacy parked class: the styling/a11y class (a3)"
+    )
+    parser.add_argument(
+        "--a11y",
+        action="store_true",
+        help="legacy parked class: the accessibility class (IA §10.5 A)",
+    )
+    parser.add_argument(
+        "--parity",
+        action="store_true",
+        help="legacy parked class: the FEATURE-PARITY workbench checks (u5)",
+    )
+    parser.add_argument(
+        "--live",
+        action="store_true",
+        help="legacy parked class: the IA-core class against the live /api/* (no fixtures)",
+    )
+    parser.add_argument(
+        "--interactions",
+        action="store_true",
+        help="legacy parked class: the single-screen slice interactions (workbench path)",
+    )
+    parser.add_argument(
+        "--profile",
+        choices=[ACCEPTANCE_PROFILE],
+        default=None,
+        help="the required acceptance profile: the restored room's five classes "
+        "(navigation, loading, degraded, scrolling, keyboard), dark + light "
+        "screenshots, and a bound --candidate — each required class enumerated "
+        "in the report; an omission is a named FAIL",
+    )
+    parser.add_argument(
+        "--candidate", default=None, help="the candidate SHA under review — bound into the report"
+    )
+    parser.add_argument(
+        "--preview",
+        default=None,
+        help="the preview target (URL) under review — bound into the report",
+    )
+    parser.add_argument(
+        "--base",
+        default=None,
+        help="render an already-running portal at this URL instead of starting one",
+    )
     args = parser.parse_args()
 
     global _BASE_OVERRIDE
@@ -2868,22 +4262,36 @@ def main() -> int:
 
     profile = args.profile
     if profile == ACCEPTANCE_PROFILE:
-        # The profile is the ENUMERATED contract: every class runs, dark + light screenshots,
-        # and the interactions class executes the slice path. It also requires an IDENTIFIED
-        # candidate (Astra finding): acceptance without a candidate identity is the
-        # overstated-verdict class the profile exists to catch.
+        # The profile is the ENUMERATED contract: every restored class runs, dark + light
+        # screenshots, and a candidate is required (Astra finding): acceptance without a
+        # candidate identity is the overstated-verdict class the profile exists to catch.
         if not args.candidate:
-            print("the acceptance profile requires --candidate <sha> — an unidentified "
-                  "candidate cannot be accepted", file=sys.stderr)
+            print(
+                "the acceptance profile requires --candidate <sha> — an unidentified "
+                "candidate cannot be accepted",
+                file=sys.stderr,
+            )
             return 2
-        args.charts = True
-        args.visuals = True
-        args.style = True
-        args.a11y = True
-        args.parity = True
-        args.live = True
+        args.boards = True
         args.no_screenshot = False
         args.screenshot_themes = "dark,light"
+
+    legacy_requested = any(
+        (
+            args.geometry,
+            args.charts,
+            args.visuals,
+            args.style,
+            args.a11y,
+            args.parity,
+            args.live,
+            args.interactions,
+        )
+    )
+    if not legacy_requested:
+        # The served room is the default target: a bare invocation checks the room the server
+        # actually serves. The parked single-screen classes are explicit opt-ins.
+        args.boards = True
 
     fixtures = [item.strip() for item in args.fixtures.split(",") if item.strip()]
     fixture_rc = check_fixtures()
@@ -2896,30 +4304,36 @@ def main() -> int:
     json_path = Path(args.json_path) if args.json_path else out / "gate_report.json"
 
     # The class roster this run requests — the report enumerates each (executed/omitted), and
-    # the profile treats an omitted required class as a FAIL, never a silent skip.
-    requested_classes: list[str] = ["geometry"]
-    if args.charts:
-        requested_classes.append("charts")
-    if args.visuals:
-        requested_classes.append("visuals")
-    if args.style:
-        requested_classes.append("style")
-    if args.a11y:
-        requested_classes.append("a11y")
-    if args.parity:
-        requested_classes.append("parity")
-    if args.live:
-        requested_classes.append("live")
-    if profile == ACCEPTANCE_PROFILE:
-        requested_classes.append("interactions")
+    # an omitted required class is a FAIL, never a silent skip.
+    requested_classes: list[str] = []
+    if args.boards:
+        requested_classes.extend(PROFILE_CLASSES)
+    for flag, name in (
+        (args.geometry, "geometry"),
+        (args.charts, "charts"),
+        (args.visuals, "visuals"),
+        (args.style, "style"),
+        (args.a11y, "a11y"),
+        (args.parity, "parity"),
+        (args.live, "live"),
+        (args.interactions, "interactions"),
+    ):
+        if flag:
+            requested_classes.append(name)
 
     try:
         screenshot_themes = tuple(
             item.strip() for item in args.screenshot_themes.split(",") if item.strip()
         )
-        results, errors = run_browser_gate(
-            fixtures, out, not args.no_screenshot, screenshot_themes=screenshot_themes
-        )
+        results, errors = [], []
+        if args.boards:
+            board_results, board_errors = run_boards_gate(out, not args.no_screenshot)
+            results, errors = results + board_results, errors + board_errors
+        if args.geometry:
+            geometry_results, geometry_errors = run_browser_gate(
+                fixtures, out, not args.no_screenshot, screenshot_themes=screenshot_themes
+            )
+            results, errors = results + geometry_results, errors + geometry_errors
         if args.charts:
             chart_results, chart_errors = run_chart_gate(out, not args.no_screenshot)
             results, errors = results + chart_results, errors + chart_errors
@@ -2938,19 +4352,24 @@ def main() -> int:
         if args.live:
             live_results, live_errors = run_live_gate(out, not args.no_screenshot)
             results, errors = results + live_results, errors + live_errors
-        if profile == ACCEPTANCE_PROFILE:
+        if args.interactions:
             interaction_results, interaction_errors = run_acceptance_interactions(
                 out, not args.no_screenshot
             )
             results, errors = results + interaction_results, errors + interaction_errors
     except ImportError:
-        print("playwright is not installed; run with --check-fixtures for the browser-free check",
-              file=sys.stderr)
+        print(
+            "playwright is not installed; run with --check-fixtures for the browser-free check",
+            file=sys.stderr,
+        )
         return 2
     except Exception as error:  # noqa: BLE001 - a missing browser is exit 2, not a silent pass
         print(f"browser unavailable: {error}", file=sys.stderr)
-        print("run `python3 -m playwright install --with-deps chromium` in an environment with "
-              "the system libraries, or use --check-fixtures", file=sys.stderr)
+        print(
+            "run `python3 -m playwright install --with-deps chromium` in an environment with "
+            "the system libraries, or use --check-fixtures",
+            file=sys.stderr,
+        )
         return 2
 
     # Capture-file readability (the rendered proof must be real, not a filename): every
@@ -2965,8 +4384,11 @@ def main() -> int:
     if args.candidate:
         try:
             head = subprocess.run(
-                ["git", "rev-parse", "HEAD"], cwd=Path.cwd(),
-                capture_output=True, text=True, timeout=15,
+                ["git", "rev-parse", "HEAD"],
+                cwd=Path.cwd(),
+                capture_output=True,
+                text=True,
+                timeout=15,
             ).stdout.strip()
         except Exception:  # noqa: BLE001 — an unreadable checkout verifies nothing
             head = ""
@@ -3024,7 +4446,11 @@ def main() -> int:
                         "preview is not serving this candidate"
                     )
     return write_report(
-        results, errors, report_path, json_path, fixture_rc,
+        results,
+        errors,
+        report_path,
+        json_path,
+        fixture_rc,
         requested_classes=requested_classes,
         candidate=args.candidate or "",
         candidate_verified=candidate_verified,
