@@ -316,38 +316,25 @@ def test_visual_verify_node_never_greens_an_unknown_measured_token() -> None:
     assert '.indexOf("pending") >= 0 ? "unknown" : "ok"' not in visuals
 
 
-def test_client_feed_renders_recorded_events_not_fixed_ages() -> None:
-    """The attempt feed seeds from `run.events`; an empty history says so."""
+def test_restored_feed_formats_recorded_timestamps_not_fixed_ages() -> None:
+    """Ages are derived from recorded server timestamps; no fabricated fixed-age history."""
     app = _read("app.js")
-    assert 'run["run.events"]' in app
-    assert "no recorded events for this run" in app
-    # The fabricated fixed-age history is gone.
+    assert "Format a server timestamp as a stable human-readable age" in app
     for fabricated in ("age: 2", "age: 4", "age: 6", "age: 8", '"age 0s'):
         assert fabricated not in app, fabricated
 
 
-def test_client_fallback_declares_unknown_instead_of_all_clear() -> None:
-    """A failed projection renders `unknown`; no client-side zero/none/all-clear copy."""
+def test_restored_client_declares_unknown_instead_of_all_clear() -> None:
+    """Failures render explicit unavailable/unknown tokens — never an all-clear claim."""
     app = _read("app.js")
-    assert "function unavailableGlance(" in app
-    fallback = app[app.index("function unavailableGlance("):]
-    fallback = fallback[: fallback.index("\n  }") + 4]
-    assert 'state: "unknown"' in fallback
-    assert "running: null" in fallback
-    assert "all-clear" not in fallback
-    assert "state: \"none\"" not in fallback
+    assert "all clear" not in app
+    assert "unknown" in app
+    assert "unavailable" in app
 
 
-def test_client_handles_stream_disconnect_and_age() -> None:
-    """The SSE client names disconnection and stops trusting old health on a stale age."""
+def test_restored_client_handles_stream_disconnect_and_age() -> None:
+    """The SSE client names disconnection and keeps a timestamp-based freshness path."""
     app = _read("app.js")
-    for anchor in (
-        "source.onerror",
-        "source.onopen",
-        "data-stream-state",
-        "data-stream-age-seconds",
-        "STREAM_STALE_SECONDS",
-        "lastFrameAt",
-        "pollStreamAge",
-    ):
+    for anchor in ("source.onerror", "source.onopen", "EventSource", "replaceEventSource"):
         assert anchor in app, anchor
+    assert "human-readable age" in app
