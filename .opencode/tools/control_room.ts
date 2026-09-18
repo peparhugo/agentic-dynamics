@@ -17,33 +17,86 @@ const ENDPOINTS: Record<string, string> = {
   routing: "/api/routing",
   design_sessions: "/api/design-sessions",
   claude_agents: "/api/claude-agents",
+  // Read-only operational surfaces added for the Units 4-5 delivery work (F0): the projection
+  // health block, the one resting-screen projection, and the operational read models.
+  projections: "/api/projections",
+  glance: "/api/glance",
+  operations: "/api/operations",
+}
+
+/** Hard deadline for ONE portal request: a live portal answers fast; a hung one must not
+ *  hang the turn. */
+const REQUEST_TIMEOUT_MS = 10_000
+
+/**
+ * The portal's base URL. Explicit `CONTROL_ROOM_URL` wins; otherwise compose from the same
+ * `FINOPS_HOST`/`FINOPS_PORT` the portal's systemd unit declares; otherwise the compatible
+ * loopback default (127.0.0.1:8000). Exported for the focused test.
+ */
+export function resolveBaseUrl(env: Record<string, string | undefined> = process.env): string {
+  const explicit = (env.CONTROL_ROOM_URL || "").trim().replace(/\/+$/, "")
+  if (explicit) return explicit
+  const host = (env.FINOPS_HOST || "127.0.0.1").trim()
+  const port = (env.FINOPS_PORT || "8000").trim()
+  return `http://${host}:${port}`
 }
 
 export default tool({
   description:
-    "Read-only GET query against the running Control Room portal (apps/control_room/server.py). Requires the portal already running on FINOPS_PORT (default 8000) — this tool does not start it.",
+    "Read-only GET query against the running Control Room portal (apps/control_room/server.py). Base URL: CONTROL_ROOM_URL, else http://$FINOPS_HOST:$FINOPS_PORT (default 127.0.0.1:8000). Requires the portal already running — this tool does not start it.",
   args: {
-    endpoint: tool.schema.enum(["matrix", "status", "flags", "routing", "design_sessions", "claude_agents"]).optional().default("status"),
+    endpoint: tool.schema
+      .enum([
+        "matrix",
+        "status",
+        "flags",
+        "routing",
+        "design_sessions",
+        "claude_agents",
+        "projections",
+        "glance",
+        "operations",
+      ])
+      .optional()
+      .default("status"),
   },
   async execute(args) {
-    const port = process.env.FINOPS_PORT || "8000"
-    const url = `http://127.0.0.1:${port}${ENDPOINTS[args.endpoint]}`
+    const url = `${resolveBaseUrl()}${ENDPOINTS[args.endpoint]}`
 
     let res: Response
+    let text: string
     try {
-      res = await fetch(url)
+      res = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+      // Body consumption belongs INSIDE the error boundary (review fix): a server may send
+      // headers and then stall the body — that must surface as `unavailable`, never as an
+      // uncaught deadline escaping the tool's structured outcome.
+      text = await res.text()
     } catch (e) {
-      return `Control Room portal not reachable at ${url}. Start it with: python3 apps/control_room/server.py`
+      // Unavailable service: distinguish the deadline from other transport failures, keep the
+      // real reason, and never fabricate data.
+      const reason =
+        e instanceof Error && e.name === "TimeoutError"
+          ? `no response within ${REQUEST_TIMEOUT_MS}ms`
+          : e instanceof Error
+            ? e.message
+            : String(e)
+      return {
+        output: `Control Room portal unavailable at ${url}: ${reason}. Start it with: python3 apps/control_room/server.py`,
+        metadata: { endpoint: args.endpoint, url, outcome: "unavailable" },
+      }
     }
 
-    const text = await res.text()
     if (!res.ok) {
-      return { output: text || `Control Room request failed (HTTP ${res.status})`, metadata: { endpoint: args.endpoint, status: res.status } }
+      // Non-success response: the HTTP status is the answer; the body is passed through.
+      return {
+        output: text || `Control Room request failed (HTTP ${res.status})`,
+        metadata: { endpoint: args.endpoint, url, status: res.status, outcome: "non-success" },
+      }
     }
 
     return {
       output: text,
-      metadata: { endpoint: args.endpoint, url, timestamp: new Date().toISOString() },
+      metadata: { endpoint: args.endpoint, url, timestamp: new Date().toISOString(), outcome: "ok" },
     }
   },
 })

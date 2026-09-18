@@ -9,6 +9,8 @@ from __future__ import annotations
 import hashlib
 import math
 import os
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +20,26 @@ from typing import Any
 # default values are read once at import (as in live.py), but ``ChromaStore.__init__``
 # re-checks the environment so a test or a forked worker can still override them.
 CHROMA_HOST = os.environ.get("CHROMA_HOST", "localhost")
-CHROMA_PORT = int(os.environ.get("CHROMA_PORT", "8000"))
+# TWO distinct endpoints exist and neither implies the other (review fix P1):
+#   * the HOST checkout reaches the PUBLISHED loopback port (127.0.0.1:8100 — the kb-chroma
+#     unit and the reachability probe both declare it);
+#   * the ladder's containers reach the service BY NAME on its INTERNAL port
+#     (chromadb:8000) — ``x-ladder-env`` declares CHROMA_HOST=chromadb AND CHROMA_PORT=8000.
+# The default below is the HOST endpoint. A non-loopback CHROMA_HOST WITHOUT an explicit port
+# is a configuration error and ``resolve_chroma_endpoint`` refuses it rather than silently
+# pairing the by-name host with the host's published port.
+CHROMA_PORT = int(os.environ.get("CHROMA_PORT", "8100"))
+#: The service's in-network port (what ``chromadb`` listens on inside the container). Named
+#: here so the refusal message and the compose declaration share one documented value.
+CHROMA_CONTAINER_PORT = 8000
+
+# Bounded-operation defaults (delivery-simplification Units 4-5): chromadb's HTTP session is
+# constructed ``timeout=None`` with no settings hook, and ollama's default client also waits
+# forever — so every layer we own declares its own deadline. Env-overridable.
+EMBED_TIMEOUT_ENV = "FINOPS_EMBED_TIMEOUT_S"
+DEFAULT_EMBED_TIMEOUT_S = 15.0
+CHROMA_TIMEOUT_ENV = "FINOPS_CHROMA_TIMEOUT_S"
+DEFAULT_CHROMA_TIMEOUT_S = 10.0
 
 
 def step_doc_id(session_id: str, step_index: int) -> str:
@@ -36,11 +57,28 @@ def step_doc_id(session_id: str, step_index: int) -> str:
 class EmbeddingClient:
     """Generate text embeddings via local Ollama model."""
 
-    def __init__(self, model: str = "bge-m3:latest", host: str | None = None):
+    def __init__(
+        self,
+        model: str = "bge-m3:latest",
+        host: str | None = None,
+        *,
+        timeout_s: float | None = None,
+    ):
         import ollama
 
         self.model = model
-        self._client = ollama.Client(host=host) if host else ollama
+        self.timeout_s = (
+            float(timeout_s)
+            if timeout_s is not None
+            else float(os.environ.get(EMBED_TIMEOUT_ENV, DEFAULT_EMBED_TIMEOUT_S))
+        )
+        # A dedicated client with an explicit deadline — the module-level default client
+        # inherits ollama's own ``timeout=None`` (wait forever), which is how a stalled
+        # embedding provider used to block retrieval and the chroma projector indefinitely.
+        self._client = ollama.Client(
+            host=host or os.environ.get("OLLAMA_HOST") or "http://127.0.0.1:11434",
+            timeout=self.timeout_s,
+        )
 
     def embed(self, text: str) -> list[float]:
         r = self._client.embeddings(model=self.model, prompt=text)
@@ -105,6 +143,206 @@ class ChromaStoreError(RuntimeError):
     """
 
 
+def resolve_chroma_endpoint(
+    host: str | None = None, port: int | None = None
+) -> tuple[str, int]:
+    """Resolve the chroma endpoint for THIS environment — explicitly, never by implication.
+
+    Precedence: explicit arguments > environment (``CHROMA_HOST``/``CHROMA_PORT``) > the host
+    defaults (``localhost:8100``). A non-loopback ``CHROMA_HOST`` REQUIRES an explicit port:
+    the service answers on its internal port inside the ladder network while the host
+    publishes a different one, so defaulting the port for a named host silently targets the
+    wrong endpoint (review finding P1). One resolver — the store and its tests share it.
+    """
+    resolved_host = (
+        str(host) if host is not None else os.environ.get("CHROMA_HOST", CHROMA_HOST)
+    )
+    if port is not None:
+        return resolved_host, int(port)
+    env_port = os.environ.get("CHROMA_PORT")
+    if env_port:
+        return resolved_host, int(env_port)
+    if resolved_host not in ("localhost", "127.0.0.1", "::1"):
+        raise ChromaStoreError(
+            f"CHROMA_HOST={resolved_host!r} names a service endpoint but no CHROMA_PORT is "
+            f"declared: the by-name container port is {CHROMA_CONTAINER_PORT} while the "
+            f"host's published port is {CHROMA_PORT} — declare CHROMA_PORT explicitly "
+            "(see x-ladder-env)"
+        )
+    return resolved_host, CHROMA_PORT
+
+
+def _bounded_get(url: str, deadline: float) -> int:
+    """One GET whose TOTAL elapsed time is bounded by the absolute ``deadline``.
+
+    httpx's timeout bounds INACTIVITY, not elapsed time: a server dribbling one byte at a
+    time can extend a request indefinitely, and a fresh timeout per probe multiplies the
+    overrun (review finding P1). Here the client timeout is the REMAINING time (so no single
+    blocking read can exceed the deadline) AND the streamed body is checked against the
+    deadline per chunk (so a slow stream is cut at the deadline too). Raises
+    :class:`ChromaStoreError` on deadline exhaustion or transport failure; returns the HTTP
+    status otherwise.
+    """
+    import httpx
+
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise ChromaStoreError(f"chroma init deadline exhausted before GET {url}")
+    try:
+        with (
+            httpx.Client(timeout=httpx.Timeout(max(0.001, remaining))) as client,
+            client.stream("GET", url) as response,
+        ):
+            status = response.status_code
+            for _chunk in response.iter_bytes():
+                if time.monotonic() > deadline:
+                    raise ChromaStoreError(
+                        f"GET {url} exceeded the chroma initialization deadline"
+                    )
+            return status
+    except ChromaStoreError:
+        raise
+    except Exception as exc:
+        raise ChromaStoreError(
+            f"GET {url} failed within the chroma init deadline: {type(exc).__name__}: {exc}"
+        ) from exc
+
+
+def _probe_chroma(host: str, port: int, deadline: float) -> None:
+    """Readiness gate sharing ONE absolute deadline with construction.
+
+    chromadb's FastAPI transport builds ``httpx.Client(timeout=None, ...)`` and its
+    constructor performs network calls (server version, identity, tenant/database) over it —
+    an unresponsive server would block construction forever. This gate probes the liveness
+    contract (heartbeat, must be 2xx) and the exact endpoints the constructor will hit (must
+    merely answer), with every request cut at ``deadline`` — no probe receives fresh time
+    (review finding P1).
+    """
+    base = f"http://{host}:{port}"
+    last = ""
+    for path in ("/api/v2/heartbeat", "/api/v1/heartbeat"):
+        try:
+            status = _bounded_get(f"{base}{path}", deadline)
+        except ChromaStoreError as exc:
+            last = str(exc)
+            continue
+        if status == 200:
+            break
+        last = f"{path}: HTTP {status}"
+    else:
+        raise ChromaStoreError(
+            f"chroma server not answerable at {base} within the initialization deadline ({last})"
+        )
+    for path in (
+        "/api/v2/version",
+        "/api/v2/auth/identity",
+        "/api/v2/tenants/default_tenant/databases/default_database",
+    ):
+        _bounded_get(f"{base}{path}", deadline)
+
+
+#: How long an endpoint stays refused after an initialization that FAILED TO COMPLETE within
+#: its deadline. Combined with the atomic capacity reservation below, this keeps repeated
+#: outages from piling up attempts (review finding P2).
+CHROMA_CONSTRUCTION_COOLDOWN_S = 60.0
+#: Bounded capacity for chromadb initialization in this process. A reservation is taken
+#: ATOMICALLY before a worker starts and released only when the operation actually ends, so
+#: concurrent callers cannot stack constructors against a stalled endpoint.
+CHROMA_INIT_SLOTS = 2
+_CHROMA_INIT_CAPACITY = threading.BoundedSemaphore(CHROMA_INIT_SLOTS)
+_CHROMA_CONSTRUCTION_LOCK = threading.Lock()
+_CHROMA_CONSTRUCTION_REFUSED_UNTIL: dict[tuple[str, int], float] = {}
+
+
+def _initialize_chroma(host: str, port: int, timeout_s: float) -> Any:
+    """Construct the chromadb client under ONE absolute deadline and a bounded reservation.
+
+    The whole initialization — readiness probes AND the constructor's own identity/tenant
+    calls — runs inside a single daemon worker awaited ONCE against ``timeout_s``; the
+    deadline starts before the first probe, so no phase can borrow fresh time (review finding
+    P1). The capacity reservation is acquired atomically BEFORE the worker starts and
+    released only when the operation actually ends — a timed-out caller cannot free capacity
+    that a still-stuck constructor holds, so concurrent and retried calls cannot accumulate
+    constructors (review finding P2). A completed-but-failed initialization releases its slot
+    immediately; only deadline overruns set the cooldown.
+    """
+    import chromadb
+
+    key = (str(host), int(port))
+    with _CHROMA_CONSTRUCTION_LOCK:
+        until = _CHROMA_CONSTRUCTION_REFUSED_UNTIL.get(key, 0.0)
+    now = time.monotonic()
+    if now < until:
+        raise ChromaStoreError(
+            f"chromadb initialization suppressed for {until - now:.0f}s more "
+            f"(a recent attempt at {host}:{port} did not complete within its deadline)"
+        )
+    if not _CHROMA_INIT_CAPACITY.acquire(blocking=False):
+        raise ChromaStoreError(
+            f"chromadb initialization refused: {CHROMA_INIT_SLOTS} initializations are in "
+            "flight (a stalled endpoint holds this process's capacity)"
+        )
+    # Capture the reservation OBJECT: the worker must release exactly the capacity its
+    # reservation was taken from, even if the module attribute is later replaced (tests).
+    capacity = _CHROMA_INIT_CAPACITY
+    deadline = time.monotonic() + timeout_s
+    result: dict[str, Any] = {}
+    done = threading.Event()
+
+    def _worker() -> None:
+        try:
+            _probe_chroma(str(host), int(port), deadline)
+            result["client"] = chromadb.HttpClient(host=str(host), port=int(port))
+        except BaseException as exc:  # noqa: BLE001 — delivered to the caller below
+            result["error"] = exc
+        finally:
+            done.set()
+            capacity.release()  # held until the operation ACTUALLY ends
+
+    try:
+        threading.Thread(target=_worker, name="chroma-init", daemon=True).start()
+    except BaseException:
+        capacity.release()
+        raise
+    if not done.wait(timeout_s):
+        with _CHROMA_CONSTRUCTION_LOCK:
+            _CHROMA_CONSTRUCTION_REFUSED_UNTIL[key] = (
+                time.monotonic() + CHROMA_CONSTRUCTION_COOLDOWN_S
+            )
+        raise ChromaStoreError(
+            f"chromadb initialization exceeded {timeout_s:g}s at {host}:{port} "
+            "(the server stalled during the readiness probe or identity/tenant validation)"
+        )
+    error = result.get("error")
+    if error is not None:
+        if isinstance(error, ChromaStoreError):
+            raise error
+        raise ChromaStoreError(
+            f"chromadb initialization failed at {host}:{port}: {error!r}"
+        )
+    return result["client"]
+
+
+def _bound_chroma_session(client: Any, timeout_s: float) -> bool:
+    """Apply the declared deadline to chromadb's shared HTTP session.
+
+    chromadb 1.x exposes no settings hook for the session timeout (it is constructed
+    ``timeout=None``); this is a version-tolerant private-attribute poke. Returns False
+    when the session cannot be reached — the construction pre-flight is then the only
+    bound, so a caller that needs a hard guarantee should keep its own deadline too.
+    """
+    session = getattr(getattr(client, "_server", None), "_session", None)
+    if session is None:
+        return False
+    try:
+        import httpx
+
+        session.timeout = httpx.Timeout(timeout_s)
+        return True
+    except Exception:  # noqa: BLE001 — an unbounded library session is reported, not fatal
+        return False
+
+
 class ChromaStore:
     """Vector store for experiment session embeddings and knowledge chunks.
 
@@ -121,15 +359,25 @@ class ChromaStore:
         host: str | None = None,
         port: int | None = None,
         collection_name: str | None = None,
+        *,
+        timeout_s: float | None = None,
     ):
-        import chromadb
-
-        # Env-driven defaults (re-checked here, not only at import) so a caller or
-        # test can override CHROMA_HOST/CHROMA_PORT without reloading the module.
-        self._client = chromadb.HttpClient(
-            host=host if host is not None else os.environ.get("CHROMA_HOST", CHROMA_HOST),
-            port=port if port is not None else int(os.environ.get("CHROMA_PORT", str(CHROMA_PORT))),
+        # One resolver for both environments (review fix P1): explicit args > env > host
+        # defaults, with a LOUD refusal when a named host carries no port.
+        resolved_host, resolved_port = resolve_chroma_endpoint(host, port)
+        self.host = resolved_host
+        self.port = resolved_port
+        self.timeout_s = (
+            float(timeout_s)
+            if timeout_s is not None
+            else float(os.environ.get(CHROMA_TIMEOUT_ENV, DEFAULT_CHROMA_TIMEOUT_S))
         )
+        # Bounded initialization, in order (review findings P1/P2): ONE absolute deadline
+        # covers the readiness probes AND the constructor's own I/O, inside a single daemon
+        # worker under an atomic capacity reservation; only then is the shared session's
+        # timeout applied for every subsequent request.
+        self._client = _initialize_chroma(resolved_host, resolved_port, self.timeout_s)
+        self.session_bounded = _bound_chroma_session(self._client, self.timeout_s)
         self._embedder = EmbeddingClient()
         # Instance shadow of the class default: ``collection_name`` is the
         # per-instance override while ``COLLECTION_NAME`` stays the documented

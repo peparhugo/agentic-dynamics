@@ -31,10 +31,11 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import re
+import threading
 import time
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
@@ -71,6 +72,33 @@ DEFAULT_TOP_K = 40
 DEFAULT_SEED_COUNT = 12
 DEFAULT_RAG_TOKEN_LIMIT = 8000
 DEFAULT_EXECUTOR_RAG_RATIO = 0.20
+
+#: The declared overall wall-clock budget for one retrieval pass (delivery-simplification
+#: Units 4-5). Legs are bounded at their transports too (ChromaStore session timeout /
+#: ollama client timeout); this budget is the outer bound that keeps a leg which is stuck
+#: below its transport from extending the pass. ``FINOPS_RETRIEVAL_BUDGET_S`` overrides.
+RETRIEVAL_BUDGET_ENV = "FINOPS_RETRIEVAL_BUDGET_S"
+DEFAULT_RETRIEVAL_BUDGET_S = 20.0
+
+#: Graph expansion is part of the SAME declared budget (review finding P1): it receives the
+#: remaining wall-clock as its own timeout and is skipped when less than this remains, with
+#: a named cause — a blocked database request must never outlive the pass.
+EXPANSION_MIN_BUDGET_S = 0.05
+
+#: Per-DEPENDENCY in-flight capacity (review finding P1): one failed backend must never
+#: monopolize the capacity a healthy fallback needs — dense and lexical have SEPARATE pools,
+#: so stalled dense calls cannot refuse lexical launches. Workers are daemon threads, so a
+#: leg stuck below its transport can never block process shutdown either.
+RETRIEVAL_LEG_CAPACITY = {
+    "dense": 2,
+    "lexical": 2,
+    "expansion": 1,
+    "embedding": 2,
+}
+_LEG_SLOTS = {
+    name: threading.BoundedSemaphore(capacity)
+    for name, capacity in RETRIEVAL_LEG_CAPACITY.items()
+}
 REDUNDANCY_THRESHOLD = 0.92
 #: The cosine-collapse embeds only the top-K candidates (by list order — the fused list is
 #: score-ordered). Pairs beyond the cap default to 0.0 in the collapse (no dedupe), which is
@@ -846,34 +874,59 @@ def collapse_redundant(
 
 
 def _pairwise_similarities(
-    candidates: list[Candidate], embedder: Any = None
-) -> tuple[dict[tuple[str, str], float], str]:
+    candidates: list[Candidate],
+    embedder: Any = None,
+    *,
+    timeout_s: float | None = None,
+) -> tuple[dict[tuple[str, str], float], str, str]:
     """Compute pairwise cosine similarities among candidates (or degrade to a no-op).
 
-    Returns ``(similarities, path)``. ``similarities`` maps ``(id_a, id_b)`` to a
+    Returns ``(similarities, path, error)``. ``similarities`` maps ``(id_a, id_b)`` to a
     similarity in ``[0, 1]`` (``1.0`` = identical) computed as ``1 - cosine_distance``
-    over the embedder's vectors. When no embedder is supplied, fewer than two
-    candidates survive, or embedding fails, returns ``({}, "none")`` so
-    :func:`collapse_redundant` degrades to a no-op. ``path`` is ``"embedding"`` or
-    ``"none"`` and is recorded on the attempt for audit (which dedupe leg actually
-    ran).
+    over the embedder's vectors. When no embedder is supplied, fewer than two candidates
+    survive, or embedding fails/times out, returns ``({}, "none", <cause or "">)`` so
+    :func:`collapse_redundant` degrades to a no-op AND the caller can record why.
+    ``path`` is ``"embedding"`` or ``"none"`` (which dedupe leg actually ran).
+
+    Bounded like every other leg (review finding P2): ONE daemon worker under the
+    per-dependency embedding capacity — never a fresh executor whose non-daemon threads
+    outlive a timeout or block process shutdown. The embed calls are transport-bounded at
+    the ollama client; the deadline here is the outer guarantee.
     """
     if len(candidates) < 2 or embedder is None:
-        return {}, "none"
+        return {}, "none", ""
+    if timeout_s is not None and timeout_s <= 0:
+        return {}, "none", (
+            f"retrieval budget exhausted before the embedding leg ({timeout_s:g}s left)"
+        )
+    embedded = candidates[:COLLAPSE_EMBED_CAP]
+    budget_label = timeout_s if timeout_s is not None else DEFAULT_RETRIEVAL_BUDGET_S
+
+    def _embed_all() -> list[Any]:
+        return [embedder.embed(c.text) for c in embedded]
+
+    deadline = time.monotonic() + budget_label
+    handle, refusal = _launch_leg("embedding", _embed_all)
+    if handle is None:
+        return {}, "none", refusal
+    ok, error = _await_leg(handle, deadline)
+    if not ok:
+        if handle["done"].is_set():
+            return {}, "none", f"embedding leg failed: {error}"
+        return {}, "none", f"embedding leg exceeded its {budget_label:g}s deadline"
+    embeddings: list[Any] = list(handle["value"] or [])
     try:
-        embedded = candidates[:COLLAPSE_EMBED_CAP]
-        with ThreadPoolExecutor(max_workers=8) as pool:
-            embeddings = list(pool.map(embedder.embed, [c.text for c in embedded]))
         sims: dict[tuple[str, str], float] = {}
         for i in range(len(embedded)):
             for j in range(i + 1, len(embedded)):
                 dist = embedder.cosine_distance(embeddings[i], embeddings[j])
                 sims[(embedded[i].id, embedded[j].id)] = 1.0 - dist
-        return sims, "embedding"
-    except Exception:
+        return sims, "embedding", ""
+    except Exception as exc:
         # Embedding infra unavailable (Ollama down, embedder missing, etc.) — the
-        # collapse must degrade to a no-op, never crash the phase.
-        return {}, "none"
+        # collapse must degrade to a no-op, never crash the phase; the cause is returned
+        # for the caller to record (a failure state must never be readable as success).
+        return {}, "none", f"{type(exc).__name__}: {exc}"
 
 
 def compute_token_budget(
@@ -959,6 +1012,10 @@ class RetrievalAttempt:
     cache_status: str
     fallback_mode: str
     dedup_path: str = ""  # "embedding" | "none" — which redundancy-collapse leg ran
+    #: Named causes for legs that failed or exceeded the declared retrieval budget
+    #: ({"dense"|"lexical"|"embedding": reason}). Empty when every attempted leg returned;
+    #: a degraded pass is never silent.
+    leg_errors: dict[str, str] = field(default_factory=dict)
     # k4 no-silent-empties: candidates excluded from the top-K because their source_type was
     # empty after both the store metadata and the resolver were consulted, while a typed
     # candidate existed. Each entry is {"id", "reason"} — the exclusion is recorded, never
@@ -1056,6 +1113,7 @@ class RetrievalAttempt:
             "latency_ms": self.latency_ms,
             "cache_status": self.cache_status,
             "dedup_path": self.dedup_path,
+            "leg_errors": self.leg_errors,
             "fallback_mode": self.fallback_mode,
             "untyped_excluded": self.untyped_excluded,
             "weights_version": self.weights_version,
@@ -1378,6 +1436,68 @@ def _resolve_source_type(
     return resolved if resolved else source_type
 
 
+def _launch_leg(name: str, fn: Callable[[], Any]) -> tuple[dict[str, Any] | None, str]:
+    """Start one retrieval leg on a daemon worker; return ``(handle, refusal)``.
+
+    Parallelism is preserved (both legs launch before either is awaited). The per-dependency
+    bounded semaphore means a stalled backend cannot accumulate unbounded abandoned work
+    within ITS dependency, and cannot consume the capacity another dependency's healthy
+    fallback needs. A daemon worker can never block process shutdown.
+    """
+    slots = _LEG_SLOTS.get(name)
+    if slots is None:
+        return None, f"{name} leg not started: no capacity pool is declared for it"
+    if not slots.acquire(blocking=False):
+        return None, (
+            f"{name} leg not started: all {RETRIEVAL_LEG_CAPACITY[name]} {name} legs are "
+            "in flight (a stalled backend is holding this dependency's capacity)"
+        )
+    handle: dict[str, Any] = {
+        "name": name,
+        "done": threading.Event(),
+        "value": None,
+        "error": None,
+    }
+
+    def _worker() -> None:
+        try:
+            handle["value"] = fn()
+        except BaseException as exc:  # noqa: BLE001 — delivered to the caller below
+            handle["error"] = exc
+        finally:
+            handle["done"].set()
+            slots.release()
+
+    try:
+        threading.Thread(target=_worker, name=f"retrieval-{name}", daemon=True).start()
+    except BaseException:
+        slots.release()
+        raise
+    return handle, ""
+
+
+def _await_leg(handle: dict[str, Any], deadline: float) -> tuple[bool, str]:
+    """Await one leg against the absolute ``deadline``; return ``(ok, error)``.
+
+    A leg that ALREADY returned is collected regardless of the clock — a stalled sibling
+    must never discard a ready result. Only a still-running leg can be failed by the budget;
+    its worker keeps running until its own transport bound ends it (daemon, so it is never a
+    shutdown blocker).
+    """
+    remaining = deadline - time.monotonic()
+    completed = bool(handle["done"].is_set())
+    if not completed and remaining > 0:
+        completed = bool(handle["done"].wait(remaining))
+    if completed:
+        if handle["error"] is not None:
+            return False, f"{type(handle['error']).__name__}: {handle['error']}"
+        return True, ""
+    return False, (
+        f"{handle['name']} leg did not return within the remaining {max(remaining, 0.0):.2f}s "
+        "of the retrieval budget"
+    )
+
+
 def retrieve(
     raw_work_item: str,
     *,
@@ -1395,6 +1515,7 @@ def retrieve(
     now: datetime | None = None,
     pattern_projection: bool = False,
     source_type_resolver: Callable[[str], str | None] | None = None,
+    deadline_s: float | None = None,
 ) -> RetrievalAttempt:
     """Run the deterministic retrieval pipeline and record the attempt.
 
@@ -1405,6 +1526,11 @@ def retrieve(
     and selected. The ``RetrievalAttempt`` is returned *before* any LLM call so the
     trace survives construction/execution failures.
 
+    ``deadline_s`` bounds the whole pass (default ``FINOPS_RETRIEVAL_BUDGET_S``, 20s):
+    leg waits use the remaining budget, the pool is dismissed without joining, and a leg
+    that fails or exceeds the budget is NAMED in ``leg_errors`` — a degraded pass is
+    never silently pooled with a clean one.
+
     ``source_type_resolver`` is the k4 no-silent-empties side channel: a deterministic
     ``candidate_id -> source_type`` lookup (never an LLM) consulted when a store's
     metadata carries no ``source_type`` (an older projection), so such a candidate is
@@ -1413,6 +1539,12 @@ def retrieve(
     recorded reason whenever a typed candidate exists (see ``UNTYPED_EXCLUDED_REASON``).
     """
     t0 = time.monotonic()
+    budget_s = (
+        float(deadline_s)
+        if deadline_s is not None
+        else float(os.environ.get(RETRIEVAL_BUDGET_ENV, DEFAULT_RETRIEVAL_BUDGET_S))
+    )
+    leg_errors: dict[str, str] = {}
     plan = build_query_plan(
         raw_work_item,
         phase_objective=phase_objective,
@@ -1444,23 +1576,38 @@ def retrieve(
             plan.lexical_query, limit=top_k, commit=commit_sha
         )
 
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        futures = {}
-        if dense_ok:
-            futures["dense"] = pool.submit(_dense_leg)
-        if lexical_ok:
-            futures["lexical"] = pool.submit(_lexical_leg)
-        for name, fut in futures.items():
-            try:
-                if name == "dense":
-                    dense_hits = fut.result()
-                else:
-                    lexical_hits = fut.result()
-            except Exception:
-                if name == "dense":
-                    dense_ok = False
-                else:
-                    lexical_ok = False
+    # Bounded legs (delivery-simplification Units 4-5; review fixes P1/P2): both legs launch
+    # on daemon workers under a process-wide in-flight cap, each is awaited against the
+    # declared budget, and a leg that fails or exceeds it is NAMED in ``leg_errors`` — a
+    # degraded pass is never silently pooled with a clean one. No executor is used: there is
+    # nothing whose shutdown could wait for a stuck worker.
+    handles: dict[str, dict[str, Any]] = {}
+    if dense_ok:
+        handle, refusal = _launch_leg("dense", _dense_leg)
+        if handle is None:
+            leg_errors["dense"] = refusal
+            dense_ok = False
+        else:
+            handles["dense"] = handle
+    if lexical_ok:
+        handle, refusal = _launch_leg("lexical", _lexical_leg)
+        if handle is None:
+            leg_errors["lexical"] = refusal
+            lexical_ok = False
+        else:
+            handles["lexical"] = handle
+    for name, handle in handles.items():
+        ok, error = _await_leg(handle, t0 + budget_s)
+        if not ok:
+            leg_errors[name] = error
+            if name == "dense":
+                dense_ok = False
+            else:
+                lexical_ok = False
+        elif name == "dense":
+            dense_hits = handle["value"] or []
+        else:
+            lexical_hits = handle["value"] or []
 
     candidates: list[Candidate] = []
     ranks: dict[str, dict[str, int | None]] = {}
@@ -1610,28 +1757,62 @@ def retrieve(
         from agentic_dynamics.knowledge.embeddings import EmbeddingClient
 
         embedder = EmbeddingClient()
-    except Exception:
-        embedder = None  # optional dep missing → collapse degrades to a no-op
-    similarities, dedup_path = _pairwise_similarities(fused, embedder)
+    except Exception as exc:  # optional dep missing → collapse degrades to a no-op
+        embedder = None
+        leg_errors["embedding"] = f"embedder unavailable: {type(exc).__name__}: {exc}"
+
+    similarities, dedup_path, embed_error = _pairwise_similarities(
+        fused, embedder, timeout_s=max(0.0, budget_s - (time.monotonic() - t0))
+    )
+    if embed_error:
+        leg_errors["embedding"] = embed_error
     fused = collapse_redundant(fused, similarities)
 
-    # Then expand the strongest seeds through the graph (decayed boost).
-    if graph_client is not None and fused:
-        try:
-            seeds = [c.id for c in fused[:seed_count]]
-            # Seed canonical id → real fused score, for scoring expanded hops below.
-            seed_scores = {c.id: c.fused_score for c in fused[:seed_count]}
-            expanded = graph_client.expand_candidates(
+    # Then expand the strongest seeds through the graph (decayed boost). Expansion runs as
+    # ONE MORE bounded leg (review finding P1/P2): the client's own ``timeout_ms`` can check
+    # traversal progress but cannot interrupt a blocked database request, so the pass must
+    # never await it synchronously. It launches on the same daemon/semaphore machinery, is
+    # awaited against the same budget, and a timeout KEEPS the unexpanded fusion with a
+    # named cause; it is skipped outright (recorded) when too little budget remains.
+    remaining_s = budget_s - (time.monotonic() - t0)
+    expanded_nodes: list[dict[str, Any]] | None = None
+    if graph_client is not None and fused and remaining_s > EXPANSION_MIN_BUDGET_S:
+        seeds = [c.id for c in fused[:seed_count]]
+        # Seed canonical id → real fused score, for scoring expanded hops below.
+        seed_scores = {c.id: c.fused_score for c in fused[:seed_count]}
+
+        def _expand_leg():
+            return graph_client.expand_candidates(
                 seeds,
                 max_depth=2,
                 max_neighbors=8,
                 max_nodes=40,
-                timeout_ms=300,
+                timeout_ms=max(1, int(max(0.0, budget_s - (time.monotonic() - t0)) * 1000)),
                 repository_id=repository_id,
                 acl_scope=acl_scope,
             )
+
+        handle, refusal = _launch_leg("expansion", _expand_leg)
+        if handle is None:
+            leg_errors["expansion"] = refusal
+        else:
+            expand_ok, expand_error = _await_leg(handle, t0 + budget_s)
+            if expand_ok:
+                expanded_nodes = handle["value"] or []
+            else:
+                leg_errors["expansion"] = f"expansion incomplete: {expand_error}"
+    elif graph_client is not None and fused:
+        # The graph client is healthy (its search leg ran); only the neighborhood extension
+        # was cut by the budget — recorded, never silent (review finding P1/P6).
+        leg_errors["expansion"] = (
+            f"expansion skipped: retrieval budget {budget_s:g}s exhausted "
+            f"({remaining_s:.2f}s left)"
+        )
+
+    if expanded_nodes is not None:
+        try:
             fused_ids = {c.id for c in fused}
-            for node in expanded:
+            for node in expanded_nodes:
                 props = node.get("properties") or {}
                 # Prefer the canonical id the graph leg already resolved; fall back to
                 # deriving it from properties (elementId last) for resilience.
@@ -1706,8 +1887,9 @@ def retrieve(
                         evidence_class=str(props.get("evidence_class", "") or ""),
                     )
                 )
-        except Exception:
+        except Exception as exc:
             graph_ok = False
+            leg_errors["expansion"] = f"expansion failed: {type(exc).__name__}: {exc}"
 
     # Record any graph traversal paths on the expanded candidates.
     graph_paths = {c.id: c.graph_path for c in fused if c.graph_path}
@@ -1754,6 +1936,7 @@ def retrieve(
         latency_ms=round((time.monotonic() - t0) * 1000.0, 2),
         cache_status="unknown",
         dedup_path=dedup_path,
+        leg_errors=leg_errors,
         fallback_mode=fallback.value,
         untyped_excluded=untyped_excluded,
         timestamp=datetime.now(timezone.utc).isoformat(),
