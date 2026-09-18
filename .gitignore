@@ -99,3 +99,7 @@ experiments/results/
 # The aio-context plugin's delivery journal (runtime diagnostics; the 2026-09-17 cache repair
 # appends one line per snapshot delivery — the session cache report reads it).
 .opencode/aio-context-events.jsonl
+
+# The explicit task-context handoff attachment (runtime state; written per active session by
+# the controller/AIO — the same runtime-state class as the two files above).
+.opencode/aio-task-context.json
