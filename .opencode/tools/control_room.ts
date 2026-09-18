@@ -64,8 +64,13 @@ export default tool({
     const url = `${resolveBaseUrl()}${ENDPOINTS[args.endpoint]}`
 
     let res: Response
+    let text: string
     try {
       res = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+      // Body consumption belongs INSIDE the error boundary (review fix): a server may send
+      // headers and then stall the body — that must surface as `unavailable`, never as an
+      // uncaught deadline escaping the tool's structured outcome.
+      text = await res.text()
     } catch (e) {
       // Unavailable service: distinguish the deadline from other transport failures, keep the
       // real reason, and never fabricate data.
@@ -81,7 +86,6 @@ export default tool({
       }
     }
 
-    const text = await res.text()
     if (!res.ok) {
       // Non-success response: the HTTP status is the answer; the body is passed through.
       return {

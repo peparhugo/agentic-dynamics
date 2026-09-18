@@ -80,6 +80,28 @@ test("execute: non-success response carries the HTTP status", async () => {
   expect(result.metadata.url).toBe("http://portal.test:9000/api/glance")
 })
 
+test("execute: a stalled response BODY is unavailable, not an uncaught timeout", async () => {
+  process.env.CONTROL_ROOM_URL = "http://portal.test:9000"
+  // Headers arrive, then the body never does: `res.text()` rejects with the deadline.
+  globalThis.fetch = (async () =>
+    ({
+      ok: true,
+      status: 200,
+      text: async () => {
+        const err = new Error("body stalled")
+        err.name = "TimeoutError"
+        throw err
+      },
+    }) as unknown as Response) as unknown as typeof fetch
+
+  const result = (await toolDef.execute({ endpoint: "status" })) as {
+    output: string
+    metadata: Record<string, unknown>
+  }
+  expect(result.metadata.outcome).toBe("unavailable")
+  expect(result.output).toContain("10000ms")
+})
+
 test("execute: valid data passes through from the configured base URL", async () => {
   process.env.CONTROL_ROOM_URL = "http://100.83.229.3:8001"
   let seen = ""
