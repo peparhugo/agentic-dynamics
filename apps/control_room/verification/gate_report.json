@@ -1,239 +1,244 @@
 {
   "status": "PASS",
+  "requested_classes": [
+    "navigation",
+    "loading",
+    "degraded",
+    "scrolling",
+    "keyboard"
+  ],
+  "executed_classes": [
+    "navigation",
+    "loading",
+    "degraded",
+    "scrolling",
+    "keyboard"
+  ],
+  "candidate": "9fba7b83c",
+  "candidate_verified": true,
+  "preview": "",
+  "preview_verified": false,
+  "preview_exercised": false,
+  "preview_serves_candidate": false,
   "screenshots": [
     {
-      "fixture": "F-0",
+      "case": "boards-navigation",
       "viewport": "desktop",
+      "screenshot": "/tmp/wt_cr_followups/apps/control_room/verification/boards_fleet_desktop_dark_1440x900.png",
       "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-0_desktop_dark_1440x900.png"
+      "board": "fleet"
     },
     {
-      "fixture": "F-0",
+      "case": "boards-navigation",
+      "viewport": "desktop",
+      "screenshot": "/tmp/wt_cr_followups/apps/control_room/verification/boards_status_desktop_dark_1440x900.png",
+      "theme": "dark",
+      "board": "status"
+    },
+    {
+      "case": "boards-navigation",
+      "viewport": "desktop",
+      "screenshot": "/tmp/wt_cr_followups/apps/control_room/verification/boards_flags_desktop_dark_1440x900.png",
+      "theme": "dark",
+      "board": "flags"
+    },
+    {
+      "case": "boards-navigation",
+      "viewport": "desktop",
+      "screenshot": "/tmp/wt_cr_followups/apps/control_room/verification/boards_sessions_desktop_dark_1440x900.png",
+      "theme": "dark",
+      "board": "sessions"
+    },
+    {
+      "case": "boards-navigation",
+      "viewport": "desktop",
+      "screenshot": "/tmp/wt_cr_followups/apps/control_room/verification/boards_routing_desktop_dark_1440x900.png",
+      "theme": "dark",
+      "board": "routing"
+    },
+    {
+      "case": "boards-navigation",
+      "viewport": "desktop",
+      "screenshot": "/tmp/wt_cr_followups/apps/control_room/verification/boards_operations_desktop_dark_1440x900.png",
+      "theme": "dark",
+      "board": "operations"
+    },
+    {
+      "case": "boards-navigation",
+      "viewport": "desktop",
+      "screenshot": "/tmp/wt_cr_followups/apps/control_room/verification/boards_surfaces_desktop_dark_1440x900.png",
+      "theme": "dark",
+      "board": "surfaces"
+    },
+    {
+      "case": "boards-navigation",
+      "viewport": "desktop",
+      "check": "seven-boards-dark",
+      "screenshot": ""
+    },
+    {
+      "case": "boards-navigation",
+      "viewport": "desktop",
+      "screenshot": "/tmp/wt_cr_followups/apps/control_room/verification/boards_fleet_desktop_light_1440x900.png",
+      "theme": "light",
+      "board": "fleet"
+    },
+    {
+      "case": "boards-navigation",
+      "viewport": "desktop",
+      "screenshot": "/tmp/wt_cr_followups/apps/control_room/verification/boards_status_desktop_light_1440x900.png",
+      "theme": "light",
+      "board": "status"
+    },
+    {
+      "case": "boards-navigation",
+      "viewport": "desktop",
+      "screenshot": "/tmp/wt_cr_followups/apps/control_room/verification/boards_flags_desktop_light_1440x900.png",
+      "theme": "light",
+      "board": "flags"
+    },
+    {
+      "case": "boards-navigation",
+      "viewport": "desktop",
+      "screenshot": "/tmp/wt_cr_followups/apps/control_room/verification/boards_sessions_desktop_light_1440x900.png",
+      "theme": "light",
+      "board": "sessions"
+    },
+    {
+      "case": "boards-navigation",
+      "viewport": "desktop",
+      "screenshot": "/tmp/wt_cr_followups/apps/control_room/verification/boards_routing_desktop_light_1440x900.png",
+      "theme": "light",
+      "board": "routing"
+    },
+    {
+      "case": "boards-navigation",
+      "viewport": "desktop",
+      "screenshot": "/tmp/wt_cr_followups/apps/control_room/verification/boards_operations_desktop_light_1440x900.png",
+      "theme": "light",
+      "board": "operations"
+    },
+    {
+      "case": "boards-navigation",
+      "viewport": "desktop",
+      "screenshot": "/tmp/wt_cr_followups/apps/control_room/verification/boards_surfaces_desktop_light_1440x900.png",
+      "theme": "light",
+      "board": "surfaces"
+    },
+    {
+      "case": "boards-navigation",
+      "viewport": "desktop",
+      "check": "seven-boards-light",
+      "screenshot": ""
+    },
+    {
+      "case": "boards-navigation",
       "viewport": "narrow",
+      "screenshot": "/tmp/wt_cr_followups/apps/control_room/verification/boards_routing_narrow_dark_1024x768.png",
       "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-0_narrow_dark_1024x768.png"
+      "board": "routing"
     },
     {
-      "fixture": "F-0",
-      "viewport": "mobile",
-      "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-0_mobile_dark_390x844.png"
-    },
-    {
-      "fixture": "F-1",
-      "viewport": "desktop",
-      "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-1_desktop_dark_1440x900.png"
-    },
-    {
-      "fixture": "F-1",
+      "case": "boards-navigation",
       "viewport": "narrow",
+      "screenshot": "/tmp/wt_cr_followups/apps/control_room/verification/boards_operations_narrow_dark_1024x768.png",
       "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-1_narrow_dark_1024x768.png"
+      "board": "operations"
     },
     {
-      "fixture": "F-1",
-      "viewport": "mobile",
-      "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-1_mobile_dark_390x844.png"
-    },
-    {
-      "fixture": "F-2",
-      "viewport": "desktop",
-      "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-2_desktop_dark_1440x900.png"
-    },
-    {
-      "fixture": "F-2",
+      "case": "boards-navigation",
       "viewport": "narrow",
+      "screenshot": "/tmp/wt_cr_followups/apps/control_room/verification/boards_surfaces_narrow_dark_1024x768.png",
       "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-2_narrow_dark_1024x768.png"
+      "board": "surfaces"
     },
     {
-      "fixture": "F-2",
-      "viewport": "mobile",
-      "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-2_mobile_dark_390x844.png"
-    },
-    {
-      "fixture": "F-3",
-      "viewport": "desktop",
-      "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-3_desktop_dark_1440x900.png"
-    },
-    {
-      "fixture": "F-3",
+      "case": "boards-navigation",
       "viewport": "narrow",
-      "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-3_narrow_dark_1024x768.png"
+      "check": "seven-boards-dark",
+      "screenshot": ""
     },
     {
-      "fixture": "F-3",
-      "viewport": "mobile",
-      "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-3_mobile_dark_390x844.png"
-    },
-    {
-      "fixture": "F-4",
+      "case": "boards-loading",
       "viewport": "desktop",
+      "screenshot": "/tmp/wt_cr_followups/apps/control_room/verification/boards_loading_operations_reload_desktop_dark_1440x900.png",
       "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-4_desktop_dark_1440x900.png"
+      "board": "operations"
     },
     {
-      "fixture": "F-4",
-      "viewport": "narrow",
-      "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-4_narrow_dark_1024x768.png"
-    },
-    {
-      "fixture": "F-4",
-      "viewport": "mobile",
-      "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-4_mobile_dark_390x844.png"
-    },
-    {
-      "fixture": "F-5",
+      "case": "boards-loading",
       "viewport": "desktop",
-      "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-5_desktop_dark_1440x900.png"
+      "check": "operations",
+      "screenshot": ""
     },
     {
-      "fixture": "F-5",
-      "viewport": "narrow",
-      "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-5_narrow_dark_1024x768.png"
-    },
-    {
-      "fixture": "F-5",
-      "viewport": "mobile",
-      "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-5_mobile_dark_390x844.png"
-    },
-    {
-      "fixture": "F-6",
+      "case": "boards-loading",
       "viewport": "desktop",
+      "check": "surfaces",
+      "screenshot": ""
+    },
+    {
+      "case": "boards-loading",
+      "viewport": "desktop",
+      "check": "routing",
+      "screenshot": ""
+    },
+    {
+      "case": "boards-degraded",
+      "viewport": "desktop",
+      "screenshot": "/tmp/wt_cr_followups/apps/control_room/verification/boards_degraded_operations_desktop_dark_1440x900.png",
       "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-6_desktop_dark_1440x900.png"
+      "board": "operations"
     },
     {
-      "fixture": "F-6",
-      "viewport": "narrow",
+      "case": "boards-degraded",
+      "viewport": "desktop",
+      "check": "degraded-operations",
+      "screenshot": ""
+    },
+    {
+      "case": "boards-degraded",
+      "viewport": "desktop",
+      "check": "surface-failure",
+      "screenshot": ""
+    },
+    {
+      "case": "boards-scrolling",
+      "viewport": "desktop",
+      "check": "below-fold",
+      "screenshot": ""
+    },
+    {
+      "case": "boards-scrolling",
+      "viewport": "desktop",
+      "check": "scroll-reset",
+      "screenshot": ""
+    },
+    {
+      "case": "boards-keyboard",
+      "viewport": "desktop",
+      "screenshot": "/tmp/wt_cr_followups/apps/control_room/verification/boards_keyboard_drawer_dark_1440x900.png",
       "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-6_narrow_dark_1024x768.png"
+      "check": "drawer-open"
     },
     {
-      "fixture": "F-6",
-      "viewport": "mobile",
-      "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-6_mobile_dark_390x844.png"
-    },
-    {
-      "fixture": "F-7",
+      "case": "boards-keyboard",
       "viewport": "desktop",
-      "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-7_desktop_dark_1440x900.png"
+      "check": "dark-enter-escape",
+      "screenshot": ""
     },
     {
-      "fixture": "F-7",
-      "viewport": "narrow",
-      "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-7_narrow_dark_1024x768.png"
-    },
-    {
-      "fixture": "F-7",
-      "viewport": "mobile",
-      "theme": "dark",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-7_mobile_dark_390x844.png"
-    },
-    {
-      "case": "history",
+      "case": "boards-keyboard",
       "viewport": "desktop",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/charts_desktop_dark_1440x900.png"
+      "screenshot": "/tmp/wt_cr_followups/apps/control_room/verification/boards_keyboard_drawer_light_1440x900.png",
+      "theme": "light",
+      "check": "drawer-open"
     },
     {
-      "case": "history",
-      "viewport": "narrow",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/charts_narrow_dark_1024x768.png"
-    },
-    {
-      "case": "history",
-      "viewport": "mobile",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/charts_mobile_dark_390x844.png"
-    },
-    {
-      "case": "visuals",
+      "case": "boards-keyboard",
       "viewport": "desktop",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/visuals_desktop_dark_1440x900.png"
-    },
-    {
-      "case": "visuals",
-      "viewport": "narrow",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/visuals_narrow_dark_1024x768.png"
-    },
-    {
-      "case": "visuals",
-      "viewport": "mobile",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/visuals_mobile_dark_390x844.png"
-    },
-    {
-      "case": "style",
-      "viewport": "desktop",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/style_desktop_dark_1440x900.png"
-    },
-    {
-      "case": "style",
-      "viewport": "narrow",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/style_narrow_dark_1024x768.png"
-    },
-    {
-      "case": "style",
-      "viewport": "mobile",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/style_mobile_dark_390x844.png"
-    },
-    {
-      "case": "a11y",
-      "viewport": "desktop",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/a11y_desktop_dark_1440x900.png"
-    },
-    {
-      "case": "a11y",
-      "viewport": "mobile",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/a11y_mobile_dark_390x844.png"
-    },
-    {
-      "case": "parity-workbench",
-      "viewport": "desktop",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/parity_workbench_desktop.png"
-    },
-    {
-      "case": "parity-dock",
-      "viewport": "desktop",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/parity_dock_desktop.png"
-    },
-    {
-      "case": "parity-workbench",
-      "viewport": "mobile",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/parity_workbench_mobile.png"
-    },
-    {
-      "case": "parity-dock",
-      "viewport": "mobile",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/parity_dock_mobile.png"
-    },
-    {
-      "case": "live",
-      "viewport": "desktop",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/live_desktop_dark_1440x900.png"
-    },
-    {
-      "case": "live",
-      "viewport": "narrow",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/live_narrow_dark_1024x768.png"
-    },
-    {
-      "case": "live",
-      "viewport": "mobile",
-      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/live_mobile_dark_390x844.png"
+      "check": "light-enter-escape",
+      "screenshot": ""
     }
   ],
   "errors": []
