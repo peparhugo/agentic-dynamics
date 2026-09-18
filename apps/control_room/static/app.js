@@ -3161,7 +3161,13 @@
     const title = $("#run-detail-title")
     title.textContent = `RUN ${runId}`
     drawer.hidden = false
+    // Remember the origin BEFORE moving focus: the keyboard operator pressed Enter on the row.
     state.runDetailReturnFocus = document.activeElement
+    // Move focus into the drawer with it. The drawer's Escape handler is scoped to the drawer
+    // (it stops propagation so the shell never fights it), so focus left on the row behind the
+    // open drawer makes the immediate Escape a no-op — the #83 keyboard contract: Enter opens,
+    // focus lands on the close control, Escape closes, focus returns to the originating row.
+    $("#run-detail-close").focus()
     content.replaceChildren(paragraph("Loading run detail…"))
     try {
       const response = await fetch(`/api/runs/${encodeURIComponent(runId)}`)
@@ -4047,6 +4053,11 @@
 
   bindControls()
   bindSurfaceViews()
+  // The shell restored the stored board while this file was still parsing, so its automatic
+  // first-visit load (clicking the board's own Refresh / drawer toggle) ran before the
+  // handlers above existed and was a no-op. Now that both control sets are bound, let the
+  // shell initialize the active board once — the reload-on-Operations/Surfaces/Routing fix.
+  window.ControlRoomShell?.initializeBoard?.()
   bindDocsHealthControls()
   renderFleet()
   renderPipelineStages()
