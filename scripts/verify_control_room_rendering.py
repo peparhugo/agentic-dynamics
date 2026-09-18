@@ -2393,10 +2393,8 @@ def _boards_page(
 
 def _settle(page: Any, milliseconds: int = 300) -> None:
     """Give the page a bounded moment to finish the renders a probe will read."""
-    try:
+    with contextlib.suppress(Exception):
         page.wait_for_timeout(milliseconds)
-    except Exception:  # noqa: BLE001 — a page that cannot wait is reported by its probes
-        pass
 
 
 def _check_board_navigation(
@@ -2491,7 +2489,7 @@ def _check_board_navigation(
             {
                 "case": "boards-navigation",
                 "viewport": name,
-                "check": "seven-boards-%s" % theme,
+                "check": f"seven-boards-{theme}",
                 "screenshot": "",
             }
         )
