@@ -9,7 +9,7 @@
 **Viewports:** desktop 1440x900, narrow 1024x768, mobile 390x844
 **Themes:** dark, light, forced-colors
 **Primitives:** present/unique · in-viewport · non-zero box · scrollable pages (vertical) · no horizontal overflow · WCAG-AA contrast · first-paint · console-clean
-**Candidate:** 9fba7b83c (verified against the checkout HEAD)
+**Candidate:** b89210424 (verified against the checkout HEAD)
 
 **Screenshots:** 21 (boards-degraded 1, boards-keyboard 2, boards-loading 1, boards-navigation 17)
 
