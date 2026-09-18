@@ -1987,6 +1987,95 @@ def run_acceptance_interactions(
                     results.append({"case": "interactions", "viewport": "desktop",
                                     "check": "below-fold-capture",
                                     "screenshot": str(shot), "theme": theme})
+
+                # 6. Keyboard run-journey (browser regression, reviewer finding P3): the
+                # drawer-first Escape must be exercised as BEHAVIOR — the source-string check
+                # cannot. Open a found run, press Escape: only the drawer closes, the finder
+                # value and focus return to the row, and the workbench stays open; a second
+                # Escape closes the workbench; and a drawer hidden inside an INACTIVE panel
+                # must never consume the key.
+                page.locator("#workbench-nav [data-lens-target='operations']").click()
+                page.wait_for_timeout(600)
+                run_rows = page.locator("tr[data-run-id]")
+                if run_rows.count():
+                    origin = run_rows.first.get_attribute("data-run-id") or ""
+                    finder = page.locator("#operations-run-finder")
+                    saved_filter = ""
+                    if finder.count():
+                        finder.fill(origin)
+                        page.wait_for_timeout(250)
+                        saved_filter = finder.input_value()
+                    run_rows.first.click()
+                    page.wait_for_timeout(600)
+                    if page.locator("#run-detail-drawer:not([hidden])").count():
+                        page.keyboard.press("Escape")
+                        page.wait_for_timeout(300)
+                        state = page.evaluate(
+                            """() => ({
+                              drawerOpen: !(document.getElementById('run-detail-drawer') || {}).hidden,
+                              workbenchOpen: !(document.getElementById('workbench') || {}).hidden,
+                              filter: (document.getElementById('operations-run-finder') || {}).value || '',
+                              focus: document.activeElement
+                                ? (document.activeElement.getAttribute('data-run-id') || '')
+                                : '',
+                            })"""
+                        )
+                        if state["drawerOpen"] or not state["workbenchOpen"]:
+                            errors.append(
+                                "interactions: the first Escape must close only the run-detail "
+                                f"drawer and keep the workbench open (drawerOpen="
+                                f"{state['drawerOpen']}, workbenchOpen={state['workbenchOpen']})"
+                            )
+                        if finder.count() and saved_filter != state["filter"]:
+                            errors.append(
+                                "interactions: the run finder's value was lost on the "
+                                f"drawer-first Escape (was {saved_filter!r}, now "
+                                f"{state['filter']!r})"
+                            )
+                        if origin and state["focus"] != origin:
+                            errors.append(
+                                "interactions: focus did not return to the originating run row "
+                                f"after Escape (focus={state['focus']!r})"
+                            )
+                        if not errors:
+                            results.append({"case": "interactions", "viewport": "desktop",
+                                            "check": "drawer-first-escape",
+                                            "screenshot": "", "theme": theme})
+                        page.keyboard.press("Escape")
+                        page.wait_for_timeout(300)
+                        if not page.evaluate(
+                            "() => (document.getElementById('workbench') || {}).hidden === true"
+                        ):
+                            errors.append("interactions: a second Escape must close the workbench")
+                        else:
+                            results.append({"case": "interactions", "viewport": "desktop",
+                                            "check": "second-escape-closes-workbench",
+                                            "screenshot": "", "theme": theme})
+                        # Inactive-panel scope: reopen, open a drawer, switch to Health, Escape —
+                        # the hidden drawer must not swallow the key.
+                        page.locator("#workbench-open").click()
+                        page.wait_for_timeout(300)
+                        page.locator("#workbench-nav [data-lens-target='operations']").click()
+                        page.wait_for_timeout(600)
+                        if page.locator("tr[data-run-id]").count():
+                            page.locator("tr[data-run-id]").first.click()
+                            page.wait_for_timeout(500)
+                        page.locator("#workbench-nav [data-lens-target='health']").click()
+                        page.wait_for_timeout(400)
+                        page.keyboard.press("Escape")
+                        page.wait_for_timeout(300)
+                        if not page.evaluate(
+                            "() => (document.getElementById('workbench') || {}).hidden === true"
+                        ):
+                            errors.append(
+                                "interactions: Escape after leaving the Operations panel must "
+                                "close the workbench — a drawer hidden inside an inactive panel "
+                                "must not consume it"
+                            )
+                        else:
+                            results.append({"case": "interactions", "viewport": "desktop",
+                                            "check": "inactive-panel-escape",
+                                            "screenshot": "", "theme": theme})
                 context.close()
             browser.close()
     finally:

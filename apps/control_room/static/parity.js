@@ -1857,7 +1857,7 @@
     var dhead = element("header", "drawer-header");
     dhead.appendChild(element("h3", "panel-title", { id: "run-detail-title" }, "RUN DETAIL"));
     var dclose = element("button", "icon-button",
-      { type: "button", "aria-label": "Close run detail" }, "✕");
+      { type: "button", id: "run-detail-close", "aria-label": "Close run detail" }, "✕");
     dhead.appendChild(dclose);
     drawer.appendChild(dhead);
     var detailContent = element("div", "run-detail-content", { id: "run-detail-content" });
@@ -1866,13 +1866,24 @@
     // A stable return target: closing (button or Escape) restores focus to the row that opened
     // the drawer, so keyboard navigation never falls back to the document body (main's repair).
     var drawerOrigin = null;
-    function closeRunDetail() {
+    function closeRunDetail(restoreFocus) {
       drawer.hidden = true;
       clear(detailContent);
-      if (drawerOrigin && typeof drawerOrigin.focus === "function") drawerOrigin.focus();
+      // Restore focus to the originating row ONLY for an in-place close (button/Escape).
+      // When the caller is LEAVING the panel (openPanel), the nav button owns focus: moving it
+      // into a panel that is about to be hidden would strand the keyboard on BODY, and Escape
+      // would then hit nothing at all (review finding P3 follow-up).
+      if (restoreFocus !== false && drawerOrigin && typeof drawerOrigin.focus === "function") {
+        if (drawerOrigin.offsetParent || drawerOrigin.getClientRects().length) {
+          drawerOrigin.focus();
+        }
+      }
       drawerOrigin = null;
     }
     dclose.addEventListener("click", closeRunDetail);
+    // Register the drawer's closer with the workbench so its Escape handler can be
+    // drawer-first even when focus sits on the originating row (outside the drawer).
+    activeRunDetailClose = function (restoreFocus) { closeRunDetail(restoreFocus); };
     function activate(event) {
       var row = event.target.closest("tr[data-run-id]");
       if (!row) return;
@@ -1886,13 +1897,19 @@
     host.addEventListener("click", activate);
     host.addEventListener("keydown", activate);
     drawer.addEventListener("keydown", function (event) {
-      if (event.key === "Escape") closeRunDetail();
+      // Stop the event here: without this, closing the drawer on Escape would bubble to the
+      // workbench-level handler and dismiss the workbench too (a double-close).
+      if (event.key === "Escape") { event.stopPropagation(); closeRunDetail(); }
     });
   }
 
   function openRunDetail(runId, drawer, content) {
     if (!runId) return;
     drawer.hidden = false;
+    // Focus the drawer's own close control: keyboard users land INSIDE the opened detail (the
+    // drawer's Escape works directly), and the return-focus target stays the originating row.
+    var closeBtn = document.getElementById("run-detail-close");
+    if (closeBtn) closeBtn.focus();
     clear(content);
     content.appendChild(note("Loading run detail…"));
     getJSON("/api/runs/" + encodeURIComponent(runId)).then(function (result) {
@@ -2300,10 +2317,22 @@
   ];
 
   var workbenchOrigin = null;
+  //: The run-detail drawer's closer, registered by the Operations panel. The workbench-level
+  //: Escape handler consults it FIRST: while the drawer is open, Escape returns to the found
+  //: list (focus restored to the row) instead of dismissing the whole workbench — the
+  //: operator's filter/position survives the drill-down (repair: the drawer's own Escape
+  //: listener never fired while focus was on the originating row, outside the drawer).
+  var activeRunDetailClose = null;
 
   /** Show one panel, hiding the others; lazy-load it the first time. */
   function openPanel(id) {
     currentPanel = id;
+    if (id !== "operations" && typeof activeRunDetailClose === "function") {
+      // Leaving Operations abandons its detail view: clear the drawer so a hidden-but-open
+      // drawer can never consume Escape or retain stale focus (review finding P3).
+      var openDrawer = document.getElementById("run-detail-drawer");
+      if (openDrawer && !openDrawer.hidden) activeRunDetailClose(false);
+    }
     PANELS.forEach(function (panel) {
       var node = document.getElementById("wb-" + panel.id);
       if (node) node.hidden = panel.id !== id;
@@ -2361,7 +2390,20 @@
 
   /** A-1/A-6: keep focus inside the workbench modal and close it on Escape. */
   function trapFocus(event) {
-    if (event.key === "Escape") { closeWorkbench(); return; }
+    if (event.key === "Escape") {
+      // Drill-down precedence, scoped to the ACTIVE panel (review finding P3): an open
+      // run-detail drawer consumes Escape only while its Operations panel is the visible one.
+      // A drawer hidden inside an inactive panel must never swallow the key.
+      var opsPanel = document.getElementById("wb-operations");
+      var drawer = document.getElementById("run-detail-drawer");
+      var opsActive = opsPanel && !opsPanel.hidden;
+      if (opsActive && drawer && !drawer.hidden && typeof activeRunDetailClose === "function") {
+        activeRunDetailClose();
+        return;
+      }
+      closeWorkbench();
+      return;
+    }
     if (event.key !== "Tab") return;
     var workbench = document.getElementById("workbench");
     if (!workbench || workbench.hidden) return;

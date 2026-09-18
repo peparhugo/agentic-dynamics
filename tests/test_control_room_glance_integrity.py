@@ -206,7 +206,7 @@ def test_workspace_narration_and_events_come_from_the_recorded_ledger(monkeypatc
     assert row["terminal.target"] == "/tmp/wt_flow_recorded"
     assert f"wt/{run_id}" not in json.dumps(row)
     assert row["evidence.advisory"] == "narration recorded"
-    assert row["evidence.measured"] == "tests passed"
+    assert row["evidence.measured"] == "tests passed (independence unrecorded)"
     # A recorded event history with real identifiers/timestamps, never fixed ages.
     events = row["run.events"]
     assert events, "the recorded attempts/gate must surface as events"
@@ -298,14 +298,14 @@ def _read(name: str) -> str:
 def test_dock_binding_never_guesses_an_id() -> None:
     """The dock uses the explicit cell binding only; no fabricated workspace fallback."""
     parity = _read("parity.js")
-    match = parity[parity.index("function cellIdFor("):]
+    match = parity[parity.index("function cellIdFor(") :]
     match = match[: match.index("\n  }") + 4]
     assert 'run["spec.cell"]' in match
     assert "terminal.target" not in match
     assert "session.identity" not in match
     # The stream target the operator sees is the binding (or an explicit unbound marker).
     assert '"unbound"' in parity
-    assert 'data-event-ts' in parity  # recorded event timestamps reach the feed rows
+    assert "data-event-ts" in parity  # recorded event timestamps reach the feed rows
 
 
 def test_visual_verify_node_never_greens_an_unknown_measured_token() -> None:
@@ -330,12 +330,12 @@ def test_client_fallback_declares_unknown_instead_of_all_clear() -> None:
     """A failed projection renders `unknown`; no client-side zero/none/all-clear copy."""
     app = _read("app.js")
     assert "function unavailableGlance(" in app
-    fallback = app[app.index("function unavailableGlance("):]
+    fallback = app[app.index("function unavailableGlance(") :]
     fallback = fallback[: fallback.index("\n  }") + 4]
     assert 'state: "unknown"' in fallback
     assert "running: null" in fallback
     assert "all-clear" not in fallback
-    assert "state: \"none\"" not in fallback
+    assert 'state: "none"' not in fallback
 
 
 def test_client_handles_stream_disconnect_and_age() -> None:
@@ -351,3 +351,151 @@ def test_client_handles_stream_disconnect_and_age() -> None:
         "pollStreamAge",
     ):
         assert anchor in app, anchor
+
+
+# ── the run-journey repairs: ledger resolution + cost/verdict fidelity ─────────────────────
+
+
+def test_recorded_ledger_resolves_the_container_spelled_path(tmp_path, monkeypatch):
+    """The run's ledger pointer is spelled /repo/... (the container mount) while the room runs
+    on the host. Without the mapping, every ledger-derived field silently rendered unknown."""
+    ledger = {"workdir": "/tmp/wt_x", "total_cost_usd": 0.5, "phases": []}
+    target = tmp_path / "experiments" / "results" / "workflows" / "spec" / "run.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(ledger), encoding="utf-8")
+    import agentic_dynamics.core.paths as paths_mod
+
+    monkeypatch.setattr(paths_mod, "PROJECT_ROOT", tmp_path)
+    detail = {"run": {"ledger_path": "/repo/experiments/results/workflows/spec/run.json"}}
+    assert glance._recorded_ledger(detail) == ledger
+    # An unresolvable pointer stays None (unknown), never a fabricated read.
+    assert glance._recorded_ledger({"run": {"ledger_path": "/repo/nope.json"}}) is None
+
+
+def test_cost_provenance_reports_the_aggregate_label_or_unknown():
+    # No phase evidence: the amount is recorded, its provenance is not — say exactly that.
+    assert (
+        glance._cost_provenance({}, {"run": {"cost_usd": 0.027517302}}, None)
+        == "$0.0275 · source unknown"
+    )
+    assert glance._cost_provenance({"cost_usd": 0.25}, None, None) == "$0.2500 · source unknown"
+    # The aggregate's own label: one uniform recorded source across the contributors.
+    assert (
+        glance._cost_provenance(
+            {},
+            {"run": {"cost_usd": 5.0}},
+            {"phases": [
+                {"cost_usd": 1.0, "cost_source": "metered"},
+                {"cost_usd": 4.0, "cost_source": "metered"},
+            ]},
+        )
+        == "$5.0000 · metered"
+    )
+    # MIXED contributors never inherit the first phase's label (review finding P2).
+    assert (
+        glance._cost_provenance(
+            {},
+            {"run": {"cost_usd": 5.0}},
+            {"phases": [
+                {"cost_usd": 1.0, "cost_source": "metered"},
+                {"cost_usd": 4.0, "cost_source": "estimated"},
+            ]},
+        )
+        == "$5.0000 · mixed"
+    )
+    # A RECORDED zero with a recognized source is a measurement, not an unknown
+    # (review finding P3; the cost contract distinguishes metered zero from absence).
+    assert (
+        glance._cost_provenance(
+            {},
+            {"run": {"cost_usd": 0.0}},
+            {"total_cost_usd": 0.0, "phases": [{"cost_usd": 0.0, "cost_source": "metered"}]},
+        )
+        == "$0.0000 · metered"
+    )
+    # Absence stays unknown: no amount, no recognized source.
+    assert glance._cost_provenance({}, {"run": {"cost_usd": 0.0}}, None) == "unknown"
+    assert glance._cost_provenance({}, None, None) == "unknown"
+    # A provenance LABEL alone never establishes an amount (review finding P2 repro 1):
+    # no aggregate, a phase carrying only a source -> unknown, never $0.0000.
+    assert (
+        glance._cost_provenance(
+            {}, {"run": {"cost_usd": 0.0}}, {"phases": [{"cost_source": "metered"}]}
+        )
+        == "unknown"
+    )
+    # A COMPLETE aggregate is derivable from the phase amounts (review finding P2 repro 2):
+    # no top-level total, one phase recording $3.50 metered -> $3.5000 · metered.
+    assert (
+        glance._cost_provenance(
+            {},
+            {"run": {"cost_usd": 0.0}},
+            {"phases": [{"cost_usd": 3.50, "cost_source": "metered"}]},
+        )
+        == "$3.5000 · metered"
+    )
+    # An INCOMPLETE aggregate (a phase without a recorded amount) stays unknown.
+    assert (
+        glance._cost_provenance(
+            {},
+            {"run": {"cost_usd": 0.0}},
+            {"phases": [{"cost_usd": 3.50, "cost_source": "metered"}, {"kind": "test"}]},
+        )
+        == "unknown"
+    )
+
+
+def test_measured_state_names_independent_verification():
+    independent = {
+        "phases": [{"kind": "test", "test_executed_success": True, "evaluator_independent": True}]
+    }
+    assert glance._measured_state(None, independent) == "independent tests passed"
+    failed = {
+        "phases": [{"kind": "test", "test_executed_success": False, "evaluator_independent": True}]
+    }
+    assert glance._measured_state(None, failed) == "independent tests failed"
+    participant = {"phases": [{"kind": "test", "test_executed_success": True}]}
+    assert glance._measured_state(None, participant) == "tests passed (independence unrecorded)"
+    # A passing NON-independent test alongside a failing independent one is a FAILURE — the
+    # verdict and independence belong to the same phase, never pooled across phases.
+    mixed_failure = {"phases": [
+        {"kind": "test", "test_executed_success": True, "evaluator_independent": False},
+        {"kind": "test", "test_executed_success": False, "evaluator_independent": True},
+    ]}
+    assert glance._measured_state(None, mixed_failure) == "independent tests failed"
+    # An independent pending result is not a pass.
+    mixed_pending = {"phases": [
+        {"kind": "test", "test_executed_success": True, "evaluator_independent": True},
+        {"kind": "test", "test_executed_success": None, "evaluator_independent": True},
+    ]}
+    assert glance._measured_state(None, mixed_pending) == "test result pending"
+    # All pass, but not all recorded-independent: the weaker, truthful claim.
+    mixed_pass = {"phases": [
+        {"kind": "test", "test_executed_success": True, "evaluator_independent": False},
+        {"kind": "test", "test_executed_success": True, "evaluator_independent": True},
+    ]}
+    assert glance._measured_state(None, mixed_pass) == "tests passed (independence unrecorded)"
+    assert glance._measured_state(None, {"phases": []}) == "no test recorded"
+
+
+def test_run_detail_drawer_escape_is_drawer_first() -> None:
+    """An open drawer consumes Escape before the workbench: the workbench handler delegates to
+    the registered drawer closer when the drawer is visible, and the drawer stops its own
+    Escape from bubbling (no double-close)."""
+    parity = _read("parity.js")
+    assert "activeRunDetailClose" in parity
+    # The workbench Escape branch consults the drawer's visibility BEFORE closing the workbench.
+    workbench_handler = parity[parity.index("function trapFocus(") :]
+    workbench_handler = workbench_handler[: workbench_handler.index("\n  }") + 4]
+    assert "run-detail-drawer" in workbench_handler
+    assert "activeRunDetailClose()" in workbench_handler
+    assert workbench_handler.index("activeRunDetailClose()") < workbench_handler.index(
+        "closeWorkbench()"
+    )
+    # The drawer's own Escape stops propagation so it never reaches the workbench handler.
+    assert "stopPropagation" in parity
+    # The drawer close control is addressable and the opened detail takes focus (reachability).
+    assert 'id: "run-detail-close"' in parity
+    open_detail = parity[parity.index("function openRunDetail(") :]
+    open_detail = open_detail[: open_detail.index("\n  }") + 4]
+    assert "run-detail-close" in open_detail
