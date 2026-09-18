@@ -16,8 +16,11 @@ pre-flight against a silent server, and the chromadb session timeout application
 from __future__ import annotations
 
 import socket
+import subprocess
+import sys
 import threading
 import time
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -29,6 +32,8 @@ from agentic_dynamics.knowledge.retrieval import (
     _pairwise_similarities,
     retrieve,
 )
+
+_ROOT = Path(__file__).resolve().parent.parent
 
 REPO = "agentic-dynamics"
 ACL = "public"
@@ -286,3 +291,100 @@ def test_embedding_client_declares_a_timeout():
     assert default.timeout_s > 0
     explicit = emb.EmbeddingClient(timeout_s=1.25)
     assert explicit.timeout_s == 1.25
+
+
+# ── review fix P1: expansion is part of the budget ──────────────
+
+
+class _SlowExpandGraph(_GraphStub):
+    """A graph whose expansion blocks, ignoring its own ``timeout_ms`` (review repro)."""
+
+    def expand_candidates(self, seeds, **kwargs):
+        time.sleep(2.0)
+        return []
+
+
+def test_expansion_cannot_outlive_the_budget():
+    dense = _DenseStub([_dense_hit("d1", "alpha text")])
+    graph = _SlowExpandGraph([])
+    started = time.monotonic()
+    attempt = retrieve("q", dense_store=dense, graph_client=graph, deadline_s=0.4)
+    elapsed = time.monotonic() - started
+    assert elapsed < 1.5, f"retrieve() took {elapsed:.2f}s with a blocked expansion"
+    assert "expansion" in attempt.leg_errors
+    assert "budget" in attempt.leg_errors["expansion"]
+
+
+# ── review fix P2: bounded in-flight work + daemon workers ──────
+
+
+def test_repeated_outages_are_bounded_and_named():
+    from agentic_dynamics.knowledge.retrieval import RETRIEVAL_MAX_INFLIGHT_LEGS
+
+    gates = [threading.Event() for _ in range(8)]
+    base_threads = threading.active_count()
+    results = []
+    started = time.monotonic()
+    try:
+        for i in range(5):
+            dense = _DenseStub(block=gates[i])
+            graph = _GraphStub([])  # lexical returns instantly; only dense blocks
+            results.append(
+                retrieve("q", dense_store=dense, graph_client=graph, deadline_s=0.15)
+            )
+        elapsed = time.monotonic() - started
+        growth = threading.active_count() - base_threads
+    finally:
+        for gate in gates:
+            gate.set()
+
+    assert elapsed < 3.0, f"five outage calls took {elapsed:.2f}s"
+    assert growth <= RETRIEVAL_MAX_INFLIGHT_LEGS + 2, (
+        f"{growth} worker threads accumulated for {len(results)} calls"
+    )
+    refusals = [r.leg_errors.get("dense", "") for r in results]
+    assert any("in flight" in reason for reason in refusals), refusals
+
+
+def test_process_exits_with_a_stuck_leg():
+    src = str(_ROOT / "src")
+    script = f'''
+import sys, threading, time
+sys.path.insert(0, {src!r})
+from agentic_dynamics.knowledge.retrieval import retrieve
+
+class Blocking:
+    def search(self, query, *, top_k=10, where=None):
+        threading.Event().wait()  # blocks forever
+        return []
+
+class Graph:
+    def search_knowledge_fulltext(self, query, *, limit=10, commit=None):
+        return []
+
+started = time.monotonic()
+attempt = retrieve("q", dense_store=Blocking(), graph_client=Graph(), deadline_s=0.2)
+print("returned", round(time.monotonic() - started, 2), flush=True)
+'''
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        timeout=20,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert "returned" in completed.stdout
+
+
+# ── review fix P2: named causes survive serialization ───────────
+
+
+def test_leg_errors_survive_to_dict():
+    dense = _DenseStub(exc=RuntimeError("dense connection refused"))
+    graph = _GraphStub([])
+    attempt = retrieve("q", dense_store=dense, graph_client=graph)
+    payload = attempt.to_dict()
+    assert "leg_errors" in payload
+    assert "dense" in payload["leg_errors"]
+    assert "connection refused" in payload["leg_errors"]["dense"]

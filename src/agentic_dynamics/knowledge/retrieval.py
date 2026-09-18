@@ -33,6 +33,7 @@ import json
 import math
 import os
 import re
+import threading
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -80,6 +81,19 @@ DEFAULT_EXECUTOR_RAG_RATIO = 0.20
 #: below its transport from extending the pass. ``FINOPS_RETRIEVAL_BUDGET_S`` overrides.
 RETRIEVAL_BUDGET_ENV = "FINOPS_RETRIEVAL_BUDGET_S"
 DEFAULT_RETRIEVAL_BUDGET_S = 20.0
+
+#: Graph expansion is part of the SAME declared budget (review finding P1): it receives the
+#: remaining wall-clock as its own timeout and is skipped when less than this remains, with
+#: a named cause — a blocked database request must never outlive the pass.
+EXPANSION_MIN_BUDGET_S = 0.05
+
+#: Max retrieval legs allowed IN FLIGHT in this process at once. A stalled backend must not
+#: let repeated retrieval calls accumulate unbounded abandoned work (review finding P2):
+#: extra calls fail their leg fast with a named cause instead of stacking another blocked
+#: thread. The workers are daemon threads, so a leg stuck below its transport can never block
+#: process shutdown either.
+RETRIEVAL_MAX_INFLIGHT_LEGS = 4
+_LEG_SLOTS = threading.BoundedSemaphore(RETRIEVAL_MAX_INFLIGHT_LEGS)
 REDUNDANCY_THRESHOLD = 0.92
 #: The cosine-collapse embeds only the top-K candidates (by list order — the fused list is
 #: score-ordered). Pairs beyond the cap default to 0.0 in the collapse (no dedupe), which is
@@ -1089,6 +1103,7 @@ class RetrievalAttempt:
             "latency_ms": self.latency_ms,
             "cache_status": self.cache_status,
             "dedup_path": self.dedup_path,
+            "leg_errors": self.leg_errors,
             "fallback_mode": self.fallback_mode,
             "untyped_excluded": self.untyped_excluded,
             "weights_version": self.weights_version,
@@ -1411,6 +1426,65 @@ def _resolve_source_type(
     return resolved if resolved else source_type
 
 
+def _launch_leg(name: str, fn: Callable[[], Any]) -> tuple[dict[str, Any] | None, str]:
+    """Start one retrieval leg on a daemon worker; return ``(handle, refusal)``.
+
+    Parallelism is preserved (both legs launch before either is awaited). The bounded
+    semaphore means a stalled backend cannot accumulate unbounded abandoned work: once the
+    in-flight limit is reached, later calls get a named refusal instead of another blocked
+    thread. A daemon worker can never block process shutdown.
+    """
+    if not _LEG_SLOTS.acquire(blocking=False):
+        return None, (
+            f"{name} leg not started: {RETRIEVAL_MAX_INFLIGHT_LEGS} retrieval legs already "
+            "in flight (a stalled backend is holding capacity)"
+        )
+    handle: dict[str, Any] = {
+        "name": name,
+        "done": threading.Event(),
+        "value": None,
+        "error": None,
+    }
+
+    def _worker() -> None:
+        try:
+            handle["value"] = fn()
+        except BaseException as exc:  # noqa: BLE001 — delivered to the caller below
+            handle["error"] = exc
+        finally:
+            handle["done"].set()
+            _LEG_SLOTS.release()
+
+    try:
+        threading.Thread(target=_worker, name=f"retrieval-{name}", daemon=True).start()
+    except BaseException:
+        _LEG_SLOTS.release()
+        raise
+    return handle, ""
+
+
+def _await_leg(handle: dict[str, Any], deadline: float) -> tuple[bool, str]:
+    """Await one leg against the absolute ``deadline``; return ``(ok, error)``.
+
+    A leg that ALREADY returned is collected regardless of the clock — a stalled sibling
+    must never discard a ready result. Only a still-running leg can be failed by the budget;
+    its worker keeps running until its own transport bound ends it (daemon, so it is never a
+    shutdown blocker).
+    """
+    remaining = deadline - time.monotonic()
+    completed = bool(handle["done"].is_set())
+    if not completed and remaining > 0:
+        completed = bool(handle["done"].wait(remaining))
+    if completed:
+        if handle["error"] is not None:
+            return False, f"{type(handle['error']).__name__}: {handle['error']}"
+        return True, ""
+    return False, (
+        f"{handle['name']} leg did not return within the remaining {max(remaining, 0.0):.2f}s "
+        "of the retrieval budget"
+    )
+
+
 def retrieve(
     raw_work_item: str,
     *,
@@ -1489,56 +1563,38 @@ def retrieve(
             plan.lexical_query, limit=top_k, commit=commit_sha
         )
 
-    # Bounded legs (delivery-simplification Units 4-5): each leg is awaited only for the
-    # remaining share of the declared budget, and the pool is DISMISSED without joining —
-    # a stalled backend must not extend the pass through executor shutdown. The legs'
-    # transports are bounded too (ChromaStore session timeout / ollama client timeout);
-    # the budget here is the outer guarantee.
-    pool = ThreadPoolExecutor(max_workers=2)
-    futures: dict[str, Any] = {}
+    # Bounded legs (delivery-simplification Units 4-5; review fixes P1/P2): both legs launch
+    # on daemon workers under a process-wide in-flight cap, each is awaited against the
+    # declared budget, and a leg that fails or exceeds it is NAMED in ``leg_errors`` — a
+    # degraded pass is never silently pooled with a clean one. No executor is used: there is
+    # nothing whose shutdown could wait for a stuck worker.
+    handles: dict[str, dict[str, Any]] = {}
     if dense_ok:
-        futures["dense"] = pool.submit(_dense_leg)
+        handle, refusal = _launch_leg("dense", _dense_leg)
+        if handle is None:
+            leg_errors["dense"] = refusal
+            dense_ok = False
+        else:
+            handles["dense"] = handle
     if lexical_ok:
-        futures["lexical"] = pool.submit(_lexical_leg)
-    try:
-        for name, fut in futures.items():
-            remaining = budget_s - (time.monotonic() - t0)
-            # A leg that ALREADY returned is collected regardless of the clock — a stalled
-            # sibling must never discard a ready result. Only a still-running leg can be
-            # failed by the budget.
-            if not fut.done() and remaining <= 0:
-                leg_errors[name] = (
-                    f"retrieval budget {budget_s:g}s exhausted before the {name} leg returned"
-                )
-                if name == "dense":
-                    dense_ok = False
-                else:
-                    lexical_ok = False
-                continue
-            try:
-                hits = fut.result(timeout=None if fut.done() else remaining)
-            except FutureTimeoutError:
-                leg_errors[name] = (
-                    f"{name} leg did not return within the remaining {remaining:.2f}s "
-                    f"of the {budget_s:g}s retrieval budget"
-                )
-                if name == "dense":
-                    dense_ok = False
-                else:
-                    lexical_ok = False
-            except Exception as exc:
-                leg_errors[name] = f"{type(exc).__name__}: {exc}"
-                if name == "dense":
-                    dense_ok = False
-                else:
-                    lexical_ok = False
+        handle, refusal = _launch_leg("lexical", _lexical_leg)
+        if handle is None:
+            leg_errors["lexical"] = refusal
+            lexical_ok = False
+        else:
+            handles["lexical"] = handle
+    for name, handle in handles.items():
+        ok, error = _await_leg(handle, t0 + budget_s)
+        if not ok:
+            leg_errors[name] = error
+            if name == "dense":
+                dense_ok = False
             else:
-                if name == "dense":
-                    dense_hits = hits
-                else:
-                    lexical_hits = hits
-    finally:
-        pool.shutdown(wait=False, cancel_futures=True)
+                lexical_ok = False
+        elif name == "dense":
+            dense_hits = handle["value"] or []
+        else:
+            lexical_hits = handle["value"] or []
 
     candidates: list[Candidate] = []
     ranks: dict[str, dict[str, int | None]] = {}
@@ -1699,23 +1755,51 @@ def retrieve(
         leg_errors["embedding"] = embed_error
     fused = collapse_redundant(fused, similarities)
 
-    # Then expand the strongest seeds through the graph (decayed boost).
-    if graph_client is not None and fused:
-        try:
-            seeds = [c.id for c in fused[:seed_count]]
-            # Seed canonical id → real fused score, for scoring expanded hops below.
-            seed_scores = {c.id: c.fused_score for c in fused[:seed_count]}
-            expanded = graph_client.expand_candidates(
+    # Then expand the strongest seeds through the graph (decayed boost). Expansion runs as
+    # ONE MORE bounded leg (review finding P1/P2): the client's own ``timeout_ms`` can check
+    # traversal progress but cannot interrupt a blocked database request, so the pass must
+    # never await it synchronously. It launches on the same daemon/semaphore machinery, is
+    # awaited against the same budget, and a timeout KEEPS the unexpanded fusion with a
+    # named cause; it is skipped outright (recorded) when too little budget remains.
+    remaining_s = budget_s - (time.monotonic() - t0)
+    expanded_nodes: list[dict[str, Any]] | None = None
+    if graph_client is not None and fused and remaining_s > EXPANSION_MIN_BUDGET_S:
+        seeds = [c.id for c in fused[:seed_count]]
+        # Seed canonical id → real fused score, for scoring expanded hops below.
+        seed_scores = {c.id: c.fused_score for c in fused[:seed_count]}
+
+        def _expand_leg():
+            return graph_client.expand_candidates(
                 seeds,
                 max_depth=2,
                 max_neighbors=8,
                 max_nodes=40,
-                timeout_ms=300,
+                timeout_ms=max(1, int(max(0.0, budget_s - (time.monotonic() - t0)) * 1000)),
                 repository_id=repository_id,
                 acl_scope=acl_scope,
             )
+
+        handle, refusal = _launch_leg("expansion", _expand_leg)
+        if handle is None:
+            leg_errors["expansion"] = refusal
+        else:
+            expand_ok, expand_error = _await_leg(handle, t0 + budget_s)
+            if expand_ok:
+                expanded_nodes = handle["value"] or []
+            else:
+                leg_errors["expansion"] = f"expansion incomplete: {expand_error}"
+    elif graph_client is not None and fused:
+        # The graph client is healthy (its search leg ran); only the neighborhood extension
+        # was cut by the budget — recorded, never silent (review finding P1/P6).
+        leg_errors["expansion"] = (
+            f"expansion skipped: retrieval budget {budget_s:g}s exhausted "
+            f"({remaining_s:.2f}s left)"
+        )
+
+    if expanded_nodes is not None:
+        try:
             fused_ids = {c.id for c in fused}
-            for node in expanded:
+            for node in expanded_nodes:
                 props = node.get("properties") or {}
                 # Prefer the canonical id the graph leg already resolved; fall back to
                 # deriving it from properties (elementId last) for resilience.
@@ -1790,8 +1874,9 @@ def retrieve(
                         evidence_class=str(props.get("evidence_class", "") or ""),
                     )
                 )
-        except Exception:
+        except Exception as exc:
             graph_ok = False
+            leg_errors["expansion"] = f"expansion failed: {type(exc).__name__}: {exc}"
 
     # Record any graph traversal paths on the expanded candidates.
     graph_paths = {c.id: c.graph_path for c in fused if c.graph_path}
