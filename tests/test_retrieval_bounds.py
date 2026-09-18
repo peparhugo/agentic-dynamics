@@ -318,18 +318,20 @@ def test_expansion_cannot_outlive_the_budget():
 # ── review fix P2: bounded in-flight work + daemon workers ──────
 
 
-def test_repeated_outages_are_bounded_and_named():
-    from agentic_dynamics.knowledge.retrieval import RETRIEVAL_MAX_INFLIGHT_LEGS
+def test_stalled_dense_never_starves_healthy_lexical():
+    """Review finding P1: per-dependency capacity — a stalled dense backend must not consume
+    the capacity the healthy lexical fallback needs."""
+    from agentic_dynamics.knowledge.retrieval import RETRIEVAL_LEG_CAPACITY
 
-    gates = [threading.Event() for _ in range(8)]
+    gates = [threading.Event() for _ in range(6)]
     base_threads = threading.active_count()
-    results = []
+    attempts = []
     started = time.monotonic()
     try:
         for i in range(5):
             dense = _DenseStub(block=gates[i])
-            graph = _GraphStub([])  # lexical returns instantly; only dense blocks
-            results.append(
+            graph = _GraphStub([_lex_hit("k1", "approved lexical finding")])
+            attempts.append(
                 retrieve("q", dense_store=dense, graph_client=graph, deadline_s=0.15)
             )
         elapsed = time.monotonic() - started
@@ -339,11 +341,90 @@ def test_repeated_outages_are_bounded_and_named():
             gate.set()
 
     assert elapsed < 3.0, f"five outage calls took {elapsed:.2f}s"
-    assert growth <= RETRIEVAL_MAX_INFLIGHT_LEGS + 2, (
-        f"{growth} worker threads accumulated for {len(results)} calls"
+    for attempt in attempts:
+        # EVERY call still receives the healthy lexical evidence — never no_rag.
+        assert any(c.id == "k1" for c in attempt.candidates), attempt.leg_errors
+        assert attempt.fallback_mode == FallbackMode.LEXICAL_GRAPH_ONLY.value
+    assert any(
+        "capacity" in error for attempt in attempts for error in attempt.leg_errors.values()
+    ), [a.leg_errors for a in attempts]
+    assert growth <= RETRIEVAL_LEG_CAPACITY["dense"] + 2, (
+        f"{growth} worker threads accumulated for {len(attempts)} calls"
     )
-    refusals = [r.leg_errors.get("dense", "") for r in results]
-    assert any("in flight" in reason for reason in refusals), refusals
+
+
+def test_embedding_timeouts_do_not_accumulate_threads(monkeypatch):
+    from agentic_dynamics.knowledge.retrieval import RETRIEVAL_LEG_CAPACITY
+
+    stub = _BlockingEmbedder()
+    monkeypatch.setattr(emb, "EmbeddingClient", lambda *a, **k: stub)
+    base_threads = threading.active_count()
+    attempts = []
+    started = time.monotonic()
+    try:
+        for _ in range(4):
+            dense = _DenseStub([_dense_hit("d1", "alpha text"), _dense_hit("d2", "beta text")])
+            graph = _GraphStub([])
+            attempts.append(
+                retrieve("alpha", dense_store=dense, graph_client=graph, deadline_s=0.15)
+            )
+        elapsed = time.monotonic() - started
+        growth = threading.active_count() - base_threads
+    finally:
+        stub.gate.set()
+
+    assert elapsed < 3.0, f"four embedding-outage calls took {elapsed:.2f}s"
+    assert all("embedding" in a.leg_errors for a in attempts), [a.leg_errors for a in attempts]
+    assert growth <= RETRIEVAL_LEG_CAPACITY["embedding"] + 2, (
+        f"{growth} embedding worker threads accumulated"
+    )
+
+
+def test_process_exits_with_a_stuck_embedder():
+    src = str(_ROOT / "src")
+    script = """
+import sys, threading, time
+sys.path.insert(0, "SRC_PATH")
+import agentic_dynamics.knowledge.embeddings as emb
+
+class BlockingEmbedder:
+    def embed(self, text):
+        threading.Event().wait()  # blocks forever
+        return [0.0]
+    def embed_batch(self, texts, batch_size=32):
+        return [self.embed(t) for t in texts]
+    def cosine_distance(self, a, b):
+        return 0.5
+
+emb.EmbeddingClient = BlockingEmbedder
+
+from agentic_dynamics.knowledge.retrieval import retrieve
+
+_META = {"source_type": "finding", "authority": "MEASURED", "repository_id": "agentic-dynamics",
+         "acl_scope": "public", "commit_sha": "", "observed_at": "2026-09-01T00:00:00+00:00"}
+
+class Dense:
+    def search(self, query, *, top_k=10, where=None):
+        return [{"id": "d1", "document": "alpha", "metadata": dict(_META), "distance": 0.1},
+                {"id": "d2", "document": "beta", "metadata": dict(_META), "distance": 0.1}]
+
+class Graph:
+    def search_knowledge_fulltext(self, query, *, limit=10, commit=None):
+        return []
+
+started = time.monotonic()
+attempt = retrieve("alpha", dense_store=Dense(), graph_client=Graph(), deadline_s=0.2)
+print("returned", round(time.monotonic() - started, 2), "legs", attempt.leg_errors, flush=True)
+""".replace("SRC_PATH", src)
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        timeout=20,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert "returned" in completed.stdout
 
 
 def test_process_exits_with_a_stuck_leg():

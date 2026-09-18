@@ -36,8 +36,6 @@ import re
 import threading
 import time
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
@@ -87,13 +85,20 @@ DEFAULT_RETRIEVAL_BUDGET_S = 20.0
 #: a named cause — a blocked database request must never outlive the pass.
 EXPANSION_MIN_BUDGET_S = 0.05
 
-#: Max retrieval legs allowed IN FLIGHT in this process at once. A stalled backend must not
-#: let repeated retrieval calls accumulate unbounded abandoned work (review finding P2):
-#: extra calls fail their leg fast with a named cause instead of stacking another blocked
-#: thread. The workers are daemon threads, so a leg stuck below its transport can never block
-#: process shutdown either.
-RETRIEVAL_MAX_INFLIGHT_LEGS = 4
-_LEG_SLOTS = threading.BoundedSemaphore(RETRIEVAL_MAX_INFLIGHT_LEGS)
+#: Per-DEPENDENCY in-flight capacity (review finding P1): one failed backend must never
+#: monopolize the capacity a healthy fallback needs — dense and lexical have SEPARATE pools,
+#: so stalled dense calls cannot refuse lexical launches. Workers are daemon threads, so a
+#: leg stuck below its transport can never block process shutdown either.
+RETRIEVAL_LEG_CAPACITY = {
+    "dense": 2,
+    "lexical": 2,
+    "expansion": 1,
+    "embedding": 2,
+}
+_LEG_SLOTS = {
+    name: threading.BoundedSemaphore(capacity)
+    for name, capacity in RETRIEVAL_LEG_CAPACITY.items()
+}
 REDUNDANCY_THRESHOLD = 0.92
 #: The cosine-collapse embeds only the top-K candidates (by list order — the fused list is
 #: score-ordered). Pairs beyond the cap default to 0.0 in the collapse (no dedupe), which is
@@ -883,9 +888,10 @@ def _pairwise_similarities(
     :func:`collapse_redundant` degrades to a no-op AND the caller can record why.
     ``path`` is ``"embedding"`` or ``"none"`` (which dedupe leg actually ran).
 
-    Bounded by construction: the embed calls run in a pool awaited against an absolute
-    deadline and the pool is dismissed without joining — a stalled embedding provider
-    cannot extend the retrieval pass (the ollama client's own timeout ends the calls).
+    Bounded like every other leg (review finding P2): ONE daemon worker under the
+    per-dependency embedding capacity — never a fresh executor whose non-daemon threads
+    outlive a timeout or block process shutdown. The embed calls are transport-bounded at
+    the ollama client; the deadline here is the outer guarantee.
     """
     if len(candidates) < 2 or embedder is None:
         return {}, "none", ""
@@ -893,30 +899,34 @@ def _pairwise_similarities(
         return {}, "none", (
             f"retrieval budget exhausted before the embedding leg ({timeout_s:g}s left)"
         )
-    deadline = None if timeout_s is None else time.monotonic() + timeout_s
     embedded = candidates[:COLLAPSE_EMBED_CAP]
-    pool = ThreadPoolExecutor(max_workers=8)
+    budget_label = timeout_s if timeout_s is not None else DEFAULT_RETRIEVAL_BUDGET_S
+
+    def _embed_all() -> list[Any]:
+        return [embedder.embed(c.text) for c in embedded]
+
+    deadline = time.monotonic() + budget_label
+    handle, refusal = _launch_leg("embedding", _embed_all)
+    if handle is None:
+        return {}, "none", refusal
+    ok, error = _await_leg(handle, deadline)
+    if not ok:
+        if handle["done"].is_set():
+            return {}, "none", f"embedding leg failed: {error}"
+        return {}, "none", f"embedding leg exceeded its {budget_label:g}s deadline"
+    embeddings: list[Any] = list(handle["value"] or [])
     try:
-        futures = [pool.submit(embedder.embed, c.text) for c in embedded]
-        embeddings: list[Any] = []
-        for fut in futures:
-            remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
-            embeddings.append(fut.result(timeout=remaining))
         sims: dict[tuple[str, str], float] = {}
         for i in range(len(embedded)):
             for j in range(i + 1, len(embedded)):
                 dist = embedder.cosine_distance(embeddings[i], embeddings[j])
                 sims[(embedded[i].id, embedded[j].id)] = 1.0 - dist
         return sims, "embedding", ""
-    except FutureTimeoutError:
-        return {}, "none", f"embedding leg exceeded its {timeout_s:g}s deadline"
     except Exception as exc:
         # Embedding infra unavailable (Ollama down, embedder missing, etc.) — the
         # collapse must degrade to a no-op, never crash the phase; the cause is returned
         # for the caller to record (a failure state must never be readable as success).
         return {}, "none", f"{type(exc).__name__}: {exc}"
-    finally:
-        pool.shutdown(wait=False, cancel_futures=True)
 
 
 def compute_token_budget(
@@ -1429,15 +1439,18 @@ def _resolve_source_type(
 def _launch_leg(name: str, fn: Callable[[], Any]) -> tuple[dict[str, Any] | None, str]:
     """Start one retrieval leg on a daemon worker; return ``(handle, refusal)``.
 
-    Parallelism is preserved (both legs launch before either is awaited). The bounded
-    semaphore means a stalled backend cannot accumulate unbounded abandoned work: once the
-    in-flight limit is reached, later calls get a named refusal instead of another blocked
-    thread. A daemon worker can never block process shutdown.
+    Parallelism is preserved (both legs launch before either is awaited). The per-dependency
+    bounded semaphore means a stalled backend cannot accumulate unbounded abandoned work
+    within ITS dependency, and cannot consume the capacity another dependency's healthy
+    fallback needs. A daemon worker can never block process shutdown.
     """
-    if not _LEG_SLOTS.acquire(blocking=False):
+    slots = _LEG_SLOTS.get(name)
+    if slots is None:
+        return None, f"{name} leg not started: no capacity pool is declared for it"
+    if not slots.acquire(blocking=False):
         return None, (
-            f"{name} leg not started: {RETRIEVAL_MAX_INFLIGHT_LEGS} retrieval legs already "
-            "in flight (a stalled backend is holding capacity)"
+            f"{name} leg not started: all {RETRIEVAL_LEG_CAPACITY[name]} {name} legs are "
+            "in flight (a stalled backend is holding this dependency's capacity)"
         )
     handle: dict[str, Any] = {
         "name": name,
@@ -1453,12 +1466,12 @@ def _launch_leg(name: str, fn: Callable[[], Any]) -> tuple[dict[str, Any] | None
             handle["error"] = exc
         finally:
             handle["done"].set()
-            _LEG_SLOTS.release()
+            slots.release()
 
     try:
         threading.Thread(target=_worker, name=f"retrieval-{name}", daemon=True).start()
     except BaseException:
-        _LEG_SLOTS.release()
+        slots.release()
         raise
     return handle, ""
 
