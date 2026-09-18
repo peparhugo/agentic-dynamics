@@ -52,6 +52,11 @@ test("resolveBaseUrl: compatible loopback default", () => {
 })
 
 test("execute: unavailable service is a precise bounded failure, never fabricated data", async () => {
+  // Hermetic: the host tool env now legitimately carries CONTROL_ROOM_URL (the F0 drop-in),
+  // so this case must clear it explicitly rather than assume an ambient-free environment.
+  delete process.env.CONTROL_ROOM_URL
+  delete process.env.FINOPS_HOST
+  delete process.env.FINOPS_PORT
   globalThis.fetch = (async () => {
     const err = new Error("connection refused")
     err.name = "TimeoutError"
