@@ -6,10 +6,11 @@
 **Executed classes:** navigation, loading, degraded, scrolling, keyboard
 **Omitted classes:** none
 **Fixtures:** boards (restored) + F-0..F-7 (legacy parked; deterministic, no live Redis/clock/network — waiver W2)
-**Viewports:** desktop 1440x900, narrow 1024x768, mobile 390x844
-**Themes:** dark, light, forced-colors
-**Primitives:** present/unique · in-viewport · non-zero box · scrollable pages (vertical) · no horizontal overflow · WCAG-AA contrast · first-paint · console-clean
-**Candidate:** b89210424 (verified against the checkout HEAD)
+**Viewports exercised:** desktop, narrow
+**Themes exercised:** dark, light
+**Coverage executed:** navigation: seven destinations, exactly one visible board, aria-current, no horizontal overflow, every board captured (desktop dark+light, narrow dark) · loading: first visit and reload for Operations/Surfaces/Routing; each endpoint requested exactly once; rendered fixture values asserted; delayed and failed routing responses settle (loading state refused by the readiness predicate) · degraded: an unreadable control db reads 'unavailable', never 0; a failed read model names its reason and URL while its siblings render · scrolling: real wheel input reaches the last below-fold run row; an overflow-y:hidden page fails the same check · keyboard: Enter opens the run drawer with focus on its close control; Escape closes it and returns focus to the originating row
+**Coverage omitted:** mobile viewport (390x844), forced-colors theme, WCAG-AA contrast, first-paint timing, charts, visuals, style, a11y, parity, live, interactions (legacy parked classes)
+**Candidate:** 53bee3428 (verified against the checkout HEAD)
 
 **Screenshots:** 21 (boards-degraded 1, boards-keyboard 2, boards-loading 1, boards-navigation 17)
 
