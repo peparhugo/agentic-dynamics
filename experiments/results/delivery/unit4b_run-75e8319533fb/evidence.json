@@ -58,5 +58,13 @@
       }
     ],
     "finding": "the commit-msg hook did not install: the run clone has no .git/hooks/ directory and _install_commit_msg_hook writes without creating it; the P0-4 strict gate then fails a plain-message commit at the finish line. The delivery itself is unaffected (the evidence above is from the same phase)."
+  },
+  "child_session": {
+    "artifact": "child_session.jsonl",
+    "sha256": "546b67a3d57c2e96c94cbd4c648fe4ed78f690bd6a0b48f867cb2685d6516349",
+    "session_id": "ses_f4967713effewb6VVmYbkp7jUb",
+    "tie": "the phase attempt records session_id ses_f4967713effewb6VVmYbkp7jUb; this artifact's records carry the same sessionID and contain the delivered citation 3c4d382ea67744ba\u2026 \u2014 the worker's OWN record of the knowledge it worked with",
+    "citation_excerpt_sha256": "5dd6145eb73bc19330cb90c046d21f61499e068d80d1c57d8325a42fe432ab32",
+    "qualification": "This ties the citation to the run/phase/attempt and the worker's session. It does NOT by itself distinguish the parent's prepared prompt from the child's own retrieval (both derive from the same corpus and goal); the child's output also contains engine-path lines the prepared-child branch cannot emit, so the prepared-step transport's effect in THIS run is not established. See IMAGE_AND_PATH.md; the rerun must instrument the child's argv/output to close this."
   }
 }

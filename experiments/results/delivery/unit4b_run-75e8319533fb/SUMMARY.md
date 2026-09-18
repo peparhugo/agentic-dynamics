@@ -8,11 +8,18 @@ isolation retained).
 request key `aio-explicit:flash_ladder_kb:unit4b-retrieval-demo-3`, base `9da3687ef89c`,
 model `deepseek/deepseek-v4-flash`, candidate `136d1c2fcc22`.
 
-**What the worker received:** the exact prepared-step prompt
-(`prepared_step_generate.a1.json`; its `prompt_sha256` verifies) carries the Evidence block with
-citation `[K:3c4d382ea67744ba…@121126dfbcd65a…:workload:skill/flash-ladder/taskman#pattern]` — a
-public (`acl_scope: public`), repository-scoped (`agentic-dynamics`) DERIVED pattern, revision
-`121126dfb…`.
+**What the parent prepared — and how it reached the worker (qualified):** the exact
+prepared-step prompt (`prepared_step_generate.a1.json`; its `prompt_sha256` verifies) carries
+the Evidence block with citation
+`[K:3c4d382ea67744ba…@121126dfbcd65a…:workload:skill/flash-ladder/taskman#pattern]` — a public
+(`acl_scope: public`), repository-scoped (`agentic-dynamics`) DERIVED pattern, revision
+`121126dfb…`. The worker's own session (`child_session.jsonl`) contains that citation; the
+image-version forensics in `IMAGE_AND_PATH.md` establish that, under the code that actually
+ran, that prompt can only have come from the parent's prepared payload. **Caveat (review
+2026-09-18):** the cell executed the image's baked `run_workflow.py` (pre-`67cd2e988`) because
+the broker set no working directory and the command is relative — so the *current*
+prepared-child implementation was not exercised. The rerun (post-merge, with the cell-workdir
+and hook fixes active, through `g_test`) is the evidence that closes this.
 
 **Recorded revisions:** the ledger's `augmentation_evidence` names the final emitted set only —
 `{id, revision, source_type, locator}` — the by-id mapping over the trimmed selection
@@ -28,10 +35,13 @@ leg delivered; the unavailable legs are named, never silently empty.
 `repository_id: agentic-dynamics`; the spec requested exactly that scope. Coordinator records
 carry `acl_scope: org:agentic-dynamics` and are excluded by the retrieval hard pre-filter.
 
-**Phase outcome (separate rail):** the phase's commit was refused (`COMMIT_PREFIX`) because the
-commit-msg hook silently fails to install when a run clone has no `.git/hooks/` directory (the
-runner writes the hook without creating the directory; the P0-4 strict gate default then fails a
-plain-message commit at the finish line). The delivery evidence above is from the same phase and
-is unaffected; the rail is repaired on this branch.
+**Phase outcome (separate rails, both repaired on this branch):** the phase's commit was
+refused (`COMMIT_PREFIX`) because the commit-msg hook silently fails to install when a run
+clone has no `.git/hooks/` directory (the runner writes the hook without creating the
+directory; the P0-4 strict gate default then fails a plain-message commit at the finish line).
+And the phase emitted engine-path output because the cell ran the image's baked code rather
+than the clone's — the broker set no working directory. Both repairs carry tests; the failed
+run is preserved here as historical evidence, and the closeout claim stays qualified until the
+rerun passes through `g_test`.
 
 Machine-readable twin: `evidence.json`.
