@@ -9,6 +9,8 @@ from __future__ import annotations
 import hashlib
 import math
 import os
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -18,11 +20,18 @@ from typing import Any
 # default values are read once at import (as in live.py), but ``ChromaStore.__init__``
 # re-checks the environment so a test or a forked worker can still override them.
 CHROMA_HOST = os.environ.get("CHROMA_HOST", "localhost")
-# The live host publishes the chromadb container on 127.0.0.1:8100 (the kb-chroma unit and
-# the reachability probe both declare 8100). The former 8000 default collided with the
-# Control Room portal's port range and never matched the live service — the drift is why a
-# coordinator with no CHROMA_PORT env silently targeted nothing.
+# TWO distinct endpoints exist and neither implies the other (review fix P1):
+#   * the HOST checkout reaches the PUBLISHED loopback port (127.0.0.1:8100 — the kb-chroma
+#     unit and the reachability probe both declare it);
+#   * the ladder's containers reach the service BY NAME on its INTERNAL port
+#     (chromadb:8000) — ``x-ladder-env`` declares CHROMA_HOST=chromadb AND CHROMA_PORT=8000.
+# The default below is the HOST endpoint. A non-loopback CHROMA_HOST WITHOUT an explicit port
+# is a configuration error and ``resolve_chroma_endpoint`` refuses it rather than silently
+# pairing the by-name host with the host's published port.
 CHROMA_PORT = int(os.environ.get("CHROMA_PORT", "8100"))
+#: The service's in-network port (what ``chromadb`` listens on inside the container). Named
+#: here so the refusal message and the compose declaration share one documented value.
+CHROMA_CONTAINER_PORT = 8000
 
 # Bounded-operation defaults (delivery-simplification Units 4-5): chromadb's HTTP session is
 # constructed ``timeout=None`` with no settings hook, and ollama's default client also waits
@@ -134,15 +143,45 @@ class ChromaStoreError(RuntimeError):
     """
 
 
+def resolve_chroma_endpoint(
+    host: str | None = None, port: int | None = None
+) -> tuple[str, int]:
+    """Resolve the chroma endpoint for THIS environment — explicitly, never by implication.
+
+    Precedence: explicit arguments > environment (``CHROMA_HOST``/``CHROMA_PORT``) > the host
+    defaults (``localhost:8100``). A non-loopback ``CHROMA_HOST`` REQUIRES an explicit port:
+    the service answers on its internal port inside the ladder network while the host
+    publishes a different one, so defaulting the port for a named host silently targets the
+    wrong endpoint (review finding P1). One resolver — the store and its tests share it.
+    """
+    resolved_host = (
+        str(host) if host is not None else os.environ.get("CHROMA_HOST", CHROMA_HOST)
+    )
+    if port is not None:
+        return resolved_host, int(port)
+    env_port = os.environ.get("CHROMA_PORT")
+    if env_port:
+        return resolved_host, int(env_port)
+    if resolved_host not in ("localhost", "127.0.0.1", "::1"):
+        raise ChromaStoreError(
+            f"CHROMA_HOST={resolved_host!r} names a service endpoint but no CHROMA_PORT is "
+            f"declared: the by-name container port is {CHROMA_CONTAINER_PORT} while the "
+            f"host's published port is {CHROMA_PORT} — declare CHROMA_PORT explicitly "
+            "(see x-ladder-env)"
+        )
+    return resolved_host, CHROMA_PORT
+
+
 def _probe_chroma(host: str, port: int, timeout_s: float) -> None:
-    """Bounded readiness gate before constructing the chromadb client.
+    """Bounded readiness gate before the chromadb client constructor performs any I/O.
 
     chromadb's FastAPI transport builds ``httpx.Client(timeout=None, ...)`` and its
-    constructor performs identity/tenant calls over it — so an unresponsive server blocks
-    client CONSTRUCTION forever (measured 2026-09-11..18: the chroma projector and the
-    retrieval probe both hung on a dead server). Probe the server's own heartbeat with our
-    deadline first: a server that cannot answer its heartbeat is reported unavailable,
-    never waited on.
+    constructor performs network calls (server version, identity, tenant/database) over it —
+    so an unresponsive server blocks construction forever. This gate probes, with our bounded
+    client, BOTH the liveness contract (heartbeat, must be 2xx) AND the exact endpoints the
+    constructor will hit (must merely ANSWER — any HTTP status proves the endpoint is not
+    stalled). Review repro that this closes: heartbeat 200 + identity stall used to block
+    construction past the declared timeout.
     """
     import httpx
 
@@ -155,11 +194,80 @@ def _probe_chroma(host: str, port: int, timeout_s: float) -> None:
             last = f"{path}: {type(exc).__name__}: {exc}"
             continue
         if response.status_code == 200:
-            return
+            break
         last = f"{path}: HTTP {response.status_code}"
-    raise ChromaStoreError(
-        f"chroma server not answerable at {base} within {timeout_s:g}s ({last})"
-    )
+    else:
+        raise ChromaStoreError(
+            f"chroma server not answerable at {base} within {timeout_s:g}s ({last})"
+        )
+    for path in (
+        "/api/v2/version",
+        "/api/v2/auth/identity",
+        "/api/v2/tenants/default_tenant/databases/default_database",
+    ):
+        try:
+            httpx.get(f"{base}{path}", timeout=timeout_s)
+        except Exception as exc:
+            raise ChromaStoreError(
+                f"chroma construction endpoint not answering at {base}{path} within "
+                f"{timeout_s:g}s ({type(exc).__name__}: {exc})"
+            ) from exc
+
+
+#: How long an endpoint stays refused after a construction that failed to complete within its
+#: deadline. Bounds outstanding construction work across repeated outages (review finding P2).
+CHROMA_CONSTRUCTION_COOLDOWN_S = 60.0
+_CHROMA_CONSTRUCTION_LOCK = threading.Lock()
+_CHROMA_CONSTRUCTION_REFUSED_UNTIL: dict[tuple[str, int], float] = {}
+
+
+def _construct_chroma_bounded(host: str, port: int, timeout_s: float) -> Any:
+    """Construct the chromadb client under a hard deadline, with a failure cooldown.
+
+    The constructor performs network I/O in a session it creates ``timeout=None``; the
+    preflight probes the same endpoints, but construction itself must still be bounded so a
+    server that stalls mid-construction cannot block the caller (review finding P1). The wait
+    runs on a DAEMON thread: on timeout the caller raises, a short cooldown suppresses
+    repeated attempts against the same endpoint, and an abandoned constructor can never block
+    process shutdown. The client is returned only after the constructor completed.
+    """
+    import chromadb
+
+    key = (str(host), int(port))
+    with _CHROMA_CONSTRUCTION_LOCK:
+        until = _CHROMA_CONSTRUCTION_REFUSED_UNTIL.get(key, 0.0)
+    now = time.monotonic()
+    if now < until:
+        raise ChromaStoreError(
+            f"chromadb client construction suppressed for {until - now:.0f}s more "
+            f"(a recent attempt at {host}:{port} did not complete within {timeout_s:g}s)"
+        )
+    result: dict[str, Any] = {}
+    done = threading.Event()
+
+    def _construct() -> None:
+        try:
+            result["client"] = chromadb.HttpClient(host=str(host), port=int(port))
+        except BaseException as exc:  # noqa: BLE001 — delivered to the caller below
+            result["error"] = exc
+        finally:
+            done.set()
+
+    threading.Thread(target=_construct, name="chroma-construct", daemon=True).start()
+    if not done.wait(timeout_s):
+        with _CHROMA_CONSTRUCTION_LOCK:
+            _CHROMA_CONSTRUCTION_REFUSED_UNTIL[key] = (
+                time.monotonic() + CHROMA_CONSTRUCTION_COOLDOWN_S
+            )
+        raise ChromaStoreError(
+            f"chromadb client construction exceeded {timeout_s:g}s at {host}:{port} "
+            "(the server stalled during identity/tenant validation)"
+        )
+    if "error" in result:
+        raise ChromaStoreError(
+            f"chromadb client construction failed at {host}:{port}: {result['error']!r}"
+        )
+    return result["client"]
 
 
 def _bound_chroma_session(client: Any, timeout_s: float) -> bool:
@@ -201,14 +309,9 @@ class ChromaStore:
         *,
         timeout_s: float | None = None,
     ):
-        import chromadb
-
-        # Env-driven defaults (re-checked here, not only at import) so a caller or
-        # test can override CHROMA_HOST/CHROMA_PORT without reloading the module.
-        resolved_host = host if host is not None else os.environ.get("CHROMA_HOST", CHROMA_HOST)
-        resolved_port = (
-            port if port is not None else int(os.environ.get("CHROMA_PORT", str(CHROMA_PORT)))
-        )
+        # One resolver for both environments (review fix P1): explicit args > env > host
+        # defaults, with a LOUD refusal when a named host carries no port.
+        resolved_host, resolved_port = resolve_chroma_endpoint(host, port)
         self.host = resolved_host
         self.port = resolved_port
         self.timeout_s = (
@@ -216,10 +319,12 @@ class ChromaStore:
             if timeout_s is not None
             else float(os.environ.get(CHROMA_TIMEOUT_ENV, DEFAULT_CHROMA_TIMEOUT_S))
         )
-        # Bounded construction: the library's own client is unbounded (see _probe_chroma),
-        # so the readiness gate runs first and the shared session gets our deadline after.
+        # Bounded construction, in order (review fix P1): the readiness gate probes the
+        # constructor's own endpoints with our deadline, then construction itself runs under
+        # a hard deadline, and only then is the shared session's timeout applied for every
+        # subsequent request.
         _probe_chroma(resolved_host, resolved_port, self.timeout_s)
-        self._client = chromadb.HttpClient(host=resolved_host, port=resolved_port)
+        self._client = _construct_chroma_bounded(resolved_host, resolved_port, self.timeout_s)
         self.session_bounded = _bound_chroma_session(self._client, self.timeout_s)
         self._embedder = EmbeddingClient()
         # Instance shadow of the class default: ``collection_name`` is the

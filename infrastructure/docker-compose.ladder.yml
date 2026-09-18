@@ -79,7 +79,11 @@ x-ladder-env: &ladder-env
   # RAG retrieval store endpoints (slice 3, D-17 by-name reachability): the two-leg fusion's
   # dense (chroma 8000) + lexical (neo4j 7687) stores. Consulted only by rag_augment-enabled
   # workflows (and the kb-* consumers) — inert for the plain worker cells.
+  # BOTH variables are declared together on purpose (review fix P1): the container reaches the
+  # service BY NAME on its INTERNAL port (8000), while the host publishes a different port
+  # (8100) — omitting CHROMA_PORT here made a by-name client silently inherit the host port.
   CHROMA_HOST: chromadb
+  CHROMA_PORT: "8000"
   FINOPS_NEO4J_URI: bolt://neo4j:7687
   # F1 close-out (D-17, the single internet policy point): every ladder-env consumer routes
   # its outbound model-API traffic through the egress proxy — no bypass via the bridge NAT.
