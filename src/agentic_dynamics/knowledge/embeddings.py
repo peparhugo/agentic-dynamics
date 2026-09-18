@@ -18,7 +18,19 @@ from typing import Any
 # default values are read once at import (as in live.py), but ``ChromaStore.__init__``
 # re-checks the environment so a test or a forked worker can still override them.
 CHROMA_HOST = os.environ.get("CHROMA_HOST", "localhost")
-CHROMA_PORT = int(os.environ.get("CHROMA_PORT", "8000"))
+# The live host publishes the chromadb container on 127.0.0.1:8100 (the kb-chroma unit and
+# the reachability probe both declare 8100). The former 8000 default collided with the
+# Control Room portal's port range and never matched the live service — the drift is why a
+# coordinator with no CHROMA_PORT env silently targeted nothing.
+CHROMA_PORT = int(os.environ.get("CHROMA_PORT", "8100"))
+
+# Bounded-operation defaults (delivery-simplification Units 4-5): chromadb's HTTP session is
+# constructed ``timeout=None`` with no settings hook, and ollama's default client also waits
+# forever — so every layer we own declares its own deadline. Env-overridable.
+EMBED_TIMEOUT_ENV = "FINOPS_EMBED_TIMEOUT_S"
+DEFAULT_EMBED_TIMEOUT_S = 15.0
+CHROMA_TIMEOUT_ENV = "FINOPS_CHROMA_TIMEOUT_S"
+DEFAULT_CHROMA_TIMEOUT_S = 10.0
 
 
 def step_doc_id(session_id: str, step_index: int) -> str:
@@ -36,11 +48,28 @@ def step_doc_id(session_id: str, step_index: int) -> str:
 class EmbeddingClient:
     """Generate text embeddings via local Ollama model."""
 
-    def __init__(self, model: str = "bge-m3:latest", host: str | None = None):
+    def __init__(
+        self,
+        model: str = "bge-m3:latest",
+        host: str | None = None,
+        *,
+        timeout_s: float | None = None,
+    ):
         import ollama
 
         self.model = model
-        self._client = ollama.Client(host=host) if host else ollama
+        self.timeout_s = (
+            float(timeout_s)
+            if timeout_s is not None
+            else float(os.environ.get(EMBED_TIMEOUT_ENV, DEFAULT_EMBED_TIMEOUT_S))
+        )
+        # A dedicated client with an explicit deadline — the module-level default client
+        # inherits ollama's own ``timeout=None`` (wait forever), which is how a stalled
+        # embedding provider used to block retrieval and the chroma projector indefinitely.
+        self._client = ollama.Client(
+            host=host or os.environ.get("OLLAMA_HOST") or "http://127.0.0.1:11434",
+            timeout=self.timeout_s,
+        )
 
     def embed(self, text: str) -> list[float]:
         r = self._client.embeddings(model=self.model, prompt=text)
@@ -105,6 +134,54 @@ class ChromaStoreError(RuntimeError):
     """
 
 
+def _probe_chroma(host: str, port: int, timeout_s: float) -> None:
+    """Bounded readiness gate before constructing the chromadb client.
+
+    chromadb's FastAPI transport builds ``httpx.Client(timeout=None, ...)`` and its
+    constructor performs identity/tenant calls over it — so an unresponsive server blocks
+    client CONSTRUCTION forever (measured 2026-09-11..18: the chroma projector and the
+    retrieval probe both hung on a dead server). Probe the server's own heartbeat with our
+    deadline first: a server that cannot answer its heartbeat is reported unavailable,
+    never waited on.
+    """
+    import httpx
+
+    base = f"http://{host}:{port}"
+    last = ""
+    for path in ("/api/v2/heartbeat", "/api/v1/heartbeat"):
+        try:
+            response = httpx.get(f"{base}{path}", timeout=timeout_s)
+        except Exception as exc:  # noqa: BLE001 — the probe reports, never raises
+            last = f"{path}: {type(exc).__name__}: {exc}"
+            continue
+        if response.status_code == 200:
+            return
+        last = f"{path}: HTTP {response.status_code}"
+    raise ChromaStoreError(
+        f"chroma server not answerable at {base} within {timeout_s:g}s ({last})"
+    )
+
+
+def _bound_chroma_session(client: Any, timeout_s: float) -> bool:
+    """Apply the declared deadline to chromadb's shared HTTP session.
+
+    chromadb 1.x exposes no settings hook for the session timeout (it is constructed
+    ``timeout=None``); this is a version-tolerant private-attribute poke. Returns False
+    when the session cannot be reached — the construction pre-flight is then the only
+    bound, so a caller that needs a hard guarantee should keep its own deadline too.
+    """
+    session = getattr(getattr(client, "_server", None), "_session", None)
+    if session is None:
+        return False
+    try:
+        import httpx
+
+        session.timeout = httpx.Timeout(timeout_s)
+        return True
+    except Exception:  # noqa: BLE001 — an unbounded library session is reported, not fatal
+        return False
+
+
 class ChromaStore:
     """Vector store for experiment session embeddings and knowledge chunks.
 
@@ -121,15 +198,29 @@ class ChromaStore:
         host: str | None = None,
         port: int | None = None,
         collection_name: str | None = None,
+        *,
+        timeout_s: float | None = None,
     ):
         import chromadb
 
         # Env-driven defaults (re-checked here, not only at import) so a caller or
         # test can override CHROMA_HOST/CHROMA_PORT without reloading the module.
-        self._client = chromadb.HttpClient(
-            host=host if host is not None else os.environ.get("CHROMA_HOST", CHROMA_HOST),
-            port=port if port is not None else int(os.environ.get("CHROMA_PORT", str(CHROMA_PORT))),
+        resolved_host = host if host is not None else os.environ.get("CHROMA_HOST", CHROMA_HOST)
+        resolved_port = (
+            port if port is not None else int(os.environ.get("CHROMA_PORT", str(CHROMA_PORT)))
         )
+        self.host = resolved_host
+        self.port = resolved_port
+        self.timeout_s = (
+            float(timeout_s)
+            if timeout_s is not None
+            else float(os.environ.get(CHROMA_TIMEOUT_ENV, DEFAULT_CHROMA_TIMEOUT_S))
+        )
+        # Bounded construction: the library's own client is unbounded (see _probe_chroma),
+        # so the readiness gate runs first and the shared session gets our deadline after.
+        _probe_chroma(resolved_host, resolved_port, self.timeout_s)
+        self._client = chromadb.HttpClient(host=resolved_host, port=resolved_port)
+        self.session_bounded = _bound_chroma_session(self._client, self.timeout_s)
         self._embedder = EmbeddingClient()
         # Instance shadow of the class default: ``collection_name`` is the
         # per-instance override while ``COLLECTION_NAME`` stays the documented

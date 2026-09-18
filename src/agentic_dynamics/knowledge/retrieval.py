@@ -31,10 +31,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import re
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
@@ -71,6 +73,13 @@ DEFAULT_TOP_K = 40
 DEFAULT_SEED_COUNT = 12
 DEFAULT_RAG_TOKEN_LIMIT = 8000
 DEFAULT_EXECUTOR_RAG_RATIO = 0.20
+
+#: The declared overall wall-clock budget for one retrieval pass (delivery-simplification
+#: Units 4-5). Legs are bounded at their transports too (ChromaStore session timeout /
+#: ollama client timeout); this budget is the outer bound that keeps a leg which is stuck
+#: below its transport from extending the pass. ``FINOPS_RETRIEVAL_BUDGET_S`` overrides.
+RETRIEVAL_BUDGET_ENV = "FINOPS_RETRIEVAL_BUDGET_S"
+DEFAULT_RETRIEVAL_BUDGET_S = 20.0
 REDUNDANCY_THRESHOLD = 0.92
 #: The cosine-collapse embeds only the top-K candidates (by list order — the fused list is
 #: score-ordered). Pairs beyond the cap default to 0.0 in the collapse (no dedupe), which is
@@ -846,34 +855,54 @@ def collapse_redundant(
 
 
 def _pairwise_similarities(
-    candidates: list[Candidate], embedder: Any = None
-) -> tuple[dict[tuple[str, str], float], str]:
+    candidates: list[Candidate],
+    embedder: Any = None,
+    *,
+    timeout_s: float | None = None,
+) -> tuple[dict[tuple[str, str], float], str, str]:
     """Compute pairwise cosine similarities among candidates (or degrade to a no-op).
 
-    Returns ``(similarities, path)``. ``similarities`` maps ``(id_a, id_b)`` to a
+    Returns ``(similarities, path, error)``. ``similarities`` maps ``(id_a, id_b)`` to a
     similarity in ``[0, 1]`` (``1.0`` = identical) computed as ``1 - cosine_distance``
-    over the embedder's vectors. When no embedder is supplied, fewer than two
-    candidates survive, or embedding fails, returns ``({}, "none")`` so
-    :func:`collapse_redundant` degrades to a no-op. ``path`` is ``"embedding"`` or
-    ``"none"`` and is recorded on the attempt for audit (which dedupe leg actually
-    ran).
+    over the embedder's vectors. When no embedder is supplied, fewer than two candidates
+    survive, or embedding fails/times out, returns ``({}, "none", <cause or "">)`` so
+    :func:`collapse_redundant` degrades to a no-op AND the caller can record why.
+    ``path`` is ``"embedding"`` or ``"none"`` (which dedupe leg actually ran).
+
+    Bounded by construction: the embed calls run in a pool awaited against an absolute
+    deadline and the pool is dismissed without joining — a stalled embedding provider
+    cannot extend the retrieval pass (the ollama client's own timeout ends the calls).
     """
     if len(candidates) < 2 or embedder is None:
-        return {}, "none"
+        return {}, "none", ""
+    if timeout_s is not None and timeout_s <= 0:
+        return {}, "none", (
+            f"retrieval budget exhausted before the embedding leg ({timeout_s:g}s left)"
+        )
+    deadline = None if timeout_s is None else time.monotonic() + timeout_s
+    embedded = candidates[:COLLAPSE_EMBED_CAP]
+    pool = ThreadPoolExecutor(max_workers=8)
     try:
-        embedded = candidates[:COLLAPSE_EMBED_CAP]
-        with ThreadPoolExecutor(max_workers=8) as pool:
-            embeddings = list(pool.map(embedder.embed, [c.text for c in embedded]))
+        futures = [pool.submit(embedder.embed, c.text) for c in embedded]
+        embeddings: list[Any] = []
+        for fut in futures:
+            remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
+            embeddings.append(fut.result(timeout=remaining))
         sims: dict[tuple[str, str], float] = {}
         for i in range(len(embedded)):
             for j in range(i + 1, len(embedded)):
                 dist = embedder.cosine_distance(embeddings[i], embeddings[j])
                 sims[(embedded[i].id, embedded[j].id)] = 1.0 - dist
-        return sims, "embedding"
-    except Exception:
+        return sims, "embedding", ""
+    except FutureTimeoutError:
+        return {}, "none", f"embedding leg exceeded its {timeout_s:g}s deadline"
+    except Exception as exc:
         # Embedding infra unavailable (Ollama down, embedder missing, etc.) — the
-        # collapse must degrade to a no-op, never crash the phase.
-        return {}, "none"
+        # collapse must degrade to a no-op, never crash the phase; the cause is returned
+        # for the caller to record (a failure state must never be readable as success).
+        return {}, "none", f"{type(exc).__name__}: {exc}"
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
 
 def compute_token_budget(
@@ -959,6 +988,10 @@ class RetrievalAttempt:
     cache_status: str
     fallback_mode: str
     dedup_path: str = ""  # "embedding" | "none" — which redundancy-collapse leg ran
+    #: Named causes for legs that failed or exceeded the declared retrieval budget
+    #: ({"dense"|"lexical"|"embedding": reason}). Empty when every attempted leg returned;
+    #: a degraded pass is never silent.
+    leg_errors: dict[str, str] = field(default_factory=dict)
     # k4 no-silent-empties: candidates excluded from the top-K because their source_type was
     # empty after both the store metadata and the resolver were consulted, while a typed
     # candidate existed. Each entry is {"id", "reason"} — the exclusion is recorded, never
@@ -1395,6 +1428,7 @@ def retrieve(
     now: datetime | None = None,
     pattern_projection: bool = False,
     source_type_resolver: Callable[[str], str | None] | None = None,
+    deadline_s: float | None = None,
 ) -> RetrievalAttempt:
     """Run the deterministic retrieval pipeline and record the attempt.
 
@@ -1405,6 +1439,11 @@ def retrieve(
     and selected. The ``RetrievalAttempt`` is returned *before* any LLM call so the
     trace survives construction/execution failures.
 
+    ``deadline_s`` bounds the whole pass (default ``FINOPS_RETRIEVAL_BUDGET_S``, 20s):
+    leg waits use the remaining budget, the pool is dismissed without joining, and a leg
+    that fails or exceeds the budget is NAMED in ``leg_errors`` — a degraded pass is
+    never silently pooled with a clean one.
+
     ``source_type_resolver`` is the k4 no-silent-empties side channel: a deterministic
     ``candidate_id -> source_type`` lookup (never an LLM) consulted when a store's
     metadata carries no ``source_type`` (an older projection), so such a candidate is
@@ -1413,6 +1452,12 @@ def retrieve(
     recorded reason whenever a typed candidate exists (see ``UNTYPED_EXCLUDED_REASON``).
     """
     t0 = time.monotonic()
+    budget_s = (
+        float(deadline_s)
+        if deadline_s is not None
+        else float(os.environ.get(RETRIEVAL_BUDGET_ENV, DEFAULT_RETRIEVAL_BUDGET_S))
+    )
+    leg_errors: dict[str, str] = {}
     plan = build_query_plan(
         raw_work_item,
         phase_objective=phase_objective,
@@ -1444,23 +1489,56 @@ def retrieve(
             plan.lexical_query, limit=top_k, commit=commit_sha
         )
 
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        futures = {}
-        if dense_ok:
-            futures["dense"] = pool.submit(_dense_leg)
-        if lexical_ok:
-            futures["lexical"] = pool.submit(_lexical_leg)
+    # Bounded legs (delivery-simplification Units 4-5): each leg is awaited only for the
+    # remaining share of the declared budget, and the pool is DISMISSED without joining —
+    # a stalled backend must not extend the pass through executor shutdown. The legs'
+    # transports are bounded too (ChromaStore session timeout / ollama client timeout);
+    # the budget here is the outer guarantee.
+    pool = ThreadPoolExecutor(max_workers=2)
+    futures: dict[str, Any] = {}
+    if dense_ok:
+        futures["dense"] = pool.submit(_dense_leg)
+    if lexical_ok:
+        futures["lexical"] = pool.submit(_lexical_leg)
+    try:
         for name, fut in futures.items():
-            try:
-                if name == "dense":
-                    dense_hits = fut.result()
-                else:
-                    lexical_hits = fut.result()
-            except Exception:
+            remaining = budget_s - (time.monotonic() - t0)
+            # A leg that ALREADY returned is collected regardless of the clock — a stalled
+            # sibling must never discard a ready result. Only a still-running leg can be
+            # failed by the budget.
+            if not fut.done() and remaining <= 0:
+                leg_errors[name] = (
+                    f"retrieval budget {budget_s:g}s exhausted before the {name} leg returned"
+                )
                 if name == "dense":
                     dense_ok = False
                 else:
                     lexical_ok = False
+                continue
+            try:
+                hits = fut.result(timeout=None if fut.done() else remaining)
+            except FutureTimeoutError:
+                leg_errors[name] = (
+                    f"{name} leg did not return within the remaining {remaining:.2f}s "
+                    f"of the {budget_s:g}s retrieval budget"
+                )
+                if name == "dense":
+                    dense_ok = False
+                else:
+                    lexical_ok = False
+            except Exception as exc:
+                leg_errors[name] = f"{type(exc).__name__}: {exc}"
+                if name == "dense":
+                    dense_ok = False
+                else:
+                    lexical_ok = False
+            else:
+                if name == "dense":
+                    dense_hits = hits
+                else:
+                    lexical_hits = hits
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
     candidates: list[Candidate] = []
     ranks: dict[str, dict[str, int | None]] = {}
@@ -1610,9 +1688,15 @@ def retrieve(
         from agentic_dynamics.knowledge.embeddings import EmbeddingClient
 
         embedder = EmbeddingClient()
-    except Exception:
-        embedder = None  # optional dep missing → collapse degrades to a no-op
-    similarities, dedup_path = _pairwise_similarities(fused, embedder)
+    except Exception as exc:  # optional dep missing → collapse degrades to a no-op
+        embedder = None
+        leg_errors["embedding"] = f"embedder unavailable: {type(exc).__name__}: {exc}"
+
+    similarities, dedup_path, embed_error = _pairwise_similarities(
+        fused, embedder, timeout_s=max(0.0, budget_s - (time.monotonic() - t0))
+    )
+    if embed_error:
+        leg_errors["embedding"] = embed_error
     fused = collapse_redundant(fused, similarities)
 
     # Then expand the strongest seeds through the graph (decayed boost).
@@ -1754,6 +1838,7 @@ def retrieve(
         latency_ms=round((time.monotonic() - t0) * 1000.0, 2),
         cache_status="unknown",
         dedup_path=dedup_path,
+        leg_errors=leg_errors,
         fallback_mode=fallback.value,
         untyped_excluded=untyped_excluded,
         timestamp=datetime.now(timezone.utc).isoformat(),
