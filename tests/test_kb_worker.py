@@ -666,6 +666,37 @@ def test_kb_chroma_v1_handler_skips_fact_records(monkeypatch):
     handler(_record(source_type="fact"))  # returns silently — never touches ChromaStore
 
 
+def test_kb_chroma_v1_handler_reuses_one_store_across_records(monkeypatch):
+    """One store per worker, not per record (the 2026-09-18 stall).
+
+    A per-record ChromaStore leaked its HTTP session with the record: 1,018 sockets in
+    CLOSE-WAIT to chroma:8100, the process at its 1024-FD limit, every artifact read then
+    dead-lettered with "Too many open files" and the watermark DB could not open. The handler
+    must build ONE store for its lifetime.
+    """
+    import sys
+    import types
+
+    fake = types.ModuleType("agentic_dynamics.knowledge.embeddings")
+    built: list[str | None] = []
+
+    class CountingStore:
+        def __init__(self, *a, **k):
+            built.append(k.get("collection_name"))
+
+        def upsert(self, *a, **k):
+            return 1
+
+    fake.ChromaStore = CountingStore
+    monkeypatch.setitem(sys.modules, "agentic_dynamics.knowledge.embeddings", fake)
+
+    handler = kb_worker.build_handler("kb-chroma-v1", _FakeRedis())
+    for _ in range(25):
+        handler(_record())
+
+    assert built == ["knowledge_chunks_v1"], "25 records must reuse ONE ChromaStore"
+
+
 # ── the poll-loop termination contract (graph-leg closeout, Thread 1) ──
 #
 # Pre-fix, the worker's main loop broke out with "idle after N polls; exiting" once
