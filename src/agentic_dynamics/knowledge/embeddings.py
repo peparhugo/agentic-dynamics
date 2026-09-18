@@ -172,64 +172,99 @@ def resolve_chroma_endpoint(
     return resolved_host, CHROMA_PORT
 
 
-def _probe_chroma(host: str, port: int, timeout_s: float) -> None:
-    """Bounded readiness gate before the chromadb client constructor performs any I/O.
+def _bounded_get(url: str, deadline: float) -> int:
+    """One GET whose TOTAL elapsed time is bounded by the absolute ``deadline``.
 
-    chromadb's FastAPI transport builds ``httpx.Client(timeout=None, ...)`` and its
-    constructor performs network calls (server version, identity, tenant/database) over it —
-    so an unresponsive server blocks construction forever. This gate probes, with our bounded
-    client, BOTH the liveness contract (heartbeat, must be 2xx) AND the exact endpoints the
-    constructor will hit (must merely ANSWER — any HTTP status proves the endpoint is not
-    stalled). Review repro that this closes: heartbeat 200 + identity stall used to block
-    construction past the declared timeout.
+    httpx's timeout bounds INACTIVITY, not elapsed time: a server dribbling one byte at a
+    time can extend a request indefinitely, and a fresh timeout per probe multiplies the
+    overrun (review finding P1). Here the client timeout is the REMAINING time (so no single
+    blocking read can exceed the deadline) AND the streamed body is checked against the
+    deadline per chunk (so a slow stream is cut at the deadline too). Raises
+    :class:`ChromaStoreError` on deadline exhaustion or transport failure; returns the HTTP
+    status otherwise.
     """
     import httpx
 
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise ChromaStoreError(f"chroma init deadline exhausted before GET {url}")
+    try:
+        with (
+            httpx.Client(timeout=httpx.Timeout(max(0.001, remaining))) as client,
+            client.stream("GET", url) as response,
+        ):
+            status = response.status_code
+            for _chunk in response.iter_bytes():
+                if time.monotonic() > deadline:
+                    raise ChromaStoreError(
+                        f"GET {url} exceeded the chroma initialization deadline"
+                    )
+            return status
+    except ChromaStoreError:
+        raise
+    except Exception as exc:
+        raise ChromaStoreError(
+            f"GET {url} failed within the chroma init deadline: {type(exc).__name__}: {exc}"
+        ) from exc
+
+
+def _probe_chroma(host: str, port: int, deadline: float) -> None:
+    """Readiness gate sharing ONE absolute deadline with construction.
+
+    chromadb's FastAPI transport builds ``httpx.Client(timeout=None, ...)`` and its
+    constructor performs network calls (server version, identity, tenant/database) over it —
+    an unresponsive server would block construction forever. This gate probes the liveness
+    contract (heartbeat, must be 2xx) and the exact endpoints the constructor will hit (must
+    merely answer), with every request cut at ``deadline`` — no probe receives fresh time
+    (review finding P1).
+    """
     base = f"http://{host}:{port}"
     last = ""
     for path in ("/api/v2/heartbeat", "/api/v1/heartbeat"):
         try:
-            response = httpx.get(f"{base}{path}", timeout=timeout_s)
-        except Exception as exc:  # noqa: BLE001 — the probe reports, never raises
-            last = f"{path}: {type(exc).__name__}: {exc}"
+            status = _bounded_get(f"{base}{path}", deadline)
+        except ChromaStoreError as exc:
+            last = str(exc)
             continue
-        if response.status_code == 200:
+        if status == 200:
             break
-        last = f"{path}: HTTP {response.status_code}"
+        last = f"{path}: HTTP {status}"
     else:
         raise ChromaStoreError(
-            f"chroma server not answerable at {base} within {timeout_s:g}s ({last})"
+            f"chroma server not answerable at {base} within the initialization deadline ({last})"
         )
     for path in (
         "/api/v2/version",
         "/api/v2/auth/identity",
         "/api/v2/tenants/default_tenant/databases/default_database",
     ):
-        try:
-            httpx.get(f"{base}{path}", timeout=timeout_s)
-        except Exception as exc:
-            raise ChromaStoreError(
-                f"chroma construction endpoint not answering at {base}{path} within "
-                f"{timeout_s:g}s ({type(exc).__name__}: {exc})"
-            ) from exc
+        _bounded_get(f"{base}{path}", deadline)
 
 
-#: How long an endpoint stays refused after a construction that failed to complete within its
-#: deadline. Bounds outstanding construction work across repeated outages (review finding P2).
+#: How long an endpoint stays refused after an initialization that FAILED TO COMPLETE within
+#: its deadline. Combined with the atomic capacity reservation below, this keeps repeated
+#: outages from piling up attempts (review finding P2).
 CHROMA_CONSTRUCTION_COOLDOWN_S = 60.0
+#: Bounded capacity for chromadb initialization in this process. A reservation is taken
+#: ATOMICALLY before a worker starts and released only when the operation actually ends, so
+#: concurrent callers cannot stack constructors against a stalled endpoint.
+CHROMA_INIT_SLOTS = 2
+_CHROMA_INIT_CAPACITY = threading.BoundedSemaphore(CHROMA_INIT_SLOTS)
 _CHROMA_CONSTRUCTION_LOCK = threading.Lock()
 _CHROMA_CONSTRUCTION_REFUSED_UNTIL: dict[tuple[str, int], float] = {}
 
 
-def _construct_chroma_bounded(host: str, port: int, timeout_s: float) -> Any:
-    """Construct the chromadb client under a hard deadline, with a failure cooldown.
+def _initialize_chroma(host: str, port: int, timeout_s: float) -> Any:
+    """Construct the chromadb client under ONE absolute deadline and a bounded reservation.
 
-    The constructor performs network I/O in a session it creates ``timeout=None``; the
-    preflight probes the same endpoints, but construction itself must still be bounded so a
-    server that stalls mid-construction cannot block the caller (review finding P1). The wait
-    runs on a DAEMON thread: on timeout the caller raises, a short cooldown suppresses
-    repeated attempts against the same endpoint, and an abandoned constructor can never block
-    process shutdown. The client is returned only after the constructor completed.
+    The whole initialization — readiness probes AND the constructor's own identity/tenant
+    calls — runs inside a single daemon worker awaited ONCE against ``timeout_s``; the
+    deadline starts before the first probe, so no phase can borrow fresh time (review finding
+    P1). The capacity reservation is acquired atomically BEFORE the worker starts and
+    released only when the operation actually ends — a timed-out caller cannot free capacity
+    that a still-stuck constructor holds, so concurrent and retried calls cannot accumulate
+    constructors (review finding P2). A completed-but-failed initialization releases its slot
+    immediately; only deadline overruns set the cooldown.
     """
     import chromadb
 
@@ -239,33 +274,51 @@ def _construct_chroma_bounded(host: str, port: int, timeout_s: float) -> Any:
     now = time.monotonic()
     if now < until:
         raise ChromaStoreError(
-            f"chromadb client construction suppressed for {until - now:.0f}s more "
-            f"(a recent attempt at {host}:{port} did not complete within {timeout_s:g}s)"
+            f"chromadb initialization suppressed for {until - now:.0f}s more "
+            f"(a recent attempt at {host}:{port} did not complete within its deadline)"
         )
+    if not _CHROMA_INIT_CAPACITY.acquire(blocking=False):
+        raise ChromaStoreError(
+            f"chromadb initialization refused: {CHROMA_INIT_SLOTS} initializations are in "
+            "flight (a stalled endpoint holds this process's capacity)"
+        )
+    # Capture the reservation OBJECT: the worker must release exactly the capacity its
+    # reservation was taken from, even if the module attribute is later replaced (tests).
+    capacity = _CHROMA_INIT_CAPACITY
+    deadline = time.monotonic() + timeout_s
     result: dict[str, Any] = {}
     done = threading.Event()
 
-    def _construct() -> None:
+    def _worker() -> None:
         try:
+            _probe_chroma(str(host), int(port), deadline)
             result["client"] = chromadb.HttpClient(host=str(host), port=int(port))
         except BaseException as exc:  # noqa: BLE001 — delivered to the caller below
             result["error"] = exc
         finally:
             done.set()
+            capacity.release()  # held until the operation ACTUALLY ends
 
-    threading.Thread(target=_construct, name="chroma-construct", daemon=True).start()
+    try:
+        threading.Thread(target=_worker, name="chroma-init", daemon=True).start()
+    except BaseException:
+        capacity.release()
+        raise
     if not done.wait(timeout_s):
         with _CHROMA_CONSTRUCTION_LOCK:
             _CHROMA_CONSTRUCTION_REFUSED_UNTIL[key] = (
                 time.monotonic() + CHROMA_CONSTRUCTION_COOLDOWN_S
             )
         raise ChromaStoreError(
-            f"chromadb client construction exceeded {timeout_s:g}s at {host}:{port} "
-            "(the server stalled during identity/tenant validation)"
+            f"chromadb initialization exceeded {timeout_s:g}s at {host}:{port} "
+            "(the server stalled during the readiness probe or identity/tenant validation)"
         )
-    if "error" in result:
+    error = result.get("error")
+    if error is not None:
+        if isinstance(error, ChromaStoreError):
+            raise error
         raise ChromaStoreError(
-            f"chromadb client construction failed at {host}:{port}: {result['error']!r}"
+            f"chromadb initialization failed at {host}:{port}: {error!r}"
         )
     return result["client"]
 
@@ -319,12 +372,11 @@ class ChromaStore:
             if timeout_s is not None
             else float(os.environ.get(CHROMA_TIMEOUT_ENV, DEFAULT_CHROMA_TIMEOUT_S))
         )
-        # Bounded construction, in order (review fix P1): the readiness gate probes the
-        # constructor's own endpoints with our deadline, then construction itself runs under
-        # a hard deadline, and only then is the shared session's timeout applied for every
-        # subsequent request.
-        _probe_chroma(resolved_host, resolved_port, self.timeout_s)
-        self._client = _construct_chroma_bounded(resolved_host, resolved_port, self.timeout_s)
+        # Bounded initialization, in order (review findings P1/P2): ONE absolute deadline
+        # covers the readiness probes AND the constructor's own I/O, inside a single daemon
+        # worker under an atomic capacity reservation; only then is the shared session's
+        # timeout applied for every subsequent request.
+        self._client = _initialize_chroma(resolved_host, resolved_port, self.timeout_s)
         self.session_bounded = _bound_chroma_session(self._client, self.timeout_s)
         self._embedder = EmbeddingClient()
         # Instance shadow of the class default: ``collection_name`` is the

@@ -38,6 +38,15 @@ def _clean_env(monkeypatch):
     monkeypatch.delenv("CHROMA_PORT", raising=False)
 
 
+@pytest.fixture(autouse=True)
+def _fresh_init_capacity(monkeypatch):
+    """Per-test initialization capacity: a stuck constructor from one test must not leak its
+    reservation into another (the reservation is process-global by design)."""
+    monkeypatch.setattr(
+        emb, "_CHROMA_INIT_CAPACITY", threading.BoundedSemaphore(emb.CHROMA_INIT_SLOTS)
+    )
+
+
 # ── finding 1: endpoint resolution ──────────────────────────────
 
 
@@ -132,7 +141,7 @@ def test_construction_fails_within_deadline_when_identity_stalls():
         server.server_close()
     assert elapsed < 2.0, f"construction took {elapsed:.2f}s against an identity-stalling server"
     message = str(excinfo.value)
-    assert "identity" in message or "construction" in message
+    assert "deadline" in message or "identity" in message or "version" in message
 
 
 def test_bounded_construction_backstop_and_cooldown(monkeypatch):
@@ -157,3 +166,85 @@ def test_bounded_construction_backstop_and_cooldown(monkeypatch):
     assert first < 2.0, f"bounded construction took {first:.2f}s"
     assert second < 0.2, f"a recent construction failure must refuse fast (took {second:.2f}s)"
     assert "suppressed" in str(excinfo.value)
+
+
+# ── review round 2: absolute elapsed deadlines + atomic capacity ─
+
+
+class _SlowStreamHandler(BaseHTTPRequestHandler):
+    """Heartbeat answers instantly; every other path streams one byte every 20 ms."""
+
+    def do_GET(self):  # noqa: N802 — the BaseHTTPRequestHandler contract
+        if "heartbeat" in self.path:
+            body = b'{"nanosecond heartbeat": 1}'
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        self.send_response(200)
+        self.send_header("Content-Length", "1000000")
+        self.end_headers()
+        try:
+            while True:
+                self.wfile.write(b"x")
+                self.wfile.flush()
+                time.sleep(0.02)
+        except Exception:  # client went away / server closed
+            return
+
+    def log_message(self, *args):  # keep test output quiet
+        return
+
+
+def test_slow_streaming_server_is_cut_at_the_deadline():
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _SlowStreamHandler)
+    server.daemon_threads = True
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    port = server.server_port
+    try:
+        started = time.monotonic()
+        with pytest.raises(ChromaStoreError):
+            ChromaStore(host="127.0.0.1", port=port, timeout_s=0.05)
+        elapsed = time.monotonic() - started
+    finally:
+        server.shutdown()
+        server.server_close()
+    # Inactivity timeouts would let the dribble run for seconds; one absolute deadline cuts it.
+    assert elapsed < 0.6, f"slow stream extended initialization to {elapsed:.2f}s"
+
+
+def test_concurrent_initializations_reserve_capacity_atomically(monkeypatch):
+    # The stall is inside CONSTRUCTION (preflight disabled): the reservation must be held by
+    # the stuck constructor, so concurrent callers cannot pile up threads (review finding P2).
+    monkeypatch.setattr(emb, "_probe_chroma", lambda *a, **k: None)
+    server, stop, port = _silent_server()
+    outcomes: list[str] = []
+    base_threads = threading.active_count()
+
+    def attempt() -> None:
+        try:
+            ChromaStore(host="127.0.0.1", port=port, timeout_s=0.3)
+            outcomes.append("constructed")
+        except ChromaStoreError as exc:
+            outcomes.append(str(exc))
+
+    threads = [threading.Thread(target=attempt, daemon=True) for _ in range(12)]
+    started = time.monotonic()
+    try:
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=6)
+        elapsed = time.monotonic() - started
+        growth = threading.active_count() - base_threads
+    finally:
+        stop.set()
+        server.close()
+
+    timeouts = [o for o in outcomes if "exceeded" in o]
+    refusals = [o for o in outcomes if "capacity" in o or "suppressed" in o]
+    assert len(timeouts) == emb.CHROMA_INIT_SLOTS, outcomes
+    assert len(refusals) == 12 - emb.CHROMA_INIT_SLOTS, outcomes
+    assert elapsed < 3.0, f"12 concurrent initializations took {elapsed:.2f}s"
+    assert growth <= emb.CHROMA_INIT_SLOTS + 1, f"{growth} constructor threads accumulated"
