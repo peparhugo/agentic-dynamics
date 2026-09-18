@@ -43,7 +43,7 @@ export function resolveBaseUrl(env: Record<string, string | undefined> = process
 
 export default tool({
   description:
-    "Read-only GET query against the running Control Room portal (apps/control_room/server.py). Base URL: CONTROL_ROOM_URL, else http://$FINOPS_HOST:$FINOPS_PORT (default 127.0.0.1:8000). Requires the portal already running — this tool does not start it.",
+    "Read-only GET query against the running Control Room portal (apps/control_room/server.py). Base URL: CONTROL_ROOM_URL, else http://$FINOPS_HOST:$FINOPS_PORT (default 127.0.0.1:8000). Requires the portal already running — this tool does not start it. NOTE: `status` is a Server-Sent-Events STREAM (it never completes), so a one-shot call to it will hit the request deadline; `glance` is the resting-screen read (the default).",
   args: {
     endpoint: tool.schema
       .enum([
@@ -58,7 +58,10 @@ export default tool({
         "operations",
       ])
       .optional()
-      .default("status"),
+      // The default must be a COMPLETE one-shot read: `status` streams forever, so using it
+      // as the default made every default call die on the request deadline (found live during
+      // the F0 post-restart verification). The resting screen's payload is `glance`.
+      .default("glance"),
   },
   async execute(args) {
     const url = `${resolveBaseUrl()}${ENDPOINTS[args.endpoint]}`
