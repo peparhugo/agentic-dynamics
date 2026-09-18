@@ -2398,6 +2398,12 @@ def _install_commit_msg_hook(wd: Path, phase_name: str, goal: str) -> None:
         "    f.write(expected + (sep + rest if sep else ''))\n"
     )
     try:
+        # A fresh run clone may carry no .git/hooks/ directory at all (the fleet's clones do
+        # not): write_text into the missing directory raised FileNotFoundError, the best-effort
+        # except swallowed it, and the hook silently never installed — the strict gate then
+        # failed a plain-message commit at the finish line (2026-09-18 delivery demo,
+        # run-75e8319533fb). Create the directory the installer writes into.
+        hook.parent.mkdir(parents=True, exist_ok=True)
         hook.write_text(script, encoding="utf-8")
         hook.chmod(0o755)
         prefix_file.write_text(expected, encoding="utf-8")
