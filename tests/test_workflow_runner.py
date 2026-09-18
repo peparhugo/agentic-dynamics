@@ -1,6 +1,7 @@
 """Tests for the execute runner — run_workflow drives agent_task phases in a worktree."""
 
 import json
+import shutil
 import subprocess
 import threading
 import time
@@ -1893,6 +1894,33 @@ def test_commit_msg_hook_prefixes_plain_commits_at_commit_time(tmp_path):
     assert subjects == ["[workflow] scope — g done", "[workflow] scope — g", "Initial"]
 
 
+def test_commit_msg_hook_installs_into_a_clone_without_a_hooks_directory(tmp_path):
+    """The fleet's run clones carry no .git/hooks/ directory; the installer must CREATE it.
+
+    Regression (2026-09-18 delivery demo, run-75e8319533fb): write_text into the missing
+    directory raised FileNotFoundError, swallowed by the best-effort except — the hook never
+    installed, and the strict gate then failed a plain-message commit at the finish line.
+    A delivery run must not die on a missing directory.
+    """
+    from agentic_dynamics.runtime import workflow_runner as wr
+
+    _git_init(tmp_path)
+    shutil.rmtree(tmp_path / ".git" / "hooks", ignore_errors=True)
+    assert not (tmp_path / ".git" / "hooks").exists(), "this test pins the hooks-less shape"
+    wr._install_commit_msg_hook(tmp_path, "generate", "implement taskman")
+    hook = tmp_path / ".git" / "hooks" / "commit-msg"
+    assert hook.exists(), "the installer must create the hooks directory it writes into"
+    assert hook.stat().st_mode & 0o111
+
+    (tmp_path / "f").write_text("x")
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "plain message"], cwd=tmp_path, check=True)
+    subject = subprocess.run(
+        ["git", "log", "-1", "--format=%s"], cwd=tmp_path, capture_output=True, text=True
+    ).stdout.strip()
+    assert subject == "[workflow] generate — implement taskman"
+
+
 def test_commit_prefix_strict_mode_fails_a_plain_message_commit(tmp_path, monkeypatch):
     """FINOPS_COMMIT_GATE=strict restores the fail-with-evidence mode: a plain-message
     commit fails the phase with COMMIT_PREFIX + the subject as evidence."""
@@ -3021,6 +3049,8 @@ def test_git_commit_verbose_names_the_reason(tmp_path):
     assert h and reason == ""
     # a git REFUSAL is named with its detail, never a bare ""
     hook = tmp_path / ".git" / "hooks" / "pre-commit"
+    # Git templates can be empty (this host's are): create the directory the hook lands in.
+    hook.parent.mkdir(parents=True, exist_ok=True)
     hook.write_text("#!/bin/sh\nexit 1\n")
     hook.chmod(0o755)
     (tmp_path / "b.txt").write_text("y")

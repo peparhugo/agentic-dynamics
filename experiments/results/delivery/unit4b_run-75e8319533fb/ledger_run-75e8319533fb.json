@@ -1,0 +1,157 @@
+{
+  "spec_name": "flash_ladder_kb",
+  "spec_id": "flash_ladder_kb@0.1",
+  "workflow_revision_id": "4ac6c3e852349913c84d184cc0f3ae110db9a4554fe8b7079fa353b1d3e027ed",
+  "model": "deepseek/deepseek-v4-flash",
+  "workdir": "/tmp/wt_flash_ladder_kb_e7a0df45",
+  "goal": "Implement a pure-Python, stdlib-only package `taskman` (with `TaskManager`) in this worktree that satisfies the behavioural contract in tests/flash_ladder/taskman_contract_test.py. Do not modify any test file.",
+  "git_sha": "136d1c2fc",
+  "started_at": "2026-09-18T22:16:24.455380+00:00",
+  "ended_at": "2026-09-18T22:18:35.630112+00:00",
+  "awaiting": false,
+  "awaiting_phase": "",
+  "awaiting_reason": "",
+  "already_complete": false,
+  "checkpoints": [],
+  "state": "failed",
+  "attempts": [
+    {
+      "attempt_id": "91492963f979_generate_a1",
+      "job_id": "91492963f979",
+      "phase": "generate",
+      "attempt_number": 1,
+      "parent_attempt_id": null,
+      "retry_reason": "",
+      "first_pass": false,
+      "accepted": false,
+      "escalation_from": null,
+      "escalation_to": null,
+      "model": "deepseek/deepseek-v4-flash",
+      "status": "failed",
+      "cost_usd": 0.00731457,
+      "cost_inference": null,
+      "cost_orchestration": 0.0,
+      "leased_at": "2026-09-18T22:16:24.462973+00:00",
+      "first_token_at": null,
+      "tokens": {
+        "in": 0,
+        "out": 0,
+        "reasoning": 0,
+        "answer": 0,
+        "explanation": 0,
+        "total": 20365
+      },
+      "test_executed_success": null,
+      "evaluator_independent": null,
+      "confidence": 1.0
+    }
+  ],
+  "attempt_count": 1,
+  "total_cost_usd": 0.007315,
+  "ok": false,
+  "phases": [
+    {
+      "phase": "generate",
+      "kind": "agent",
+      "status": "failed",
+      "spec_id": "flash_ladder_kb@0.1",
+      "model": "deepseek/deepseek-v4-flash",
+      "duration_s": 131.14,
+      "timed_out": false,
+      "commit_hash": "",
+      "commit_status": "",
+      "error": "admission: gate disarmed (FINOPS_ADMISSION_REQUIRED unset) \u2014 phases run unleased\ncost: $0.0073  ok: False\ncontrol: child mode \u2014 parent aggregates, child emits nothing\n\nCOMMIT_PREFIX \u2014 commits made during phase 'generate' do not match '[workflow] generate \u2014 Implement a pure-Python, stdlib-only pac': 'flash_ladder taskman: stdlib-only TaskManager passing the behavioral contract' (136d1c2fcc22) (note: the separator is an EM-DASH U+2014 '\u2014', not a hyphen; the resume machinery matches the exact byte pattern)",
+      "tokens": {
+        "in": 0,
+        "out": 0,
+        "reasoning": 0,
+        "answer": 0,
+        "explanation": 0,
+        "total": 20365
+      },
+      "cost_usd": 0.00731457,
+      "cost_inference": null,
+      "cost_orchestration": 0.0,
+      "leased_at": "2026-09-18T22:16:24.462973+00:00",
+      "first_token_at": null,
+      "cost_source": "",
+      "estimation_method": "",
+      "reported_cost_usd": null,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "cache_hit_rate": 0.0,
+      "session_id": "ses_f4967713effewb6VVmYbkp7jUb",
+      "files_created": [
+        ".instrument/session.jsonl",
+        ".opencode/.gitignore",
+        ".opencode/aio-context-events.jsonl",
+        ".opencode/package-lock.json",
+        ".opencode/package.json",
+        ".ruff_cache/.gitignore",
+        ".ruff_cache/0.16.2/13820971850023399794",
+        ".ruff_cache/CACHEDIR.TAG",
+        "taskman/__init__.py",
+        "taskman/manager.py"
+      ],
+      "files_modified": [],
+      "change_detection": "",
+      "change_observation_partial": false,
+      "confidence": 1.0,
+      "attempts": [],
+      "raw_prompt_hash": "sha256:9970585ce71e9ac299cf9e94cccf1281fe905d96c06bae90e5d70234e6c06a7f",
+      "pre_phase_commit": "9da3687ef",
+      "retrieval_attempt_id": "retrieval:7685e7023b1f9234",
+      "constructor_attempt_id": "constructor:237469444aa113f1",
+      "selected_evidence_ids": [
+        "3c4d382ea67744ba4413237f2ca76f019437fece50655e62d3678d14497579e0"
+      ],
+      "augmentation_evidence": [
+        {
+          "id": "3c4d382ea67744ba4413237f2ca76f019437fece50655e62d3678d14497579e0",
+          "revision": "121126dfbcd65a656883e3f3cc81b12e612aeeeb",
+          "source_type": "pattern",
+          "locator": "workload:skill/flash-ladder/taskman#pattern"
+        }
+      ],
+      "retrieval_leg_errors": {
+        "dense": "RuntimeError: dense store construction failed: ModuleNotFoundError: No module named 'chromadb'",
+        "embedding": "embedder unavailable: ModuleNotFoundError: No module named 'ollama'"
+      },
+      "augmentation_versions": {
+        "constructor": "deterministic-fallback"
+      },
+      "augmentation_tokens": {},
+      "augmentation_cost_usd": 0.0,
+      "augmentation_latency_ms": 48279.87,
+      "fallback_mode": "lexical_graph_only",
+      "test_executed_success": null,
+      "evaluator_independent": null,
+      "tests_passed": 0,
+      "tests_total": 0,
+      "change_analysis": null,
+      "stall_evidence": null,
+      "deploy_gate": null,
+      "commit_gate": {
+        "reason": "COMMIT_PREFIX",
+        "subjects": [
+          "flash_ladder taskman: stdlib-only TaskManager passing the behavioral contract"
+        ],
+        "offenders": [
+          {
+            "sha": "136d1c2fcc22c1c1f6767a32fdd4b536325c3a57",
+            "subject": "flash_ladder taskman: stdlib-only TaskManager passing the behavioral contract"
+          }
+        ],
+        "expected_prefix": "[workflow] generate \u2014 Implement a pure-Python, stdlib-only pac"
+      },
+      "relabel_gate": null
+    }
+  ],
+  "run_id": "run-75e8319533fb",
+  "parent_run_id": "",
+  "family_id": "run-75e8319533fb",
+  "resumed_from_run_id": "",
+  "resumed_from_ledger": "",
+  "inherited_phases": [],
+  "unresolved_checkpoints": []
+}
