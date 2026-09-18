@@ -132,6 +132,18 @@
     "decision.receipt": "rcpt",
   };
 
+  //: The run-row band clamp (`data-max-lines`). The band is a WRAPPING container, not a single
+  //: text line, so its clamp is a safety bound rather than the one-line clamp it used to be:
+  //: measured at the live worst case the tallest band renders 5 text lines (mobile). The per-cell
+  //: clamp stays `ROW_FIELD_MAX_LINES`; this one only proves the band cannot run away.
+  var ROW_BAND_MAX_LINES = 8;
+
+  //: The run-row value clamp (`data-max-lines`). Roster values WRAP so they stay readable, so a
+  //: cell may legitimately render up to this many text lines; a long command or identifier breaks
+  //: across lines WHOLE, never with an ellipsis. The band itself is a wrapping container rather
+  //: than a single text line, so the clamp lives on each field (its label shares the first line).
+  var ROW_FIELD_MAX_LINES = 4;
+
   /** The per-viewport at-rest capacities fixed by docs/research/control_room_ia.md §3.2. */
   function capacities() {
     var width = window.innerWidth;
@@ -162,6 +174,10 @@
     field.appendChild(element("span", null, { "data-label": "" }, label));
 
     var valueNode = element("span", null, { "data-value": "" }, value);
+    // Full-text path (CONTENT FIT): whatever a viewport must shorten still exposes its complete
+    // text. `title` covers pointer hover and assistive tech; the run row itself is focusable and
+    // Enter/Space opens the dock, whose address lists the same value in full (the keyboard path).
+    valueNode.setAttribute("title", value === undefined || value === null ? "" : String(value));
     if (opts.identifier) valueNode.setAttribute("data-identifier", "");
     else valueNode.setAttribute("data-no-ellipsis", "");
     if (opts.state) {
@@ -252,6 +268,11 @@
    * prompt glyph, the status rail, the settlement/source chips, the lease bar) are added without
    * touching the gate's 16-field row schema.
    *
+   * CONTENT FIT: each declared band is a WRAPPING flex container, so its cells flow onto extra
+   * sub-lines instead of being squeezed until a value clips mid-token. Every value also carries
+   * its full text as a `title`, and the row is focusable (Enter/Space opens the dock) so the
+   * complete text stays reachable by keyboard even if a future viewport must shorten something.
+   *
    * The density ladder is a presentation difference, never a second information model: on the
    * compact (mobile) view each value carries an explicit semantic mark (`wt:`, `cmd:`, `said:`)
    * so the stranger never reconstructs field meaning from order or colour.
@@ -308,46 +329,53 @@
     });
 
     // ── Line 1 · the session identity band (Move 1) ────────────────────────────────────────
+    // Each band is a WRAPPING container: its cells flow onto extra sub-lines when the row runs
+    // out of width, so a value is never cut. The band keeps `data-row-line` (the gate counts
+    // exactly three declared lines per row) plus a safety `data-max-lines`; the per-value clamp
+    // lives on each field.
     var lineOne = element("div", "row-line session-band",
-      { "data-row-line": "", "data-max-lines": "1", "data-agent": session });
+      { "data-row-line": "", "data-max-lines": String(ROW_BAND_MAX_LINES), "data-agent": session });
     lineOne.appendChild(element("span", "agent-prompt", { "aria-hidden": "true" }, "\u276F"));
     lineOne.appendChild(element("span", "row-status",
       { "data-state": statusState, title: "session state: " + statusState, "aria-hidden": "true" },
       statusGlyph));
     appendField(lineOne, "session.identity", lab("session.identity", "session"), session, {
-      identifier: true, maxLines: 1, title: "agent session",
+      identifier: true, maxLines: ROW_FIELD_MAX_LINES, title: "agent session",
     });
     appendField(lineOne, "terminal.target", lab("terminal.target", "target"),
       compact ? mark("wt", basename(run["terminal.target"])) : run["terminal.target"], {
-        identifier: true, maxLines: 1, title: "terminal target (worktree/host)",
+        identifier: true, maxLines: ROW_FIELD_MAX_LINES,
+        title: "terminal target (worktree/host)",
       });
     appendField(lineOne, "command.current", lab("command.current", "command"),
-      mark("cmd", run["command.current"]), { maxLines: 1 });
+      mark("cmd", run["command.current"]), { maxLines: ROW_FIELD_MAX_LINES });
     appendField(lineOne, "model.provider", lab("model.provider", "model"),
       compact ? mark("mdl", basename(run["model.provider"])) : run["model.provider"], {
-        identifier: true, maxLines: 1,
+        identifier: true, maxLines: ROW_FIELD_MAX_LINES,
       });
     appendField(lineOne, "attempt.number", lab("attempt.number", "attempt"),
-      mark("att", run["attempt.number"]), { maxLines: 1 });
+      mark("att", run["attempt.number"]), { maxLines: ROW_FIELD_MAX_LINES });
 
     // ── Line 2 · lifecycle state + the lease cost pair (Move 6) ────────────────────────────
-    var lineTwo = element("div", "row-line run-state", { "data-row-line": "", "data-max-lines": "1" });
+    var lineTwo = element("div", "row-line run-state",
+      { "data-row-line": "", "data-max-lines": String(ROW_BAND_MAX_LINES) });
     // `spec/cell` names the experiment cell this session belongs to (IA §2 R2 / §10.2): without
     // it the row is a run without its assignment, and the stranger cannot place it in the grid.
     appendField(lineTwo, "spec.cell", lab("spec.cell", "spec"),
-      mark("spec", run["spec.cell"]), { maxLines: 1 });
+      mark("spec", run["spec.cell"]), { maxLines: ROW_FIELD_MAX_LINES });
     appendField(lineTwo, "phase.progress", lab("phase.progress", "phase"),
-      mark("ph", run["phase.progress"]), { maxLines: 1 });
+      mark("ph", run["phase.progress"]), { maxLines: ROW_FIELD_MAX_LINES });
     appendField(lineTwo, "lifecycle.state", lab("lifecycle.state", "lifecycle"),
-      mark("life", lifecycle), { maxLines: 1 });
-    appendField(lineTwo, "run.live", lab("run.live", "live"), mark("live", live), { maxLines: 1 });
+      mark("life", lifecycle), { maxLines: ROW_FIELD_MAX_LINES });
+    appendField(lineTwo, "run.live", lab("run.live", "live"), mark("live", live),
+      { maxLines: ROW_FIELD_MAX_LINES });
     appendField(lineTwo, "source.commit", lab("source.commit", "commit"),
-      mark("cmt", sourceValue), { identifier: true, maxLines: 1 });
+      mark("cmt", sourceValue), { identifier: true, maxLines: ROW_FIELD_MAX_LINES });
     appendField(lineTwo, "cost.provenance", lab("cost.provenance", "cost"), costPair, {
-      maxLines: 1, title: "reserved/cap · " + settlement + " · " + costSource,
+      maxLines: ROW_FIELD_MAX_LINES, title: "reserved/cap · " + settlement + " · " + costSource,
     });
     appendField(lineTwo, "attention.state", lab("attention.state", "attention"),
-      mark("attn", run["attention.state"]), { maxLines: 1 });
+      mark("attn", run["attention.state"]), { maxLines: ROW_FIELD_MAX_LINES });
     // The settlement state and cost_source are non-field chips, so the money meaning travels on
     // the row without widening the required field schema.
     if (!compact) {
@@ -359,21 +387,21 @@
 
     // ── Line 3 · the coupled evidence/decision footer (Move 3, Move 4) ─────────────────────
     var lineThree = element("div", "row-line row-evidence row-decision",
-      { "data-row-line": "", "data-max-lines": "1" });
+      { "data-row-line": "", "data-max-lines": String(ROW_BAND_MAX_LINES) });
     appendField(lineThree, "evidence.advisory", lab("evidence.advisory", "said"),
-      mark("said", advisory), { evidenceClass: "advisory", maxLines: 1 });
+      mark("said", advisory), { evidenceClass: "advisory", maxLines: ROW_FIELD_MAX_LINES });
     appendField(lineThree, "evidence.measured", lab("evidence.measured", "measured"),
-      mark("meas", measured), { evidenceClass: "measured", maxLines: 1 });
+      mark("meas", measured), { evidenceClass: "measured", maxLines: ROW_FIELD_MAX_LINES });
     appendField(lineThree, "evidence.source", lab("evidence.source", "source"),
-      mark("src", sourceValue), { evidenceClass: "source", maxLines: 1 });
+      mark("src", sourceValue), { evidenceClass: "source", maxLines: ROW_FIELD_MAX_LINES });
     appendField(lineThree, "decision.eligibility", lab("decision.eligibility", "eligible"),
-      mark("elig", eligibility), { maxLines: 1 });
+      mark("elig", eligibility), { maxLines: ROW_FIELD_MAX_LINES });
     if (!compact && governed) {
       lineThree.appendChild(element("span", "row-authority",
         { "data-authority": "controller", title: "authority: controller" }, "controller"));
     }
     appendField(lineThree, "decision.receipt", lab("decision.receipt", "receipt"),
-      mark("rcpt", run["decision.receipt"]), { maxLines: 1 });
+      mark("rcpt", run["decision.receipt"]), { maxLines: ROW_FIELD_MAX_LINES });
 
     row.appendChild(lineOne);
     row.appendChild(lineTwo);

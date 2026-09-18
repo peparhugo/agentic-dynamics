@@ -490,26 +490,32 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  /* Fill the region's remaining height and scroll VERTICALLY when the wrapped rows exceed it.
+     The R2 box is a fixed §3.2 budget (the render gate asserts its exact geometry), so the
+     roster — not the page — owns the vertical overflow; content is never clipped away. Vertical
+     scrolling is the re-baselined contract (decision 9f357fce); horizontal overflow remains
+     forbidden, so overflow-x is hidden and the rows below are width-capped at the region edge.
+     ``min-width: 0`` forces the flex child to the container width (a flex child's default
+     min-width would otherwise grow it to the row content and re-overflow the region). */
+  flex: 1 1 auto;
   min-height: 0;
-  /* The region never overflows the page horizontally (the live gate's ia-region-h-scroll
-     refusal): a narrow viewport scrolls the ROSTER inside R2 instead of pushing the row bands
-     past the region edge. ``min-width: 0`` forces the flex child to the container width so
-     its own overflow-x scrolls (a flex child's default min-width would otherwise grow it to
-     the row content and re-overflow the region). */
   min-width: 0;
   max-width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* The run OBJECT. Not a service row: a left status rail, a monospace session identity band, a
    coupled evidence/decision footer, and a lease headroom bar attached along the bottom edge
-   (Move 1, Move 4, Move 6). The bottom padding reserves the strip so the 3 declared row-lines
-   still fit the fixed 88px box the gate measures. */
+   (Move 1, Move 4, Move 6). The three declared row-lines wrap their cells rather than clipping
+   them; the row grows to fit and the roster scrolls vertically inside the fixed region box. */
 .run-row {
   position: relative;
   flex: 0 0 auto;
-  height: 88px;
+  /* The row GROWS to its wrapped content instead of clipping it. The region's fixed budget is
+     honoured by the roster's own vertical scroll (`.run-list`), never by cutting a value; the
+     min-height keeps a sparse row at its canonical density. */
+  min-height: 88px;
   padding: 6px 8px 10px;
   /* A roster entry, not a card: a left status rail and a hairline separator only. The density
      comes from alignment, so removing the box keeps the surface from reading as a card stack
@@ -519,7 +525,7 @@ body {
   border-bottom: 1px solid var(--line);
   border-radius: 0;
   background: transparent;
-  overflow: hidden;
+  overflow: visible;
   cursor: pointer;
 }
 
@@ -533,22 +539,51 @@ body {
 
 .row-line {
   display: flex;
-  flex-wrap: nowrap;
+  /* Cells WRAP into sub-lines when the band runs out of width: a value is never squeezed to the
+     point of clipping. The band keeps its canonical identity as one declared row-line (the gate
+     counts exactly three per row); it is a labelled band, not a single text line. */
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 10px;
+  gap: 2px 10px;
   min-width: 0;
-  height: 24px;
-  overflow: hidden;
+  min-height: 24px;
+  overflow: visible;
 }
 
-.row-line .field { gap: 3px; min-width: 0; overflow: hidden; }
+.row-line .field {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  /* Keep each cell's natural width so wrapping happens BETWEEN cells, never by squeezing a
+     short cell to nothing; a single cell wider than the band is capped and its value wraps. */
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+}
 .row-line .field [data-label] { font-size: 11px; }
-.row-line .field [data-value] { font-size: 13px; }
+.row-line .field [data-value] {
+  font-size: 13px;
+  /* Values wrap whole instead of being cut mid-token; `overflow-wrap: anywhere` covers an
+     unbroken identifier (a commit sha, a worktree name) so it can never overflow the band. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+/* A roster identifier is a value like any other: it wraps and stays complete on screen, and its
+   full text also rides the value's `title` plus the keyboard-reachable run dock. The 22ch
+   middle-elide remains for the other surfaces (attention items), not the run roster. */
+.row-line .field [data-value][data-identifier] {
+  display: inline;
+  max-width: 100%;
+  overflow: visible;
+  text-overflow: clip;
+}
 
 /* Move 1 — the session identity band leads the row: prompt glyph, agent token, worktree target,
    current command, provider×model, attempt. Monospace and heavier than the state lines, so a
    stranger reads "CLI agent session" before reading any label. */
-.session-band { gap: 12px; }
+.session-band { gap: 3px 12px; }
 .session-band .field [data-value] { font-weight: 600; }
 .agent-prompt {
   flex: 0 0 auto;
@@ -1156,8 +1191,8 @@ body {
     --r3ch: 116px;
   }
   .attention-item { height: 52px; }
-  .run-row { height: 84px; padding: 5px 8px 9px; }
-  .run-row .row-line { height: 23px; }
+  .run-row { min-height: 84px; padding: 5px 8px 9px; }
+  .run-row .row-line { min-height: 23px; }
   .run-row .row-lease { bottom: 3px; height: 4px; }
   .region-title { padding-top: 6px; }
   /* Narrow trends lens: one step tighter than desktop, still 2 columns. */
@@ -1201,8 +1236,8 @@ body {
   .r2 .region-title { display: none; }
   .r2-head { height: 32px; padding: 4px 8px 0; }
   .run-list { gap: 0; padding: 4px 8px 4px; }
-  .run-row { height: 80px; padding: 3px 6px 8px; }
-  .row-line { height: 23px; gap: 8px; }
+  .run-row { min-height: 80px; padding: 3px 6px 8px; }
+  .row-line { min-height: 23px; gap: 2px 8px; }
   .row-line .field [data-value] { font-size: 13px; }
   .run-lease { left: 6px; right: 6px; bottom: 3px; height: 4px; }
   /* Mobile is triage: the row shows VALUES (a terminal-style band) and keeps the field labels

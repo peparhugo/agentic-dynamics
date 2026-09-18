@@ -1,0 +1,94 @@
+name: control_room_row_content_fit
+question: >-
+  The Control Room's run rows clip their own values mid-token at 1024x768 and 390x844.
+  Measured live on main 128a08c7e (Playwright, 2026-09-18): the command cell
+  "cmd:control_room_design_determination" needs 290px and is given 99px; the model cell
+  "mdl:deepseek-v4-flash" 164px -> 56px; the target "wt:wt_ui_determination" 172px -> 59px;
+  at 1024x768 the run id gets 8px. None of the clipped values carries a title/aria-label,
+  there is no scrollable region, and body { overflow-y: hidden } — the content is not
+  reachable at all. Make every run-row value fully readable at 1440x900, 1024x768, and
+  390x844 (fit, wrap, or an accessible full-text path), with no horizontal overflow, no new
+  panels, and no change to the room's information architecture.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+comparison: null
+writeup: {format: lab_book, sections: [question, implement, verify]}
+stop: {budget_usd: 2.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    rag_augment: true
+    rag:
+      repository_id: agentic-dynamics
+      acl_scope: public
+      pattern_projection: false
+    context:
+      domain_context: >-
+        canonical_sources: [docs/research/control_room_wireframe.md (E10 run row content +
+        dimensions), docs/research/control_room_state_screens.md (state language),
+        docs/research/control_room_direction.md (restraint budget),
+        apps/control_room/static/app.js (renderRunRow) + style.css + keyed-list.js,
+        apps/control_room/routes/glance.py (the emitted row payload),
+        scripts/verify_control_room_rendering.py, tests/test_admin_frontend.py,
+        tests/test_control_room_glance_integrity.py, tests/test_control_room_static_views.py]
+        policies: [fix the run-row CONTENT FIT only — no new boards, lenses, metrics, or IA
+        changes; run-row values fully readable at 1440x900 + 1024x768 + 390x844; no
+        mid-token clipping unless an accessible full-text path exists (title/aria + a
+        keyboard-reachable disclosure), never a bare clipped string; no horizontal
+        overflow; render only packet-emitted values, never derive a consequential value
+        client-side; an unmeasured value stays a labelled unknown; keep every render-gate
+        fixture and selector working; vanilla JS only, no build step; the tree stays
+        lint-clean (ruff over src/ scripts/ apps/ tests/)]
+        verification: [python3 scripts/verify_control_room_rendering.py --check-fixtures,
+        python3 -m pytest tests/test_admin_frontend.py tests/test_control_room_glance_integrity.py
+        tests/test_control_room_static_views.py tests/test_admin_server.py -q]
+    phases:
+      - name: fit
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 5400
+        prompt: |
+          GOAL: {goal}
+          The Control Room's run rows clip their own values mid-token at 1024x768 and
+          390x844, with no way to read them (no title/aria-label, no scrollable region,
+          body { overflow-y: hidden }). Fix the run-row content fit:
+          - Every run-row value (session id, terminal target, command/spec, model x attempt,
+            phase n/t, lifecycle, claim/evidence, commit, cost provenance, eligibility,
+            receipt) must be READABLE at 1440x900, 1024x768, and 390x844: let cells wrap,
+            restructure the row into labelled lines, and/or drop only the lowest-signal
+            fields — never cut a value mid-token ("unk…", "missin…", "promotab…").
+          - If a value must be shortened, give it an accessible full-text path (title +
+            a keyboard-reachable disclosure) — a bare clipped string is not acceptable.
+          - No horizontal overflow at any of the three viewports; the page's scroll
+            contract stays honored (vertical scrolling where content exceeds the viewport).
+          - Work only in apps/control_room/static/ (plus tests only if a selector pin needs
+            updating). Do not add panels/lenses/metrics, do not change the IA, do not derive
+            consequential values client-side; unmeasured values stay labelled unknowns.
+          - Run the verification commands in context.verification (the render gate's
+            --check-fixtures must PASS; the focused tests must stay green) and commit.
+      - name: verify
+        kind: test
+        scope: implementation
+        timeout: 900
+        tests:
+          - tests/test_admin_frontend.py
+          - tests/test_control_room_glance_integrity.py
+          - tests/test_control_room_static_views.py
+          - tests/test_admin_server.py
+        prompt: |
+          The declared target verifies the row-content-fit slice end to end: fix the code,
+          never weaken a pin. `scripts/verify_control_room_rendering.py --check-fixtures` is
+          the acceptance companion.
