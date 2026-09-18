@@ -64,13 +64,13 @@ def test_glance_surface_is_read_only() -> None:
     assert rules["/api/events"] == {"GET"}
 
 
-def test_client_can_address_typed_objects_from_the_resting_roster() -> None:
-    """The dock is opened from a roster row keyed by its stable `data-run-id` (Move 5)."""
+def test_client_can_address_typed_objects_from_the_restored_roster() -> None:
+    """The run detail is opened from a board row keyed by its stable `data-run-id`; selection
+    survives as an identity — the drawer re-derives its content from the run key."""
     from pathlib import Path
 
     client = (Path(__file__).resolve().parent.parent / "apps" / "control_room" / "static" / "app.js").read_text()
     assert 'data-run-id' in client
-    assert "openDock" in client
-    assert "closeDock" in client
-    # Selection survives as an identity, not a card: the ladder is re-derived from the run key.
-    assert "findRunById" in client
+    assert "openRunDetail" in client
+    assert "closeRunDetail" in client
+    assert "renderRunDetail" in client
