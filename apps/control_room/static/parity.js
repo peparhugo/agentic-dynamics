@@ -1866,16 +1866,24 @@
     // A stable return target: closing (button or Escape) restores focus to the row that opened
     // the drawer, so keyboard navigation never falls back to the document body (main's repair).
     var drawerOrigin = null;
-    function closeRunDetail() {
+    function closeRunDetail(restoreFocus) {
       drawer.hidden = true;
       clear(detailContent);
-      if (drawerOrigin && typeof drawerOrigin.focus === "function") drawerOrigin.focus();
+      // Restore focus to the originating row ONLY for an in-place close (button/Escape).
+      // When the caller is LEAVING the panel (openPanel), the nav button owns focus: moving it
+      // into a panel that is about to be hidden would strand the keyboard on BODY, and Escape
+      // would then hit nothing at all (review finding P3 follow-up).
+      if (restoreFocus !== false && drawerOrigin && typeof drawerOrigin.focus === "function") {
+        if (drawerOrigin.offsetParent || drawerOrigin.getClientRects().length) {
+          drawerOrigin.focus();
+        }
+      }
       drawerOrigin = null;
     }
     dclose.addEventListener("click", closeRunDetail);
     // Register the drawer's closer with the workbench so its Escape handler can be
     // drawer-first even when focus sits on the originating row (outside the drawer).
-    activeRunDetailClose = closeRunDetail;
+    activeRunDetailClose = function (restoreFocus) { closeRunDetail(restoreFocus); };
     function activate(event) {
       var row = event.target.closest("tr[data-run-id]");
       if (!row) return;
@@ -2323,7 +2331,7 @@
       // Leaving Operations abandons its detail view: clear the drawer so a hidden-but-open
       // drawer can never consume Escape or retain stale focus (review finding P3).
       var openDrawer = document.getElementById("run-detail-drawer");
-      if (openDrawer && !openDrawer.hidden) activeRunDetailClose();
+      if (openDrawer && !openDrawer.hidden) activeRunDetailClose(false);
     }
     PANELS.forEach(function (panel) {
       var node = document.getElementById("wb-" + panel.id);
