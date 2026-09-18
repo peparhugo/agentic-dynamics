@@ -295,7 +295,11 @@ def _risk(packet: dict[str, Any] | None) -> dict[str, Any]:
         return {"identity": "unknown", "state": "unknown", "action": "unknown"}
     failed = packet.get("failed_runs", [])
     if failed:
-        return {"identity": str(failed[0].get("run_id", "none")), "state": "active", "action": "inspect"}
+        return {
+            "identity": str(failed[0].get("run_id", "none")),
+            "state": "active",
+            "action": "inspect",
+        }
     return {"identity": "none", "state": "all-clear", "action": "none"}
 
 
@@ -346,13 +350,32 @@ def _token(value: Any) -> str:
     return str(raw)
 
 
+def _resolve_recorded_path(path: str) -> Path:
+    """Resolve a recorded artifact path to THIS host's checkout.
+
+    Runs execute in containers where the repo is mounted at ``/repo``; the ledger pointer they
+    stamp is spelled ``/repo/experiments/...``. The room runs on the host, where the same file
+    lives under the checkout — a raw ``Path(...)`` read therefore failed and every
+    ledger-derived field silently rendered ``unknown`` (the fixed defect). The mapping is
+    explicit: a leading ``/repo/`` resolves against the project root; anything else is used
+    as written.
+    """
+    prefix = "/repo/"
+    if path.startswith(prefix):
+        from agentic_dynamics.core.paths import PROJECT_ROOT  # lazy: see this module's imports
+
+        return PROJECT_ROOT / path[len(prefix) :]
+    return Path(path)
+
+
 def _recorded_ledger(detail: dict[str, Any] | None) -> dict[str, Any] | None:
     """Read the run's recorded ledger artifact, or ``None`` when there is none/unreadable.
 
     The ledger pointer lives on the run row (``ledger_path``, stamped by the CLI's terminal
-    write). It is the run's own artifact and the only place a workspace binding and prose
-    narration are recorded today; a missing or unreadable file stays ``None`` so every field
-    derived from it renders ``unknown`` rather than a fabricated value.
+    write). It is the run's own artifact and the only place a workspace binding, prose
+    narration, and the independent test verdict are recorded today; a missing or unreadable
+    file stays ``None`` so every field derived from it renders ``unknown`` rather than a
+    fabricated value.
     """
     if not detail:
         return None
@@ -360,10 +383,49 @@ def _recorded_ledger(detail: dict[str, Any] | None) -> dict[str, Any] | None:
     if not path:
         return None
     try:
-        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        payload = json.loads(_resolve_recorded_path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
     return payload if isinstance(payload, dict) else None
+
+
+def _cost_provenance(
+    run: dict[str, Any], detail: dict[str, Any] | None, ledger: dict[str, Any] | None
+) -> str:
+    """The run's recorded spend with its provenance, or ``unknown`` — never ``$0.00``.
+
+    The journey needs cost with provenance or an explicit unknown: the recorded total exists
+    in the control row (and the ledger), so it is surfaced with its recorded source when one
+    is stamped. A missing/zero total stays ``unknown`` — an absent measurement is not $0.
+    """
+    total: float | None = None
+    candidates = (
+        ((detail or {}).get("run") or {}).get("cost_usd"),
+        run.get("cost_usd"),
+        (ledger or {}).get("total_cost_usd"),
+    )
+    for candidate in candidates:
+        try:
+            value = float(candidate)
+        except (TypeError, ValueError):
+            continue
+        if value > 0:
+            total = value
+            break
+    if total is None:
+        return "unknown"
+    source = ""
+    for phase in (ledger or {}).get("phases") or []:
+        if isinstance(phase, dict) and str(phase.get("cost_source") or "").strip():
+            source = str(phase["cost_source"]).strip()
+            break
+    if not source:
+        return f"${total:.4f} · recorded"
+    if source.lower() == "unknown":
+        # The amount is recorded while its provenance is not — say exactly that (never drop
+        # the recorded total, never dress the unknown source as a method).
+        return f"${total:.4f} · source unknown"
+    return f"${total:.4f} · {source}"
 
 
 def _attempt_number(detail: dict[str, Any] | None) -> str:
@@ -411,9 +473,7 @@ def _cell_binding(ledger: dict[str, Any] | None) -> str:
     return "unknown"
 
 
-def _narration_state(
-    detail: dict[str, Any] | None, ledger: dict[str, Any] | None
-) -> str:
+def _narration_state(detail: dict[str, Any] | None, ledger: dict[str, Any] | None) -> str:
     """Whether recorded prose narration exists — never claimed without the record."""
     if ledger is None:
         return "narration unknown"
@@ -435,11 +495,12 @@ def _measured_state(detail: dict[str, Any] | None, ledger: dict[str, Any] | None
             if isinstance(phase, dict) and str(phase.get("kind") or "") == "test"
         ]
         if tests:
+            independent = any(phase.get("evaluator_independent") is True for phase in tests)
             outcomes = [phase.get("test_executed_success") for phase in tests]
             if any(outcome is True for outcome in outcomes):
-                return "tests passed"
+                return "independent tests passed" if independent else "tests passed"
             if any(outcome is False for outcome in outcomes):
-                return "tests failed"
+                return "independent tests failed" if independent else "tests failed"
             return "test result pending"
     verdicts = [_token(gate.get("verdict")) for gate in (detail or {}).get("gates") or []]
     if "fail" in verdicts:
@@ -461,18 +522,17 @@ def _receipt_state(detail: dict[str, Any] | None) -> str:
     if detail.get("approvals"):
         return "recorded"
     for command in detail.get("commands") or []:
-        if _token(command.get("state")) == "completed" and str(
-            command.get("receipt_json") or ""
-        ).strip():
+        if (
+            _token(command.get("state")) == "completed"
+            and str(command.get("receipt_json") or "").strip()
+        ):
             return "recorded"
     if detail.get("commands"):
         return "pending"
     return "missing"
 
 
-def _row_events(
-    detail: dict[str, Any] | None, *, limit: int = 8
-) -> list[dict[str, Any]]:
+def _row_events(detail: dict[str, Any] | None, *, limit: int = 8) -> list[dict[str, Any]]:
     """Recorded events for one run — real ids and timestamps, oldest first, bounded.
 
     Every entry is derived from a control record the Operations lens already reads (an attempt,
@@ -532,9 +592,7 @@ def _row_events(
     return events[-limit:] if limit > 0 else events
 
 
-def _run_row(
-    run: dict[str, Any], *, epoch: int, detail: dict[str, Any] | None
-) -> dict[str, Any]:
+def _run_row(run: dict[str, Any], *, epoch: int, detail: dict[str, Any] | None) -> dict[str, Any]:
     """Project one packet run reference + its control records into the 16-field row schema.
 
     Every field the gate requires at rest is present and non-empty. Fields the records answer
@@ -564,7 +622,7 @@ def _run_row(
         "lifecycle.state": state,
         "run.live": "live" if state not in {"failed", "cancelled", "quarantined"} else "not-live",
         "source.commit": sha,
-        "cost.provenance": "unknown",
+        "cost.provenance": _cost_provenance(run, detail, ledger),
         "attention.state": "active" if awaiting else "none",
         "evidence.advisory": _narration_state(detail, ledger),
         "evidence.measured": _measured_state(detail, ledger),
@@ -745,10 +803,7 @@ def _health_signature(payload: dict[str, Any]) -> str:
     """
     system = payload.get("system") or {}
     slice_ = {
-        "states": {
-            name: (dimension or {}).get("state")
-            for name, dimension in system.items()
-        },
+        "states": {name: (dimension or {}).get("state") for name, dimension in system.items()},
         "projection_state": (payload.get("trust") or {}).get("projection_state"),
         "workers_detail": (payload.get("health_detail") or {}).get("workers"),
     }
@@ -785,6 +840,7 @@ def _event_stream(services: ControlRoomServices) -> Iterator[str]:
 
 def register(app: Flask, services: ControlRoomServices) -> None:
     """Register ``GET /api/glance`` and ``GET /api/events`` on the Flask app."""
+
     def api_glance() -> Response:
         """The one resting-screen projection (read-only; never creates the control database)."""
         return jsonify(build_glance(services))

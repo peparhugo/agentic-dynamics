@@ -351,3 +351,62 @@ def test_client_handles_stream_disconnect_and_age() -> None:
         "pollStreamAge",
     ):
         assert anchor in app, anchor
+
+
+# ── the run-journey repairs: ledger resolution + cost/verdict fidelity ─────────────────────
+
+
+def test_recorded_ledger_resolves_the_container_spelled_path(tmp_path, monkeypatch):
+    """The run's ledger pointer is spelled /repo/... (the container mount) while the room runs
+    on the host. Without the mapping, every ledger-derived field silently rendered unknown."""
+    ledger = {"workdir": "/tmp/wt_x", "total_cost_usd": 0.5, "phases": []}
+    target = tmp_path / "experiments" / "results" / "workflows" / "spec" / "run.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(ledger), encoding="utf-8")
+    import agentic_dynamics.core.paths as paths_mod
+
+    monkeypatch.setattr(paths_mod, "PROJECT_ROOT", tmp_path)
+    detail = {"run": {"ledger_path": "/repo/experiments/results/workflows/spec/run.json"}}
+    assert glance._recorded_ledger(detail) == ledger
+    # An unresolvable pointer stays None (unknown), never a fabricated read.
+    assert glance._recorded_ledger({"run": {"ledger_path": "/repo/nope.json"}}) is None
+
+
+def test_cost_provenance_reports_recorded_spend_or_unknown():
+    assert (
+        glance._cost_provenance({}, {"run": {"cost_usd": 0.027517302}}, None)
+        == "$0.0275 · recorded"
+    )
+    assert (
+        glance._cost_provenance(
+            {}, {"run": {"cost_usd": 0.5}}, {"phases": [{"cost_source": "estimated"}]}
+        )
+        == "$0.5000 · estimated"
+    )
+    assert glance._cost_provenance({"cost_usd": 0.25}, None, None) == "$0.2500 · recorded"
+    assert (
+        glance._cost_provenance(
+            {}, {"run": {"cost_usd": 0.25}}, {"phases": [{"cost_source": "unknown"}]}
+        )
+        == "$0.2500 · source unknown"
+    )
+    assert glance._cost_provenance({}, {"run": {"cost_usd": 0.0}}, None) == "unknown"
+    assert glance._cost_provenance({}, None, None) == "unknown"
+
+
+def test_measured_state_names_independent_verification():
+    independent = {
+        "phases": [
+            {"kind": "test", "test_executed_success": True, "evaluator_independent": True}
+        ]
+    }
+    assert glance._measured_state(None, independent) == "independent tests passed"
+    failed = {
+        "phases": [
+            {"kind": "test", "test_executed_success": False, "evaluator_independent": True}
+        ]
+    }
+    assert glance._measured_state(None, failed) == "independent tests failed"
+    participant = {"phases": [{"kind": "test", "test_executed_success": True}]}
+    assert glance._measured_state(None, participant) == "tests passed"
+    assert glance._measured_state(None, {"phases": []}) == "no test recorded"
