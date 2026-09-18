@@ -357,6 +357,20 @@ def build_handler(group: str, r: redis.Redis):
         return handler
 
     if group == "kb-chroma-v1":
+        # ONE store per worker process (2026-09-18 stall diagnosis): a ChromaStore constructed
+        # per record leaked its HTTP session with the record — 1,018 sockets in CLOSE-WAIT to
+        # chroma:8100 and the process at its 1024-FD limit, after which every artifact read
+        # dead-lettered ("Too many open files") and the watermark DB could not open ("unable to
+        # open database file"), so the projection's REPORTING froze while the stream itself was
+        # acked. The store is a long-lived handle; build it once and reuse it.
+        _stores: list[object] = []
+
+        def _chroma_store():
+            if not _stores:
+                from agentic_dynamics.knowledge.embeddings import ChromaStore
+
+                _stores.append(ChromaStore(collection_name="knowledge_chunks_v1"))
+            return _stores[0]
 
         def handler(record):
             # Facts are resolved by ADDRESS, never by relevance (CAP design §3.3): the dense leg
@@ -365,9 +379,7 @@ def build_handler(group: str, r: redis.Redis):
             # structural, not a convention.
             if record.source_type == "fact":
                 return
-            from agentic_dynamics.knowledge.embeddings import ChromaStore
-
-            store = ChromaStore(collection_name="knowledge_chunks_v1")
+            store = _chroma_store()
             store.upsert(
                 [record.knowledge_id],
                 [record.text],

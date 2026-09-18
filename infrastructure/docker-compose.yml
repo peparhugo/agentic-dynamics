@@ -21,16 +21,36 @@ services:
     image: chromadb/chroma:1.0.13
     container_name: chromadb
     restart: unless-stopped
+    # Endpoint contract (2026-09-18 review): clients resolve localhost:8100 (CHROMA_PORT in
+    # the kb-chroma unit; resolve_chroma_endpoint's host default). The host publishes 8100;
+    # the container keeps answering on its internal 8000.
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8100:8000"
     environment:
       - CHROMA_SERVER_HOST=0.0.0.0
       - CHROMA_SERVER_HTTP_PORT=8000
-      - IS_PERSISTENT=TRUE
-      - PERSIST_DIRECTORY=/chroma/chroma
+      # The image's entrypoint runs `chroma run /config.yaml`, and the baked config's
+      # persist_path is /data — PERSIST_DIRECTORY above is inert (kept for reference only).
+      # The volume therefore mounts the ACTUAL persist path: previously it mounted
+      # /chroma/chroma (empty) while 51M of live index sat in the container layer, so every
+      # container recreation silently lost the dense index (the recurring-stall aftermath).
       - ANONYMIZED_TELEMETRY=False
     volumes:
-      - chroma_data:/chroma/chroma
+      - chroma_data:/data
+    # No healthcheck existed: a wedged server looked identical to a busy one. The heartbeat
+    # endpoint is cheap and version-stable.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v2/heartbeat', timeout=3)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     networks:
       - ai-infra
 
