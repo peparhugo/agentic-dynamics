@@ -231,6 +231,13 @@ def build_launch_argv(
     """
     mounts = mounts if mounts is not None else []
     argv = [docker, "run", "--rm", "-i"]
+    # The cell must START IN the mounted repo view. Without this it inherits the image's
+    # WORKDIR (/app) and the relative command ("python3 scripts/run_workflow.py ...") executes
+    # the IMAGE'S BAKED COPY of the code, not the run clone's — proven by the 2026-09-18
+    # delivery run: the cell emitted engine-path messages that the clone's prepared-child
+    # implementation cannot produce, and the image's mid-evolution copy still wrapped the
+    # phase in the engine. Working dir = the fixed repo target every mount profile provides.
+    argv += ["-w", REPO_TARGET]
     for m in mounts:
         source = str((m or {}).get("source", ""))
         target = str((m or {}).get("target", ""))

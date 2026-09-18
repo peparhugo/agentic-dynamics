@@ -341,6 +341,10 @@ def test_broker_launch_argv_carries_mounts_network_env():
     assert "/tmp:rw" in joined  # the worktree mount, rw
     assert "/repo:ro" in joined  # the repo mount, ro
     assert "FINOPS_KB_WRITE=1" in joined  # the implementation scope's write flag
+    assert argv[argv.index("-w") + 1] == "/repo", (
+        "the cell must start in the mounted repo view — otherwise the relative command runs "
+        "the image's baked code, not the clone's (2026-09-18 delivery run)"
+    )
     assert argv[-2:] == ["echo", "hi"]
 
 
