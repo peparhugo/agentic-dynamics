@@ -126,6 +126,8 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     (("session", "close"), "session_close.py", ()),
     (("session", "open"), "session_open.py", ()),
     (("session", "budget"), "session_budget.py", ()),
+    # cache accounting (2026-09-17 repair): the delivery-journal ↔ session-DB join.
+    (("session", "cache-report"), "session_cache_report.py", ()),
     # decision — the self-knowledge layer: `record` (s2a) records a decision at the moment of
     # decision (what/why/alternatives/category) via the s2a decision record type.
     (("decision", "record"), "decision_record.py", ()),

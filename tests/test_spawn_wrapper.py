@@ -1933,7 +1933,11 @@ def _aio_block(**overrides) -> dict:
 
 
 def _bound_store(store, *, project: str = "") -> str:
-    """A tmp binding store with ONE real binding; returns its durable record id."""
+    """A tmp binding store with ONE real binding; returns its AUTHORIZATION identity.
+
+    The exec gate checks the binding's authorization identity (round-9): stable across
+    routine progress recording, advanced only by task-definition changes.
+    """
     from agentic_dynamics.knowledge import session_ingestion as si
 
     si.init_binding_store(store)
@@ -1949,7 +1953,8 @@ def _bound_store(store, *, project: str = "") -> str:
         publish=False,
     )
     assert result.status == si.BINDING_STATUS_CREATED
-    return result.knowledge_id
+    binding = si.read_binding("ses_aio", artifact_dir=store).binding or {}
+    return si.binding_authorization_id(binding)
 
 
 @pytest.fixture
@@ -1997,7 +2002,7 @@ def test_an_aio_submit_without_a_binding_is_refused(aio_env):
 def test_a_foreign_binding_id_is_refused(aio_env):
     _bound_store(aio_env)
     errors = validate_submit_request(_aio_request(aio=_aio_block(binding_id="f" * 64)))
-    assert any("does not match the durable binding record" in e for e in errors)
+    assert any("does not match the binding's authorization identity" in e for e in errors)
 
 
 def test_a_mismatched_agent_is_refused(aio_env):
@@ -2009,6 +2014,8 @@ def test_a_mismatched_agent_is_refused(aio_env):
 
 
 def test_a_stale_task_revision_is_refused_and_the_current_one_passes(aio_env):
+    """A GENUINE task change advances the authorization epoch: commands minted against the
+    old definition are refused; the current authorization passes."""
     from agentic_dynamics.knowledge import session_ingestion as si
 
     _bound_store(aio_env)
@@ -2016,14 +2023,37 @@ def test_a_stale_task_revision_is_refused_and_the_current_one_passes(aio_env):
         "ses_aio", context={"work_unit": "v2"}, expected_version=1,
         artifact_dir=aio_env, publish=False,
     )
+    binding = updated.binding or {}
+    auth_id = si.binding_authorization_id(binding)
+    assert si.binding_authorization_version(binding) == 2
     stale = validate_submit_request(
-        _aio_request(aio=_aio_block(binding_id=updated.knowledge_id, task_revision=1))
+        _aio_request(aio=_aio_block(binding_id=auth_id, task_revision=1))
     )
     assert any("stale task revision" in e for e in stale)
     current = validate_submit_request(
-        _aio_request(aio=_aio_block(binding_id=updated.knowledge_id, task_revision=2))
+        _aio_request(aio=_aio_block(binding_id=auth_id, task_revision=2))
     )
     assert current == []
+
+
+def test_progress_recording_does_not_advance_the_authorization(aio_env):
+    """Round-9: routine progress (next_action) preserves the authorization — a command
+    minted before the recording still passes AFTER it (the coupling defect's unit form)."""
+    from agentic_dynamics.knowledge import session_ingestion as si
+
+    auth_id = _bound_store(aio_env)
+    updated = si.update_binding_context(
+        "ses_aio", context={"next_action": "observe job X"}, expected_version=1,
+        artifact_dir=aio_env, publish=False,
+    )
+    binding = updated.binding or {}
+    assert si.binding_authorization_id(binding) == auth_id  # stable
+    assert si.binding_authorization_version(binding) == 1  # epoch unchanged
+    assert int(binding.get("context_version") or 0) == 2  # the progress counter advanced
+    errors = validate_submit_request(
+        _aio_request(aio=_aio_block(binding_id=auth_id, task_revision=1))
+    )
+    assert errors == []
 
 
 def test_capacity_verdicts_are_advisory_at_the_gate(aio_env, monkeypatch):
@@ -2242,7 +2272,7 @@ def test_the_capacity_reading_never_becomes_an_authorization_failure(tmp_path, m
     assert validate_submit_request(request) == []
     broken = {**request, "aio": {**_aio_block(binding_id="f" * 64)}}
     errors = validate_submit_request(broken)
-    assert any("does not match the durable binding record" in e for e in errors)
+    assert any("does not match the binding's authorization identity" in e for e in errors)
 
 
 def test_validate_submit_cli_reports_capacity_as_advisory(tmp_path, monkeypatch, capsys):

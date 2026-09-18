@@ -850,6 +850,65 @@ def _request_entry_lookup(client: redis.Redis, key: str) -> tuple[bool, dict | N
     return True, entry if isinstance(entry, dict) else None
 
 
+def _record_submission_in_task(*, aio: dict | None, job: dict, spec: str, workdir: str) -> str:
+    """Record a submission into the AIO's durable task state; return a note ('' when clean).
+
+    Unit 3 (recording accompanies the work, 2026-09-16): after a durable submit, the pending
+    job identity and the ONE next legitimate action go into the EXISTING binding — never a
+    new record family, never a second task ledger. The write is VERSION-GUARDED with the
+    revision the submit gate carried, so a stale session can never overwrite newer task
+    state; a conflict or an unavailable store is REPORTED without failing the submission
+    (the job itself is already durable on the board — this note is the continuation glue).
+    The note is labeled ``[auto]``: a deterministic system records WHAT happened; it never
+    manufactures why.
+    """
+    if not aio or not str(aio.get("native_session_id") or "").strip():
+        return ""
+    # The recording write's guard is the binding's CONTEXT version at gate-read time (the
+    # optimistic-concurrency token), never the authorization epoch: a stale session still
+    # cannot overwrite newer task state, while the authorization checks stay untouched.
+    try:
+        expected_version = int(aio.get("context_version"))
+    except (TypeError, ValueError):
+        return "task state not updated (the submit carried no binding context version)"
+    job_id = str(job.get("job_id") or "")
+    reconciled = bool(job.get("reconciled"))
+    key = str(job.get("request_key") or "")
+    status = str(job.get("status") or ("unknown" if reconciled else "launching"))
+    if reconciled:
+        action = (
+            f"[auto] reconciled to job {job_id} (status {status}) for spec {spec} in "
+            f"{workdir} — observe it under the same identity (control packet active_runs / "
+            f"the Control Room); request key {key} reused verbatim on any retry."
+        )
+    else:
+        action = (
+            f"[auto] submitted job {job_id} for spec {spec} in {workdir} — a queued submit "
+            f"is not a running run: verify its run row in the control packet (active_runs) "
+            f"before treating the build as started; request key {key} reused verbatim on "
+            f"any retry."
+        )
+    try:
+        from agentic_dynamics.knowledge import session_ingestion as si
+    except ImportError as exc:
+        return f"task state not updated (session_ingestion unavailable: {exc})"
+    explicit = os.environ.get("FINOPS_KB_ARTIFACT_DIR", "").strip()
+    artifact_dir = Path(explicit).expanduser() if explicit else None
+    try:
+        result = si.update_binding_context(
+            str(aio["native_session_id"]).strip(),
+            context={"next_action": action},
+            expected_version=expected_version,
+            artifact_dir=artifact_dir,
+        )
+    except Exception as exc:  # noqa: BLE001 — reported, never fatal (see the docstring)
+        return f"task state not updated ({type(exc).__name__}: {exc})"
+    status_value = str(getattr(result, "status", "") or "")
+    if status_value == si.BINDING_STATUS_UPDATED:
+        return ""
+    return f"task state not updated (status {status_value or 'unknown'})"
+
+
 def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: str,
                          workdir: str, image: str | None = None,
                          spec_sha256: str | None = None,
@@ -1083,8 +1142,12 @@ def main(argv: list[str] | None = None) -> int:
     p_submit.add_argument("--binding-id", default=None,
                           help="the durable AIO binding record id (validated against the store)")
     p_submit.add_argument("--task-revision", type=int, default=None,
-                          help="the binding's task/acceptance context version (stale revisions "
-                               "are refused)")
+                          help="the binding's AUTHORIZATION epoch (stale task definitions are "
+                               "refused; routine progress recording never advances it)")
+    p_submit.add_argument("--binding-context-version", type=int, default=None,
+                          help="the binding's context version at gate-read time: the optimistic "
+                               "guard for the optional task-state recording (a stale session's "
+                               "recording is refused)")
     p_submit.add_argument("--request-key", default=None,
                           help="a caller-stable request key: a retry with the SAME key "
                                "reconciles to the existing job instead of minting a second one "
@@ -1182,6 +1245,8 @@ def main(argv: list[str] | None = None) -> int:
                 "binding_id": args.binding_id or "",
                 "task_revision": args.task_revision,
             }
+            if args.binding_context_version is not None:
+                aio["context_version"] = args.binding_context_version
         # The workspace preparation path (Unit 2): an omitted --workdir is resolved here —
         # never a caller obligation to assemble one by hand.
         workdir = str(args.workdir or "").strip()
@@ -1243,6 +1308,13 @@ def main(argv: list[str] | None = None) -> int:
         except (RequestKeyConflictError, RequestKeyUnresolvedError) as exc:
             print(f"fleet:submit refused: {exc}", file=sys.stderr)
             return 2
+        # Unit 3 (2026-09-16): recording accompanies the work — routine bookkeeping at the
+        # action boundary. The submission is recorded into the AIO's EXISTING durable task
+        # state (version-guarded; best-effort with a REPORTED note, never silent, never
+        # fatal — the job itself is already durable on the board).
+        task_note = _record_submission_in_task(
+            aio=aio, job=cmd, spec=args.spec, workdir=workdir,
+        )
         if args.json:
             # The structured result (fleet-submit/v1): job identity, state, resolved
             # source/spec, request identity, and the prep note — machine-first, so no caller
@@ -1262,10 +1334,13 @@ def main(argv: list[str] | None = None) -> int:
                 "resume": bool(args.resume),
                 "parent_run_id": args.parent_run_id or "",
                 "prep_note": prep_note,
+                "task_note": task_note,
             }))
             return 0
         if prep_note:
             print(f"fleet:prep {prep_note}")
+        if task_note:
+            print(f"fleet:task {task_note}")
         if cmd.get("reconciled"):
             # A keyed retry: NOTHING was queued — the existing job is the submission. The
             # echoed line keeps the tool's ``fleet:jobs[<id>]`` parse working under the same
