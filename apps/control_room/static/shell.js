@@ -14,12 +14,14 @@
  * Everything here maps to a numbered design section, cited inline.
  *
  * Public surface (window.ControlRoomShell):
- *   showBoard(name)   — activate one of the five destinations           [design §1.2]
- *   openSystem()      — open the System overflow sheet                  [design §7.2]
- *   closeSystem()     — close it (Escape, scrim, close button)
- *   setTheme(name)    — "dark" | "light", persisted                     [design §8.1]
- *   setDensity(name)  — "comfortable" | "compact", persisted            [design §2.3]
- *   BOARDS            — the destination names, in nav order
+ *   showBoard(name)      — activate one of the seven destinations       [design §1.2]
+ *   initializeBoard()    — run the active board's first-visit load once
+ *                          the data layer's handlers exist             [design §7.1]
+ *   openSystem()         — open the System overflow sheet               [design §7.2]
+ *   closeSystem()        — close it (Escape, scrim, close button)
+ *   setTheme(name)       — "dark" | "light", persisted                  [design §8.1]
+ *   setDensity(name)     — "comfortable" | "compact", persisted         [design §2.3]
+ *   BOARDS               — the destination names, in nav order
  */
 (function initControlRoomShell(root, core) {
   /** The seven destinations, in nav order. System is an overflow, not a destination (§1.2). */
@@ -134,6 +136,20 @@
     const refresh = $(selector)
     const content = $(`#${board}-content`)
     if (refresh && content && content.dataset.loaded !== "true") refresh.click()
+  }
+
+  /** Run the active board's first-visit load now that the data handlers exist.
+   *
+   *  boot() necessarily runs before app.js — chrome has to be interactive during the first
+   *  poll, and orientation (board/theme/density) must survive a reload — but a board's load
+   *  control is OWNED by app.js: at boot the shell's automatic click lands before the
+   *  listener is registered, and nothing retried. A reload on Operations/Surfaces/Routing
+   *  therefore restored the board with its "Open this board…" empty state until the operator
+   *  navigated away and back (the 2026-09-18 review's zero-load reproduction). app.js calls
+   *  this once, after it has bound the board controls; a board already loaded is not clicked
+   *  again (autoLoadBoard is idempotent by its own guards). */
+  function initializeBoard() {
+    autoLoadBoard(document.body.dataset.board || readStored(BOARD_KEY) || "fleet")
   }
 
   /** Activate one destination; unknown names fall back to the home board. */
@@ -406,7 +422,9 @@
 
   /* ── Boot ─────────────────────────────────────────────────────────────────────────────────
      Runs before app.js so the chrome is interactive during the first poll. Restores the
-     operator's last board, theme, and density — orientation survives a reload. */
+     operator's last board, theme, and density — orientation survives a reload. The restored
+     board's first-visit LOAD is app.js's to run, so it is not triggered here: app.js calls
+     initializeBoard() once it has bound the board controls. */
 
   function boot() {
     bindShell()
@@ -421,6 +439,7 @@
   const shell = {
     BOARDS,
     showBoard,
+    initializeBoard,
     openSystem,
     closeSystem,
     setTheme,
