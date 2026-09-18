@@ -436,11 +436,35 @@ def _cost_provenance(
             total = value
             break
     if total is None:
-        if sources:
-            # A recognized source makes the aggregate measurable — including a recorded zero.
-            total = 0.0
+        # A provenance LABEL cannot establish an amount. Accept a zero only when it is
+        # EXPLICITLY recorded as the run total (the key is present and numeric), or when a
+        # COMPLETE aggregate is derivable — every phase carries a numeric cost. Otherwise the
+        # amount is unknown, never an invented $0.00 (review finding P2, second correction).
+        recorded_total = None
+        if isinstance(ledger, dict) and ledger.get("total_cost_usd") is not None:
+            try:
+                recorded_total = float(ledger["total_cost_usd"])
+            except (TypeError, ValueError):
+                recorded_total = None
+        if recorded_total is not None and recorded_total >= 0:
+            total = recorded_total
         else:
-            return "unknown"
+            amounts = []
+            complete = bool(phases)
+            for phase in phases:
+                raw = phase.get("cost_usd")
+                if raw is None:
+                    complete = False
+                    break
+                try:
+                    amounts.append(float(raw))
+                except (TypeError, ValueError):
+                    complete = False
+                    break
+            if complete:
+                total = sum(amounts)
+            else:
+                return "unknown"
 
     if contributors:
         known = [source for source in contributors if source in _TRUSTED_COST_SOURCES]

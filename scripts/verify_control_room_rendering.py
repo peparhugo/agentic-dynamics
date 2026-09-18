@@ -2000,9 +2000,11 @@ def run_acceptance_interactions(
                 if run_rows.count():
                     origin = run_rows.first.get_attribute("data-run-id") or ""
                     finder = page.locator("#operations-run-finder")
+                    saved_filter = ""
                     if finder.count():
                         finder.fill(origin)
                         page.wait_for_timeout(250)
+                        saved_filter = finder.input_value()
                     run_rows.first.click()
                     page.wait_for_timeout(600)
                     if page.locator("#run-detail-drawer:not([hidden])").count():
@@ -2024,10 +2026,11 @@ def run_acceptance_interactions(
                                 f"drawer and keep the workbench open (drawerOpen="
                                 f"{state['drawerOpen']}, workbenchOpen={state['workbenchOpen']})"
                             )
-                        if finder.count() and finder.input_value() != state["filter"]:
+                        if finder.count() and saved_filter != state["filter"]:
                             errors.append(
                                 "interactions: the run finder's value was lost on the "
-                                "drawer-first Escape"
+                                f"drawer-first Escape (was {saved_filter!r}, now "
+                                f"{state['filter']!r})"
                             )
                         if origin and state["focus"] != origin:
                             errors.append(

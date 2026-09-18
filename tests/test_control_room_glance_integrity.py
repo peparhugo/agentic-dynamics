@@ -416,6 +416,33 @@ def test_cost_provenance_reports_the_aggregate_label_or_unknown():
     # Absence stays unknown: no amount, no recognized source.
     assert glance._cost_provenance({}, {"run": {"cost_usd": 0.0}}, None) == "unknown"
     assert glance._cost_provenance({}, None, None) == "unknown"
+    # A provenance LABEL alone never establishes an amount (review finding P2 repro 1):
+    # no aggregate, a phase carrying only a source -> unknown, never $0.0000.
+    assert (
+        glance._cost_provenance(
+            {}, {"run": {"cost_usd": 0.0}}, {"phases": [{"cost_source": "metered"}]}
+        )
+        == "unknown"
+    )
+    # A COMPLETE aggregate is derivable from the phase amounts (review finding P2 repro 2):
+    # no top-level total, one phase recording $3.50 metered -> $3.5000 · metered.
+    assert (
+        glance._cost_provenance(
+            {},
+            {"run": {"cost_usd": 0.0}},
+            {"phases": [{"cost_usd": 3.50, "cost_source": "metered"}]},
+        )
+        == "$3.5000 · metered"
+    )
+    # An INCOMPLETE aggregate (a phase without a recorded amount) stays unknown.
+    assert (
+        glance._cost_provenance(
+            {},
+            {"run": {"cost_usd": 0.0}},
+            {"phases": [{"cost_usd": 3.50, "cost_source": "metered"}, {"kind": "test"}]},
+        )
+        == "unknown"
+    )
 
 
 def test_measured_state_names_independent_verification():
