@@ -64,7 +64,12 @@ export default tool({
       .default("glance"),
   },
   async execute(args) {
-    const url = `${resolveBaseUrl()}${ENDPOINTS[args.endpoint]}`
+    // RUNTIME fallback (review finding P2): the OpenCode 1.18.15 custom-tool path validates
+    // with the schema but forwards the ORIGINAL arguments — Zod's parsed/defaulted result is
+    // discarded — so a schema-level `.default()` never reaches execute and `{}` would build
+    // `...undefined`. Resolve the default HERE and use the resolved value everywhere.
+    const endpoint = args.endpoint ?? "glance"
+    const url = `${resolveBaseUrl()}${ENDPOINTS[endpoint]}`
 
     let res: Response
     let text: string
@@ -85,7 +90,7 @@ export default tool({
             : String(e)
       return {
         output: `Control Room portal unavailable at ${url}: ${reason}. Start it with: python3 apps/control_room/server.py`,
-        metadata: { endpoint: args.endpoint, url, outcome: "unavailable" },
+        metadata: { endpoint, url, outcome: "unavailable" },
       }
     }
 
@@ -93,13 +98,13 @@ export default tool({
       // Non-success response: the HTTP status is the answer; the body is passed through.
       return {
         output: text || `Control Room request failed (HTTP ${res.status})`,
-        metadata: { endpoint: args.endpoint, url, status: res.status, outcome: "non-success" },
+        metadata: { endpoint, url, status: res.status, outcome: "non-success" },
       }
     }
 
     return {
       output: text,
-      metadata: { endpoint: args.endpoint, url, timestamp: new Date().toISOString(), outcome: "ok" },
+      metadata: { endpoint, url, timestamp: new Date().toISOString(), outcome: "ok" },
     }
   },
 })
