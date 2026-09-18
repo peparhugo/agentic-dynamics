@@ -293,6 +293,10 @@ class PhaseResult:
     retrieval_attempt_id: str = ""
     constructor_attempt_id: str = ""
     selected_evidence_ids: list[str] = field(default_factory=list)
+    #: ADDED key (delivery-simplification Unit 4B): per-evidence provenance for the selected
+    #: set — [{"id","revision","source_type","locator"}]. IDs alone cannot distinguish
+    #: revisions; this rides the existing run result (no new dashboard). Old ledgers lack it.
+    augmentation_evidence: list[dict[str, str]] = field(default_factory=list)
     augmentation_versions: dict[str, str] = field(default_factory=dict)
     augmentation_tokens: dict[str, int] = field(default_factory=dict)
     augmentation_cost_usd: float = 0.0
@@ -375,6 +379,7 @@ class PhaseResult:
             "retrieval_attempt_id": self.retrieval_attempt_id,
             "constructor_attempt_id": self.constructor_attempt_id,
             "selected_evidence_ids": self.selected_evidence_ids,
+            "augmentation_evidence": self.augmentation_evidence,
             "augmentation_versions": self.augmentation_versions,
             "augmentation_tokens": self.augmentation_tokens,
             "augmentation_cost_usd": self.augmentation_cost_usd,
@@ -4272,6 +4277,7 @@ def run_workflow(
                         pr.retrieval_attempt_id = outcome.retrieval_attempt_id
                         pr.constructor_attempt_id = outcome.constructor_attempt_id
                         pr.selected_evidence_ids = outcome.selected_evidence_ids
+                        pr.augmentation_evidence = outcome.selected_evidence
                         pr.augmentation_versions = outcome.versions
                         pr.augmentation_tokens = outcome.token_counts
                         pr.augmentation_cost_usd = outcome.cost_usd

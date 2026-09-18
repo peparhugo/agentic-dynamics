@@ -63,6 +63,10 @@ class AugmentationOutcome:
     retrieval_attempt_id: str = ""
     constructor_attempt_id: str = ""
     selected_evidence_ids: list[str] = field(default_factory=list)
+    #: Per-evidence provenance for the selected set — [{"id","revision","source_type",
+    #: "locator"}]. The IDs alone cannot distinguish source revisions; this rides the
+    #: existing run result (no new dashboard).
+    selected_evidence: list[dict[str, str]] = field(default_factory=list)
     versions: dict[str, str] = field(default_factory=dict)
     token_counts: dict[str, int] = field(default_factory=dict)
     cost_usd: float = 0.0
@@ -193,6 +197,15 @@ def augment_prompt(
             augmented, "constructor_attempt_id", ""
         ) or _attempt_id("constructor", base_prompt, commit_sha, constructor_model)
         outcome.selected_evidence_ids = list(getattr(augmented, "evidence_ids", []) or [])
+        outcome.selected_evidence = [
+            {
+                "id": str(getattr(c, "id", "") or ""),
+                "revision": str(getattr(c, "commit_sha", "") or ""),
+                "source_type": str(getattr(c, "source_type", "") or ""),
+                "locator": str(getattr(c, "locator", "") or ""),
+            }
+            for c in (getattr(attempt, "selected_evidence", []) or [])
+        ]
         outcome.versions = dict(getattr(augmented, "versions", {}) or {})
         outcome.token_counts = dict(getattr(augmented, "token_counts", {}) or {})
         outcome.cost_usd = float(getattr(augmented, "cost_usd", 0.0) or 0.0)
