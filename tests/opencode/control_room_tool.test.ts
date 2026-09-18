@@ -52,6 +52,11 @@ test("resolveBaseUrl: compatible loopback default", () => {
 })
 
 test("execute: unavailable service is a precise bounded failure, never fabricated data", async () => {
+  // Hermetic: the host tool env now legitimately carries CONTROL_ROOM_URL (the F0 drop-in),
+  // so this case must clear it explicitly rather than assume an ambient-free environment.
+  delete process.env.CONTROL_ROOM_URL
+  delete process.env.FINOPS_HOST
+  delete process.env.FINOPS_PORT
   globalThis.fetch = (async () => {
     const err = new Error("connection refused")
     err.name = "TimeoutError"
@@ -117,6 +122,27 @@ test("execute: valid data passes through from the configured base URL", async ()
   expect(seen).toBe("http://100.83.229.3:8001/api/status")
   expect(result.metadata.outcome).toBe("ok")
   expect(JSON.parse(result.output)).toEqual({ ok: true })
+})
+
+test("execute: an omitted endpoint resolves to glance at RUNTIME (schema defaults do not reach execute)", async () => {
+  // Regression (review finding P2): OpenCode 1.18.15 forwards the ORIGINAL arguments, so the
+  // schema `.default()` never arrives; `{}` must still build a real URL, not `...undefined`.
+  delete process.env.CONTROL_ROOM_URL
+  delete process.env.FINOPS_HOST
+  delete process.env.FINOPS_PORT
+  let seen = ""
+  globalThis.fetch = (async (input: unknown) => {
+    seen = String(input)
+    return new Response('{"run_sample":[]}', { status: 200 })
+  }) as unknown as typeof fetch
+
+  const result = (await toolDef.execute({})) as {
+    output: string
+    metadata: Record<string, unknown>
+  }
+  expect(seen).toBe("http://127.0.0.1:8000/api/glance")
+  expect(result.metadata.endpoint).toBe("glance")
+  expect(result.metadata.outcome).toBe("ok")
 })
 
 test("execute: the new read-only selectors exist and stay GET-only paths", async () => {
