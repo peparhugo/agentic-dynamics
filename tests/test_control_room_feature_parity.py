@@ -68,26 +68,24 @@ def _missing(source: str, anchors: tuple[str, ...]) -> list[str]:
 # ── Controls: the refreshed presentation itself must still be present ─────────────────────────
 
 
-def test_refreshed_workbench_rehouses_both_read_lenses() -> None:
-    """The refresh's own lens homes survive (so a failure below is a lost feature, not a move)."""
+def test_the_restored_room_keeps_the_operations_and_surfaces_read_boards() -> None:
+    """Both read boards survive as destination boards; a failure here is a lost feature, not a
+    move (the single-screen workbench is parked, not the acceptance target)."""
     index = _index_text()
     missing = _missing(
         index,
         (
-            'data-lens="operations"',
-            'data-lens="surfaces"',
-            'id="wb-operations"',
-            'id="wb-surfaces"',
+            'data-board="operations"',
+            'data-board="surfaces"',
+            'id="board-operations"',
+            'id="board-surfaces"',
         ),
     )
-    assert not missing, f"refreshed workbench lost its lens panels: {missing}"
-    parity = (STATIC / "parity.js").read_text(encoding="utf-8")
-    assert re.search(r"var PANELS = \[(.*?)\];", parity, re.S), (
-        "parity.js must keep a PANELS registry"
+    assert not missing, f"restored room lost its read boards: {missing}"
+    app = (STATIC / "app.js").read_text(encoding="utf-8")
+    assert "/api/operations" in app and "/api/runs/" in app, (
+        "the operations board must read the packet and the durable run detail"
     )
-
-
-# ── 1. Operations board (main step-5/6/7) ─────────────────────────────────────────────────────
 
 
 def test_operations_board_helpers_are_rehoused() -> None:
@@ -339,7 +337,14 @@ def test_run_detail_drawer_has_a_close_control() -> None:
     )
 
 
-def test_operations_panel_is_a_workbench_lens_not_the_old_destination_board() -> None:
-    """The old destination-board ids are intentionally replaced by the workbench panels."""
+def test_the_operations_board_is_the_restored_destination_board() -> None:
+    """Intentional restoration (2026-09-18 controller direction): the room's read path is the
+    old destination board again, with the refresh control and the durable run-detail drawer
+    mounted on it — the workbench lens is the parked alternative, not the contract."""
     index = _index_text()
-    assert 'data-lens="operations"' in index and 'data-lens="surfaces"' in index
+    section = re.search(r'<section id="board-operations".*?</section>', index, re.S)
+    assert section, "the operations board section must exist"
+    assert "operations-refresh" in section.group(0)
+    assert 'id="run-detail-drawer"' in section.group(0), (
+        "the durable run-detail drawer must live on the operations board"
+    )

@@ -35,6 +35,9 @@ READ_ROUTES = (
 #: The step-5/6/7 read lenses re-housed into the workbench (index.html panel + parity.js).
 READ_LENSES = ("operations", "surfaces")
 
+#: The restored room's seven read boards (the destination-board equivalent of the lenses).
+READ_BOARDS = ("fleet", "status", "flags", "sessions", "routing", "operations", "surfaces")
+
 
 class _Workbench(HTMLParser):
     """Collect the workbench lens panels from index.html."""
@@ -65,13 +68,17 @@ def _presentation_scripts() -> str:
     )
 
 
-def test_every_read_lens_has_exactly_one_workbench_panel():
-    parsed = _parse_index()
-    # duplicates would mean two sections claiming one lens
-    assert len(set(parsed.lenses)) == len(parsed.lenses)
-    for lens in READ_LENSES:
-        assert lens in parsed.lenses, f"{lens} missing its workbench panel"
-        assert parsed.hidden.get(lens) is True, f"{lens} must start hidden (lazy-loaded at rest)"
+def test_every_read_board_has_exactly_one_destination_and_section():
+    """The restored room's contract (2026-09-18): one destination entry and one section per
+    read board — the equivalent of the workbench's one-panel-per-lens rule."""
+    index = (STATIC / "index.html").read_text(encoding="utf-8")
+    for board in READ_BOARDS:
+        assert len(re.findall(rf'<button[^>]*data-board="{board}"', index)) == 1, (
+            f"{board} must have exactly one destination entry"
+        )
+        assert len(re.findall(rf'id="board-{board}"', index)) == 1, (
+            f"{board} must have exactly one board section"
+        )
 
 
 def test_the_read_lenses_are_registered_in_the_workbench_panels():
@@ -97,14 +104,17 @@ def test_the_operations_view_renders_the_packet_states_verbatim():
     assert "data-run-id" in parity  # run rows carry the packet's identifier for click-through
 
 
-def test_the_read_panels_start_hidden_so_the_workbench_lazy_loads():
-    """The lens panels are hidden at rest; the workbench nav opens one on demand."""
-    parsed = _parse_index()
-    for lens in READ_LENSES:
-        assert parsed.hidden.get(lens) is True
-
-
-# ── wave A7: availability handling + the shell guard ─────────────────────────
+def test_non_home_boards_start_hidden_so_one_board_shows_at_rest():
+    """One board visible at rest; every other board starts hidden (the room's lazy-load rule)."""
+    index = (STATIC / "index.html").read_text(encoding="utf-8")
+    for board in READ_BOARDS:
+        match = re.search(rf'<section id="board-{board}"[^>]*>', index)
+        assert match, f"{board}: board section missing"
+        hidden = "hidden" in match.group(0)
+        if board == "fleet":
+            assert not hidden, "the home board must be visible at rest"
+        else:
+            assert hidden, f"{board} must start hidden (exactly one board at rest)"
 
 
 def test_shell_never_queries_an_empty_selector():
