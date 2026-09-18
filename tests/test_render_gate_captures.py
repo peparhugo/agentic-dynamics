@@ -64,6 +64,57 @@ def test_write_report_still_fails_on_errors_with_captures(tmp_path: Path):
 # ── The acceptance profile contract (AIO remediation 2026-09-14) ─────────────
 
 
+def test_write_report_prints_declared_coverage_only(tmp_path: Path):
+    """The 2026-09-18 review: the restored profile's report must not inherit the parked
+    profile's mobile/forced-colors/contrast/first-paint claims. Declared coverage prints
+    verbatim; a claim that was not declared is not printed."""
+    report, jp = _paths(tmp_path)
+    results = [
+        {
+            "screenshot": "s1.png",
+            "case": "boards-navigation",
+            "viewport": "desktop",
+            "theme": "dark",
+        }
+    ]
+    coverage = {
+        "performed": ["navigation: seven destinations"],
+        "omitted": ["mobile viewport (390x844)"],
+    }
+    rc = write_report(
+        results,
+        [],
+        report,
+        jp,
+        0,
+        requested_classes=["navigation"],
+        coverage=coverage,
+    )
+    assert rc == 0
+    text = report.read_text(encoding="utf-8")
+    assert "**Coverage executed:** navigation: seven destinations" in text
+    assert "**Coverage omitted:** mobile viewport (390x844)" in text
+    assert "**Viewports exercised:** desktop" in text
+    assert "**Themes exercised:** dark" in text
+    assert "WCAG-AA contrast" not in text, "a claim the run did not execute was printed"
+    data = json.loads(jp.read_text(encoding="utf-8"))
+    assert data["coverage"]["omitted"] == ["mobile viewport (390x844)"]
+
+
+def test_write_report_keeps_legacy_lines_without_a_coverage_declaration(tmp_path: Path):
+    """Legacy parked runs keep their own documented coverage lines; the restored declaration
+    is never assumed on their behalf."""
+    report, jp = _paths(tmp_path)
+    results = [{"screenshot": "s1.png", "case": "F-0", "viewport": "desktop"}]
+    rc = write_report(results, [], report, jp, 0)
+    assert rc == 0
+    text = report.read_text(encoding="utf-8")
+    assert "**Viewports:**" in text
+    assert "Coverage executed" not in text
+    data = json.loads(jp.read_text(encoding="utf-8"))
+    assert data["coverage"] == {}
+
+
 def test_write_report_names_an_omitted_required_class(tmp_path: Path):
     """The profile's omission rule: a requested class that produced no results is a NAMED
     fail — never a silent skip (--live alone cannot claim the profile ran)."""

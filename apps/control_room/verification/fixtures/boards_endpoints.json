@@ -138,6 +138,38 @@
       }
     ]
   },
+  "routing": {
+    "per_task": [
+      {
+        "task": "story/task_manager_api",
+        "routing": "default",
+        "default_model": "deepseek/deepseek-v4-flash",
+        "escalate_model": "deepseek/deepseek-v4-pro",
+        "best_correctness_model": "deepseek/deepseek-v4-pro",
+        "best_efficiency_model": "deepseek/deepseek-v4-flash"
+      },
+      {
+        "task": "workflow/agent_task",
+        "routing": "escalate",
+        "default_model": "deepseek/deepseek-v4-flash",
+        "escalate_model": "openai/gpt-6-astra",
+        "best_correctness_model": "openai/gpt-6-astra",
+        "best_efficiency_model": "deepseek/deepseek-v4-flash"
+      }
+    ],
+    "strategies": {
+      "always-default": {
+        "n": 24,
+        "total_cost": 3.1,
+        "avg_correctness": 0.66
+      },
+      "escalate-on-failure": {
+        "n": 24,
+        "total_cost": 4.2,
+        "avg_correctness": 0.78
+      }
+    }
+  },
   "surfaces": {
     "quality": {
       "population": {

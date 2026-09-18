@@ -54,6 +54,7 @@ import json
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -2148,6 +2149,16 @@ LAZY_BOARD_CASES: dict[str, tuple[str, ...]] = {
     "routing": ("/api/routing",),
 }
 
+#: The fixture values the routing drawer must actually render. The review's finding: a
+#: non-empty check accepted "Loading routing data…", and the parity fixture's mismatched
+#: fields rendered '?' — so the gate now names the values it expects to see.
+ROUTING_FIXTURE_ANCHORS: tuple[str, ...] = (
+    "story/task_manager_api",
+    "openai/gpt-6-astra",
+    "escalate-on-failure",
+    "78%",
+)
+
 #: The shared restored-board probe: one snapshot of everything the five checks assert.
 BOARDS_PROBE_JS = r"""
 () => {
@@ -2251,7 +2262,14 @@ def check_boards_fixtures() -> list[str]:
     except Exception as error:  # noqa: BLE001 — report, never crash the fixture check
         return [f"boards fixture unreadable: {error}"]
     problems: list[str] = []
-    for key in ("operations", "operations_degraded", "run_detail", "design_sessions", "surfaces"):
+    for key in (
+        "operations",
+        "operations_degraded",
+        "run_detail",
+        "design_sessions",
+        "routing",
+        "surfaces",
+    ):
         if key not in fixture:
             problems.append(f"boards fixture missing {key!r}")
     if problems:
@@ -2282,6 +2300,8 @@ def _boards_router(
     *,
     degraded: bool = False,
     surface_failures: tuple[str, ...] = (),
+    routing_delay_s: float = 0.0,
+    routing_failure: bool = False,
 ):
     """One Playwright route handler for the restored-board classes.
 
@@ -2289,6 +2309,10 @@ def _boards_router(
     parity fixtures the restored app's startup pollers need; fulfils a named surface failure
     with an HTTP 503 + error object so the panel renders the service's own reason. Anything
     unmapped aborts: a missing endpoint is a visible request, never a silent pass.
+
+    ``routing_delay_s`` / ``routing_failure`` force the routing drawer's delayed and failed
+    response states: a held request must not read as loaded, and a refused one must settle into
+    its named error state (the review's stalled-request finding).
     """
     fixture = load_boards_fixture()
     payloads: dict[str, Any] = {
@@ -2297,6 +2321,11 @@ def _boards_router(
     # The restored design-session row renderer reads title/draft_state/revision — the parity
     # fixture predates it and would throw on draft_state.replaceAll. The board fixture wins.
     payloads["/api/design-sessions"] = fixture["design_sessions"]
+    # The restored routing renderer reads task/routing/default_model/... — the parity fixture's
+    # task_type/recommended fields rendered as '?' (the review's screenshot finding). The board
+    # fixture wins. NOTE: the restored readiness predicate requires a RENDERED table, so a
+    # mismatched payload can no longer pass as merely non-empty.
+    payloads["/api/routing"] = fixture["routing"]
     for path, payload in load_parity_fixtures().items():
         payloads.setdefault(path, payload)
 
@@ -2325,6 +2354,19 @@ def _boards_router(
         elif path.startswith("/api/runs/"):
             route.fulfill(
                 status=200, content_type="application/json", body=json.dumps(fixture["run_detail"])
+            )
+        elif path == "/api/routing" and routing_failure:
+            route.fulfill(
+                status=503,
+                content_type="application/json",
+                body=json.dumps({"error": "routing read model is down"}),
+            )
+        elif path == "/api/routing" and routing_delay_s:
+            # Hold the response so the page genuinely sits in its loading state; the readiness
+            # predicate must not treat that state as loaded.
+            time.sleep(routing_delay_s)
+            route.fulfill(
+                status=200, content_type="application/json", body=json.dumps(payloads[path])
             )
         elif path in surface_failures:
             name = path.rsplit("/", 1)[-1]
@@ -2356,8 +2398,14 @@ def _board_ready_js(board: str) -> str:
             " return Boolean(el && el.dataset.loaded === 'true'); }"
         )
     return (
-        "() => { const el = document.getElementById('routing-drawer');"
-        " return Boolean(el && !el.hidden); }"
+        "() => { const drawer = document.getElementById('routing-drawer');"
+        " const content = document.getElementById('routing-content');"
+        " if (!drawer || drawer.hidden || !content) return false;"
+        " const text = content.innerText || content.textContent || '';"
+        " if (text.includes('Loading routing data')) return false;"
+        " return Boolean(content.querySelector('table'))"
+        " || text.includes('No routing data yet')"
+        " || text.includes('Routing unavailable'); }"
     )
 
 
@@ -2561,8 +2609,41 @@ def _check_board_loading(
             _row(errors, label, "loading", board, "the operations board rendered no content")
         if board == "surfaces" and not probe["surfacePanels"]:
             _row(errors, label, "loading", board, "the surfaces board rendered no panels")
-        if board == "routing" and not probe["routingText"]:
-            _row(errors, label, "loading", board, "the routing drawer rendered no content")
+        if board == "routing":
+            text = probe["routingText"]
+            if "Loading routing data" in text:
+                _row(
+                    errors,
+                    label,
+                    "loading",
+                    board,
+                    "the routing drawer still shows its loading state after the readiness wait",
+                )
+            for expected in ROUTING_FIXTURE_ANCHORS:
+                if expected not in text:
+                    _row(
+                        errors,
+                        label,
+                        "loading",
+                        board,
+                        f"the routing drawer is missing the fixture value {expected!r} — a "
+                        "stalled request must not pass as loaded",
+                    )
+            # Stalled-state sensitivity: the predicate itself must refuse the loading state,
+            # not merely happen to observe a finished render (the review's finding).
+            page.evaluate(
+                "() => { const el = document.getElementById('routing-content');"
+                " if (el) el.innerHTML = '<p class=\"empty-state\">Loading routing data…</p>'; }"
+            )
+            if page.evaluate(_board_ready_js("routing")) is True:
+                _row(
+                    errors,
+                    label,
+                    "loading",
+                    board,
+                    "the routing readiness predicate accepts the loading state as loaded — a "
+                    "stalled request would pass the gate",
+                )
         if screenshots and board == "operations":
             shot = out / "boards_loading_operations_reload_desktop_dark_1440x900.png"
             page.screenshot(path=str(shot), full_page=False)
@@ -2580,6 +2661,69 @@ def _check_board_loading(
             _row(errors, label, "loading", "console", message[:200])
         results.append(
             {"case": "boards-loading", "viewport": "desktop", "check": board, "screenshot": ""}
+        )
+        context.close()
+
+    # Routing's delayed and failed response states. A held request must still settle into the
+    # rendered fixture values, and a refused one into its named error state; neither may pass by
+    # showing any text (the review's stalled-request finding).
+    for case_name, router_kwargs, expected_anchors in (
+        ("routing-delayed", {"routing_delay_s": 0.8}, ROUTING_FIXTURE_ANCHORS),
+        ("routing-failed", {"routing_failure": True}, ("Routing unavailable",)),
+    ):
+        records = []
+        context, page, console_errors = _boards_page(
+            browser,
+            url,
+            1440,
+            900,
+            board="routing",
+            router=_boards_router(records, **router_kwargs),
+        )
+        try:
+            page.wait_for_function(_board_ready_js("routing"), timeout=8000)
+            settled = True
+        except Exception:  # noqa: BLE001 — the unsettled state is the finding
+            settled = False
+        text = page.evaluate(BOARDS_PROBE_JS)["routingText"]
+        if not settled:
+            _row(
+                errors,
+                label,
+                "loading",
+                case_name,
+                "the routing drawer never settled into a rendered state",
+            )
+        for expected in expected_anchors:
+            if expected not in text:
+                _row(
+                    errors,
+                    label,
+                    "loading",
+                    case_name,
+                    f"the routing drawer is missing {expected!r} — a delayed or failed response "
+                    "must not satisfy the loaded check by showing any text",
+                )
+        if "Loading routing data" in text:
+            _row(
+                errors,
+                label,
+                "loading",
+                case_name,
+                "the routing drawer still shows its loading state after settling",
+            )
+        for message in console_errors:
+            # The 503 is this case's OWN setup, not an app defect.
+            if "503 (Service Unavailable)" in message:
+                continue
+            _row(errors, label, "loading", f"{case_name}-console", message[:200])
+        results.append(
+            {
+                "case": "boards-loading",
+                "viewport": "desktop",
+                "check": case_name,
+                "screenshot": "",
+            }
         )
         context.close()
 
@@ -2723,6 +2867,61 @@ def _check_board_degraded(
     context.close()
 
 
+#: The scroll probe: the scroller's computed overflow, its box, and whether the LAST run row
+#: (the known below-fold row) is inside its client area.
+SCROLL_PROBE_JS = r"""
+() => {
+  const scroller = document.getElementById('boards');
+  const rows = Array.from(document.querySelectorAll('tr[data-run-id]'));
+  const last = rows.length ? rows[rows.length - 1] : null;
+  const scrollerRect = scroller ? scroller.getBoundingClientRect() : null;
+  const rowRect = last ? last.getBoundingClientRect() : null;
+  const inside = Boolean(scrollerRect && rowRect &&
+    rowRect.top >= scrollerRect.top - 1 && rowRect.bottom <= scrollerRect.bottom + 1);
+  const intersects = Boolean(rowRect && rowRect.bottom > 0 && rowRect.top < window.innerHeight);
+  return {
+    scrollTop: scroller ? scroller.scrollTop : null,
+    scrollH: scroller ? scroller.scrollHeight : null,
+    clientH: scroller ? scroller.clientHeight : null,
+    overflowY: scroller ? getComputedStyle(scroller).overflowY : null,
+    scrollerW: scroller ? scroller.scrollWidth : null,
+    scrollerCW: scroller ? scroller.clientWidth : null,
+    lastRunId: last ? last.getAttribute('data-run-id') : null,
+    lastVisible: inside && intersects,
+    rowTop: rowRect ? rowRect.top : null,
+    scrollerTop: scrollerRect ? scrollerRect.top : null,
+    scrollerBottom: scrollerRect ? scrollerRect.bottom : null,
+    scrollerBox: scrollerRect
+      ? { x: scrollerRect.x, y: scrollerRect.y, w: scrollerRect.width, h: scrollerRect.height }
+      : null,
+  };
+}
+"""
+
+
+def _expected_last_run_id() -> str:
+    """The positional id of the fixture's last run row (build_operations_payload's scheme)."""
+    fixture = load_boards_fixture()
+    seed = fixture["operations"]
+    total = int(seed.get("active_count", 0)) + int(seed.get("promotable_count", 0))
+    return f"run-fixture-{total:04d}"
+
+
+def _wheel_to_bottom(page: Any, box: dict[str, float] | None) -> dict[str, Any]:
+    """Drive real wheel input over the scroller until the below-fold row shows (bounded)."""
+    if not box:
+        return {"scrollTop": None, "lastVisible": False}
+    page.mouse.move(box["x"] + box["w"] / 2, box["y"] + box["h"] / 2)
+    probe: dict[str, Any] = {}
+    for _ in range(10):
+        page.mouse.wheel(0, 700)
+        _settle(page, 120)
+        probe = page.evaluate(SCROLL_PROBE_JS)
+        if probe.get("lastVisible"):
+            break
+    return probe
+
+
 def _check_board_scrolling(
     browser: Any,
     url: str,
@@ -2732,7 +2931,16 @@ def _check_board_scrolling(
     screenshots: bool,
     out: Path,
 ) -> None:
-    """The board scroller overflows below the fold, has no horizontal overflow, and resets."""
+    """Real wheel scrolling must reach a known below-fold row — and a hidden-overflow page
+    must FAIL the same check.
+
+    The review's finding: assigning ``scrollTop`` directly can "succeed" on a scroller with
+    ``overflow-y: hidden``, which no user can wheel. The check now drives real wheel input at
+    the scroller, asserts the last run row (a known below-fold row from the fixture) becomes
+    visible inside the scroller's client box, and closes with a negative case — the same page
+    with ``overflow-y: hidden`` injected must remain unscrollable, or the check's premise is
+    wrong and the gate says so.
+    """
     label = "desktop/boards"
     records: list[dict[str, str]] = []
     context, page, console_errors = _boards_page(
@@ -2749,7 +2957,17 @@ def _check_board_scrolling(
             "the operations board never reached its loaded state",
         )
     _settle(page, 250)
-    probe = page.evaluate(BOARDS_PROBE_JS)
+    probe = page.evaluate(SCROLL_PROBE_JS)
+    expected_last = _expected_last_run_id()
+    if probe["overflowY"] in ("hidden", "clip"):
+        _row(
+            errors,
+            label,
+            "scrolling",
+            "overflow",
+            f"the board scroller computes overflow-y: {probe['overflowY']!r} — wheel scrolling "
+            "is not possible",
+        )
     if not probe["scrollH"] or not probe["clientH"] or probe["scrollH"] <= probe["clientH"]:
         _row(
             errors,
@@ -2760,26 +2978,49 @@ def _check_board_scrolling(
             f"(scrollHeight {probe['scrollH']}, clientHeight {probe['clientH']}) — "
             "below-fold content is not reachable",
         )
-    else:
-        page.evaluate(
-            "() => { const el = document.getElementById('boards');"
-            " el.scrollTop = el.scrollHeight; }"
+    elif probe["lastVisible"]:
+        _row(
+            errors,
+            label,
+            "scrolling",
+            "fixture",
+            f"the last run row ({probe['lastRunId']!r}) is already visible before scrolling — "
+            "the fixture is too short to exercise below-fold reach",
         )
-        scrolled = page.evaluate("() => document.getElementById('boards').scrollTop")
-        if scrolled <= 0:
+    else:
+        if probe["lastRunId"] != expected_last:
+            _row(
+                errors,
+                label,
+                "scrolling",
+                "known-row",
+                f"the last run row is {probe['lastRunId']!r}, expected {expected_last!r}",
+            )
+        final = _wheel_to_bottom(page, probe["scrollerBox"])
+        if final["scrollTop"] is None or final["scrollTop"] <= 0:
+            _row(
+                errors,
+                label,
+                "scrolling",
+                "wheel",
+                "real wheel input did not move the board scroller",
+            )
+        if not final["lastVisible"]:
             _row(
                 errors,
                 label,
                 "scrolling",
                 "below-fold",
-                "the board scroller did not move to the bottom",
+                f"wheel scrolling never brought {expected_last!r} into view "
+                f"(scrollTop {final['scrollTop']}, rowTop {final['rowTop']}, "
+                f"scroller {final['scrollerTop']}..{final['scrollerBottom']})",
             )
         else:
             results.append(
                 {
                     "case": "boards-scrolling",
                     "viewport": "desktop",
-                    "check": "below-fold",
+                    "check": "wheel-below-fold",
                     "screenshot": "",
                 }
             )
@@ -2820,6 +3061,66 @@ def _check_board_scrolling(
     for message in console_errors:
         _row(errors, label, "scrolling", "console", message[:200])
     context.close()
+
+    # The negative case: the SAME page with overflow-y hidden must stay unscrollable. If the
+    # wheel check "passes" here, it would accept the regression class the review named.
+    negative_records: list[dict[str, str]] = []
+    ncontext, npage, nconsole = _boards_page(
+        browser, url, 1440, 900, board="operations", router=_boards_router(negative_records)
+    )
+    npage.add_style_tag(content="#boards { overflow-y: hidden !important; }")
+    try:
+        npage.wait_for_function(_board_ready_js("operations"), timeout=8000)
+    except Exception:  # noqa: BLE001 — the failed state is the finding
+        _row(
+            errors,
+            label,
+            "scrolling",
+            "hidden-overflow-load",
+            "the negative-case operations board never reached its loaded state",
+        )
+    _settle(npage, 250)
+    nprobe = npage.evaluate(SCROLL_PROBE_JS)
+    if nprobe["overflowY"] != "hidden":
+        _row(
+            errors,
+            label,
+            "scrolling",
+            "negative-setup",
+            f"the negative case did not take effect (overflow-y: {nprobe['overflowY']!r})",
+        )
+    nfinal = _wheel_to_bottom(npage, nprobe["scrollerBox"])
+    if nfinal["scrollTop"] not in (None, 0):
+        _row(
+            errors,
+            label,
+            "scrolling",
+            "negative-case",
+            f"the overflow-y:hidden page scrolled anyway (scrollTop {nfinal['scrollTop']}) — the "
+            "wheel check does not distinguish a real scroller",
+        )
+    elif nfinal["lastVisible"]:
+        _row(
+            errors,
+            label,
+            "scrolling",
+            "negative-case",
+            "the overflow-y:hidden page showed its below-fold row without scrolling — the "
+            "wheel check does not distinguish a real scroller",
+        )
+    else:
+        results.append(
+            {
+                "case": "boards-scrolling",
+                "viewport": "desktop",
+                "check": "hidden-overflow-fails",
+                "screenshot": "",
+            }
+        )
+    _settle(npage, 200)
+    for message in nconsole:
+        _row(errors, label, "scrolling", "negative-console", message[:200])
+    ncontext.close()
 
 
 def _check_board_keyboard(
@@ -2951,6 +3252,44 @@ def _check_board_keyboard(
             }
         )
         context.close()
+
+
+def boards_coverage(*, legacy_ran: bool = False) -> dict[str, list[str]]:
+    """The restored classes' EXECUTED coverage, and what this run does not exercise.
+
+    The report prints these claims verbatim and prints nothing else as coverage, so the gate
+    cannot inherit another profile's claims (the review's finding: the restored profile's
+    report still listed mobile, forced-colors, WCAG-AA contrast and first-paint checks, none
+    of which its classes run).
+    """
+    performed = [
+        "navigation: seven destinations, exactly one visible board, aria-current, no "
+        "horizontal overflow, every board captured (desktop dark+light, narrow dark)",
+        "loading: first visit and reload for Operations/Surfaces/Routing; each endpoint "
+        "requested exactly once; rendered fixture values asserted; delayed and failed routing "
+        "responses settle (loading state refused by the readiness predicate)",
+        "degraded: an unreadable control db reads 'unavailable', never 0; a failed read model "
+        "names its reason and URL while its siblings render",
+        "scrolling: real wheel input reaches the last below-fold run row; an overflow-y:hidden "
+        "page fails the same check",
+        "keyboard: Enter opens the run drawer with focus on its close control; Escape closes it "
+        "and returns focus to the originating row",
+    ]
+    omitted: list[str] = []
+    if legacy_ran:
+        performed.append(
+            "legacy parked classes: their own documented checks (geometry/semantics, charts, "
+            "visuals, style, a11y, parity, live, interactions)"
+        )
+    else:
+        omitted = [
+            "mobile viewport (390x844)",
+            "forced-colors theme",
+            "WCAG-AA contrast",
+            "first-paint timing",
+            "charts, visuals, style, a11y, parity, live, interactions (legacy parked classes)",
+        ]
+    return {"performed": performed, "omitted": omitted}
 
 
 def run_boards_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], list[str]]:
@@ -3586,7 +3925,8 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
                  candidate: str = "", candidate_verified: bool = False,
                  preview: str = "", preview_verified: bool = False,
                  preview_exercised: bool = False,
-                 preview_serves_candidate: bool = False) -> int:
+                 preview_serves_candidate: bool = False,
+                 coverage: dict[str, Any] | None = None) -> int:
     """Write the markdown + JSON reports; return the exit code.
 
     The report is the gate's artifact (the website gate's pattern): status, the classes that
@@ -3598,6 +3938,12 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
     state, an omitted required class is a named FAIL (never a silent skip), and the candidate
     SHA + preview target are BOUND into both artifacts so the verdict describes exactly what
     was reviewed.
+
+    ``coverage`` (2026-09-18 review): when the caller declares what the run ACTUALLY exercises
+    (``performed`` / ``omitted``), the report prints those claims and the viewports/themes the
+    result rows recorded — never a static list inherited from another profile. Without a
+    declaration the historical legacy lines are printed, which describe the parked classes'
+    own runs.
     """
     requested = list(requested_classes or ["geometry"])
     executed: list[str] = []
@@ -3661,11 +4007,24 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
         f"**Omitted classes:** {', '.join(c for c in requested if c not in executed) or 'none'}",
         "**Fixtures:** boards (restored) + F-0..F-7 (legacy parked; deterministic, no live "
         "Redis/clock/network — waiver W2)",
-        f"**Viewports:** {', '.join(f'{k} {w}x{h}' for k, (w, h) in VIEWPORTS.items())}",
-        f"**Themes:** {', '.join(THEMES)}",
-        "**Primitives:** present/unique · in-viewport · non-zero box · scrollable pages "
-        "(vertical) · no horizontal overflow · WCAG-AA contrast · first-paint · console-clean",
     ]
+    if coverage is None:
+        # Legacy (parked) runs: the classes below actually run these checks.
+        lines += [
+            f"**Viewports:** {', '.join(f'{k} {w}x{h}' for k, (w, h) in VIEWPORTS.items())}",
+            f"**Themes:** {', '.join(THEMES)}",
+            "**Primitives:** present/unique · in-viewport · non-zero box · scrollable pages "
+            "(vertical) · no horizontal overflow · WCAG-AA contrast · first-paint · console-clean",
+        ]
+    else:
+        seen_viewports = sorted({str(r.get("viewport")) for r in results if r.get("viewport")})
+        seen_themes = sorted({str(r.get("theme")) for r in results if r.get("theme")})
+        lines += [
+            f"**Viewports exercised:** {', '.join(seen_viewports) or 'none recorded'}",
+            f"**Themes exercised:** {', '.join(seen_themes) or 'none recorded'}",
+            f"**Coverage executed:** {' · '.join(coverage.get('performed') or [])}",
+            f"**Coverage omitted:** {', '.join(coverage.get('omitted') or []) or 'none'}",
+        ]
     if candidate:
         label = "verified against the checkout HEAD" if candidate_verified else (
             "UNVERIFIED (does not match the checkout HEAD)"
@@ -3717,6 +4076,7 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
             "preview_exercised": bool(preview_exercised),
             "preview_serves_candidate": bool(preview_serves_candidate),
             "screenshots": results,
+            "coverage": coverage or {},
             "errors": errors,
         }, indent=2),
         encoding="utf-8",
@@ -3978,9 +4338,11 @@ def main() -> int:
                         f"committed candidate for {', '.join(sorted(mismatched))} — the "
                         "preview is not serving this candidate"
                     )
+    coverage = boards_coverage(legacy_ran=legacy_requested) if args.boards else None
     return write_report(
         results, errors, report_path, json_path, fixture_rc,
         requested_classes=requested_classes,
+        coverage=coverage,
         candidate=args.candidate or "",
         candidate_verified=candidate_verified,
         preview=canonical_preview or "",
