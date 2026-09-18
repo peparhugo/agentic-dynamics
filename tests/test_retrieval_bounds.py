@@ -246,7 +246,7 @@ def _silent_server() -> tuple[socket.socket, threading.Event, int]:
             try:
                 server.settimeout(0.2)
                 conn, _ = server.accept()
-            except socket.timeout:
+            except TimeoutError:
                 continue
             except OSError:
                 break
