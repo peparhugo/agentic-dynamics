@@ -206,7 +206,7 @@ def test_workspace_narration_and_events_come_from_the_recorded_ledger(monkeypatc
     assert row["terminal.target"] == "/tmp/wt_flow_recorded"
     assert f"wt/{run_id}" not in json.dumps(row)
     assert row["evidence.advisory"] == "narration recorded"
-    assert row["evidence.measured"] == "tests passed"
+    assert row["evidence.measured"] == "tests passed (independence unrecorded)"
     # A recorded event history with real identifiers/timestamps, never fixed ages.
     events = row["run.events"]
     assert events, "the recorded attempts/gate must surface as events"
@@ -372,24 +372,48 @@ def test_recorded_ledger_resolves_the_container_spelled_path(tmp_path, monkeypat
     assert glance._recorded_ledger({"run": {"ledger_path": "/repo/nope.json"}}) is None
 
 
-def test_cost_provenance_reports_recorded_spend_or_unknown():
+def test_cost_provenance_reports_the_aggregate_label_or_unknown():
+    # No phase evidence: the amount is recorded, its provenance is not — say exactly that.
     assert (
         glance._cost_provenance({}, {"run": {"cost_usd": 0.027517302}}, None)
-        == "$0.0275 · recorded"
+        == "$0.0275 · source unknown"
     )
+    assert glance._cost_provenance({"cost_usd": 0.25}, None, None) == "$0.2500 · source unknown"
+    # The aggregate's own label: one uniform recorded source across the contributors.
     assert (
         glance._cost_provenance(
-            {}, {"run": {"cost_usd": 0.5}}, {"phases": [{"cost_source": "estimated"}]}
+            {},
+            {"run": {"cost_usd": 5.0}},
+            {"phases": [
+                {"cost_usd": 1.0, "cost_source": "metered"},
+                {"cost_usd": 4.0, "cost_source": "metered"},
+            ]},
         )
-        == "$0.5000 · estimated"
+        == "$5.0000 · metered"
     )
-    assert glance._cost_provenance({"cost_usd": 0.25}, None, None) == "$0.2500 · recorded"
+    # MIXED contributors never inherit the first phase's label (review finding P2).
     assert (
         glance._cost_provenance(
-            {}, {"run": {"cost_usd": 0.25}}, {"phases": [{"cost_source": "unknown"}]}
+            {},
+            {"run": {"cost_usd": 5.0}},
+            {"phases": [
+                {"cost_usd": 1.0, "cost_source": "metered"},
+                {"cost_usd": 4.0, "cost_source": "estimated"},
+            ]},
         )
-        == "$0.2500 · source unknown"
+        == "$5.0000 · mixed"
     )
+    # A RECORDED zero with a recognized source is a measurement, not an unknown
+    # (review finding P3; the cost contract distinguishes metered zero from absence).
+    assert (
+        glance._cost_provenance(
+            {},
+            {"run": {"cost_usd": 0.0}},
+            {"total_cost_usd": 0.0, "phases": [{"cost_usd": 0.0, "cost_source": "metered"}]},
+        )
+        == "$0.0000 · metered"
+    )
+    # Absence stays unknown: no amount, no recognized source.
     assert glance._cost_provenance({}, {"run": {"cost_usd": 0.0}}, None) == "unknown"
     assert glance._cost_provenance({}, None, None) == "unknown"
 
@@ -404,7 +428,26 @@ def test_measured_state_names_independent_verification():
     }
     assert glance._measured_state(None, failed) == "independent tests failed"
     participant = {"phases": [{"kind": "test", "test_executed_success": True}]}
-    assert glance._measured_state(None, participant) == "tests passed"
+    assert glance._measured_state(None, participant) == "tests passed (independence unrecorded)"
+    # A passing NON-independent test alongside a failing independent one is a FAILURE — the
+    # verdict and independence belong to the same phase, never pooled across phases.
+    mixed_failure = {"phases": [
+        {"kind": "test", "test_executed_success": True, "evaluator_independent": False},
+        {"kind": "test", "test_executed_success": False, "evaluator_independent": True},
+    ]}
+    assert glance._measured_state(None, mixed_failure) == "independent tests failed"
+    # An independent pending result is not a pass.
+    mixed_pending = {"phases": [
+        {"kind": "test", "test_executed_success": True, "evaluator_independent": True},
+        {"kind": "test", "test_executed_success": None, "evaluator_independent": True},
+    ]}
+    assert glance._measured_state(None, mixed_pending) == "test result pending"
+    # All pass, but not all recorded-independent: the weaker, truthful claim.
+    mixed_pass = {"phases": [
+        {"kind": "test", "test_executed_success": True, "evaluator_independent": False},
+        {"kind": "test", "test_executed_success": True, "evaluator_independent": True},
+    ]}
+    assert glance._measured_state(None, mixed_pass) == "tests passed (independence unrecorded)"
     assert glance._measured_state(None, {"phases": []}) == "no test recorded"
 
 

@@ -389,15 +389,38 @@ def _recorded_ledger(detail: dict[str, Any] | None) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
+_TRUSTED_COST_SOURCES = frozenset({"metered", "estimated", "reconciled"})
+
+
 def _cost_provenance(
     run: dict[str, Any], detail: dict[str, Any] | None, ledger: dict[str, Any] | None
 ) -> str:
-    """The run's recorded spend with its provenance, or ``unknown`` — never ``$0.00``.
+    """The AGGREGATE's recorded spend with the AGGREGATE's own provenance.
 
-    The journey needs cost with provenance or an explicit unknown: the recorded total exists
-    in the control row (and the ledger), so it is surfaced with its recorded source when one
-    is stamped. A missing/zero total stays ``unknown`` — an absent measurement is not $0.
+    The label must describe the aggregate, never the first phase that happens to carry one
+    (review finding P2): per-phase contributors (cost > 0) decide it — one uniform recorded
+    source, ``mixed`` when contributors disagree, ``source unknown`` when none is recorded.
+
+    A measured zero is a value (review finding P3): when the ledger records a recognized
+    source for any phase, an explicit $0 is surfaced (``$0.0000 · metered``), never collapsed
+    to ``unknown``; an absent amount with no recorded source still renders ``unknown`` —
+    an absent measurement is not $0.
     """
+    phases = [phase for phase in (ledger or {}).get("phases") or [] if isinstance(phase, dict)]
+    contributors: list[str] = []
+    for phase in phases:
+        try:
+            cost = float(phase.get("cost_usd"))
+        except (TypeError, ValueError):
+            cost = 0.0
+        if cost > 0:
+            contributors.append(str(phase.get("cost_source") or "").strip().lower())
+    sources = [
+        str(phase.get("cost_source") or "").strip().lower()
+        for phase in phases
+        if str(phase.get("cost_source") or "").strip().lower() in _TRUSTED_COST_SOURCES
+    ]
+
     total: float | None = None
     candidates = (
         ((detail or {}).get("run") or {}).get("cost_usd"),
@@ -413,19 +436,27 @@ def _cost_provenance(
             total = value
             break
     if total is None:
-        return "unknown"
-    source = ""
-    for phase in (ledger or {}).get("phases") or []:
-        if isinstance(phase, dict) and str(phase.get("cost_source") or "").strip():
-            source = str(phase["cost_source"]).strip()
-            break
-    if not source:
-        return f"${total:.4f} · recorded"
-    if source.lower() == "unknown":
-        # The amount is recorded while its provenance is not — say exactly that (never drop
-        # the recorded total, never dress the unknown source as a method).
-        return f"${total:.4f} · source unknown"
-    return f"${total:.4f} · {source}"
+        if sources:
+            # A recognized source makes the aggregate measurable — including a recorded zero.
+            total = 0.0
+        else:
+            return "unknown"
+
+    if contributors:
+        known = [source for source in contributors if source in _TRUSTED_COST_SOURCES]
+        if not known:
+            label = "source unknown"
+        elif len(known) == len(contributors) and len(set(known)) == 1:
+            label = known[0]
+        else:
+            label = "mixed"
+    elif len(set(sources)) == 1:
+        label = sources[0]
+    elif sources:
+        label = "mixed"
+    else:
+        label = "source unknown"
+    return f"${total:.4f} · {label}"
 
 
 def _attempt_number(detail: dict[str, Any] | None) -> str:
@@ -487,7 +518,15 @@ def _narration_state(detail: dict[str, Any] | None, ledger: dict[str, Any] | Non
 
 
 def _measured_state(detail: dict[str, Any] | None, ledger: dict[str, Any] | None) -> str:
-    """The strongest recorded measured verdict: ledger test outcomes, else gate verdicts."""
+    """The recorded measured verdict — per TEST PHASE, never mixed across phases.
+
+    Success and independence are properties of the SAME phase/attempt (review finding P1):
+    a passing non-independent test alongside a failing independent one is a FAILURE, and an
+    independent pending result is not a pass. Any failure wins; then any non-True outcome is
+    pending; a pass requires every test outcome True, and only then may independence be
+    claimed (all recorded-independent -> "independent tests passed"; otherwise the weaker
+    "tests passed (independence unrecorded)").
+    """
     if ledger is not None:
         tests = [
             phase
@@ -495,13 +534,19 @@ def _measured_state(detail: dict[str, Any] | None, ledger: dict[str, Any] | None
             if isinstance(phase, dict) and str(phase.get("kind") or "") == "test"
         ]
         if tests:
-            independent = any(phase.get("evaluator_independent") is True for phase in tests)
             outcomes = [phase.get("test_executed_success") for phase in tests]
-            if any(outcome is True for outcome in outcomes):
-                return "independent tests passed" if independent else "tests passed"
             if any(outcome is False for outcome in outcomes):
-                return "independent tests failed" if independent else "tests failed"
-            return "test result pending"
+                failing = [phase for phase in tests if phase.get("test_executed_success") is False]
+                independent_fail = any(
+                    phase.get("evaluator_independent") is True for phase in failing
+                )
+                return "independent tests failed" if independent_fail else "tests failed"
+            if any(outcome is not True for outcome in outcomes):
+                return "test result pending"
+            all_independent = all(phase.get("evaluator_independent") is True for phase in tests)
+            if all_independent:
+                return "independent tests passed"
+            return "tests passed (independence unrecorded)"
     verdicts = [_token(gate.get("verdict")) for gate in (detail or {}).get("gates") or []]
     if "fail" in verdicts:
         return "gate failed"

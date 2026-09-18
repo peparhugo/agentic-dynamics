@@ -30,6 +30,13 @@ workflow:
       acl_scope: public
       pattern_projection: false
       pinned_policy: |
+        ## Pinned requirements — CURRENT policy (re-baselined 2026-09-18)
+
+        SUPERSESSION NOTICE: decision 9f357fce re-baselined the resting screen. Vertical page
+        scrolling IS allowed; there is no below-the-fold failure. The earlier "page does not
+        scroll / nothing below the fold" requirement is SUPERSEDED — never pin it as policy and
+        never fail content for being below the fold; require reachability instead.
+
         ## J1 — Glance
         *Continuous; no interaction. Rules [R1,R2,R5,R7,R10]. Surface: rest `R0 R1 R2 R3a R3b R3c`.*
 
@@ -47,9 +54,10 @@ workflow:
            → *Expected:* unknown money is `unknown`, never `$0.00`.
 
         **PASS:** at 1440×900 and 390×844 a screenshot contains exactly one `[data-answer]` anchor for each
-        of `ON-G1..G7`, in its canonical region (`G1→R0,G2→R2,G3→R1,G4→R3a,G5→R1,G6→R0,G7→R3c`), page does
-        not scroll, no region overflows. **FAIL:** any answer is missing, duplicated, below the fold, or
-        answered by a lens/mirror.
+        of `ON-G1..G7`, in its canonical region (`G1→R0,G2→R2,G3→R1,G4→R3a,G5→R1,G6→R0,G7→R3c`); the page
+        MAY scroll vertically (decision 9f357fce superseded the no-scroll resting screen) and must not
+        overflow horizontally; every answer and control remains REACHABLE by scrolling or a drill-down.
+        **FAIL:** any answer is missing, duplicated, unreachable, or answered by a lens/mirror.
 
         ---
 
@@ -73,6 +81,22 @@ workflow:
         ---
 
         ## J5 — Watch Spend
+        *Continuous; decisions at thresholds. Rules [R3,R4,R6,R7,R10]. Surface: rest `R3a` → drill `L-MONEY`.*
+
+        1. **Glance money at rest.** `R3a` shows exactly five values: `money.spend`, `money.burn`,
+           `money.quota`, `money.wallet`, `money.leases`, plus a money-risk marker. `[R7]`
+        2. **Open the ledger.** Click `R3a` → `L-MONEY`: spend history, per-window usage, lease-by-lease
+           reconciliation, settlement status, cost provenance.
+        3. **Read the arc and horizons.** `L-MONEY` shows the story session arc + `snowball_factor` `[R3]`,
+           the EPM scenario `[R4]`, `T_max`/retry rate `[R7]`, and the batch scenario `[R6]`.
+        4. **Read value.** `L-COMPOSITION`/`L-MONEY` show accepted outcomes per arm and BVI `[R10]`.
+
+        **PASS:** `R3a` contains all five `[data-field^="money."]` nodes and an exception marker; an unknown
+        cost renders explicit `unknown`, never `$0.00`; `L-MONEY` shows the arc, EPM scenario, and T_max
+        with `[P]/[X]` provenance. **FAIL:** fewer than five values, a fabricated `$0.00`, or a ratio
+        without coverage.
+
+        ---
     context:
       domain_context: >-
         canonical_sources: [apps/control_room/routes/glance.py (_recorded_ledger, _measured_state,

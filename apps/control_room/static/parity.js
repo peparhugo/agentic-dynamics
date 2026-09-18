@@ -2319,6 +2319,12 @@
   /** Show one panel, hiding the others; lazy-load it the first time. */
   function openPanel(id) {
     currentPanel = id;
+    if (id !== "operations" && typeof activeRunDetailClose === "function") {
+      // Leaving Operations abandons its detail view: clear the drawer so a hidden-but-open
+      // drawer can never consume Escape or retain stale focus (review finding P3).
+      var openDrawer = document.getElementById("run-detail-drawer");
+      if (openDrawer && !openDrawer.hidden) activeRunDetailClose();
+    }
     PANELS.forEach(function (panel) {
       var node = document.getElementById("wb-" + panel.id);
       if (node) node.hidden = panel.id !== id;
@@ -2377,10 +2383,13 @@
   /** A-1/A-6: keep focus inside the workbench modal and close it on Escape. */
   function trapFocus(event) {
     if (event.key === "Escape") {
-      // Drill-down precedence: an open run-detail drawer consumes the first Escape (back to
-      // the found list); only the next one dismisses the workbench.
+      // Drill-down precedence, scoped to the ACTIVE panel (review finding P3): an open
+      // run-detail drawer consumes Escape only while its Operations panel is the visible one.
+      // A drawer hidden inside an inactive panel must never swallow the key.
+      var opsPanel = document.getElementById("wb-operations");
       var drawer = document.getElementById("run-detail-drawer");
-      if (drawer && !drawer.hidden && typeof activeRunDetailClose === "function") {
+      var opsActive = opsPanel && !opsPanel.hidden;
+      if (opsActive && drawer && !drawer.hidden && typeof activeRunDetailClose === "function") {
         activeRunDetailClose();
         return;
       }
