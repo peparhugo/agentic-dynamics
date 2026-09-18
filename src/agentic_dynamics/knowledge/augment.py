@@ -280,6 +280,34 @@ def _durable_source_type_resolver() -> Callable[[str], str | None]:
     return _resolve
 
 
+class _UnavailableDenseStore:
+    """Leg stand-in that RAISES the recorded construction cause.
+
+    A construction failure must surface in ``leg_errors`` with its cause, not vanish into a
+    silent ``None`` — which reads identically to "no store configured" (diagnostic acceptance
+    gap). ``retrieve`` catches the raise per leg and names it, so the pass still degrades.
+    """
+
+    def __init__(self, cause: str) -> None:
+        self._cause = cause
+
+    def search(self, *args: Any, **kwargs: Any) -> list[Any]:
+        raise RuntimeError(f"dense store construction failed: {self._cause}")
+
+
+class _UnavailableGraphClient:
+    """Leg stand-in that RAISES the recorded construction cause (lexical leg + expansion)."""
+
+    def __init__(self, cause: str) -> None:
+        self._cause = cause
+
+    def search_knowledge_fulltext(self, *args: Any, **kwargs: Any) -> list[Any]:
+        raise RuntimeError(f"graph client construction failed: {self._cause}")
+
+    def expand_candidates(self, *args: Any, **kwargs: Any) -> list[Any]:
+        raise RuntimeError(f"graph client construction failed: {self._cause}")
+
+
 def default_retrieve_fn() -> Callable[..., Any]:
     """Lazily construct the dense + graph stores and bind them to ``retrieve``.
 
@@ -287,9 +315,11 @@ def default_retrieve_fn() -> Callable[..., Any]:
     deps (chromadb / neo4j) stay optional and core startup never constructs a store.
     Each store is built independently and bound via ``functools.partial``; a store
     that cannot be constructed (missing optional dep or unreachable client) is bound
-    as ``None`` so :func:`retrieve` marks that leg down. A store that constructs but
-    is unreachable at query time is handled by ``retrieve``'s existing per-leg
-    try/except — augmentation never blocks the phase.
+    as a FAILING STAND-IN carrying its construction cause, so the cause reaches
+    ``attempt.leg_errors`` through the ordinary reporting path (review diagnostic gap) —
+    never as a silent ``None``. A store that constructs but is unreachable at query time
+    is handled by ``retrieve``'s existing per-leg try/except — augmentation never blocks
+    the phase.
 
     Endpoint conventions: ``ChromaStore`` reads ``CHROMA_HOST``/``CHROMA_PORT``;
     ``Neo4jClient`` uses its own URI/auth constructor defaults (env-overridable per
@@ -301,18 +331,33 @@ def default_retrieve_fn() -> Callable[..., Any]:
 
     # Dense leg: runtime-RAG knowledge chunks live in their own collection, isolated
     # from the historical ``session_embeddings`` collection.
-    dense_store = None
+    dense_store: Any = None
+    dense_cause = ""
     try:
         dense_store = ChromaStore(collection_name="knowledge_chunks_v1")
-    except Exception:
+    except Exception as exc:  # noqa: BLE001 — the cause is REPORTED through the leg
         dense_store = None
+        dense_cause = f"{type(exc).__name__}: {exc}"
 
     # Graph leg: lexical (full-text) search + bounded expansion over the knowledge graph.
-    graph_client = None
+    graph_client: Any = None
+    graph_cause = ""
     try:
         graph_client = Neo4jClient()
-    except Exception:
+    except Exception as exc:  # noqa: BLE001 — the cause is REPORTED through the leg
         graph_client = None
+        graph_cause = f"{type(exc).__name__}: {exc}"
+
+    dense_leg = (
+        dense_store
+        if dense_store is not None
+        else (_UnavailableDenseStore(dense_cause) if dense_cause else None)
+    )
+    lexical_leg = (
+        graph_client
+        if graph_client is not None
+        else (_UnavailableGraphClient(graph_cause) if graph_cause else None)
+    )
 
     # k4 no-silent-empties: bind the durable-artifact source-type resolver so a candidate
     # whose store metadata carries no source_type is typed from the authoritative kb/ layer
@@ -325,8 +370,8 @@ def default_retrieve_fn() -> Callable[..., Any]:
     # ``no_rag`` when both are down) rather than raising out of ``augment_prompt``.
     return functools.partial(
         _retrieve,
-        dense_store=dense_store,
-        graph_client=graph_client,
+        dense_store=dense_leg,
+        graph_client=lexical_leg,
         source_type_resolver=source_type_resolver,
     )
 

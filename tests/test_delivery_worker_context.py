@@ -374,3 +374,28 @@ def test_degraded_leg_causes_reach_the_run_result(tmp_path):
     assert "dense" in phase.retrieval_leg_errors
     assert "dense backend down" in phase.retrieval_leg_errors["dense"]
     assert result.to_dict()["phases"][0]["retrieval_leg_errors"] == phase.retrieval_leg_errors
+
+
+def test_construction_causes_reach_the_run_result(monkeypatch):
+    """Diagnostic acceptance gap: a store that fails to CONSTRUCT must name its cause in
+    ``leg_errors`` rather than vanishing into a silent ``None``."""
+    from agentic_dynamics.knowledge import augment as aug
+
+    class _BoomChroma:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("chroma init refused")
+
+    class _BoomNeo4j:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("neo4j init refused")
+
+    monkeypatch.setattr("agentic_dynamics.knowledge.embeddings.ChromaStore", _BoomChroma)
+    monkeypatch.setattr("agentic_dynamics.knowledge.graph.Neo4jClient", _BoomNeo4j)
+
+    retrieve_fn = aug.default_retrieve_fn()
+    attempt = retrieve_fn(
+        raw_work_item="q", repository_id="agentic-dynamics", acl_scope="public"
+    )
+    assert attempt.fallback_mode == "no_rag"
+    assert "chroma init refused" in attempt.leg_errors.get("dense", "")
+    assert "neo4j init refused" in attempt.leg_errors.get("lexical", "")
