@@ -1,17 +1,14 @@
-"""Feature-parity guard for the Control Room UI/UX refresh (work order a1).
+"""Feature-parity guard for the Control Room's read surfaces (work order a1; restored 2026-09-18).
 
-The merge that landed the refresh (``0244f3315``) resolved ``apps/control_room/static/app.js``
-to the refresh side *wholesale*: the refreshed one-resting-screen client hydrates from
-``GET /api/glance``, and main's step-5/6/7 read views — the Operations board, the Surfaces
-board and its A7 unavailability rendering, the step-12 batch lane, the routing board, the
-registry board and the subscription-usage board — were re-housed only partially (some in
-``parity.js``'s workbench lenses, some not at all). ``tests/test_control_room_static_views.py``
-already proves the *lenses* exist; this suite proves the *features inside them* survived.
+The restored room (PR #84, controller direction) serves seven destination boards; the
+single-screen workbench is parked in-tree. This suite proves the read FEATURES inside the
+served page survived the rework, browser-free, by reading the static modules as text.
 
-It is deliberately browser-free and reads the refreshed static modules as text. Anchors are a
-mix of function names, identifier strings and DOM ids — the "where it must live post-rework"
-column of ``docs/reviews/control_room_refresh_feature_parity.md``. It is EXPECTED TO FAIL on
-the pre-rework tree: each failing test names the main-side anchors that have no home yet.
+Every input derives from the scripts ``index.html`` actually loads — never the parked modules
+(``parity.js``/``charts.js``/``visuals.js``), whose in-tree copies could otherwise keep an
+assertion green while the served page has lost the feature (the 2026-09-18 safe-actions
+finding). Anchors are a mix of function names, identifier strings and DOM ids — the "where it
+must live post-rework" column of ``docs/reviews/control_room_refresh_feature_parity.md``.
 
 Behaviour is pinned, not snapshots: any implementation that exposes the pinned function/string
 and renders the same payload fields passes, regardless of formatting or renaming of private
@@ -30,19 +27,22 @@ pytestmark = pytest.mark.fast
 ROOT = Path(__file__).resolve().parent.parent
 STATIC = ROOT / "apps" / "control_room" / "static"
 
-#: The scripts the refreshed index.html actually loads — the refreshed presentation. main's
-#: helpers must be ported into one of these (parity.js is the natural host).
-REFRESH_MODULES = ("app.js", "charts.js", "visuals.js", "parity.js")
-
 
 def _module_text(*names: str) -> str:
-    """Concatenate the refreshed static modules named."""
+    """Concatenate the static modules named."""
     return "\n".join((STATIC / name).read_text(encoding="utf-8") for name in names)
 
 
 def _refresh_text() -> str:
-    """The text of every script the refreshed client loads."""
-    return _module_text(*REFRESH_MODULES)
+    """The text of every script the restored client actually loads.
+
+    Derived from the markup, never a second roster: parity.js/charts.js/visuals.js are parked
+    in-tree but unloaded, and an assertion that reads them proves nothing about the served
+    page (the 2026-09-18 review's safe-actions finding).
+    """
+    srcs = re.findall(r'<script[^>]+src="([^"]+)"', _index_text())
+    names = [Path(src.strip()).name for src in srcs if src.strip().endswith(".js")]
+    return _module_text(*names)
 
 
 def _index_text() -> str:
@@ -104,6 +104,12 @@ def test_operations_board_helpers_are_rehoused() -> None:
 
 
 def test_operations_board_renders_the_packet_sections() -> None:
+    """The restored renderer's own section labels — read from the loaded scripts only.
+
+    Safe actions are intentionally absent: the restored Operations renderer does not display
+    them (the parked workbench lens did), so asserting them on the loaded page would be the
+    false-confidence class the 2026-09-18 review found.
+    """
     source = _refresh_text()
     missing = _missing(
         source,
@@ -114,17 +120,16 @@ def test_operations_board_renders_the_packet_sections() -> None:
             "Decisions owed",
             "Promotable runs",
             "Unhealthy workers",
-            "DEGRADED SURFACES",
-            "ATTENTION",
-            "SAFE ACTIONS",
-            "PROJECTION LAG",
-            "ATTEMPTS",
-            "GATES",
-            "APPROVALS",
-            "COMMAND JOURNAL",
+            "Degraded surfaces",
+            "Attention",
+            "Projection lag",
+            "Attempts",
+            "Gates",
+            "Approvals",
+            "Command journal",
         ),
     )
-    assert not missing, f"Operations board lost main's sections/labels: {missing}"
+    assert not missing, f"Operations board lost the restored sections/labels: {missing}"
 
 
 def test_operations_rows_click_through_to_run_detail() -> None:
@@ -159,9 +164,17 @@ def test_surface_failure_renders_the_named_reason_and_its_url() -> None:
 
 
 def test_panels_render_their_degraded_lists() -> None:
+    """The loaded panels render the degraded lists they are handed, never an all-clear.
+
+    The restored renderer renders the operations summary's degradation and the quality panel's
+    list; other surfaces report failure as their named per-panel error (renderSurfaceError).
+    """
     source = _refresh_text()
-    assert source.count("data.degraded || []") >= 3, (
-        "quality/SLA/batch panels must render their degraded lists (A7), not an all-clear"
+    assert source.count("data.degraded || []") >= 2, (
+        "operations + quality must render their degraded lists (A7), not an all-clear"
+    )
+    assert "data.degraded.map((d) => d.surface)" in source, (
+        "the quality panel must name each degraded surface it was handed"
     )
 
 
