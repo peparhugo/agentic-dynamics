@@ -2683,15 +2683,18 @@ def _check_board_navigation(
     screenshots: bool,
     out: Path,
 ) -> None:
-    """The seven destinations: one visible board at a time, aria-current, no overflow."""
-    for name in ("desktop", "narrow"):
+    """The seven destinations: one visible board at a time, aria-current, no overflow.
+
+    Desktop runs in both themes (the profile's dark + light captures); narrow runs dark.
+    """
+    for theme, name in (("dark", "desktop"), ("light", "desktop"), ("dark", "narrow")):
         width, height = VIEWPORTS[name]
         records: list[dict[str, str]] = []
         context, page, console_errors = _boards_page(
-            browser, url, width, height, router=_boards_router(records)
+            browser, url, width, height, theme=theme, router=_boards_router(records)
         )
         _settle(page)
-        label = f"{name}/boards"
+        label = f"{name}/{theme}/boards"
         probe = page.evaluate(BOARDS_PROBE_JS)
         if probe["board"] != "fleet":
             _row(
@@ -2745,14 +2748,14 @@ def _check_board_navigation(
                 name == "desktop" or board in ("operations", "surfaces", "routing")
             )
             if capture:
-                shot = out / f"boards_{board}_{name}_dark_{width}x{height}.png"
+                shot = out / f"boards_{board}_{name}_{theme}_{width}x{height}.png"
                 page.screenshot(path=str(shot), full_page=False)
                 results.append(
                     {
                         "case": "boards-navigation",
                         "viewport": name,
                         "screenshot": str(shot),
-                        "theme": "dark",
+                        "theme": theme,
                         "board": board,
                     }
                 )
@@ -2763,7 +2766,7 @@ def _check_board_navigation(
             {
                 "case": "boards-navigation",
                 "viewport": name,
-                "check": "seven-boards",
+                "check": "seven-boards-%s" % theme,
                 "screenshot": "",
             }
         )
