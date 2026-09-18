@@ -64,9 +64,13 @@ class AugmentationOutcome:
     constructor_attempt_id: str = ""
     selected_evidence_ids: list[str] = field(default_factory=list)
     #: Per-evidence provenance for the selected set — [{"id","revision","source_type",
-    #: "locator"}]. The IDs alone cannot distinguish source revisions; this rides the
-    #: existing run result (no new dashboard).
+    #: "locator"}]. Follows the FINAL emitted set (the constructor may trim evidence), so
+    #: it never claims a source the worker did not receive; rides the existing run result.
     selected_evidence: list[dict[str, str]] = field(default_factory=list)
+    #: Named causes for retrieval legs that failed or exceeded the budget
+    #: ({"dense"|"lexical"|"embedding"|"expansion": reason}) — carried through the
+    #: augmentation outcome into the run result so a degraded pass stays diagnosable.
+    retrieval_leg_errors: dict[str, str] = field(default_factory=dict)
     versions: dict[str, str] = field(default_factory=dict)
     token_counts: dict[str, int] = field(default_factory=dict)
     cost_usd: float = 0.0
@@ -164,6 +168,7 @@ def augment_prompt(
         if attempt is None:
             raise RuntimeError("retrieve returned no attempt")
         retrieval_mode = str(getattr(attempt, "fallback_mode", "") or "no_rag")
+        outcome.retrieval_leg_errors = dict(getattr(attempt, "leg_errors", {}) or {})
         outcome.retrieval_attempt_id = getattr(attempt, "retrieval_attempt_id", "") or _attempt_id(
             "retrieval", base_prompt, commit_sha
         )
@@ -197,15 +202,31 @@ def augment_prompt(
             augmented, "constructor_attempt_id", ""
         ) or _attempt_id("constructor", base_prompt, commit_sha, constructor_model)
         outcome.selected_evidence_ids = list(getattr(augmented, "evidence_ids", []) or [])
-        outcome.selected_evidence = [
-            {
-                "id": str(getattr(c, "id", "") or ""),
-                "revision": str(getattr(c, "commit_sha", "") or ""),
-                "source_type": str(getattr(c, "source_type", "") or ""),
-                "locator": str(getattr(c, "locator", "") or ""),
-            }
+        # Provenance follows the FINAL emitted set (review finding P2): the constructor may
+        # trim evidence to fit its token budget, so copying the retrieval-level selection
+        # would claim sources the worker never received. Map the final ids back to the
+        # attempt's candidates for revision/source-type/locator.
+        by_id = {
+            str(getattr(c, "id", "") or ""): c
             for c in (getattr(attempt, "selected_evidence", []) or [])
-        ]
+        }
+        outcome.selected_evidence = []
+        for evidence_id in outcome.selected_evidence_ids:
+            candidate = by_id.get(str(evidence_id))
+            outcome.selected_evidence.append(
+                {
+                    "id": str(evidence_id),
+                    "revision": (
+                        str(getattr(candidate, "commit_sha", "") or "") if candidate else ""
+                    ),
+                    "source_type": (
+                        str(getattr(candidate, "source_type", "") or "") if candidate else ""
+                    ),
+                    "locator": (
+                        str(getattr(candidate, "locator", "") or "") if candidate else ""
+                    ),
+                }
+            )
         outcome.versions = dict(getattr(augmented, "versions", {}) or {})
         outcome.token_counts = dict(getattr(augmented, "token_counts", {}) or {})
         outcome.cost_usd = float(getattr(augmented, "cost_usd", 0.0) or 0.0)

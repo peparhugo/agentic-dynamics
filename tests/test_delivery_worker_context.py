@@ -109,10 +109,13 @@ def _fake_agent(**overrides):
 
 
 class _DenseStub:
-    def __init__(self, hits):
-        self._hits = list(hits)
+    def __init__(self, hits=None, *, exc=None):
+        self._hits = list(hits or [])
+        self._exc = exc
 
     def search(self, query, *, top_k=10, where=None):
+        if self._exc is not None:
+            raise self._exc
         return list(self._hits)
 
 
@@ -277,3 +280,97 @@ def test_unavailable_retrieval_is_reported_distinct_from_empty(tmp_path):
     )
     assert healthy_empty.phases[0].fallback_mode == "full"
     assert healthy_empty.phases[0].selected_evidence_ids == []
+
+
+def _construct_trimming(request):
+    """The deterministic renderer, simulating a constructor that TRIMS evidence to fit."""
+    kept = list(request.evidence)[:1]
+    plan = PromptPlan(
+        schema_version="prompt-plan/v1",
+        task_intent="trim fixture",
+        raw_work_item_hash=hash_work_item(request.raw_work_item),
+    )
+    prompt = render_prompt(plan, request, kept)
+    return AugmentedPrompt(
+        prompt=prompt,
+        prompt_plan=plan,
+        raw_work_item_hash=hash_work_item(request.raw_work_item),
+        constructor_model=request.constructor_model,
+        schema_version="prompt-plan/v1",
+        evidence_ids=[e.knowledge_id for e in kept],
+        token_count=0,
+        fallback=True,
+        repair_count=0,
+        validator_errors=[],
+    )
+
+
+def test_provenance_follows_the_trimmed_final_selection(tmp_path):
+    spec = _spec(tmp_path)
+    dense = _DenseStub(
+        [_dense_hit("k1", "FIRST-MARKER alpha"), _dense_hit("k2", "SECOND-MARKER beta")]
+    )
+    graph = _GraphStub([])
+    seen: dict[str, int] = {}
+
+    def recording_retrieve(**kwargs):
+        attempt = retrieve(**kwargs, dense_store=dense, graph_client=graph, deadline_s=2.0)
+        seen["selected"] = len(attempt.selected_evidence)
+        return attempt
+
+    captured: list[str] = []
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        captured.append(prompt)
+        return _fake_agent()
+
+    result = run_workflow(
+        spec,
+        goal="deliver the bounded change",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        rag_augment=True,
+        retrieve_fn=recording_retrieve,
+        construct_fn=_construct_trimming,
+        run_agentic_fn=agent,
+    )
+    phase = result.phases[0]
+    assert phase.status == "ok", phase.error
+    # The retrieval found two; the constructor emitted one (simulated trim).
+    assert seen["selected"] == 2
+    assert len(phase.selected_evidence_ids) == 1
+    trimmed_id = phase.selected_evidence_ids[0]
+    # Provenance claims ONLY the emitted source — never the trimmed-away one.
+    assert [e["id"] for e in phase.augmentation_evidence] == [trimmed_id]
+    emitted_marker = "FIRST-MARKER" if trimmed_id == "k1" else "SECOND-MARKER"
+    other_marker = "SECOND-MARKER" if trimmed_id == "k1" else "FIRST-MARKER"
+    assert captured and emitted_marker in captured[0]
+    assert other_marker not in captured[0]
+
+
+def test_degraded_leg_causes_reach_the_run_result(tmp_path):
+    spec = _spec(tmp_path)
+    dense = _DenseStub(exc=RuntimeError("dense backend down"))
+    graph = _GraphStub([_lex_hit("k_private", PRIVATE)])
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        return _fake_agent()
+
+    result = run_workflow(
+        spec,
+        goal="deliver",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        rag_augment=True,
+        retrieve_fn=functools.partial(
+            retrieve, dense_store=dense, graph_client=graph, deadline_s=2.0
+        ),
+        construct_fn=_construct,
+        run_agentic_fn=agent,
+    )
+    phase = result.phases[0]
+    assert "dense" in phase.retrieval_leg_errors
+    assert "dense backend down" in phase.retrieval_leg_errors["dense"]
+    assert result.to_dict()["phases"][0]["retrieval_leg_errors"] == phase.retrieval_leg_errors
