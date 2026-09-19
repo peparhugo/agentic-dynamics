@@ -325,16 +325,16 @@ def default_retrieve_fn() -> Callable[..., Any]:
     ``Neo4jClient`` uses its own URI/auth constructor defaults (env-overridable per
     ``graph.py``).
     """
-    from agentic_dynamics.knowledge.embeddings import ChromaStore
     from agentic_dynamics.knowledge.graph import Neo4jClient
+    from agentic_dynamics.knowledge.neo4j_vectors import Neo4jVectorStore
     from agentic_dynamics.knowledge.retrieval import retrieve as _retrieve
 
-    # Dense leg: runtime-RAG knowledge chunks live in their own collection, isolated
-    # from the historical ``session_embeddings`` collection.
+    # Dense leg: embeddings ride the SAME Knowledge nodes the lexical leg reads (operator
+    # decision 2026-09-19 — the Chroma service is retired; one store, one client lifecycle).
     dense_store: Any = None
     dense_cause = ""
     try:
-        dense_store = ChromaStore(collection_name="knowledge_chunks_v1")
+        dense_store = Neo4jVectorStore()
     except Exception as exc:  # noqa: BLE001 — the cause is REPORTED through the leg
         dense_store = None
         dense_cause = f"{type(exc).__name__}: {exc}"
