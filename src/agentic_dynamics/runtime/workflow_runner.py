@@ -755,11 +755,9 @@ def _build_phase_prompt(
     )
     context = (domain_context or "").strip()
     if context and not template_refs_context:
-        prompt = (
-            f"{prompt}\n\nSPEC CONTEXT (the workflow's declared domain context — "
-            f"constraints, canonical sources, and verification contract; follow it):\n"
-            f"{context}\n"
-        )
+        prompt = f"{prompt}\n\nSPEC CONTEXT (the workflow's declared domain context — " \
+                 f"constraints, canonical sources, and verification contract; follow it):\n" \
+                 f"{context}\n"
     return prompt
 
 
@@ -788,9 +786,7 @@ def _git_commit_verbose(workdir: Path, phase: str, goal: str) -> tuple[str, str]
     try:
         subprocess.run(
             ["git", "add", "-A", "--", ":(exclude).instrument", ":(exclude).fleet"],
-            cwd=workdir,
-            capture_output=True,
-            timeout=60,
+            cwd=workdir, capture_output=True, timeout=60,
         )
         staged = subprocess.run(
             ["git", "diff", "--cached", "--quiet"], cwd=workdir, capture_output=True
@@ -799,18 +795,13 @@ def _git_commit_verbose(workdir: Path, phase: str, goal: str) -> tuple[str, str]
             return "", "nothing_to_commit"
         msg = f"[workflow] {phase} — {goal[:60]}"
         c = subprocess.run(
-            ["git", "commit", "-q", "-m", msg],
-            cwd=workdir,
-            capture_output=True,
-            text=True,
-            timeout=120,
+            ["git", "commit", "-q", "-m", msg], cwd=workdir, capture_output=True,
+            text=True, timeout=120,
         )
         if c.returncode != 0:
             detail = (c.stderr or c.stdout or "").strip().replace("\n", " ")[:200]
             return "", f"commit_failed: {detail or f'git commit exited {c.returncode}'}"
-        h = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"], cwd=workdir, capture_output=True, text=True
-        )
+        h = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=workdir, capture_output=True, text=True)
         return h.stdout.strip(), ""
     except Exception as exc:
         return "", f"git_error: {exc!r}"
@@ -823,9 +814,7 @@ def _git_commit(workdir: Path, phase: str, goal: str) -> str:
 
 def _git_head(workdir: Path) -> str:
     try:
-        h = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"], cwd=workdir, capture_output=True, text=True
-        )
+        h = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=workdir, capture_output=True, text=True)
         return h.stdout.strip()
     except Exception:
         return ""
@@ -911,9 +900,7 @@ def _materialize_revision(wd: Path, rev: str) -> Path | None:
     try:
         proc = subprocess.run(
             ["git", "worktree", "add", "--detach", str(checkout), rev],
-            cwd=str(wd),
-            capture_output=True,
-            timeout=120,
+            cwd=str(wd), capture_output=True, timeout=120,
         )
     except Exception:  # noqa: BLE001 — materialization is best-effort, never a gate
         shutil.rmtree(tmp, ignore_errors=True)
@@ -931,9 +918,7 @@ def _remove_materialized_revision(wd: Path, checkout: Path | None) -> None:
     with contextlib.suppress(Exception):
         subprocess.run(
             ["git", "worktree", "remove", "--force", str(checkout)],
-            cwd=str(wd),
-            capture_output=True,
-            timeout=60,
+            cwd=str(wd), capture_output=True, timeout=60,
         )
     with contextlib.suppress(Exception):
         shutil.rmtree(checkout.parent, ignore_errors=True)
@@ -955,12 +940,8 @@ def _sonar_evidence(
     ``{"status", "revision_matches"|None, "new_critical_count"|None, "analyzed_sha"}``.
     """
     if parent_checkout is None:
-        return {
-            "status": SONAR_STATUS_UNAVAILABLE,
-            "revision_matches": None,
-            "new_critical_count": None,
-            "analyzed_sha": "",
-        }
+        return {"status": SONAR_STATUS_UNAVAILABLE, "revision_matches": None,
+                "new_critical_count": None, "analyzed_sha": ""}
 
     parent_key = project_key_for(wd, parent_rev)
     after_key = project_key_for(wd, full_rev)
@@ -969,36 +950,24 @@ def _sonar_evidence(
         # ``project_key`` is passed explicitly for the parent so its key stays consistent with
         # the phase revision's (same worktree base, different rev prefix) — otherwise the temp
         # checkout's dir name would produce a different, non-comparable key.
-        before = run_sonar_analysis(
-            str(parent_checkout), project_key=parent_key, revision=parent_rev
-        )
+        before = run_sonar_analysis(str(parent_checkout), project_key=parent_key, revision=parent_rev)
         after = run_sonar_analysis(str(wd), revision=full_rev)
         before_status = getattr(before, "status", SONAR_STATUS_UNAVAILABLE)
         after_status = getattr(after, "status", SONAR_STATUS_UNAVAILABLE)
         # A stale-refused or unavailable revision cannot produce a before/after delta — fail
         # closed with the measured status (null-not-zero, never a fabricated 0).
         if before_status != SONAR_STATUS_AVAILABLE or after_status != SONAR_STATUS_AVAILABLE:
-            status = (
-                SONAR_STATUS_STALE_REFUSED
-                if (
-                    before_status == SONAR_STATUS_STALE_REFUSED
-                    or after_status == SONAR_STATUS_STALE_REFUSED
-                )
-                else SONAR_STATUS_UNAVAILABLE
-            )
+            status = SONAR_STATUS_STALE_REFUSED if (
+                before_status == SONAR_STATUS_STALE_REFUSED
+                or after_status == SONAR_STATUS_STALE_REFUSED
+            ) else SONAR_STATUS_UNAVAILABLE
             revision_matches = (
-                True
-                if status == SONAR_STATUS_AVAILABLE
-                else False
-                if status == SONAR_STATUS_STALE_REFUSED
+                True if status == SONAR_STATUS_AVAILABLE
+                else False if status == SONAR_STATUS_STALE_REFUSED
                 else None
             )
-            return {
-                "status": status,
-                "revision_matches": revision_matches,
-                "new_critical_count": None,
-                "analyzed_sha": getattr(after, "analyzed_sha", ""),
-            }
+            return {"status": status, "revision_matches": revision_matches,
+                    "new_critical_count": None, "analyzed_sha": getattr(after, "analyzed_sha", "")}
 
         before_issues = fetch_sonar_issues(parent_key, severities="BLOCKER,CRITICAL")
         after_issues = fetch_sonar_issues(after_key, severities="BLOCKER,CRITICAL")
@@ -1012,12 +981,8 @@ def _sonar_evidence(
 
     returned, result = _call_with_deadline(_leg, timeout=ANALYZER_LEG_TIMEOUT_SECONDS)
     if not returned or result is None:
-        return {
-            "status": SONAR_STATUS_UNAVAILABLE,
-            "revision_matches": None,
-            "new_critical_count": None,
-            "analyzed_sha": "",
-        }
+        return {"status": SONAR_STATUS_UNAVAILABLE, "revision_matches": None,
+                "new_critical_count": None, "analyzed_sha": ""}
     return result
 
 
@@ -1043,17 +1008,11 @@ def _lsp_evidence(
         before_ok = bool(getattr(before, "available", False))
         after_ok = bool(getattr(after, "available", False))
         if not before_ok or not after_ok:
-            return {
-                "status": "unavailable",
-                "new_error_count": None,
-                "tool": getattr(after, "tool", "") or "mypy",
-            }
+            return {"status": "unavailable", "new_error_count": None,
+                    "tool": getattr(after, "tool", "") or "mypy"}
         count = new_error_count(before, after)
-        return {
-            "status": "available",
-            "new_error_count": count,
-            "tool": getattr(after, "tool", "") or "mypy",
-        }
+        return {"status": "available", "new_error_count": count,
+                "tool": getattr(after, "tool", "") or "mypy"}
 
     returned, result = _call_with_deadline(_leg, timeout=ANALYZER_LEG_TIMEOUT_SECONDS)
     if not returned or result is None:
@@ -1068,12 +1027,8 @@ def _unavailable_sonar_payload() -> dict[str, Any]:
     degraded return: ``{"status", "revision_matches"|None, "new_critical_count"|None,
     "analyzed_sha"}``. Null-not-zero, never a fabricated delta.
     """
-    return {
-        "status": SONAR_STATUS_UNAVAILABLE,
-        "revision_matches": None,
-        "new_critical_count": None,
-        "analyzed_sha": "",
-    }
+    return {"status": SONAR_STATUS_UNAVAILABLE, "revision_matches": None,
+            "new_critical_count": None, "analyzed_sha": ""}
 
 
 def _unavailable_lsp_payload() -> dict[str, Any]:
@@ -1358,7 +1313,9 @@ def _run_test_gate(
         # "the check ran and failed", never on "the environment refused". Prefix once.
         error = str(pr.error or "")
         if not error.startswith(("VERIFIER_", "ADMISSION_", "TEST_GATE:")):
-            pr.error = f"TEST_GATE: {error}" if error else ("TEST_GATE: verification failed")
+            pr.error = f"TEST_GATE: {error}" if error else (
+                "TEST_GATE: verification failed"
+            )
         return  # an already-failed verdict keeps its own evidence
     if empty_refuses and int(pr.tests_total or 0) == 0:
         pr.status = "failed"
@@ -1887,7 +1844,6 @@ def _executor_as_run_agent(
     match :class:`StepResult`'s field surface, so every post-phase decision reads both
     paths identically.
     """
-
     def _call(prompt: str, **agent_kwargs: Any) -> Any:
         phase = dict(phase_def)
         # Wave A2: the engine's loop hands the real attempt ordinal here; CONSUME it into the
@@ -1900,20 +1856,10 @@ def _executor_as_run_agent(
         # forward them to the adapter (the Docker executor ignores them — its container has
         # its own watchdog and its own fresh session).
         phase["_agent_kwargs"] = {
-            k: v
-            for k, v in agent_kwargs.items()
-            if k
-            not in (
-                "model",
-                "backend",
-                "workdir",
-                "thinking_effort",
-                "thinking_budget_tokens",
-                "output_token_limit",
-                "timeout",
-                "silent_mode",
-                "enforce_pytest",
-            )
+            k: v for k, v in agent_kwargs.items()
+            if k not in ("model", "backend", "workdir", "thinking_effort",
+                         "thinking_budget_tokens", "output_token_limit", "timeout",
+                         "silent_mode", "enforce_pytest")
         }
         return executor.execute(
             StepRequest(
@@ -1935,7 +1881,6 @@ def _executor_as_run_agent(
                 phase_def=phase,
             )
         )
-
     return _call
 
 
@@ -2094,16 +2039,16 @@ DEPLOY_OUTPUT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # (compile(, r", print(, quote) before the banner text. MULTILINE so the banner
     # matches as a standalone line anywhere in the output, not only at string end.
     (
-        re.compile(r"(?m)^(?![^\"'\n]*(?:compile\(|r\"|print\())[^\"'\n]*Deploy\s+complete!$"),
+        re.compile(
+            r"(?m)^(?![^\"'\n]*(?:compile\(|r\"|print\())[^\"'\n]*Deploy\s+complete!$"
+        ),
         "firebase deploy output (Deploy complete!)",
     ),
     # hosting[<host>] progress lines are real firebase output when they carry the
     # deploy verb context ("beginning deploy" / "deploying") — a bare hosting[<host>]
     # substring appears in source files (compose yml, docs) and is NOT a banner.
     (
-        re.compile(
-            r"hosting\[(?:ai-finops-rulebook|agentic-dynamics)\][^\n]*(?:beginning|deploying|Deploying|complete|Complete)"
-        ),
+        re.compile(r"hosting\[(?:ai-finops-rulebook|agentic-dynamics)\][^\n]*(?:beginning|deploying|Deploying|complete|Complete)"),
         "firebase hosting[<production-host>] output",
     ),
     (
@@ -2174,11 +2119,9 @@ def _deploy_pattern_match(command: str) -> str | None:
     # prefixes). Anything else — git, echo, grep, cat, python, cp, rg — means firebase
     # is an argument, not the executed command.
     known_launchers = ("npx ", "yarn ", "sudo ", "firebase ", "./firebase", "env ")
-    starts_at_command = (
-        head.startswith("firebase")
-        or any(head.startswith(ln) for ln in known_launchers)
-        or bool(re.match(r"^[A-Za-z_][A-Za-z0-9_]*=[^\s]*\s+(?:npx\s+|sudo\s+)?firebase\b", head))
-    )
+    starts_at_command = head.startswith("firebase") or any(
+        head.startswith(ln) for ln in known_launchers
+    ) or bool(re.match(r"^[A-Za-z_][A-Za-z0-9_]*=[^\s]*\s+(?:npx\s+|sudo\s+)?firebase\b", head))
     if not starts_at_command:
         # Also allow a compound whose LAST command is firebase (a &&/;/| chain ending in
         # the deploy): `build && firebase deploy` IS a deploy act.
@@ -2193,9 +2136,7 @@ def _deploy_pattern_match(command: str) -> str | None:
             r"^(?:(?:[A-Za-z_][A-Za-z0-9_]*=[^\s]*\s+)?(?:&&|\|\||;)\s+)*"
             r"(?:sh|bash)\s+-c\s+[\"']",
             head,
-        ) or re.match(
-            r"^(?:(?:[A-Za-z_][A-Za-z0-9_]*=[^\s]*\s+)?(?:&&|\|\||;)\s+)*eval\s+[\"']", head
-        )
+        ) or re.match(r"^(?:(?:[A-Za-z_][A-Za-z0-9_]*=[^\s]*\s+)?(?:&&|\|\||;)\s+)*eval\s+[\"']", head)
         wrap_ok = bool(wrap_at_command) and bool(
             re.search(r"firebase\b", head.split("&&")[-1].split("||")[-1].split(";")[-1])
         )
@@ -2242,7 +2183,9 @@ def _scan_transcript_for_deploys(transcript: Path) -> list[dict[str, Any]]:
         for command in _commands_from_event(event):
             matched = _deploy_pattern_match(command)
             if matched is not None:
-                violations.append({"command": command, "pattern": matched, "line": line[:2000]})
+                violations.append(
+                    {"command": command, "pattern": matched, "line": line[:2000]}
+                )
                 continue
             # OUTPUT tier (indirection — a script/alias/variable that reached firebase deploy):
             # a real production deploy prints its banner in the tool output no matter how it
@@ -2292,7 +2235,8 @@ def _enforce_deploy_gate(
     pr.deploy_gate = {"reason": "DEPLOY_GATE", "violations": violations}
     offending = "; ".join(f"'{v['command']}'" for v in violations)
     msg = (
-        f"DEPLOY_GATE — firebase production deploy in phase not marked deploy_allowed: {offending}"
+        f"DEPLOY_GATE — firebase production deploy in phase not marked deploy_allowed: "
+        f"{offending}"
     )
     if pr.status == "ok":
         pr.status = "failed"
@@ -2351,11 +2295,7 @@ def _git_log_commits(
             argv.append("--first-parent")
         argv += ["--format=%H|%s|%ae", rev_range]
         log = subprocess.run(
-            argv,
-            cwd=workdir,
-            capture_output=True,
-            text=True,
-            timeout=30,
+            argv, cwd=workdir, capture_output=True, text=True, timeout=30,
         )
     except Exception:  # noqa: BLE001 — a git problem degrades to "no commits to check"
         return []
@@ -2407,7 +2347,6 @@ def _install_commit_msg_hook(wd: Path, phase_name: str, goal: str) -> None:
     if os.environ.get("FINOPS_COMMIT_HOOK", "1") == "0":
         return
     expected = f"[workflow] {phase_name} — {_goal_prefix(goal)}"
-
     # A campaign worktree's ``.git`` is a FILE (pointing at the shared git dir), not a
     # directory — writing to ``wd/.git/hooks/`` fails silently (the 2d run's p5 lesson:
     # the hook never installed, the wrapper's commit landed unprefixed, the gate failed
@@ -2418,11 +2357,8 @@ def _install_commit_msg_hook(wd: Path, phase_name: str, goal: str) -> None:
     def _git_path(kind: str) -> Path | None:
         try:
             r = subprocess.run(
-                ["git", "rev-parse", "--git-path", kind],
-                cwd=wd,
-                capture_output=True,
-                text=True,
-                timeout=15,
+                ["git", "rev-parse", "--git-path", kind], cwd=wd,
+                capture_output=True, text=True, timeout=15,
             )
             raw = r.stdout.strip()
             if r.returncode != 0 or not raw:
@@ -2502,11 +2438,8 @@ def _canonicalize_commit_range(
     # filter-branch's temp-checkout cwd.
     try:
         gp = subprocess.run(
-            ["git", "rev-parse", "--git-path", "commit_prefix_filter.py"],
-            cwd=wd,
-            capture_output=True,
-            text=True,
-            timeout=15,
+            ["git", "rev-parse", "--git-path", "commit_prefix_filter.py"], cwd=wd,
+            capture_output=True, text=True, timeout=15,
         )
         raw = gp.stdout.strip()
         if gp.returncode == 0 and raw:
@@ -2534,11 +2467,7 @@ def _canonicalize_commit_range(
         rng = f"{pre_head}..HEAD" if pre_head else "HEAD"
         run = subprocess.run(
             ["git", "filter-branch", "--msg-filter", f"{sys.executable} {script}", "--", rng],
-            cwd=wd,
-            capture_output=True,
-            text=True,
-            timeout=300,
-            env=env,
+            cwd=wd, capture_output=True, text=True, timeout=300, env=env,
         )
         if run.returncode != 0:
             return None
@@ -2546,19 +2475,13 @@ def _canonicalize_commit_range(
         # confuse a later relabel-tree comparison).
         try:
             branch = subprocess.run(
-                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                cwd=wd,
-                capture_output=True,
-                text=True,
-                timeout=15,
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=wd,
+                capture_output=True, text=True, timeout=15,
             ).stdout.strip()
             if branch and branch != "HEAD":
                 subprocess.run(
                     ["git", "update-ref", "-d", f"refs/original/refs/heads/{branch}"],
-                    cwd=wd,
-                    capture_output=True,
-                    text=True,
-                    timeout=15,
+                    cwd=wd, capture_output=True, text=True, timeout=15,
                 )
         except Exception:  # noqa: BLE001 — the backup-ref cleanup is best-effort
             pass
@@ -2570,12 +2493,7 @@ def _canonicalize_commit_range(
 #: The doc-lifecycle status vocabulary (the contract — must stay in lockstep with
 #: tests/test_doc_lifecycle.py's STATUS_VOCABULARY).
 DOC_STATUS_VOCABULARY = {
-    "proposed",
-    "accepted",
-    "implementing",
-    "implemented",
-    "superseded",
-    "abandoned",
+    "proposed", "accepted", "implementing", "implemented", "superseded", "abandoned",
 }
 
 
@@ -2596,18 +2514,11 @@ def _enforce_doc_contract(pr: PhaseResult, wd: Path, pre_head: str | None) -> No
         if pre_head:
             r = subprocess.run(
                 ["git", "diff", "--name-only", f"{pre_head}..HEAD", "--", "docs/"],
-                cwd=wd,
-                capture_output=True,
-                text=True,
-                timeout=30,
+                cwd=wd, capture_output=True, text=True, timeout=30,
             )
         else:
             r = subprocess.run(
-                ["git", "ls-files", "docs/"],
-                cwd=wd,
-                capture_output=True,
-                text=True,
-                timeout=30,
+                ["git", "ls-files", "docs/"], cwd=wd, capture_output=True, text=True, timeout=30,
             )
         paths = [ln for ln in r.stdout.splitlines() if ln.strip().endswith(".md")]
     except Exception:  # noqa: BLE001 — an unreadable git state degrades to "no check"
@@ -2716,17 +2627,11 @@ def _enforce_commit_prefix(
             try:
                 tracked = subprocess.run(
                     ["git", "diff", "--quiet", pre_head, "--", "."],
-                    cwd=wd,
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
+                    cwd=wd, capture_output=True, text=True, timeout=30,
                 ).returncode
                 untracked = subprocess.run(
                     ["git", "ls-files", "--others", "--exclude-standard"],
-                    cwd=wd,
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
+                    cwd=wd, capture_output=True, text=True, timeout=30,
                 ).stdout.strip()
                 changed = tracked != 0 or bool(untracked)
             except Exception:  # noqa: BLE001 — a git problem degrades to "no change check"
@@ -2738,10 +2643,7 @@ def _enforce_commit_prefix(
             try:
                 untracked = subprocess.run(
                     ["git", "ls-files", "--others", "--exclude-standard"],
-                    cwd=wd,
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
+                    cwd=wd, capture_output=True, text=True, timeout=30,
                 ).stdout.strip()
                 changed = bool(untracked)
             except Exception:  # noqa: BLE001 — a git problem degrades to "no change check"
@@ -2828,7 +2730,9 @@ def _enforce_commit_prefix(
         "offenders": [{"sha": sha, "subject": subject} for sha, subject in bad],
         "expected_prefix": expected,
     }
-    offenders_txt = ", ".join(f"{subject!r} ({sha[:12]})" for sha, subject in bad)
+    offenders_txt = ", ".join(
+        f"{subject!r} ({sha[:12]})" for sha, subject in bad
+    )
     msg = (
         f"COMMIT_PREFIX — commits made during phase '{phase_name}' do not match "
         f"'{expected}': {offenders_txt} "
@@ -2870,35 +2774,15 @@ APPROVALS_DIRNAME = "approvals"
 #: whitespace-collapsed) is unsigned and refuses to authorize a reuse.
 PLACEHOLDER_OPERATORS = frozenset(
     {
-        "operator",
-        "your name",
-        "your-name",
-        "your signature",
-        "sign here",
-        "sign-here",
-        "todo",
-        "tbd",
-        "n/a",
-        "na",
-        "xxx",
-        "???",
-        "<name>",
-        "placeholder",
-        "name",
+        "operator", "your name", "your-name", "your signature", "sign here", "sign-here",
+        "todo", "tbd", "n/a", "na", "xxx", "???", "<name>", "placeholder", "name",
     }
 )
 
 
 def discarded_trees_path(spec_name: str) -> Path:
     """The discarded-trees ledger for a spec (append-only JSONL)."""
-    return (
-        PROJECT_ROOT
-        / "experiments"
-        / "results"
-        / "workflows"
-        / spec_name
-        / DISCARDED_TREES_FILENAME
-    )
+    return PROJECT_ROOT / "experiments" / "results" / "workflows" / spec_name / DISCARDED_TREES_FILENAME
 
 
 def _git_tree_hash(workdir: Path, rev: str = "HEAD") -> str:
@@ -2944,10 +2828,7 @@ def _git_tree_hash(workdir: Path, rev: str = "HEAD") -> str:
         # no-op.)
         removed = subprocess.run(
             ["git", "rm", "-r", "-f", "--cached", "-q", "--ignore-unmatch", "--", "approvals"],
-            cwd=workdir,
-            env=env,
-            capture_output=True,
-            timeout=30,
+            cwd=workdir, env=env, capture_output=True, timeout=30,
         )
         if removed.returncode != 0:
             print(
@@ -2980,19 +2861,14 @@ def _worktree_branch(workdir: Path) -> str:
     try:
         r = subprocess.run(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            cwd=workdir,
-            capture_output=True,
-            text=True,
-            timeout=30,
+            cwd=workdir, capture_output=True, text=True, timeout=30,
         )
         return r.stdout.strip() if r.returncode == 0 else ""
     except Exception:  # noqa: BLE001
         return ""
 
 
-def load_discarded_trees(
-    spec_name: str, *, ledger_path: Path | None = None
-) -> list[dict[str, Any]]:
+def load_discarded_trees(spec_name: str, *, ledger_path: Path | None = None) -> list[dict[str, Any]]:
     """Read the discarded-trees ledger for ``spec_name`` (one dict per entry; bad lines skipped)."""
     path = Path(ledger_path) if ledger_path is not None else discarded_trees_path(spec_name)
     try:
@@ -3122,15 +2998,10 @@ def approval_authorizes_tree(
     rel = path.relative_to(wd).as_posix()
     if pre_head:
         try:
-            present = (
-                subprocess.run(
-                    ["git", "cat-file", "-e", f"{pre_head}:{rel}"],
-                    cwd=wd,
-                    capture_output=True,
-                    timeout=30,
-                ).returncode
-                == 0
-            )
+            present = subprocess.run(
+                ["git", "cat-file", "-e", f"{pre_head}:{rel}"],
+                cwd=wd, capture_output=True, timeout=30,
+            ).returncode == 0
         except Exception:  # noqa: BLE001 — an unresolvable pre-head refuses the approval
             present = False
         evidence["present_at_pre_head"] = present
@@ -3188,7 +3059,10 @@ def _enforce_tree_gate(
     branch = _worktree_branch(wd)
     discarded = load_discarded_trees(spec_name, ledger_path=ledger_path)
     match = next(
-        (d for d in discarded if d.get("tree_hash") == phase_tree and d.get("branch") == branch),
+        (
+            d for d in discarded
+            if d.get("tree_hash") == phase_tree and d.get("branch") == branch
+        ),
         None,
     )
     if match is None:
@@ -3342,10 +3216,7 @@ def _tree_of(wd: Path, commit: str) -> str | None:
     try:
         out = subprocess.run(
             ["git", "rev-parse", f"{commit}^{{tree}}"],
-            cwd=wd,
-            capture_output=True,
-            text=True,
-            timeout=30,
+            cwd=wd, capture_output=True, text=True, timeout=30,
         )
     except (OSError, subprocess.SubprocessError):
         return None
@@ -3388,11 +3259,7 @@ def _phase_commit_sha(workdir: Path, phase_name: str, goal: str) -> str:
     """
     try:
         log = subprocess.run(
-            ["git", "log", "--format=%H %s"],
-            cwd=workdir,
-            capture_output=True,
-            text=True,
-            timeout=30,
+            ["git", "log", "--format=%H %s"], cwd=workdir, capture_output=True, text=True, timeout=30
         )
     except Exception:  # noqa: BLE001 — a git problem degrades to "no checkpoint commit"
         return ""
@@ -3442,33 +3309,18 @@ def _checkpoint_approval_valid(
         return False, evidence
     rel = path.relative_to(wd).as_posix()
     try:
-        at_head = (
-            subprocess.run(
-                ["git", "cat-file", "-e", f"HEAD:{rel}"],
-                cwd=wd,
-                capture_output=True,
-                timeout=30,
-            ).returncode
-            == 0
-        )
-        at_checkpoint = (
-            subprocess.run(
-                ["git", "cat-file", "-e", f"{checkpoint_commit}:{rel}"],
-                cwd=wd,
-                capture_output=True,
-                timeout=30,
-            ).returncode
-            == 0
-        )
-        ancestor = (
-            subprocess.run(
-                ["git", "merge-base", "--is-ancestor", checkpoint_commit, "HEAD"],
-                cwd=wd,
-                capture_output=True,
-                timeout=30,
-            ).returncode
-            == 0
-        )
+        at_head = subprocess.run(
+            ["git", "cat-file", "-e", f"HEAD:{rel}"],
+            cwd=wd, capture_output=True, timeout=30,
+        ).returncode == 0
+        at_checkpoint = subprocess.run(
+            ["git", "cat-file", "-e", f"{checkpoint_commit}:{rel}"],
+            cwd=wd, capture_output=True, timeout=30,
+        ).returncode == 0
+        ancestor = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", checkpoint_commit, "HEAD"],
+            cwd=wd, capture_output=True, timeout=30,
+        ).returncode == 0
     except Exception:  # noqa: BLE001 — an unresolvable git state refuses the approval
         at_head, at_checkpoint, ancestor = False, True, False
     evidence["committed_at_head"] = at_head
@@ -3661,14 +3513,8 @@ def _first_unsatisfied_checkpoint(
     the typed-capture and the gate read the contracts exactly once each.
     """
     _, unsatisfied = _checkpoint_contract_decisions(
-        wd,
-        spec,
-        phases,
-        completed,
-        goal,
-        run_id=run_id,
-        gate_id=gate_id,
-        reached=reached,
+        wd, spec, phases, completed, goal,
+        run_id=run_id, gate_id=gate_id, reached=reached,
         inherited_origins=inherited_origins,
     )
     return unsatisfied
@@ -3687,7 +3533,7 @@ def _apply_attempt_totals(
     """
     if not rows:
         return
-    for attempt_row in rows if include_last else rows[:-1]:
+    for attempt_row in (rows if include_last else rows[:-1]):
         pr.cost_usd = round(pr.cost_usd + float(attempt_row.get("cost_usd") or 0.0), 6)
         for key, value in (attempt_row.get("tokens") or {}).items():
             pr.tokens[key] = int(pr.tokens.get(key, 0)) + int(value)
@@ -3759,7 +3605,9 @@ def _build_attempt_records(result: WorkflowRunResult, job_id: str) -> list[Attem
                         leased_at=row.get("leased_at"),
                         first_token_at=row.get("first_token_at"),
                         test_executed_success=(phase.test_executed_success if is_final else None),
-                        evaluator_independent=(phase.evaluator_independent if is_final else None),
+                        evaluator_independent=(
+                            phase.evaluator_independent if is_final else None
+                        ),
                         cost_inference=(phase.cost_inference if is_final else None),
                         cost_orchestration=(phase.cost_orchestration if is_final else None),
                         confidence=(phase.confidence if is_final else None),
@@ -4037,10 +3885,8 @@ def run_workflow(
     # byte-for-byte identical to ``_build_phase_prompt``. ``retrieve_fn``/``construct_fn``
     # are injectable for tests; when unset, production resolves the real retrieve +
     # a constructor whose model call reuses ``run_agent`` (default flash model).
-    rag_augment = (
-        rag_augment
-        if rag_augment is not None
-        else bool(spec.workflow.params.get("rag_augment", False))
+    rag_augment = rag_augment if rag_augment is not None else bool(
+        spec.workflow.params.get("rag_augment", False)
     )
     rag_params = _resolve_rag_params(spec, rag_params, wd=wd, rag_augment=rag_augment)
     # The domain-context transport (AIO remediation 2026-09-14) — resolved HERE, by the
@@ -4048,20 +3894,15 @@ def run_workflow(
     # caller) gets the spec's declared constraints transported into the phase prompts. An
     # explicit kwarg outranks the spec (the CLI passes the same value — one source of truth).
     if domain_context is None:
-        domain_context = (
-            str(((spec.workflow.params or {}).get("context") or {}).get("domain_context") or "")
-            or None
-        )
+        domain_context = str(
+            ((spec.workflow.params or {}).get("context") or {}).get("domain_context") or ""
+        ) or None
     pinned_policy = str(rag_params.get("pinned_policy", ""))
     inherited_tools = list(rag_params.get("inherited_tools") or DEFAULT_INHERITED_TOOLS)
 
     result = WorkflowRunResult(
-        spec_name=spec.name,
-        spec_id=spec.spec_id,
-        model=model,
-        workdir=str(wd),
-        goal=goal,
-        started_at=_now(),
+        spec_name=spec.name, spec_id=spec.spec_id, model=model, workdir=str(wd),
+        goal=goal, started_at=_now(),
         # w2 (revision identity): pin the canonical spec digest this run executes at
         # construction, so a later edit to the spec file cannot retroactively re-key the
         # ledger (completion follows the revision the run actually executed).
@@ -4077,13 +3918,10 @@ def run_workflow(
     publisher = publisher_factory(cell_id) if (publish and publisher_factory) else None
     if publisher is not None and publisher.enabled:
         publisher.set_status("running")
-        publisher.publish_event(
-            {
-                "type": "text",
-                "sessionID": cell_id,
-                "part": {"text": f"workflow {spec.name} — {goal[:120]}"},
-            }
-        )
+        publisher.publish_event({
+            "type": "text", "sessionID": cell_id,
+            "part": {"text": f"workflow {spec.name} — {goal[:120]}"},
+        })
 
     prior: list[str] = []
     completed: set[str] = set()
@@ -4148,13 +3986,8 @@ def run_workflow(
         # + cost/token summary ride over from the previous run's typed record (best-effort)
         # so the operator-await latency survives the ledger boundary.
         decisions, unsatisfied = _checkpoint_contract_decisions(
-            wd,
-            spec,
-            phases,
-            completed,
-            goal,
-            run_id=approval_run_id,
-            gate_id=approval_gate_id,
+            wd, spec, phases, completed, goal,
+            run_id=approval_run_id, gate_id=approval_gate_id,
             reached=reached_checkpoints,
             # The caller distinguishes the resume KIND: None = a legacy inference resume
             # (``resume=True`` with no selected parent); a mapping (even empty — the
@@ -4162,8 +3995,7 @@ def run_workflow(
             # whose expected run/gate binding must never be relaxed by the global index.
             inherited_origins=(
                 {entry["phase"]: entry for entry in resume_state.inherited_phases}
-                if resume_state is not None
-                else None
+                if resume_state is not None else None
             ),
         )
         for cphase, valid, evidence in decisions:
@@ -4184,13 +4016,10 @@ def run_workflow(
             )
             result.checkpoints.append(record)
             if publisher is not None and publisher.enabled:
-                publisher.publish_event(
-                    {
-                        "type": "checkpoint",
-                        "sessionID": cell_id,
-                        "part": record.to_dict(),
-                    }
-                )
+                publisher.publish_event({
+                    "type": "checkpoint", "sessionID": cell_id,
+                    "part": record.to_dict(),
+                })
         # A REACHED checkpoint whose contract just validated is now skippable — the approval
         # is the evidence that turns a stop into completion. (Invalid contracts return
         # below; a reached checkpoint is never skippable on its ``awaiting`` status alone.)
@@ -4208,9 +4037,7 @@ def run_workflow(
                     if pname in completed:
                         result.inherited_phases.append(
                             _inherited_entry(
-                                resume_state,
-                                pname,
-                                reached_checkpoints,
+                                resume_state, pname, reached_checkpoints,
                                 gate_id=approval_gate_id,
                             )
                         )
@@ -4233,7 +4060,9 @@ def run_workflow(
     # AFTER the checkpoint fold above: a final checkpoint approved by this resume completes
     # the phase set and must read as logical completion, not as a run that still has work.
     result.already_complete = bool(
-        resume and phases and {str(p.get("name", "?")) for p in phases} <= completed
+        resume
+        and phases
+        and {str(p.get("name", "?")) for p in phases} <= completed
     )
 
     fork_enabled = fork if fork is not None else bool(spec.workflow.params.get("fork", False))
@@ -4246,11 +4075,9 @@ def run_workflow(
         preferences = RoutingPreferences.from_dict(spec.workflow.params.get("preferences"))
     if signals is None:
         raw_signals = spec.workflow.params.get("signals") or {}
-        signals = (
-            {m: ModelSignals.from_dict(d) for m, d in raw_signals.items()}
-            if isinstance(raw_signals, dict)
-            else {}
-        )
+        signals = {m: ModelSignals.from_dict(d) for m, d in raw_signals.items()} if isinstance(
+            raw_signals, dict
+        ) else {}
 
     prev_session_id = ""
     prev_model = ""
@@ -4298,9 +4125,7 @@ def run_workflow(
             if resume_state is not None:
                 result.inherited_phases.append(
                     _inherited_entry(
-                        resume_state,
-                        name,
-                        reached_checkpoints,
+                        resume_state, name, reached_checkpoints,
                         gate_id=approval_gate_id,
                     )
                 )
@@ -4308,18 +4133,13 @@ def run_workflow(
             continue
         phase_timeout = int(phase_def.get("timeout", timeout))
         pr = PhaseResult(
-            phase=name,
-            kind=kind,
-            status="ok",
-            spec_id=spec.spec_id,
+            phase=name, kind=kind, status="ok", spec_id=spec.spec_id,
             requires_deliverable=bool(phase_def.get("requires_deliverable", False)),
         )
         # Publish the live phase as each phase *starts* (1-based index over the full
         # list, so resume keeps the original position). Display-only badge data.
         if publisher is not None and publisher.enabled:
-            display_index = (
-                (full_phase_index + 1) if full_phase_index is not None else phase_idx + 1
-            )
+            display_index = (full_phase_index + 1) if full_phase_index is not None else phase_idx + 1
             publisher.set_phase({"name": name, "index": display_index, "total": total})
         t0 = time.time()
         # e1 (control_db_evidence): the phase's process exit code, observed when the agent's
@@ -4355,17 +4175,10 @@ def run_workflow(
                 # verifier runs is the SAME target list the in-process path uses (local
                 # parity — test_suite_speed p2 scoping preserved on both sides).
                 _run_test_gate(
-                    pr,
-                    wd,
-                    language,
-                    phase_timeout,
-                    target=phase_def.get("tests"),
+                    pr, wd, language, phase_timeout, target=phase_def.get("tests"),
                     verifier_executor=verifier_executor,
                     containerized_path=containerized_path,
-                    phase_def=phase_def,
-                    name=name,
-                    model=model,
-                    goal=goal,
+                    phase_def=phase_def, name=name, model=model, goal=goal,
                     spec_name=spec.name,
                     # The explicit phase's b5 rule: zero tests refuse when a target was
                     # DECLARED; a whole-tree empty collection stays honest (no target).
@@ -4378,9 +4191,7 @@ def run_workflow(
                     # rewrite it. The hash the parent carried covers exactly these bytes.
                     prompt = str(phase_def.get("prompt", ""))
                 else:
-                    prompt = _build_phase_prompt(
-                        phase_def, goal, prior, domain_context=domain_context
-                    )
+                    prompt = _build_phase_prompt(phase_def, goal, prior, domain_context=domain_context)
                 # Point the agent's built-in publisher at this workflow's cell so the
                 # fine-grained session events stream into the Control Room.
                 prev_cell = os.environ.get("FINOPS_CELL_ID")
@@ -4472,8 +4283,7 @@ def run_workflow(
                             pinned_policy=pinned_policy,
                             rag_params=rag_params,
                             retrieve_fn=retrieve_fn or default_retrieve_fn(),
-                            construct_fn=construct_fn
-                            or default_construct_fn(rag_params, run_agent),
+                            construct_fn=construct_fn or default_construct_fn(rag_params, run_agent),
                         )
                         prompt = outcome.prompt
                         pr.raw_prompt_hash = outcome.raw_prompt_hash
@@ -4543,14 +4353,20 @@ def run_workflow(
                             "output_token_limit": output_token_limit,
                             "timeout": phase_timeout,
                             "silent_mode": silent_mode,
-                            "enforce_pytest": bool(phase_def.get("enforce_pytest", enforce_pytest)),
+                            "enforce_pytest": bool(
+                                phase_def.get("enforce_pytest", enforce_pytest)
+                            ),
                         }
                         # Cache-aware forking: reuse the previous phase's session prefix so
                         # the shared context is served as provider cache reads (DeepSeek
                         # cache read ~120x cheaper than input). A model switch breaks the
                         # cache prefix, so only fork when the model is unchanged. Both
                         # backends support it (opencode --session/--fork; claude --resume/--fork-session).
-                        if fork_enabled and prev_session_id and prev_model == attempt_model:
+                        if (
+                            fork_enabled
+                            and prev_session_id
+                            and prev_model == attempt_model
+                        ):
                             agent_kwargs["session_id"] = prev_session_id
                             agent_kwargs["fork"] = True
                         pr.model = attempt_model
@@ -4566,7 +4382,9 @@ def run_workflow(
                         # per attempt: one invocation, one stall window — an escalated retry
                         # must not inherit the failed attempt's stale clock.
                         watchdog_min = _resolve_watchdog_min(phase_watchdog_min)
-                        watchdog = PhaseWatchdog(git_wd, watchdog_min) if watchdog_min > 0 else None
+                        watchdog = (
+                            PhaseWatchdog(git_wd, watchdog_min) if watchdog_min > 0 else None
+                        )
                         if watchdog is not None:
                             agent_kwargs["watchdog"] = watchdog.seam
                             agent_kwargs["transcript_path"] = str(watchdog.transcript)
@@ -4657,9 +4475,7 @@ def run_workflow(
                     # the stub results the runner's tests inject.
                     _phase_source = getattr(ar, "cost_source", None)
                     pr.cost_source = getattr(_phase_source, "value", None) or (
-                        _phase_source
-                        if isinstance(_phase_source, str)
-                        else CostSource.UNKNOWN.value
+                        _phase_source if isinstance(_phase_source, str) else CostSource.UNKNOWN.value
                     )
                     pr.estimation_method = getattr(ar, "estimation_method", None)
                     pr.reported_cost_usd = getattr(ar, "reported_cost_usd", None)
@@ -4702,9 +4518,7 @@ def run_workflow(
                     pr.final_response = getattr(ar, "final_response", "")
                     if not getattr(ar, "ok", True):
                         pr.status = "failed"
-                        pr.error = (
-                            getattr(ar, "error", "") or f"exit_code={getattr(ar, 'exit_code', '?')}"
-                        )
+                        pr.error = getattr(ar, "error", "") or f"exit_code={getattr(ar, 'exit_code', '?')}"
                 # Step 9 escalation totals: the processing block above recorded the FINAL
                 # attempt's cost/tokens from its ``ar``; the prior (failed-ladder) attempts
                 # spent real money too, so they are added here. A single-attempt phase is a
@@ -4735,17 +4549,10 @@ def run_workflow(
         # commit below is skipped, exactly like the ``kind == "test"`` branch.
         if kind != "test" and phase_def.get("test_gate") and pr.status == "ok":
             _run_test_gate(
-                pr,
-                git_wd,
-                language,
-                phase_timeout,
-                target=phase_def.get("tests"),
+                pr, git_wd, language, phase_timeout, target=phase_def.get("tests"),
                 verifier_executor=verifier_executor,
                 containerized_path=containerized_path,
-                phase_def=phase_def,
-                name=name,
-                model=model,
-                goal=goal,
+                phase_def=phase_def, name=name, model=model, goal=goal,
                 spec_name=spec.name,
                 # A required native gate refuses a zero-test suite outright (wave A3 #5).
                 empty_refuses=True,
@@ -4825,19 +4632,10 @@ def run_workflow(
                 tree_dirty = True
                 try:
                     st = subprocess.run(
-                        [
-                            "git",
-                            "status",
-                            "--porcelain",
-                            "--",
-                            ".",
-                            ":(exclude).instrument",
-                            ":(exclude).fleet",
-                        ],
+                        ["git", "status", "--porcelain", "--", ".",
+                         ":(exclude).instrument", ":(exclude).fleet"],
                         cwd=git_wd,
-                        capture_output=True,
-                        text=True,
-                        timeout=30,
+                        capture_output=True, text=True, timeout=30,
                     )
                     tree_dirty = st.returncode != 0 or bool(st.stdout.strip())
                 except Exception:  # noqa: BLE001 — unreadable git state counts as dirty (fail-closed)
@@ -4915,22 +4713,19 @@ def run_workflow(
 
         if publisher is not None and publisher.enabled:
             tokens = pr.tokens or {}
-            publisher.publish_event(
-                {
-                    "type": "step_finish",
-                    "sessionID": cell_id,
-                    "part": {
-                        "text": f"phase {name} {pr.status}",
-                        "tokens": {
-                            "input": tokens.get("in", 0),
-                            "output": tokens.get("out", 0),
-                            "reasoning": tokens.get("reasoning", 0),
-                            "total": tokens.get("total", 0),
-                        },
-                        "cost": pr.cost_usd,
+            publisher.publish_event({
+                "type": "step_finish", "sessionID": cell_id,
+                "part": {
+                    "text": f"phase {name} {pr.status}",
+                    "tokens": {
+                        "input": tokens.get("in", 0),
+                        "output": tokens.get("out", 0),
+                        "reasoning": tokens.get("reasoning", 0),
+                        "total": tokens.get("total", 0),
                     },
-                }
-            )
+                    "cost": pr.cost_usd,
+                },
+            })
 
         # Mechanical human checkpoint (cap_runner_hardening2 §Gap 3) — the designed stop. A
         # phase declaring ``checkpoint: true`` that completes successfully (all gates passed, the
@@ -4967,13 +4762,10 @@ def run_workflow(
                 )
             )
             if publisher is not None and publisher.enabled:
-                publisher.publish_event(
-                    {
-                        "type": "checkpoint",
-                        "sessionID": cell_id,
-                        "part": result.checkpoints[-1].to_dict(),
-                    }
-                )
+                publisher.publish_event({
+                    "type": "checkpoint", "sessionID": cell_id,
+                    "part": result.checkpoints[-1].to_dict(),
+                })
             checkpoint_stop = True
 
         # e1 (control_db_evidence) — the per-phase evidence write. Runs for EVERY executed
@@ -5035,8 +4827,7 @@ def run_workflow(
                 completed -= invalidated
                 if result.inherited_phases:
                     result.inherited_phases = [
-                        entry
-                        for entry in result.inherited_phases
+                        entry for entry in result.inherited_phases
                         if entry.get("phase") not in invalidated
                     ]
                 # Retain the failing execution BEFORE removing its record (reviewer
@@ -5044,12 +4835,10 @@ def run_workflow(
                 # as attempt rows on the re-run's final record — never popped into silence,
                 # never re-marked as a first-pass success.
                 _retain_and_remove_phase_record(
-                    result,
-                    prior,
-                    prior_invocations,
-                    execution_count,
-                    name,
-                    retry_reason=(f"correction: {str(pr.error or 'verification failed')[:120]}"),
+                    result, prior, prior_invocations, execution_count, name,
+                    retry_reason=(
+                        f"correction: {str(pr.error or 'verification failed')[:120]}"
+                    ),
                 )
                 if kind == "test":
                     # The producer re-runs too: its old record must not survive as a duplicate
@@ -5057,17 +4846,11 @@ def run_workflow(
                     # it; the re-run's fresh record carries both invocations.
                     producer_name = str(target_def.get("name", "?"))
                     _retain_and_remove_phase_record(
-                        result,
-                        prior,
-                        prior_invocations,
-                        execution_count,
-                        producer_name,
+                        result, prior, prior_invocations, execution_count, producer_name,
                         retry_reason=f"correction: re-run after {name} failed verification",
                     )
                 phases[target_idx] = _correction_phase_def(
-                    target_def,
-                    failed_phase=name,
-                    failure=pr,
+                    target_def, failed_phase=name, failure=pr,
                 )
                 print(
                     f"[workflow] correction attempt {used}/{gate_retry}: phase "

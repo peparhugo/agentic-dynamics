@@ -112,22 +112,14 @@ class DockerAgentExecutor(StepExecutor):
         # command already use the PATH-resolved python3; the executors' sys.executable was the
         # one spot that baked a host path into a container argv.
         sibling_cmd = [
-            "python3",
-            "scripts/run_workflow.py",
-            "--spec",
-            self._spec_path,
-            "--goal",
-            self._goal,
-            "--model",
-            request.model or self._model,
-            "--workdir",
-            sibling_workdir,
-            "--only-phase",
-            request.phase_name,
-            "--timeout",
-            str(request.timeout or self._timeout),
-            "--thinking-effort",
-            self._thinking_effort,
+            "python3", "scripts/run_workflow.py",
+            "--spec", self._spec_path,
+            "--goal", self._goal,
+            "--model", request.model or self._model,
+            "--workdir", sibling_workdir,
+            "--only-phase", request.phase_name,
+            "--timeout", str(request.timeout or self._timeout),
+            "--thinking-effort", self._thinking_effort,
         ]
         if self._thinking_budget_tokens:
             sibling_cmd += ["--thinking-budget-tokens", str(self._thinking_budget_tokens)]

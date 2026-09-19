@@ -13,12 +13,7 @@ import sys
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-for _path in (
-    _REPO_ROOT,
-    _REPO_ROOT / "src",
-    _REPO_ROOT / "scripts",
-    _REPO_ROOT / "scripts" / "fleet",
-):
+for _path in (_REPO_ROOT, _REPO_ROOT / "src", _REPO_ROOT / "scripts", _REPO_ROOT / "scripts" / "fleet"):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
 
@@ -66,7 +61,6 @@ def test_namespace_keeps_the_legacy_shape_without_a_clone():
 
 # ── step 3b: the prepared-step transport (parent side) ──────────────────────────────────────
 
-
 def test_prepared_step_is_written_and_passed_to_the_child(tmp_path):
     """The parent readies the EXACT step: the transport file carries the prompt + its hash,
     and the child argv names the child-visible path — no re-derivation from the spec."""
@@ -93,10 +87,9 @@ def test_prepared_step_is_written_and_passed_to_the_child(tmp_path):
     assert written["workdir"] == "/repo"
 
     # the transport never lands in the cell's commits (a local-only exclude entry)
-    assert ".fleet/prepared_steps/" in (clone / ".git" / "info" / "exclude").read_text(
-        encoding="utf-8"
-    )
-
+    assert ".fleet/prepared_steps/" in (
+        clone / ".git" / "info" / "exclude"
+    ).read_text(encoding="utf-8")
 
 def test_prepared_step_exclusion_lands_without_a_git_info_dir(tmp_path):
     """A run clone with ``.git`` but WITHOUT ``.git/info/`` still excludes the transport.
