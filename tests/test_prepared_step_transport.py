@@ -239,3 +239,18 @@ def test_prepared_fork_block_must_be_complete_on_load():
     payload["fork"] = {"session_id": "ses_x"}  # incomplete: no hash, no path
     with pytest.raises(ValueError, match="incomplete"):
         StepRequest.from_prepared_dict(payload)
+
+
+def test_fork_experiment_specs_validate_with_the_real_validator():
+    """The checked-in fork specs pass load_spec + validate_spec (Astra review item 1)."""
+    from pathlib import Path as _P
+
+    from agentic_dynamics.experiment.compile_experiment import validate_spec
+    from agentic_dynamics.experiment.experiment_spec import load_spec
+
+    root = _P(__file__).resolve().parent.parent
+    for rel in ("workflows/repository/fork_seed.yaml", "workflows/repository/fork_branch.yaml"):
+        spec = load_spec(root / rel)
+        errors = validate_spec(spec)
+        assert not errors, f"{rel}: {errors}"
+        assert spec.intent == "measure"
