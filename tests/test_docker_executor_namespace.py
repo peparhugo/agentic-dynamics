@@ -531,3 +531,42 @@ def test_identity_is_stable_against_sqlite_bookkeeping_churn(tmp_path, monkeypat
     (ns / "opencode.db-wal").write_bytes(b"")
     ref2, err2 = executor._persist_session_state(_request(), session_id="ses_a")
     assert (ref2, err2) == (ref, "")
+
+
+def test_readonly_scope_gets_a_writable_workdir_and_transcript(tmp_path, monkeypatch):
+    """A read-only profile must not host runner writes: scratch workdir + state transcript."""
+    import scripts.fleet.docker_executor as de
+
+    run_dir = tmp_path / "runs" / "run-abc"
+    clone = run_dir / "repo"
+    clone.mkdir(parents=True)
+    state_root = tmp_path / "state"
+    monkeypatch.setattr(de.spawn_wrapper, "STATE_ROOT", str(state_root), raising=True)
+    executor = _executor(run_clone=str(clone))
+    request = _request()
+    request.phase_def = {"scope": "research_readonly"}
+    executor.build_request(request)
+
+    assert request.workdir == "/state/workdir"
+    assert request.transcript_path == "/state/transcripts/p1.a1.session.jsonl"
+    assert (state_root / "t" / "run-abc" / "p1" / "a1" / "workdir").is_dir()
+    prepared = json.loads(
+        (clone / ".fleet" / "prepared_steps" / "p1.a1.json").read_text(encoding="utf-8")
+    )
+    assert prepared["workdir"] == "/state/workdir"
+    assert prepared["transcript_path"] == "/state/transcripts/p1.a1.session.jsonl"
+
+
+def test_implementation_scope_keeps_the_clone_workdir(tmp_path, monkeypatch):
+    """The rw profiles are unchanged: the clone stays the workdir."""
+    import scripts.fleet.docker_executor as de
+
+    clone = tmp_path / "runs" / "run-abc" / "repo"
+    clone.mkdir(parents=True)
+    monkeypatch.setattr(de.spawn_wrapper, "STATE_ROOT", str(tmp_path / "state"), raising=True)
+    executor = _executor(run_clone=str(clone))
+    request = _request()
+    request.phase_def = {"scope": "implementation"}
+    executor.build_request(request)
+    assert request.workdir == "/repo"
+    assert request.transcript_path == ""

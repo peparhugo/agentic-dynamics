@@ -165,6 +165,21 @@ class DockerAgentExecutor(StepExecutor):
             request.transcript_path = (
                 f"/state/transcripts/{request.phase_name}.a{attempt}.session.jsonl"
             )
+            # A read-only profile mounts the clone READ-ONLY: the adapter still initializes
+            # the workdir (git init) and opencode writes project state in its CWD, so an agent
+            # cell whose workdir is the ro clone cannot start (observed: zero tokens, no
+            # session). Run the agent in a WRITABLE scratch beside its private state — the
+            # repo stays readable at /repo (ro) via absolute paths — and create the host dir
+            # now so the child's `--dir` exists at spawn time.
+            request.workdir = f"{spawn_wrapper.STATE_TARGET}/workdir"
+            if self._run_clone:
+                run_key = Path(self._run_clone).parent.name
+                host_scratch = (
+                    Path(spawn_wrapper.STATE_ROOT)
+                    / f"{self._spec_name}/{run_key}/{request.phase_name}/a{attempt}"
+                    / "workdir"
+                )
+                host_scratch.mkdir(parents=True, exist_ok=True)
 
         # Step 3 (prepared-step transport): the parent readies the EXACT step (prompt + hash +
         # settings + attempt) and the child consumes it — never a re-derivation from the spec.
