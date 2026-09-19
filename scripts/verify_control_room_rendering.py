@@ -103,49 +103,21 @@ FIELDS = {
     },
 }
 ROW_FIELDS = {
-    "session.identity",
-    "spec.cell",
-    "terminal.target",
-    "command.current",
-    "model.provider",
-    "attempt.number",
-    "phase.progress",
-    "lifecycle.state",
-    "run.live",
-    "source.commit",
-    "cost.provenance",
-    "attention.state",
-    "evidence.advisory",
-    "evidence.measured",
-    "evidence.source",
-    "decision.eligibility",
-    "decision.receipt",
+    "session.identity", "spec.cell", "terminal.target", "command.current", "model.provider",
+    "attempt.number", "phase.progress", "lifecycle.state", "run.live", "source.commit",
+    "cost.provenance", "attention.state", "evidence.advisory", "evidence.measured",
+    "evidence.source", "decision.eligibility", "decision.receipt",
 }
 EXPECTED_BOXES = {
-    "desktop": {
-        "R0": (16, 0, 1408, 72),
-        "R1": (16, 84, 300, 800),
-        "R2": (328, 84, 744, 800),
-        "R3a": (1084, 84, 340, 220),
-        "R3b": (1084, 312, 340, 180),
-        "R3c": (1084, 500, 340, 140),
-    },
-    "narrow": {
-        "R0": (12, 0, 1000, 60),
-        "R1": (12, 68, 224, 692),
-        "R2": (244, 68, 472, 692),
-        "R3a": (724, 68, 288, 160),
-        "R3b": (724, 236, 288, 132),
-        "R3c": (724, 376, 288, 116),
-    },
-    "mobile": {
-        "R0": (12, 0, 366, 72),
-        "R1": (12, 80, 366, 144),
-        "R2": (12, 232, 366, 284),
-        "R3a": (12, 524, 366, 92),
-        "R3b": (12, 624, 366, 68),
-        "R3c": (12, 700, 366, 60),
-    },
+    "desktop": {"R0": (16, 0, 1408, 72), "R1": (16, 84, 300, 800),
+                "R2": (328, 84, 744, 800), "R3a": (1084, 84, 340, 220),
+                "R3b": (1084, 312, 340, 180), "R3c": (1084, 500, 340, 140)},
+    "narrow": {"R0": (12, 0, 1000, 60), "R1": (12, 68, 224, 692),
+               "R2": (244, 68, 472, 692), "R3a": (724, 68, 288, 160),
+               "R3b": (724, 236, 288, 132), "R3c": (724, 376, 288, 116)},
+    "mobile": {"R0": (12, 0, 366, 72), "R1": (12, 80, 366, 144),
+               "R2": (12, 232, 366, 284), "R3a": (12, 524, 366, 92),
+               "R3b": (12, 624, 366, 68), "R3c": (12, 700, 366, 60)},
 }
 ROW_COUNT = {"desktop": 8, "narrow": 7, "mobile": 3}
 ATTENTION_COUNT = {"desktop": 5, "narrow": 4, "mobile": 3}
@@ -213,14 +185,8 @@ FIXTURE_DELTAS: dict[str, dict[str, Any]] = {
         "run_counts": {"running": 80, "queued": 60, "failed": 40, "live": 20},
     },
     "F-3": {
-        "cost": {
-            "spend": "$48.10",
-            "burn": "$2.40/h",
-            "quota": "96%",
-            "wallet": "$1.60",
-            "leases": "$9.90",
-            "money_risk": True,
-        },
+        "cost": {"spend": "$48.10", "burn": "$2.40/h", "quota": "96%", "wallet": "$1.60",
+                 "leases": "$9.90", "money_risk": True},
     },
     "F-4": {
         "provider_unknown": True,
@@ -268,7 +234,8 @@ def _apply_delta(seed: dict[str, Any], fixture_id: str) -> dict[str, Any]:
     if delta.get("provider_unknown"):
         payload["composition"]["provider"] = {"top": "openai 5", "other": "0", "unknown": "2"}
         payload["trust"]["unknown_count"] = 2
-        payload["cost"] = {key: "unknown" for key in ("spend", "burn", "quota", "wallet", "leases")}
+        payload["cost"] = {key: "unknown" for key in
+                           ("spend", "burn", "quota", "wallet", "leases")}
         payload["cost"]["money_risk"] = False
     if delta.get("stale_projection"):
         payload["system"]["projections"] = {"state": "degraded", "age_seconds": 901}
@@ -280,12 +247,8 @@ def _apply_delta(seed: dict[str, Any], fixture_id: str) -> dict[str, Any]:
         payload["system"]["browser"] = {"state": "down", "age_seconds": 7}
     if delta.get("empty_queues"):
         payload["attention"]["decision"] = {
-            "state": "none",
-            "target": "none",
-            "kind": "none",
-            "epoch": 42,
-            "authority": "none",
-            "eligibility": "none",
+            "state": "none", "target": "none", "kind": "none", "epoch": 42,
+            "authority": "none", "eligibility": "none",
         }
         payload["attention"]["risk"] = {"identity": "none", "state": "all-clear", "action": "none"}
     return payload
@@ -353,18 +316,12 @@ def check_fixtures() -> int:
             # Facelift repair A5-D2: every actionable row must carry the lease/cost facets, so a
             # stranger can identify spend against a hard budget from the row alone (the F-0 seed
             # supplies a known $5.00 cap and an over-cap row).
-            for facet in (
-                "budget.reserved",
-                "budget.settled",
-                "budget.cap",
-                "budget.headroom",
-                "budget.settlement",
-            ):
+            for facet in ("budget.reserved", "budget.settled", "budget.cap",
+                          "budget.headroom", "budget.settlement"):
                 if row.get(facet) in (None, ""):
                     problems.append(f"{fixture_id}: row {row.get('id')} missing {facet}")
-        if fixture_id == "F-0" and not any(
-            row.get("budget.headroom") == 0 for row in wire["run_sample"]
-        ):
+        if fixture_id == "F-0" and not any(row.get("budget.headroom") == 0
+                                           for row in wire["run_sample"]):
             problems.append("F-0: needs an over-cap row (budget.headroom == 0)")
         for name in ("model", "condition", "provider", "lifecycle"):
             marginal = wire["composition"][name]
@@ -424,9 +381,8 @@ def _attach_console(page: Any) -> list[str]:
     by the listeners, so the caller reads it after the page has settled.
     """
     errors: list[str] = []
-    page.on(
-        "console", lambda message: errors.append(message.text) if message.type == "error" else None
-    )
+    page.on("console", lambda message: errors.append(message.text)
+            if message.type == "error" else None)
     page.on("pageerror", lambda error: errors.append(str(error)))
     return errors
 
@@ -872,54 +828,18 @@ def _chart_history(base: dict[str, Any]) -> list[dict[str, Any]]:
         {"running": 5, "queued": 1, "failed": 1, "live": 3},
     ]
     costs = [
-        {
-            "spend": "$8.00",
-            "burn": "$0.40/h",
-            "quota": "44%",
-            "wallet": "$11.00",
-            "leases": "$1.00",
-            "money_risk": False,
-        },
-        {
-            "spend": "$9.10",
-            "burn": "$0.55/h",
-            "quota": "50%",
-            "wallet": "$10.10",
-            "leases": "$1.20",
-            "money_risk": False,
-        },
-        {
-            "spend": "$10.20",
-            "burn": "$0.70/h",
-            "quota": "55%",
-            "wallet": "$9.00",
-            "leases": "$1.50",
-            "money_risk": False,
-        },
-        {
-            "spend": "$11.10",
-            "burn": "$0.78/h",
-            "quota": "58%",
-            "wallet": "$8.20",
-            "leases": "$1.80",
-            "money_risk": False,
-        },
-        {
-            "spend": "$12.00",
-            "burn": "$0.80/h",
-            "quota": "60%",
-            "wallet": "$7.80",
-            "leases": "$2.00",
-            "money_risk": False,
-        },
-        {
-            "spend": "$12.40",
-            "burn": "$0.82/h",
-            "quota": "61%",
-            "wallet": "$7.60",
-            "leases": "$2.10",
-            "money_risk": False,
-        },
+        {"spend": "$8.00", "burn": "$0.40/h", "quota": "44%", "wallet": "$11.00",
+         "leases": "$1.00", "money_risk": False},
+        {"spend": "$9.10", "burn": "$0.55/h", "quota": "50%", "wallet": "$10.10",
+         "leases": "$1.20", "money_risk": False},
+        {"spend": "$10.20", "burn": "$0.70/h", "quota": "55%", "wallet": "$9.00",
+         "leases": "$1.50", "money_risk": False},
+        {"spend": "$11.10", "burn": "$0.78/h", "quota": "58%", "wallet": "$8.20",
+         "leases": "$1.80", "money_risk": False},
+        {"spend": "$12.00", "burn": "$0.80/h", "quota": "60%", "wallet": "$7.80",
+         "leases": "$2.00", "money_risk": False},
+        {"spend": "$12.40", "burn": "$0.82/h", "quota": "61%", "wallet": "$7.60",
+         "leases": "$2.10", "money_risk": False},
     ]
     samples = []
     for index in range(6):
@@ -936,24 +856,18 @@ def _sse_frames(payloads: list[dict[str, Any]], *, with_transitions: bool) -> st
     first = payloads[0]
     frames = (
         "event: snapshot\n"
-        + "data: "
-        + json.dumps({"control_epoch": first["control_epoch"]}, separators=(",", ":"))
+        + "data: " + json.dumps({"control_epoch": first["control_epoch"]}, separators=(",", ":"))
         + "\n\n"
         + "event: replay_complete\n"
-        + "data: "
-        + json.dumps({"control_epoch": first["control_epoch"]}, separators=(",", ":"))
+        + "data: " + json.dumps({"control_epoch": first["control_epoch"]}, separators=(",", ":"))
         + "\n\n"
     )
     if with_transitions:
         for payload in payloads[1:]:
             frames += (
                 "event: transition\n"
-                + "data: "
-                + json.dumps(
-                    {"control_epoch": payload["control_epoch"], "glance": payload},
-                    separators=(",", ":"),
-                )
-                + "\n\n"
+                + "data: " + json.dumps({"control_epoch": payload["control_epoch"],
+                                         "glance": payload}, separators=(",", ":")) + "\n\n"
             )
     return frames
 
@@ -984,11 +898,8 @@ def run_chart_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], 
                 for name, (width, height) in VIEWPORTS.items():
                     label = f"{name}/{case}"
                     context = browser.new_context(
-                        viewport={"width": width, "height": height},
-                        timezone_id="UTC",
-                        locale="en-US",
-                        reduced_motion="reduce",
-                        color_scheme="dark",
+                        viewport={"width": width, "height": height}, timezone_id="UTC",
+                        locale="en-US", reduced_motion="reduce", color_scheme="dark",
                     )
                     context.add_init_script(
                         "try{localStorage.setItem('control-room-theme','dark')}catch(e){}"
@@ -1008,10 +919,12 @@ def run_chart_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], 
                             timeout=5000,
                         )
                     page.click("#lens-open")
-                    page.locator("[data-chart-lens]:not([hidden])").wait_for(timeout=5000)
+                    page.locator('[data-chart-lens]:not([hidden])').wait_for(timeout=5000)
                     probe = page.evaluate(CHART_PROBE_JS)
                     _check_charts(label, name, case, probe, errors)
-                    contrast_failures = page.evaluate(CONTRAST_JS, ["[data-chart-lens]", 4.5, 3.0])
+                    contrast_failures = page.evaluate(
+                        CONTRAST_JS, ["[data-chart-lens]", 4.5, 3.0]
+                    )
                     for failure in contrast_failures:
                         _row(errors, label, case, "chart-contrast", json.dumps(failure))
                     if screenshots and case == "history":
@@ -1024,11 +937,8 @@ def run_chart_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], 
             frames = _sse_frames([fixture], with_transitions=False)
             for name, (width, height) in VIEWPORTS.items():
                 context = browser.new_context(
-                    viewport={"width": width, "height": height},
-                    timezone_id="UTC",
-                    locale="en-US",
-                    reduced_motion="reduce",
-                    color_scheme="dark",
+                    viewport={"width": width, "height": height}, timezone_id="UTC",
+                    locale="en-US", reduced_motion="reduce", color_scheme="dark",
                 )
                 page = context.new_page()
                 page.route("**/api/glance", lambda route: route.abort())
@@ -1036,7 +946,7 @@ def run_chart_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], 
                 page.goto(url, wait_until="domcontentloaded")
                 page.wait_for_timeout(2500)  # the 2s ready fallback when no replay boundary
                 page.click("#lens-open")
-                page.locator("[data-chart-lens]:not([hidden])").wait_for(timeout=5000)
+                page.locator('[data-chart-lens]:not([hidden])').wait_for(timeout=5000)
                 probe = page.evaluate(CHART_PROBE_JS)
                 _check_charts(f"{name}/error", name, "error", probe, errors)
                 context.close()
@@ -1047,9 +957,8 @@ def run_chart_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], 
     return results, errors
 
 
-def _check_charts(
-    label: str, viewport: str, case: str, probe: dict[str, Any], errors: list[str]
-) -> None:
+def _check_charts(label: str, viewport: str, case: str, probe: dict[str, Any],
+                  errors: list[str]) -> None:
     """Assert one lens probe: presence, budget, marks/empty/error, a11y name, no horizontal page overflow."""
     if not probe.get("open"):
         _row(errors, label, case, "chart", "lens did not open")
@@ -1064,29 +973,20 @@ def _check_charts(
             _row(errors, label, case, "chart", f"{chart['id']} body {body}")
             continue
         if body["height"] > max_height + 2:
-            _row(
-                errors,
-                label,
-                case,
-                "chart-budget",
-                f"{chart['id']} body height {body['height']:.0f} > {max_height}",
-            )
+            _row(errors, label, case, "chart-budget",
+                 f"{chart['id']} body height {body['height']:.0f} > {max_height}")
         if not chart.get("table"):
             _row(errors, label, case, "chart-table", f"{chart['id']} missing textual equivalent")
         if case == "history":
             if chart["id"] == "dependency":
                 # Dependency health is gauges + a status grid, not a time-series SVG.
                 if chart.get("gauges", 0) < 2 or chart.get("statusCells", 0) < 4:
-                    _row(
-                        errors,
-                        label,
-                        case,
-                        "chart-blank",
-                        f"dependency gauges={chart.get('gauges')} "
-                        f"status={chart.get('statusCells')}",
-                    )
+                    _row(errors, label, case, "chart-blank",
+                         f"dependency gauges={chart.get('gauges')} "
+                         f"status={chart.get('statusCells')}")
             elif not chart.get("hasSvg") or not chart.get("viewBox") or not chart.get("aria"):
-                _row(errors, label, case, "chart-svg", f"{chart['id']} svg/viewBox/aria incomplete")
+                _row(errors, label, case, "chart-svg",
+                     f"{chart['id']} svg/viewBox/aria incomplete")
             elif chart.get("marks", 0) <= 0:
                 _row(errors, label, case, "chart-blank", f"{chart['id']} has no marks")
             if chart.get("empty") or chart.get("error"):
@@ -1100,13 +1000,8 @@ def _check_charts(
     # Re-baseline (2026-09-13, decision 9f357fce): pages scroll vertically. Horizontal page
     # overflow is the defect this class still refuses.
     if probe["scrollWidth"] > probe["innerWidth"] + 1:
-        _row(
-            errors,
-            label,
-            case,
-            "chart-page-h-overflow",
-            f"page scrollWidth {probe['scrollWidth']} > {probe['innerWidth']}",
-        )
+        _row(errors, label, case, "chart-page-h-overflow",
+             f"page scrollWidth {probe['scrollWidth']} > {probe['innerWidth']}")
 
 
 #: Probe the SVG visuals inside the open R4 dock.
@@ -1206,7 +1101,8 @@ def _check_visuals(label: str, viewport: str, probe: dict[str, Any], errors: lis
             _row(errors, label, "a2", "visual", f"{visual} not rendered")
             continue
         if not info.get("viewBox") or info.get("role") != "img" or not info.get("aria"):
-            _row(errors, label, "a2", "visual-a11y", f"{visual} viewBox/role/aria incomplete")
+            _row(errors, label, "a2", "visual-a11y",
+                 f"{visual} viewBox/role/aria incomplete")
         if not info.get("hasTitle") or not info.get("hasDesc"):
             _row(errors, label, "a2", "visual-a11y", f"{visual} missing title/desc")
         if info.get("textNodes", 0) <= 0:
@@ -1217,24 +1113,14 @@ def _check_visuals(label: str, viewport: str, probe: dict[str, Any], errors: lis
         if box.get("width", 0) <= 0 or box.get("height", 0) <= 0:
             _row(errors, label, "a2", "visual-box", f"{visual} zero box {box}")
         elif viewport != "mobile" and box["height"] > VISUAL_BUDGET[visual] + 4:
-            _row(
-                errors,
-                label,
-                "a2",
-                "visual-budget",
-                f"{visual} height {box['height']:.0f} > {VISUAL_BUDGET[visual]}",
-            )
+            _row(errors, label, "a2", "visual-budget",
+                 f"{visual} height {box['height']:.0f} > {VISUAL_BUDGET[visual]}")
     if not probe.get("affected") or not probe.get("action"):
         _row(errors, label, "a2", "visual-action", "affected record/action missing")
     # Re-baseline (decision 9f357fce): vertical page scroll is allowed; horizontal overflow is not.
     if probe["scrollWidth"] > probe["innerWidth"] + 1:
-        _row(
-            errors,
-            label,
-            "a2",
-            "visual-page-h-overflow",
-            f"page scrollWidth {probe['scrollWidth']} > {probe['innerWidth']}",
-        )
+        _row(errors, label, "a2", "visual-page-h-overflow",
+             f"page scrollWidth {probe['scrollWidth']} > {probe['innerWidth']}")
 
 
 def run_visual_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], list[str]]:
@@ -1257,11 +1143,8 @@ def run_visual_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]],
                 for name, (width, height) in VIEWPORTS.items():
                     label = f"{name}/{theme}"
                     context = browser.new_context(
-                        viewport={"width": width, "height": height},
-                        timezone_id="UTC",
-                        locale="en-US",
-                        reduced_motion="reduce",
-                        color_scheme=theme,
+                        viewport={"width": width, "height": height}, timezone_id="UTC",
+                        locale="en-US", reduced_motion="reduce", color_scheme=theme,
                     )
                     context.add_init_script(
                         f"try{{localStorage.setItem('control-room-theme','{theme}')}}catch(e){{}}"
@@ -1286,14 +1169,15 @@ def run_visual_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]],
                     )
                     probe = page.evaluate(VISUAL_PROBE_JS)
                     _check_visuals(label, name, probe, errors)
-                    for failure in page.evaluate(SVG_TEXT_CONTRAST_JS, ["[data-visual]", 4.5, 3.0]):
+                    for failure in page.evaluate(
+                        SVG_TEXT_CONTRAST_JS, ["[data-visual]", 4.5, 3.0]
+                    ):
                         _row(errors, label, "a2", "visual-contrast", json.dumps(failure))
                     if screenshots and theme == "dark":
                         shot = out / f"visuals_{name}_dark_{width}x{height}.png"
                         page.screenshot(path=str(shot), full_page=False)
-                        results.append(
-                            {"case": "visuals", "viewport": name, "screenshot": str(shot)}
-                        )
+                        results.append({"case": "visuals", "viewport": name,
+                                        "screenshot": str(shot)})
                     context.close()
             browser.close()
     finally:
@@ -1390,10 +1274,8 @@ def run_style_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], 
             browser = playwright.chromium.launch(args=["--no-sandbox"])
             for name, (width, height) in VIEWPORTS.items():
                 context = browser.new_context(
-                    viewport={"width": width, "height": height},
-                    timezone_id="UTC",
-                    locale="en-US",
-                    color_scheme="dark",
+                    viewport={"width": width, "height": height}, timezone_id="UTC",
+                    locale="en-US", color_scheme="dark",
                 )
                 context.add_init_script(
                     "try{localStorage.setItem('control-room-theme','dark')}catch(e){}"
@@ -1422,11 +1304,8 @@ def run_style_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], 
                 context.close()
 
                 reduced = browser.new_context(
-                    viewport={"width": width, "height": height},
-                    timezone_id="UTC",
-                    locale="en-US",
-                    color_scheme="dark",
-                    reduced_motion="reduce",
+                    viewport={"width": width, "height": height}, timezone_id="UTC",
+                    locale="en-US", color_scheme="dark", reduced_motion="reduce",
                 )
                 rpage = reduced.new_page()
                 rpage.route("**/api/**", lambda route: route.abort())
@@ -1494,11 +1373,8 @@ def run_a11y_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], l
             browser = playwright.chromium.launch(args=["--no-sandbox"])
             for name, (width, height) in (("desktop", (1440, 900)), ("mobile", (390, 844))):
                 context = browser.new_context(
-                    viewport={"width": width, "height": height},
-                    timezone_id="UTC",
-                    locale="en-US",
-                    reduced_motion="reduce",
-                    color_scheme="dark",
+                    viewport={"width": width, "height": height}, timezone_id="UTC",
+                    locale="en-US", reduced_motion="reduce", color_scheme="dark",
                 )
                 context.add_init_script(
                     "try{localStorage.setItem('control-room-theme','dark')}catch(e){}"
@@ -1527,8 +1403,7 @@ def run_a11y_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], l
                     _row(errors, name, "a11y", "A-6", "could not reach a run row by keyboard")
                 else:
                     origin = page.evaluate(
-                        "() => document.activeElement.getAttribute('data-run-id')"
-                    )
+                        "() => document.activeElement.getAttribute('data-run-id')")
                     page.keyboard.press("Enter")
                     try:
                         page.locator("#selection-dock:not([hidden])").wait_for(timeout=3000)
@@ -1543,21 +1418,14 @@ def run_a11y_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], l
                         _row(errors, name, "a11y", "A-1", "focus escaped the selection dock")
                     page.keyboard.press("Escape")
                     if not page.evaluate(
-                        "() => Boolean(document.getElementById('selection-dock').hidden)"
-                    ):
+                        "() => Boolean(document.getElementById('selection-dock').hidden)"):
                         _row(errors, name, "a11y", "A-5", "Escape did not close the dock")
                     returned = page.evaluate(
                         "() => document.activeElement && document.activeElement.getAttribute"
-                        " ? document.activeElement.getAttribute('data-run-id') : null"
-                    )
+                        " ? document.activeElement.getAttribute('data-run-id') : null")
                     if returned != origin:
-                        _row(
-                            errors,
-                            name,
-                            "a11y",
-                            "A-6",
-                            f"focus returned to {returned!r}, not origin {origin!r}",
-                        )
+                        _row(errors, name, "a11y", "A-6",
+                             f"focus returned to {returned!r}, not origin {origin!r}")
                 if screenshots:
                     shot = out / f"a11y_{name}_dark_{width}x{height}.png"
                     page.screenshot(path=str(shot), full_page=False)
@@ -1593,11 +1461,8 @@ def _row(errors: list[str], viewport: str, fixture: str, check: str, detail: str
 
 
 def run_browser_gate(
-    fixture_ids: list[str],
-    out: Path,
-    screenshots: bool,
-    themes: tuple[str, ...] = THEMES,
-    screenshot_themes: tuple[str, ...] = ("dark",),
+    fixture_ids: list[str], out: Path, screenshots: bool,
+    themes: tuple[str, ...] = THEMES, screenshot_themes: tuple[str, ...] = ("dark",),
 ) -> tuple[list[dict[str, Any]], list[str]]:
     """Render every fixture at every viewport in every theme; run the geometry class.
 
@@ -1618,16 +1483,11 @@ def run_browser_gate(
                 wire = build_fixture(fixture_id)
                 frames = (
                     "event: snapshot\n"
-                    + "data: "
-                    + json.dumps(
-                        {"control_epoch": wire["control_epoch"], "fixture": fixture_id},
-                        separators=(",", ":"),
-                    )
-                    + "\n\n"
+                    + "data: " + json.dumps({"control_epoch": wire["control_epoch"],
+                                             "fixture": fixture_id}, separators=(",", ":")) + "\n\n"
                     + "event: replay_complete\n"
-                    + "data: "
-                    + json.dumps({"control_epoch": wire["control_epoch"]}, separators=(",", ":"))
-                    + "\n\n"
+                    + "data: " + json.dumps({"control_epoch": wire["control_epoch"]},
+                                            separators=(",", ":")) + "\n\n"
                 )
                 for theme in themes:
                     for name, (width, height) in VIEWPORTS.items():
@@ -1635,20 +1495,14 @@ def run_browser_gate(
                         if theme == "forced-colors":
                             context = browser.new_context(
                                 viewport={"width": width, "height": height},
-                                timezone_id="UTC",
-                                locale="en-US",
-                                reduced_motion="reduce",
-                                color_scheme="dark",
-                                forced_colors="active",
+                                timezone_id="UTC", locale="en-US", reduced_motion="reduce",
+                                color_scheme="dark", forced_colors="active",
                             )
                         else:
                             context = browser.new_context(
                                 viewport={"width": width, "height": height},
-                                timezone_id="UTC",
-                                locale="en-US",
-                                reduced_motion="reduce",
-                                color_scheme=theme,
-                                forced_colors="none",
+                                timezone_id="UTC", locale="en-US", reduced_motion="reduce",
+                                color_scheme=theme, forced_colors="none",
                             )
                             context.add_init_script(
                                 f"try{{localStorage.setItem('control-room-theme', '{theme}')}}"
@@ -1659,15 +1513,9 @@ def run_browser_gate(
                         # Bind the sink into each handler (B023): the loop rebinds
                         # ``console_errors`` every iteration, and a closure over the bare
                         # name would append into whatever list the cell points at LATER.
-                        page.on(
-                            "console",
-                            lambda message, sink=console_errors: (
-                                sink.append(message.text) if message.type == "error" else None
-                            ),
-                        )
-                        page.on(
-                            "pageerror", lambda error, sink=console_errors: sink.append(str(error))
-                        )
+                        page.on("console", lambda message, sink=console_errors: sink.append(message.text)
+                                if message.type == "error" else None)
+                        page.on("pageerror", lambda error, sink=console_errors: sink.append(str(error)))
 
                         # Playwright resolves the LAST matching handler first, so the catch-all
                         # abort must be registered BEFORE the two fixture routes it must not
@@ -1694,14 +1542,8 @@ def run_browser_gate(
                         if screenshots and theme in screenshot_themes:
                             shot = out / f"{fixture_id}_{name}_{theme}_{width}x{height}.png"
                             page.screenshot(path=str(shot), full_page=False)
-                            results.append(
-                                {
-                                    "fixture": fixture_id,
-                                    "viewport": name,
-                                    "theme": theme,
-                                    "screenshot": str(shot),
-                                }
-                            )
+                            results.append({"fixture": fixture_id, "viewport": name,
+                                            "theme": theme, "screenshot": str(shot)})
                         context.close()
             browser.close()
     finally:
@@ -1726,41 +1568,21 @@ def _check_ia_core(label: str, viewport: str, probe: dict[str, Any], errors: lis
         _row(errors, label, "live", "ia-answers", f"answers={sorted(probe['answers'])}")
     # Re-baseline (decision 9f357fce): vertical page scroll is allowed. Horizontal overflow is not.
     if probe["scrollWidth"] > width + 1:
-        _row(
-            errors,
-            label,
-            "live",
-            "ia-page-h-overflow",
-            f"scrollWidth {probe['scrollWidth']} > {width}",
-        )
+        _row(errors, label, "live", "ia-page-h-overflow",
+             f"scrollWidth {probe['scrollWidth']} > {width}")
     for region in REGIONS:
         info = probe["regions"].get(region)
         if not info:
             continue
         box = info["rect"]
         if not info["visible"] or box["width"] <= 0 or box["height"] <= 0:
-            _row(
-                errors,
-                label,
-                "live",
-                "ia-region-box",
-                f"{region} box={box} visible={info['visible']}",
-            )
-        elif (
-            box["top"] < -0.5
-            or box["bottom"] > height + 0.5
-            or box["left"] < -0.5
-            or box["right"] > width + 0.5
-        ):
+            _row(errors, label, "live", "ia-region-box", f"{region} box={box} visible={info['visible']}")
+        elif (box["top"] < -0.5 or box["bottom"] > height + 0.5
+              or box["left"] < -0.5 or box["right"] > width + 0.5):
             _row(errors, label, "live", "ia-region-fold", f"{region} box={box}")
         if info["scrollW"] > info["clientW"] + 1:
-            _row(
-                errors,
-                label,
-                "live",
-                "ia-region-h-scroll",
-                f"{region} scrollW {info['scrollW']} > {info['clientW']}",
-            )
+            _row(errors, label, "live", "ia-region-h-scroll",
+                 f"{region} scrollW {info['scrollW']} > {info['clientW']}")
     for answer, region in ANSWER_REGION.items():
         info = probe["answers"].get(answer)
         if not info:
@@ -1799,20 +1621,14 @@ def run_live_gate(
                     label = f"{name}/{theme}"
                     if theme == "forced-colors":
                         context = browser.new_context(
-                            viewport={"width": width, "height": height},
-                            timezone_id="UTC",
-                            locale="en-US",
-                            reduced_motion="reduce",
-                            color_scheme="dark",
+                            viewport={"width": width, "height": height}, timezone_id="UTC",
+                            locale="en-US", reduced_motion="reduce", color_scheme="dark",
                             forced_colors="active",
                         )
                     else:
                         context = browser.new_context(
-                            viewport={"width": width, "height": height},
-                            timezone_id="UTC",
-                            locale="en-US",
-                            reduced_motion="reduce",
-                            color_scheme=theme,
+                            viewport={"width": width, "height": height}, timezone_id="UTC",
+                            locale="en-US", reduced_motion="reduce", color_scheme=theme,
                             forced_colors="none",
                         )
                         context.add_init_script(
@@ -1832,7 +1648,8 @@ def run_live_gate(
                     if screenshots and theme == "dark":
                         shot = out / f"live_{name}_dark_{width}x{height}.png"
                         page.screenshot(path=str(shot), full_page=False)
-                        results.append({"case": "live", "viewport": name, "screenshot": str(shot)})
+                        results.append({"case": "live", "viewport": name,
+                                        "screenshot": str(shot)})
                     context.close()
             browser.close()
     finally:
@@ -1868,7 +1685,9 @@ PARKED_CLASSES: tuple[str, ...] = (
 )
 
 
-def _canonical_preview_target(base: str | None, preview: str | None) -> tuple[str, str]:
+def _canonical_preview_target(
+    base: str | None, preview: str | None
+) -> tuple[str, str]:
     """Resolve the ONE target the browser and the identity checks both use.
 
     Reviewer finding (2026-09-14): the browsers rendered ``--base`` while the identity checks
@@ -1884,7 +1703,6 @@ def _canonical_preview_target(base: str | None, preview: str | None) -> tuple[st
 
     Returns ``(target, error)``; ``error`` non-empty means refuse (exit 2).
     """
-
     def norm(value: str) -> str:
         return value.rstrip("/")
 
@@ -1914,9 +1732,7 @@ def _compare_served_assets(base: str) -> dict[str, bool]:
 
     listing = subprocess.run(
         ["git", "ls-tree", "-r", "--name-only", "HEAD", "apps/control_room/static"],
-        capture_output=True,
-        text=True,
-        timeout=15,
+        capture_output=True, text=True, timeout=15,
     )
     if listing.returncode != 0:
         return {}
@@ -1930,9 +1746,7 @@ def _compare_served_assets(base: str) -> dict[str, bool]:
 
     def committed_hash(path: str) -> str | None:
         blob = subprocess.run(
-            ["git", "show", f"HEAD:{path}"],
-            capture_output=True,
-            timeout=15,
+            ["git", "show", f"HEAD:{path}"], capture_output=True, timeout=15,
         )
         if blob.returncode != 0:
             return None
@@ -1957,7 +1771,9 @@ def _compare_served_assets(base: str) -> dict[str, bool]:
     return results
 
 
-def _exercise_refresh_action(page: Any, theme: str) -> tuple[list[dict[str, Any]], list[str]]:
+def _exercise_refresh_action(
+    page: Any, theme: str
+) -> tuple[list[dict[str, Any]], list[str]]:
     """The governed refresh action — require the control, observe the request, verify the result.
 
     Reviewer finding (2026-09-14): a missing button was silently skipped and an inert button
@@ -2015,15 +1831,9 @@ def _exercise_refresh_action(page: Any, theme: str) -> tuple[list[dict[str, Any]
             "— the action did nothing"
         )
         return results, errors
-    results.append(
-        {
-            "case": "interactions",
-            "viewport": "desktop",
-            "check": "governed-action-refresh",
-            "screenshot": "",
-            "theme": theme,
-        }
-    )
+    results.append({"case": "interactions", "viewport": "desktop",
+                    "check": "governed-action-refresh",
+                    "screenshot": "", "theme": theme})
     return results, errors
 
 
@@ -2051,11 +1861,8 @@ def run_acceptance_interactions(
             browser = playwright.chromium.launch(args=["--no-sandbox"])
             for theme in ("dark", "light"):
                 context = browser.new_context(
-                    viewport={"width": 1440, "height": 900},
-                    timezone_id="UTC",
-                    locale="en-US",
-                    reduced_motion="reduce",
-                    color_scheme=theme,
+                    viewport={"width": 1440, "height": 900}, timezone_id="UTC",
+                    locale="en-US", reduced_motion="reduce", color_scheme=theme,
                 )
                 context.add_init_script(
                     f"try{{localStorage.setItem('control-room-theme','{theme}')}}catch(e){{}}"
@@ -2068,34 +1875,24 @@ def run_acceptance_interactions(
                 # surface carrying the attention/decision rows and the run list.
                 opener = page.locator("button:has-text('Open the workbench')")
                 if not opener.count():
-                    errors.append(
-                        "interactions: the workbench opener is missing — the "
-                        "attention/run surface cannot be activated"
-                    )
+                    errors.append("interactions: the workbench opener is missing — the "
+                                  "attention/run surface cannot be activated")
                 else:
                     opener.first.click()
                     tab = page.locator('#workbench-nav [data-lens-target="operations"]')
                     tab.wait_for(timeout=20000)
                     tab.first.click()
                     page.locator("#operations-run-finder").wait_for(timeout=20000)
-                    results.append(
-                        {
-                            "case": "interactions",
-                            "viewport": "desktop",
-                            "check": "attention-activation",
-                            "screenshot": "",
-                            "theme": theme,
-                        }
-                    )
+                    results.append({"case": "interactions", "viewport": "desktop",
+                                    "check": "attention-activation",
+                                    "screenshot": "", "theme": theme})
 
                 # 1b. The run FINDER must actually filter (the requested-run path): type a
                 # real run id and assert the visible rows are exactly the matching ones.
                 finder = page.locator("#operations-run-finder")
                 if not finder.count():
-                    errors.append(
-                        "interactions: the run finder is missing — the requested-run "
-                        "path cannot be exercised"
-                    )
+                    errors.append("interactions: the run finder is missing — the requested-run "
+                                  "path cannot be exercised")
                 else:
                     all_rows = page.locator("tr[data-run-id]")
                     total = all_rows.count()
@@ -2116,31 +1913,21 @@ def run_acceptance_interactions(
                                 "interactions: the run finder left a non-matching row visible"
                             )
                         else:
-                            results.append(
-                                {
-                                    "case": "interactions",
-                                    "viewport": "desktop",
-                                    "check": "run-finder-filter",
-                                    "screenshot": "",
-                                    "theme": theme,
-                                }
-                            )
+                            results.append({"case": "interactions", "viewport": "desktop",
+                                            "check": "run-finder-filter",
+                                            "screenshot": "", "theme": theme})
                         finder.fill("")
                     else:
-                        errors.append(
-                            "interactions: no run rows to filter — the finder "
-                            "could not be exercised"
-                        )
+                        errors.append("interactions: no run rows to filter — the finder "
+                                      "could not be exercised")
 
                 # 2. Run selection by KEYBOARD: focus the finder, type a filter, focus the first
                 # run row, press Enter — the drawer must open with content.
                 rows = page.locator("tr[data-run-id]")
                 if not rows.count():
-                    errors.append(
-                        "interactions: no run rows to select — the run-selection "
-                        "check could not be exercised (a control DB with zero runs "
-                        "is not an acceptance state for this slice)"
-                    )
+                    errors.append("interactions: no run rows to select — the run-selection "
+                                  "check could not be exercised (a control DB with zero runs "
+                                  "is not an acceptance state for this slice)")
                 else:
                     first = rows.first
                     first.focus()
@@ -2151,40 +1938,22 @@ def run_acceptance_interactions(
                     # The detail fetch is async — wait for the RENDERED surface, not merely
                     # the drawer element (a "Loading…" drawer is not the slice working).
                     page.locator("#run-detail-content table").first.wait_for(
-                        state="visible", timeout=20000
-                    )
+                        state="visible", timeout=20000)
                     text = page.locator("#run-detail-content").inner_text()
-                    for surface in (
-                        "ATTEMPTS",
-                        "GOVERNED ACTION",
-                        "STEP TIMINGS",
-                        "APPROVALS",
-                        "COMMAND JOURNAL",
-                    ):
+                    for surface in ("ATTEMPTS", "GOVERNED ACTION", "STEP TIMINGS",
+                                    "APPROVALS", "COMMAND JOURNAL"):
                         if surface not in text:
                             errors.append(
                                 f"interactions: the run-detail drawer is missing the "
                                 f"{surface!r} surface — the observed-result chain is incomplete"
                             )
                     if "ATTEMPTS" in text and "GOVERNED ACTION" in text:
-                        results.append(
-                            {
-                                "case": "interactions",
-                                "viewport": "desktop",
-                                "check": "receipt-surfaces",
-                                "screenshot": "",
-                                "theme": theme,
-                            }
-                        )
-                    results.append(
-                        {
-                            "case": "interactions",
-                            "viewport": "desktop",
-                            "check": "keyboard-run-selection",
-                            "screenshot": "",
-                            "theme": theme,
-                        }
-                    )
+                        results.append({"case": "interactions", "viewport": "desktop",
+                                        "check": "receipt-surfaces",
+                                        "screenshot": "", "theme": theme})
+                    results.append({"case": "interactions", "viewport": "desktop",
+                                    "check": "keyboard-run-selection",
+                                    "screenshot": "", "theme": theme})
                     # Close via the drawer's own close control (Escape also closes the
                     # workbench — the check below needs it open).
                     page.locator('button[aria-label="Close run detail"]').first.click()
@@ -2200,7 +1969,7 @@ def run_acceptance_interactions(
                 # the workbench's BODY (the deliberate drill-down's scrolling container) carries
                 # content below the fold, and a long run-detail drawer scrolls inside its own
                 # container.
-                page.locator("#workbench").wait_for(state="visible", timeout=20000)
+                page.locator('#workbench').wait_for(state="visible", timeout=20000)
                 wb = page.locator(".wb-body")
                 wb_metrics = wb.evaluate(
                     "(el) => ({scrollHeight: el.scrollHeight, clientHeight: el.clientHeight})"
@@ -2208,23 +1977,15 @@ def run_acceptance_interactions(
                 wb.evaluate("(el) => { el.scrollTop = el.scrollHeight; }")
                 wb_scrolled = wb.evaluate("(el) => el.scrollTop")
                 if wb_metrics["scrollHeight"] <= wb_metrics["clientHeight"] or wb_scrolled <= 0:
-                    errors.append(
-                        "interactions: the workbench body does not scroll below the "
-                        f"fold (scrollHeight {wb_metrics['scrollHeight']}, "
-                        f"clientHeight {wb_metrics['clientHeight']}, "
-                        f"scrollTop {wb_scrolled}) — below-fold content is not "
-                        "reachable"
-                    )
+                    errors.append("interactions: the workbench body does not scroll below the "
+                                  f"fold (scrollHeight {wb_metrics['scrollHeight']}, "
+                                  f"clientHeight {wb_metrics['clientHeight']}, "
+                                  f"scrollTop {wb_scrolled}) — below-fold content is not "
+                                  "reachable")
                 else:
-                    results.append(
-                        {
-                            "case": "interactions",
-                            "viewport": "desktop",
-                            "check": "below-fold-scroll",
-                            "screenshot": "",
-                            "theme": theme,
-                        }
-                    )
+                    results.append({"case": "interactions", "viewport": "desktop",
+                                    "check": "below-fold-scroll",
+                                    "screenshot": "", "theme": theme})
 
                 # 4. Stale/unknown honesty: the room must render an explicit age/unknown marker
                 # somewhere on the operational surface — a stale value reading as all-clear is
@@ -2233,27 +1994,15 @@ def run_acceptance_interactions(
                     '[data-state="unknown"], [data-state="stale"], .age-chip, .state-unknown'
                 )
                 if not honest.count():
-                    results.append(
-                        {
-                            "case": "interactions",
-                            "viewport": "desktop",
-                            "check": "stale-unknown-marker",
-                            "screenshot": "",
-                            "theme": theme,
-                            "note": "no stale/unknown markers rendered on the "
-                            "operational surface at this instant",
-                        }
-                    )
+                    results.append({"case": "interactions", "viewport": "desktop",
+                                    "check": "stale-unknown-marker",
+                                    "screenshot": "", "theme": theme,
+                                    "note": "no stale/unknown markers rendered on the "
+                                            "operational surface at this instant"})
                 else:
-                    results.append(
-                        {
-                            "case": "interactions",
-                            "viewport": "desktop",
-                            "check": "stale-unknown-marker",
-                            "screenshot": "",
-                            "theme": theme,
-                        }
-                    )
+                    results.append({"case": "interactions", "viewport": "desktop",
+                                    "check": "stale-unknown-marker",
+                                    "screenshot": "", "theme": theme})
 
                 # 5. The below-fold capture (dark + light) — the rendered proof of the
                 # content a viewport-height shot can never see: the workbench is a fixed
@@ -2262,15 +2011,9 @@ def run_acceptance_interactions(
                 if screenshots:
                     shot = out / f"acceptance_belowfold_bottom_{theme}_1440x900.png"
                     page.locator(".wb-body").screenshot(path=str(shot))
-                    results.append(
-                        {
-                            "case": "interactions",
-                            "viewport": "desktop",
-                            "check": "below-fold-capture",
-                            "screenshot": str(shot),
-                            "theme": theme,
-                        }
-                    )
+                    results.append({"case": "interactions", "viewport": "desktop",
+                                    "check": "below-fold-capture",
+                                    "screenshot": str(shot), "theme": theme})
 
                 # 6. Keyboard run-journey (browser regression, reviewer finding P3): the
                 # drawer-first Escape must be exercised as BEHAVIOR — the source-string check
@@ -2322,15 +2065,9 @@ def run_acceptance_interactions(
                                 f"after Escape (focus={state['focus']!r})"
                             )
                         if not errors:
-                            results.append(
-                                {
-                                    "case": "interactions",
-                                    "viewport": "desktop",
-                                    "check": "drawer-first-escape",
-                                    "screenshot": "",
-                                    "theme": theme,
-                                }
-                            )
+                            results.append({"case": "interactions", "viewport": "desktop",
+                                            "check": "drawer-first-escape",
+                                            "screenshot": "", "theme": theme})
                         page.keyboard.press("Escape")
                         page.wait_for_timeout(300)
                         if not page.evaluate(
@@ -2338,15 +2075,9 @@ def run_acceptance_interactions(
                         ):
                             errors.append("interactions: a second Escape must close the workbench")
                         else:
-                            results.append(
-                                {
-                                    "case": "interactions",
-                                    "viewport": "desktop",
-                                    "check": "second-escape-closes-workbench",
-                                    "screenshot": "",
-                                    "theme": theme,
-                                }
-                            )
+                            results.append({"case": "interactions", "viewport": "desktop",
+                                            "check": "second-escape-closes-workbench",
+                                            "screenshot": "", "theme": theme})
                         # Inactive-panel scope: reopen, open a drawer, switch to Health, Escape —
                         # the hidden drawer must not swallow the key.
                         page.locator("#workbench-open").click()
@@ -2369,15 +2100,9 @@ def run_acceptance_interactions(
                                 "must not consume it"
                             )
                         else:
-                            results.append(
-                                {
-                                    "case": "interactions",
-                                    "viewport": "desktop",
-                                    "check": "inactive-panel-escape",
-                                    "screenshot": "",
-                                    "theme": theme,
-                                }
-                            )
+                            results.append({"case": "interactions", "viewport": "desktop",
+                                            "check": "inactive-panel-escape",
+                                            "screenshot": "", "theme": theme})
                 context.close()
             browser.close()
     finally:
@@ -2703,7 +2428,9 @@ def _boards_router(
                 body = fixture["run_detail_error"]
             else:
                 body = fixture["run_detail"]
-            route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+            route.fulfill(
+                status=200, content_type="application/json", body=json.dumps(body)
+            )
         elif path == "/api/routing" and routing_failure:
             route.fulfill(
                 status=503,
@@ -3692,9 +3419,9 @@ def _check_board_keyboard(
                 error_row.first.focus()
                 page.keyboard.press("Enter")
                 try:
-                    page.locator('#run-detail-content:has-text("Run detail unavailable")').wait_for(
-                        timeout=5000
-                    )
+                    page.locator(
+                        '#run-detail-content:has-text("Run detail unavailable")'
+                    ).wait_for(timeout=5000)
                 except Exception:  # noqa: BLE001 — the failed state is the finding
                     _row(
                         errors,
@@ -3814,30 +3541,15 @@ def _check_parity_inventory(inventory: dict[str, Any], errors: list[str]) -> Non
         for record in inventory.get(group, []):
             surface = record.get("surface")
             if surface not in palette:
-                _row(
-                    errors,
-                    "static",
-                    "parity",
-                    "placement",
-                    f"{group}:{record.get('id')} surface {surface!r} not in palette",
-                )
+                _row(errors, "static", "parity", "placement",
+                     f"{group}:{record.get('id')} surface {surface!r} not in palette")
     for capability in inventory.get("capabilities", []):
         if not capability.get("surface"):
-            _row(
-                errors,
-                "static",
-                "parity",
-                "capability-surface",
-                f"capability {capability.get('id')} has no surface",
-            )
+            _row(errors, "static", "parity", "capability-surface",
+                 f"capability {capability.get('id')} has no surface")
         if not capability.get("member_ids"):
-            _row(
-                errors,
-                "static",
-                "parity",
-                "capability-members",
-                f"capability {capability.get('id')} has no member ids",
-            )
+            _row(errors, "static", "parity", "capability-members",
+                 f"capability {capability.get('id')} has no member ids")
 
 
 def _parity_router(
@@ -3863,13 +3575,8 @@ def _parity_router(
             route.fulfill(
                 status=200,
                 content_type="application/json",
-                body=json.dumps(
-                    {
-                        "ok": True,
-                        "action": path.rstrip("/").rsplit("/", 1)[-1],
-                        "note": "recorded by the parity gate",
-                    }
-                ),
+                body=json.dumps({"ok": True, "action": path.rstrip("/").rsplit("/", 1)[-1],
+                                 "note": "recorded by the parity gate"}),
             )
             return
         if path == "/api/glance":
@@ -3879,16 +3586,17 @@ def _parity_router(
         elif path.startswith("/api/events/"):
             route.fulfill(status=200, content_type="text/event-stream", body=event_frames)
         elif path in fixtures:
-            route.fulfill(
-                status=200, content_type="application/json", body=json.dumps(fixtures[path])
-            )
+            route.fulfill(status=200, content_type="application/json",
+                          body=json.dumps(fixtures[path]))
         else:
             route.abort()
 
     return handler
 
 
-def run_parity_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], list[str]]:
+def run_parity_gate(
+    out: Path, screenshots: bool
+) -> tuple[list[dict[str, Any]], list[str]]:
     """Run the FEATURE-PARITY + per-worker surface class (u5).
 
     Deterministic and fixture-driven like the rest of the gate (waiver W2):
@@ -3915,52 +3623,31 @@ def run_parity_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]],
                 epoch = wire["control_epoch"]
                 glance_frames = (
                     "event: snapshot\n"
-                    + "data: "
-                    + json.dumps({"control_epoch": epoch}, separators=(",", ":"))
-                    + "\n\n"
+                    + "data: " + json.dumps({"control_epoch": epoch}, separators=(",", ":")) + "\n\n"
                     + "event: replay_complete\n"
-                    + "data: "
-                    + json.dumps({"control_epoch": epoch}, separators=(",", ":"))
-                    + "\n\n"
+                    + "data: " + json.dumps({"control_epoch": epoch}, separators=(",", ":")) + "\n\n"
                 )
                 # A few real per-cell frames so the R4b feed has live-shaped content, ending with
                 # the replay boundary the client keys its stream state off.
                 event_frames = (
-                    "data: "
-                    + json.dumps({"type": "step_start", "part": {"name": "build"}})
-                    + "\n\n"
-                    + "data: "
-                    + json.dumps(
-                        {
-                            "type": "tool_use",
-                            "part": {"name": "bash", "state": {"status": "completed"}},
-                        }
-                    )
-                    + "\n\n"
-                    + "data: "
-                    + json.dumps(
-                        {
-                            "type": "step_finish",
-                            "part": {"cost": 0.01, "tokens": {"input": 120, "output": 40}},
-                        }
-                    )
-                    + "\n\n"
+                    "data: " + json.dumps({"type": "step_start",
+                                           "part": {"name": "build"}}) + "\n\n"
+                    + "data: " + json.dumps({"type": "tool_use",
+                                             "part": {"name": "bash", "state": {"status": "completed"}}}) + "\n\n"
+                    + "data: " + json.dumps({"type": "step_finish",
+                                             "part": {"cost": 0.01,
+                                                      "tokens": {"input": 120, "output": 40}}}) + "\n\n"
                     + "event: replay_complete\ndata: {}\n\n"
                 )
                 context = browser.new_context(
-                    viewport={"width": width, "height": height},
-                    timezone_id="UTC",
-                    locale="en-US",
-                    reduced_motion="reduce",
-                    color_scheme="dark",
+                    viewport={"width": width, "height": height}, timezone_id="UTC",
+                    locale="en-US", reduced_motion="reduce", color_scheme="dark",
                 )
                 page = context.new_page()
                 records: list[dict[str, str]] = []
                 console_errors = _attach_console(page)
-                page.route(
-                    "**/api/**",
-                    _parity_router(records, wire, glance_frames, event_frames, fixtures),
-                )
+                page.route("**/api/**",
+                           _parity_router(records, wire, glance_frames, event_frames, fixtures))
                 page.goto(url, wait_until="domcontentloaded")
                 page.locator('[data-render-state="ready"]').wait_for(timeout=20000)
 
@@ -3968,7 +3655,8 @@ def run_parity_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]],
                 for region in PARITY_RESTING_REGIONS:
                     count = page.locator(f'[data-region="{region}"]').count()
                     if count != 1:
-                        _row(errors, name, "parity", "resting-region", f"{region} count={count}")
+                        _row(errors, name, "parity", "resting-region",
+                             f"{region} count={count}")
 
                 # 3. the workbench lenses: wired + non-empty.
                 page.click("#workbench-open")
@@ -3985,8 +3673,7 @@ def run_parity_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]],
                               const el = document.querySelector(sel);
                               return el && !el.querySelector('[data-panel-state="loading"]');
                             }""",
-                            arg=f"#wb-{panel}",
-                            timeout=5000,
+                            arg=f"#wb-{panel}", timeout=5000,
                         )
                     got = {record["path"] for record in records}
                     for path in expected:
@@ -4010,46 +3697,28 @@ def run_parity_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]],
                     if not probe or probe["content"] == 0:
                         _row(errors, name, "parity-nonempty", panel, f"panel empty: {probe}")
                     elif probe["state"] == "error":
-                        _row(
-                            errors,
-                            name,
-                            "parity-nonempty",
-                            panel,
-                            "panel rendered an explicit error state",
-                        )
+                        _row(errors, name, "parity-nonempty", panel,
+                             "panel rendered an explicit error state")
                     # One representative mutation-wiring probe: the attention lens' steer chip
                     # must POST to the flags route (the handler fulfills it).
                     if panel == "attention":
                         records.clear()
                         steer = page.locator("#wb-attention [data-action='steer']")
                         if steer.count() == 0:
-                            _row(
-                                errors,
-                                name,
-                                "parity-action",
-                                "steer",
-                                "attention flag rendered no steer action",
-                            )
+                            _row(errors, name, "parity-action", "steer",
+                                 "attention flag rendered no steer action")
                         else:
                             steer.first.click()
                             page.wait_for_timeout(250)
-                            if not any(
-                                r["method"] == "POST" and r["path"].endswith("/steer")
-                                for r in records
-                            ):
-                                _row(
-                                    errors,
-                                    name,
-                                    "parity-action",
-                                    "steer",
-                                    "steer click did not POST to the flags route",
-                                )
+                            if not any(r["method"] == "POST" and r["path"].endswith("/steer")
+                                       for r in records):
+                                _row(errors, name, "parity-action", "steer",
+                                     "steer click did not POST to the flags route")
                 if screenshots:
                     shot = out / f"parity_workbench_{name}.png"
                     page.screenshot(path=str(shot), full_page=False)
-                    results.append(
-                        {"case": "parity-workbench", "viewport": name, "screenshot": str(shot)}
-                    )
+                    results.append({"case": "parity-workbench", "viewport": name,
+                                    "screenshot": str(shot)})
                 page.click("#workbench-close")
 
                 # 4. the R4 dock: per-worker event/action + step timings.
@@ -4062,26 +3731,18 @@ def run_parity_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]],
                         _row(errors, name, "parity-dock", sub, "sub-region missing/duplicate")
                 got = {record["path"] for record in records}
                 if not any(path.startswith("/api/events/") for path in got):
-                    _row(
-                        errors,
-                        name,
-                        "parity-dock",
-                        "worker-stream",
-                        "no per-worker /api/events/<cell> request",
-                    )
+                    _row(errors, name, "parity-dock", "worker-stream",
+                         "no per-worker /api/events/<cell> request")
                 entries = page.locator(
-                    "#selection-dock [data-dock-region='worker'] [data-feed-entry]"
-                ).count()
+                    "#selection-dock [data-dock-region='worker'] [data-feed-entry]").count()
                 if entries < 1:
                     _row(errors, name, "parity-dock", "worker-feed", f"{entries} event entries")
                 actions = page.locator(
-                    "#selection-dock [data-dock-region='worker'] [data-action]"
-                ).count()
+                    "#selection-dock [data-dock-region='worker'] [data-action]").count()
                 if actions < 1:
                     _row(errors, name, "parity-dock", "worker-actions", "no [data-action] chips")
                 timings = page.locator(
-                    "#selection-dock [data-dock-region='timing'] [data-timing]"
-                ).count()
+                    "#selection-dock [data-dock-region='timing'] [data-timing]").count()
                 if timings < 1:
                     _row(errors, name, "parity-dock", "step-timings", "no [data-timing] rows")
                 states = page.eval_on_selector_all(
@@ -4094,9 +3755,8 @@ def run_parity_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]],
                 if screenshots:
                     shot = out / f"parity_dock_{name}.png"
                     page.screenshot(path=str(shot), full_page=False)
-                    results.append(
-                        {"case": "parity-dock", "viewport": name, "screenshot": str(shot)}
-                    )
+                    results.append({"case": "parity-dock", "viewport": name,
+                                    "screenshot": str(shot)})
                 for message in console_errors:
                     _row(errors, name, "parity", "console", message[:200])
                 context.close()
@@ -4157,13 +3817,8 @@ def _check_geometry(
         box = geometry["regions"][region]["rect"]
         got = (box["x"], box["y"], box["width"], box["height"])
         if any(abs(a - b) > 1 for a, b in zip(got, want, strict=True)):
-            _row(
-                errors,
-                label,
-                fixture_id,
-                "G-7",
-                f"{region} box {tuple(round(v, 1) for v in got)} want {want}",
-            )
+            _row(errors, label, fixture_id, "G-7",
+                 f"{region} box {tuple(round(v,1) for v in got)} want {want}")
 
     # G-13 row schema; G-14 row count + line clamps + fixed capacities.
     row_count = ROW_COUNT[name]
@@ -4171,102 +3826,52 @@ def _check_geometry(
         _row(errors, label, fixture_id, "G-14", f"{len(geometry['rows'])} rows want {row_count}")
     for index, row in enumerate(geometry["rows"]):
         if set(row["fields"]) != ROW_FIELDS:
-            _row(
-                errors,
-                label,
-                fixture_id,
-                "G-13",
-                f"row {index} fields {sorted(set(row['fields']) ^ ROW_FIELDS)}",
-            )
+            _row(errors, label, fixture_id, "G-13",
+                 f"row {index} fields {sorted(set(row['fields']) ^ ROW_FIELDS)}")
     attention = ATTENTION_COUNT[name]
     if geometry["attentionItems"] != attention:
-        _row(
-            errors,
-            label,
-            fixture_id,
-            "G-14",
-            f"{geometry['attentionItems']} attention items want {attention}",
-        )
+        _row(errors, label, fixture_id, "G-14",
+             f"{geometry['attentionItems']} attention items want {attention}")
     if geometry["attentionLines"] != attention * 2:
-        _row(
-            errors,
-            label,
-            fixture_id,
-            "G-14",
-            f"{geometry['attentionLines']} item-lines want {attention * 2}",
-        )
+        _row(errors, label, fixture_id, "G-14",
+             f"{geometry['attentionLines']} item-lines want {attention * 2}")
     if geometry["rowLines"] != row_count * 3:
-        _row(
-            errors,
-            label,
-            fixture_id,
-            "G-14",
-            f"{geometry['rowLines']} row-lines want {row_count * 3}",
-        )
+        _row(errors, label, fixture_id, "G-14",
+             f"{geometry['rowLines']} row-lines want {row_count * 3}")
     if geometry["detailLines"] != 2:
         _row(errors, label, fixture_id, "G-14", f"{geometry['detailLines']} detail-lines want 2")
     for entry in geometry["lineBearing"]:
         if entry["lines"] > entry["max"]:
-            _row(
-                errors,
-                label,
-                fixture_id,
-                "G-14",
-                f"{entry['where']} renders {entry['lines']} lines > max {entry['max']}",
-            )
+            _row(errors, label, fixture_id, "G-14",
+                 f"{entry['where']} renders {entry['lines']} lines > max {entry['max']}")
 
     # G-5 type floors; G-6 non-empty required values; no missing data-no-ellipsis.
     value_floor = 12.0 if name == "mobile" else 13.0
     for entry in geometry["valueSizes"]:
         if entry["size"] < value_floor - 0.01:
-            _row(
-                errors,
-                label,
-                fixture_id,
-                "G-5",
-                f"{entry['region']} value font {entry['size']} < {value_floor}",
-            )
+            _row(errors, label, fixture_id, "G-5",
+                 f"{entry['region']} value font {entry['size']} < {value_floor}")
     for entry in geometry["labelSizes"]:
         if entry["size"] < 11.0 - 0.01:
-            _row(
-                errors,
-                label,
-                fixture_id,
-                "G-5",
-                f"{entry['region']} label font {entry['size']} < 11",
-            )
+            _row(errors, label, fixture_id, "G-5",
+                 f"{entry['region']} label font {entry['size']} < 11")
     for key, value in geometry["valueTexts"].items():
         if not value:
             _row(errors, label, fixture_id, "G-6", f"empty value {key}")
     if geometry["noEllipsisMissing"]:
-        _row(
-            errors,
-            label,
-            fixture_id,
-            "G-6",
-            f"{geometry['noEllipsisMissing']} required values lack data-no-ellipsis",
-        )
+        _row(errors, label, fixture_id, "G-6",
+             f"{geometry['noEllipsisMissing']} required values lack data-no-ellipsis")
 
     # Exact schemas: answer field sets, money risk marker, bounded composition.
     for answer, expected in FIELDS.items():
         actual = geometry["answerFields"].get(answer, [])
         if len(actual) != len(set(actual)) or set(actual) != expected:
-            _row(
-                errors,
-                label,
-                fixture_id,
-                "schema",
-                f"{answer} fields {sorted(set(actual) ^ expected)}",
-            )
+            _row(errors, label, fixture_id, "schema",
+                 f"{answer} fields {sorted(set(actual) ^ expected)}")
     expected_risk = 1 if fixture_id == "F-3" else 0
     if geometry["moneyRiskCount"] != expected_risk:
-        _row(
-            errors,
-            label,
-            fixture_id,
-            "G-10",
-            f"money-risk markers {geometry['moneyRiskCount']} want {expected_risk}",
-        )
+        _row(errors, label, fixture_id, "G-10",
+             f"money-risk markers {geometry['moneyRiskCount']} want {expected_risk}")
     marginals = geometry["marginals"]
     names = [entry["name"] for entry in marginals]
     if sorted(names) != ["condition", "lifecycle", "model", "provider"]:
@@ -4305,17 +3910,10 @@ def _check_semantics(
             continue
         if not box["visible"] or box["width"] <= 0 or box["height"] <= 0:
             fail("SEM-box", f"{answer} box {box['width']}x{box['height']} visible={box['visible']}")
-        elif (
-            box["top"] < -0.5
-            or box["bottom"] > height + 0.5
-            or box["left"] < -0.5
-            or box["right"] > width + 0.5
-        ):
-            fail(
-                "SEM-fold",
-                f"{answer} box "
-                f"{tuple(round(box[k], 1) for k in ('left', 'top', 'right', 'bottom'))}",
-            )
+        elif (box["top"] < -0.5 or box["bottom"] > height + 0.5
+              or box["left"] < -0.5 or box["right"] > width + 0.5):
+            fail("SEM-fold", f"{answer} box "
+                 f"{tuple(round(box[k], 1) for k in ('left', 'top', 'right', 'bottom'))}")
         if box["scrollH"] > box["clientH"] + 1 or box["scrollW"] > box["clientW"] + 1:
             fail("SEM-answer-scroll", f"{answer} scrolls")
 
@@ -4333,11 +3931,8 @@ def _check_semantics(
         if got["age"] is None or got["age"] < 0:
             fail("SEM-G1", f"{field} non-numeric age {got['age']!r}")
         if got["state"] != want["state"] or got["age"] != want["age_seconds"]:
-            fail(
-                "SEM-G1",
-                f"{field} rendered {got['state']}/{got['age']} "
-                f"fixture {want['state']}/{want['age_seconds']}",
-            )
+            fail("SEM-G1", f"{field} rendered {got['state']}/{got['age']} "
+                 f"fixture {want['state']}/{want['age_seconds']}")
 
     # ── ON-G2 counts: exact fixture equality ──────────────────────────────────────────────
     for key in ("running", "queued", "failed", "live"):
@@ -4357,20 +3952,13 @@ def _check_semantics(
         if risk.get("risk.identity") != "none" or risk.get("risk.action") != "none":
             fail("SEM-G3", f"all-clear must render identity/action none: {risk}")
     elif risk.get("risk.identity") != want_risk["identity"]:
-        fail(
-            "SEM-G3",
-            f"risk.identity {risk.get('risk.identity')!r} fixture {want_risk['identity']!r}",
-        )
+        fail("SEM-G3", f"risk.identity {risk.get('risk.identity')!r} "
+             f"fixture {want_risk['identity']!r}")
 
     # ── ON-G4 money: five exact values, marker count, visible provenance ─────────────────
     want_cost = wire["cost"]
-    for field, key in (
-        ("money.spend", "spend"),
-        ("money.burn", "burn"),
-        ("money.quota", "quota"),
-        ("money.wallet", "wallet"),
-        ("money.leases", "leases"),
-    ):
+    for field, key in (("money.spend", "spend"), ("money.burn", "burn"), ("money.quota", "quota"),
+                       ("money.wallet", "wallet"), ("money.leases", "leases")):
         got = probe["money"].get(field)
         if got != str(want_cost.get(key, "unknown")):
             fail("SEM-G4", f"{field} rendered {got!r} fixture {want_cost.get(key)!r}")
@@ -4388,21 +3976,13 @@ def _check_semantics(
     if decision.get("decision.eligibility") not in ELIGIBILITY_STATES:
         fail("SEM-G5", f"illegal eligibility {decision.get('decision.eligibility')!r}")
     if want_decision["state"] == "none":
-        for field in (
-            "decision.target",
-            "decision.kind",
-            "decision.authority",
-            "decision.eligibility",
-        ):
+        for field in ("decision.target", "decision.kind", "decision.authority",
+                      "decision.eligibility"):
             if decision.get(field) != "none":
-                fail(
-                    "SEM-G5", f"none-decision must render {field}=none, got {decision.get(field)!r}"
-                )
+                fail("SEM-G5", f"none-decision must render {field}=none, got {decision.get(field)!r}")
     else:
-        if (
-            decision.get("decision.target") != want_decision["target"]
-            or decision.get("decision.kind") != want_decision["kind"]
-        ):
+        if (decision.get("decision.target") != want_decision["target"]
+                or decision.get("decision.kind") != want_decision["kind"]):
             fail("SEM-G5", f"decision rendered {decision} fixture {want_decision}")
 
     # ── ON-G6 trust: legal enum, integer counts, epoch + unknown-count truth ──────────────
@@ -4418,13 +3998,11 @@ def _check_semantics(
         except (TypeError, ValueError):
             fail("SEM-G6", f"{key} not a non-negative integer: {raw!r}")
     if str(trust.get("trust.epoch")) != str(want_trust["epoch"]):
-        fail("SEM-G6", f"trust.epoch {trust.get('trust.epoch')!r} fixture {want_trust['epoch']!r}")
+        fail("SEM-G6", f"trust.epoch {trust.get('trust.epoch')!r} "
+             f"fixture {want_trust['epoch']!r}")
     if str(trust.get("trust.unknown_count")) != str(want_trust["unknown_count"]):
-        fail(
-            "SEM-G6",
-            f"unknown_count {trust.get('trust.unknown_count')!r} "
-            f"fixture {want_trust['unknown_count']!r}",
-        )
+        fail("SEM-G6", f"unknown_count {trust.get('trust.unknown_count')!r} "
+             f"fixture {want_trust['unknown_count']!r}")
 
     # ── ON-G7 composition: four marginals, three explicit legible buckets, fixture truth ──
     marginals = {entry["name"]: entry for entry in probe["marginals"]}
@@ -4439,21 +4017,16 @@ def _check_semantics(
         for bucket_name, bucket in buckets.items():
             # The VISIBLE label must be the full bucket word (never 't'/'o'/'u' shorthand).
             if bucket["label"] != bucket_name:
-                fail(
-                    "SEM-G7", f"{marginal_name}.{bucket_name} label {bucket['label']!r} not legible"
-                )
+                fail("SEM-G7", f"{marginal_name}.{bucket_name} label {bucket['label']!r} not legible")
             want_value = str(wire["composition"][marginal_name][bucket_name])
             if bucket["value"] != want_value:
-                fail(
-                    "SEM-G7",
-                    f"{marginal_name}.{bucket_name} rendered {bucket['value']!r} "
-                    f"fixture {want_value!r}",
-                )
+                fail("SEM-G7", f"{marginal_name}.{bucket_name} rendered {bucket['value']!r} "
+                     f"fixture {want_value!r}")
         if not buckets.get("top", {}).get("category"):
             fail("SEM-G7", f"{marginal_name} top bucket lacks data-category")
 
     # ── R2 rows: spec/cell, paired evidence, receipt, budget facets, authority ────────────
-    expected_rows = wire["run_sample"][: len(probe["rows"])]
+    expected_rows = wire["run_sample"][:len(probe["rows"])]
 
     def unmark(value: Any) -> str:
         """Strip the compact viewport's explicit semantic mark (`spec:` / `cmd:` / `said:`...).
@@ -4471,11 +4044,8 @@ def _check_semantics(
         if not row["values"].get("spec.cell"):
             fail("SEM-R2", f"row {row['id']} missing spec/cell")
         elif unmark(row["values"].get("spec.cell")) != str(expected.get("spec.cell")):
-            fail(
-                "SEM-R2",
-                f"row {row['id']} spec {row['values'].get('spec.cell')!r} "
-                f"fixture {expected.get('spec.cell')!r}",
-            )
+            fail("SEM-R2", f"row {row['id']} spec {row['values'].get('spec.cell')!r} "
+                 f"fixture {expected.get('spec.cell')!r}")
         if row["values"].get("evidence.advisory") == row["values"].get("evidence.measured"):
             fail("SEM-R2", f"row {row['id']} ADVISORY claim equals MEASURED proof")
         for field in ("decision.eligibility", "decision.receipt", "cost.provenance"):
@@ -4485,7 +4055,8 @@ def _check_semantics(
         for facet in ("reserved", "cap", "headroom", "settlement"):
             if not budget.get(facet):
                 fail("SEM-R2", f"row {row['id']} budget.{facet} missing")
-        if row["values"].get("decision.eligibility") in GOVERNED_STATES and not row["hasAuthority"]:
+        if (row["values"].get("decision.eligibility") in GOVERNED_STATES
+                and not row["hasAuthority"]):
             fail("SEM-R2", f"row {row['id']} governed decision lacks controller authority")
 
     # ── R1 attention: reserved slots + non-increasing severity ranking ────────────────────
@@ -4543,22 +4114,14 @@ def _verify_captures(results: list[dict[str, Any]]) -> list[str]:
     return errors
 
 
-def write_report(
-    results: list[dict[str, Any]],
-    errors: list[str],
-    report_path: Path,
-    json_path: Path,
-    check_fixtures_exit: int,
-    *,
-    requested_classes: list[str] | None = None,
-    candidate: str = "",
-    candidate_verified: bool = False,
-    preview: str = "",
-    preview_verified: bool = False,
-    preview_exercised: bool = False,
-    preview_serves_candidate: bool = False,
-    coverage: dict[str, Any] | None = None,
-) -> int:
+def write_report(results: list[dict[str, Any]], errors: list[str], report_path: Path,
+                 json_path: Path, check_fixtures_exit: int, *,
+                 requested_classes: list[str] | None = None,
+                 candidate: str = "", candidate_verified: bool = False,
+                 preview: str = "", preview_verified: bool = False,
+                 preview_exercised: bool = False,
+                 preview_serves_candidate: bool = False,
+                 coverage: dict[str, Any] | None = None) -> int:
     """Write the markdown + JSON reports; return the exit code.
 
     The report is the gate's artifact (the website gate's pattern): status, the classes that
@@ -4579,7 +4142,6 @@ def write_report(
     """
     requested = list(requested_classes or ["geometry"])
     executed: list[str] = []
-
     # The per-class evidence keys the runners actually record (the gates' own case/fixture
     # vocabulary — the executed roster derives from THESE, never from a parallel guess).
     def _class_of(result: dict[str, Any]) -> str:
@@ -4599,7 +4161,6 @@ def write_report(
         if case.startswith("parity"):
             return "parity"
         return ""
-
     for result in results:
         klass = _class_of(result)
         if klass and klass not in executed:
@@ -4660,10 +4221,8 @@ def write_report(
             f"**Coverage omitted:** {', '.join(coverage.get('omitted') or []) or 'none'}",
         ]
     if candidate:
-        label = (
-            "verified against the checkout HEAD"
-            if candidate_verified
-            else ("UNVERIFIED (does not match the checkout HEAD)")
+        label = "verified against the checkout HEAD" if candidate_verified else (
+            "UNVERIFIED (does not match the checkout HEAD)"
         )
         lines.append(f"**Candidate:** {candidate} ({label})")
     if preview:
@@ -4672,13 +4231,12 @@ def write_report(
             if preview_verified and candidate:
                 label += (
                     ", serves the candidate's bytes"
-                    if preview_serves_candidate
-                    else ", SERVES A DIFFERENT TREE (asset hash mismatch)"
+                    if preview_serves_candidate else
+                    ", SERVES A DIFFERENT TREE (asset hash mismatch)"
                 )
         else:
-            label = (
-                "NOT exercised — the gate served its own instance (pass --base to target a preview)"
-            )
+            label = ("NOT exercised — the gate served its own instance "
+                     "(pass --base to target a preview)")
         lines.append(f"**Preview target:** {preview} ({label})")
     lines += [
         "",
@@ -4702,23 +4260,20 @@ def write_report(
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text("\n".join(lines), encoding="utf-8")
     json_path.write_text(
-        json.dumps(
-            {
-                "status": status,
-                "requested_classes": requested,
-                "executed_classes": executed,
-                "candidate": candidate,
-                "candidate_verified": bool(candidate_verified),
-                "preview": preview,
-                "preview_verified": bool(preview_verified),
-                "preview_exercised": bool(preview_exercised),
-                "preview_serves_candidate": bool(preview_serves_candidate),
-                "screenshots": results,
-                "coverage": coverage or {},
-                "errors": errors,
-            },
-            indent=2,
-        ),
+        json.dumps({
+            "status": status,
+            "requested_classes": requested,
+            "executed_classes": executed,
+            "candidate": candidate,
+            "candidate_verified": bool(candidate_verified),
+            "preview": preview,
+            "preview_verified": bool(preview_verified),
+            "preview_exercised": bool(preview_exercised),
+            "preview_serves_candidate": bool(preview_serves_candidate),
+            "screenshots": results,
+            "coverage": coverage or {},
+            "errors": errors,
+        }, indent=2),
         encoding="utf-8",
     )
     print("\n".join(lines))
@@ -4732,16 +4287,10 @@ def main() -> int:
     parser.add_argument("--json", default=None, dest="json_path")
     parser.add_argument("--fixtures", default="F-0")
     parser.add_argument("--no-screenshot", action="store_true")
-    parser.add_argument(
-        "--screenshot-themes",
-        default="dark",
-        help="comma-separated themes to screenshot (contrast runs all themes)",
-    )
-    parser.add_argument(
-        "--check-fixtures",
-        action="store_true",
-        help="validate deterministic fixtures without a browser",
-    )
+    parser.add_argument("--screenshot-themes", default="dark",
+                        help="comma-separated themes to screenshot (contrast runs all themes)")
+    parser.add_argument("--check-fixtures", action="store_true",
+                        help="validate deterministic fixtures without a browser")
     parser.add_argument(
         "--boards",
         action="store_true",
@@ -4795,19 +4344,12 @@ def main() -> int:
         "screenshots, and a bound --candidate — each required class enumerated "
         "in the report; an omission is a named FAIL",
     )
-    parser.add_argument(
-        "--candidate", default=None, help="the candidate SHA under review — bound into the report"
-    )
-    parser.add_argument(
-        "--preview",
-        default=None,
-        help="the preview target (URL) under review — bound into the report",
-    )
-    parser.add_argument(
-        "--base",
-        default=None,
-        help="render an already-running portal at this URL instead of starting one",
-    )
+    parser.add_argument("--candidate", default=None,
+                        help="the candidate SHA under review — bound into the report")
+    parser.add_argument("--preview", default=None,
+                        help="the preview target (URL) under review — bound into the report")
+    parser.add_argument("--base", default=None,
+                        help="render an already-running portal at this URL instead of starting one")
     args = parser.parse_args()
 
     global _BASE_OVERRIDE
@@ -4912,18 +4454,13 @@ def main() -> int:
             )
             results, errors = results + interaction_results, errors + interaction_errors
     except ImportError:
-        print(
-            "playwright is not installed; run with --check-fixtures for the browser-free check",
-            file=sys.stderr,
-        )
+        print("playwright is not installed; run with --check-fixtures for the browser-free check",
+              file=sys.stderr)
         return 2
     except Exception as error:  # noqa: BLE001 - a missing browser is exit 2, not a silent pass
         print(f"browser unavailable: {error}", file=sys.stderr)
-        print(
-            "run `python3 -m playwright install --with-deps chromium` in an environment with "
-            "the system libraries, or use --check-fixtures",
-            file=sys.stderr,
-        )
+        print("run `python3 -m playwright install --with-deps chromium` in an environment with "
+              "the system libraries, or use --check-fixtures", file=sys.stderr)
         return 2
 
     # Capture-file readability (the rendered proof must be real, not a filename): every
@@ -4938,11 +4475,8 @@ def main() -> int:
     if args.candidate:
         try:
             head = subprocess.run(
-                ["git", "rev-parse", "HEAD"],
-                cwd=Path.cwd(),
-                capture_output=True,
-                text=True,
-                timeout=15,
+                ["git", "rev-parse", "HEAD"], cwd=Path.cwd(),
+                capture_output=True, text=True, timeout=15,
             ).stdout.strip()
         except Exception:  # noqa: BLE001 — an unreadable checkout verifies nothing
             head = ""
@@ -5001,11 +4535,7 @@ def main() -> int:
                     )
     coverage = boards_coverage(legacy_ran=legacy_requested) if args.boards else None
     return write_report(
-        results,
-        errors,
-        report_path,
-        json_path,
-        fixture_rc,
+        results, errors, report_path, json_path, fixture_rc,
         requested_classes=requested_classes,
         coverage=coverage,
         candidate=args.candidate or "",
