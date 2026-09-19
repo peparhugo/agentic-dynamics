@@ -104,6 +104,14 @@ class StepRequest:
     #: executes the suite against the candidate WITHOUT reloading the producing phase by name.
     #: ``None`` for an agent step (an agent is not a verifier).
     test_boundary: TestBoundary | None = None
+    #: Isolated conversation-fork transport: when ``fork_session_id`` is set, the child
+    #: forks THIS parent session (``--session <id> --fork``) from the checkpoint bytes the
+    #: parent readied beside the prepared step (``fork_db_path``, child-visible) and verifies
+    #: them against ``fork_checkpoint_sha256``. A declared fork whose checkpoint is missing or
+    #: mismatched REFUSES to execute — never a silent fresh session.
+    fork_session_id: str = ""
+    fork_checkpoint_sha256: str = ""
+    fork_db_path: str = ""
 
     @property
     def prompt_sha256(self) -> str:
@@ -142,6 +150,17 @@ class StepRequest:
             "silent_mode": self.silent_mode,
             "enforce_pytest": self.enforce_pytest,
             "attempt": self.attempt,
+            **(
+                {
+                    "fork": {
+                        "session_id": self.fork_session_id,
+                        "checkpoint_sha256": self.fork_checkpoint_sha256,
+                        "db_path": self.fork_db_path,
+                    }
+                }
+                if self.fork_session_id
+                else {}
+            ),
         }
 
     @classmethod
@@ -192,6 +211,11 @@ class StepRequest:
             silent_mode=bool(payload.get("silent_mode", False)),
             enforce_pytest=bool(payload.get("enforce_pytest", False)),
             attempt=int(payload.get("attempt") or 1),
+            fork_session_id=str((payload.get("fork") or {}).get("session_id") or ""),
+            fork_checkpoint_sha256=str(
+                (payload.get("fork") or {}).get("checkpoint_sha256") or ""
+            ),
+            fork_db_path=str((payload.get("fork") or {}).get("db_path") or ""),
             phase_def={},
         )
 

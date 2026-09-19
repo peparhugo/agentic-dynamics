@@ -8,11 +8,13 @@ the recorded parent decision and the actual run disagree.
 
 from __future__ import annotations
 
+import hashlib
 import json
 
 import pytest
 
 from agentic_dynamics.runtime.executor import StepRequest, load_prepared_step
+from agentic_dynamics.runtime.workflow_runner import run_concrete_step
 
 
 def _request(**kwargs) -> StepRequest:
@@ -114,3 +116,89 @@ def test_phase_result_serializes_the_prepared_step_reference():
     serialized = phase.to_dict()
     assert serialized["prepared_step_path"] == ".fleet/prepared_steps/p1.a2.json"
     assert serialized["prepared_step_prompt_sha256"] == "c" * 64
+
+
+# ── isolated conversation forks: the checkpoint transport ─────────────────────────────────
+
+def test_prepared_step_carries_the_fork_identity(tmp_path):
+    """A prepared step declares its fork: parent session id + checkpoint hash + child path."""
+    req = StepRequest(
+        phase_name="p1", phase_kind="agent", prompt="do the thing", model="m", goal="g",
+        spec_name="t", workdir="/repo",
+        fork_session_id="ses_parent123", fork_checkpoint_sha256="a" * 64,
+        fork_db_path="/repo/.fleet/fork_checkpoints/p1.a1.db",
+    )
+    payload = req.to_prepared_dict(workdir="/repo")
+    assert payload["fork"] == {
+        "session_id": "ses_parent123",
+        "checkpoint_sha256": "a" * 64,
+        "db_path": "/repo/.fleet/fork_checkpoints/p1.a1.db",
+    }
+    rebuilt = StepRequest.from_prepared_dict(payload)
+    assert rebuilt.fork_session_id == "ses_parent123"
+    assert rebuilt.fork_checkpoint_sha256 == "a" * 64
+    assert rebuilt.fork_db_path == "/repo/.fleet/fork_checkpoints/p1.a1.db"
+
+
+def test_fork_stages_its_own_copy_and_forks(tmp_path, monkeypatch):
+    """The child verifies the checkpoint, stages it into ITS state dir, and forks."""
+    import hashlib
+
+    src = tmp_path / "transport" / "p1.a1.db"
+    src.parent.mkdir(parents=True)
+    src.write_bytes(b"checkpoint-bytes")
+    state = tmp_path / "state" / "data" / "opencode"
+    state.mkdir(parents=True)
+    monkeypatch.setenv("FINOPS_OPENCODE_STATE_DIR", str(tmp_path / "state" / "data"))
+    captured = {}
+
+    def fake_agent(prompt, **kwargs):
+        captured.update(kwargs)
+        class R:
+            ok = True
+            tokens = {"in": 1, "out": 1, "total": 2}
+            error = ""
+            session_id = "ses_child"
+        return R()
+
+    request = StepRequest(
+        phase_name="p1", phase_kind="agent", prompt="q", model="m", goal="g",
+        spec_name="t", workdir=str(tmp_path),
+        fork_session_id="ses_parent123",
+        fork_checkpoint_sha256=hashlib.sha256(b"checkpoint-bytes").hexdigest(),
+        fork_db_path=str(src),
+    )
+    result = run_concrete_step(request, run_agent=fake_agent)
+    assert result.state == "succeeded"
+    assert captured.get("session_id") == "ses_parent123"
+    assert captured.get("fork") is True
+    assert (state / "opencode.db").read_bytes() == b"checkpoint-bytes"
+
+
+def test_fork_refuses_a_missing_or_tampered_checkpoint(tmp_path, monkeypatch):
+    """A declared fork with missing/changed bytes REFUSES — never a silent fresh session."""
+    state = tmp_path / "state" / "data" / "opencode"
+    state.mkdir(parents=True)
+    monkeypatch.setenv("FINOPS_OPENCODE_STATE_DIR", str(tmp_path / "state" / "data"))
+
+    def fake_agent(prompt, **kwargs):  # pragma: no cover — must never run
+        raise AssertionError("the agent must not run for a refused fork")
+
+    missing = StepRequest(
+        phase_name="p1", phase_kind="agent", prompt="q", model="m", goal="g",
+        spec_name="t", workdir=str(tmp_path), fork_session_id="ses_parent",
+        fork_checkpoint_sha256="b" * 64, fork_db_path=str(tmp_path / "nope.db"),
+    )
+    with pytest.raises(ValueError, match="checkpoint missing"):
+        run_concrete_step(missing, run_agent=fake_agent)
+
+    tampered = tmp_path / "tampered.db"
+    tampered.write_bytes(b"changed")
+    bad = StepRequest(
+        phase_name="p1", phase_kind="agent", prompt="q", model="m", goal="g",
+        spec_name="t", workdir=str(tmp_path), fork_session_id="ses_parent",
+        fork_checkpoint_sha256=hashlib.sha256(b"original").hexdigest(),
+        fork_db_path=str(tampered),
+    )
+    with pytest.raises(ValueError, match="hash mismatch"):
+        run_concrete_step(bad, run_agent=fake_agent)

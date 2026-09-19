@@ -139,3 +139,48 @@ def test_prepared_relative_path_names_the_written_transport(tmp_path):
     child_path = command[command.index("--prepared-step") + 1]
     assert child_path == "/repo/.fleet/prepared_steps/p1.a1.json"
     assert child_path.endswith(executor._prepared_relative_path(_request()))
+
+
+# ── isolated conversation forks: the parent-side checkpoint staging ───────────────────────
+
+def test_fork_checkpoint_is_staged_into_the_clone_and_stamped(tmp_path):
+    """A declared fork_checkpoint: session id + hash stamped, db copied beside the step."""
+    import sqlite3
+
+    seed = tmp_path / "seed-data"
+    (seed / "opencode").mkdir(parents=True)
+    con = sqlite3.connect(seed / "opencode" / "opencode.db")
+    con.execute("create table session (id text primary key, time_created integer)")
+    con.execute("insert into session values ('ses_parent_abc', 5)")
+    con.commit()
+    con.close()
+
+    clone = tmp_path / "runs" / "run-abc" / "repo"
+    clone.mkdir(parents=True)
+    executor = _executor(run_clone=str(clone))
+    request = _request()
+    request.phase_def = {"scope": "implementation", "fork_checkpoint": str(seed)}
+    built = executor.build_request(request)
+
+    prepared = json.loads(
+        (clone / ".fleet" / "prepared_steps" / "p1.a1.json").read_text(encoding="utf-8")
+    )
+    assert prepared["fork"]["session_id"] == "ses_parent_abc"
+    stamped = clone / ".fleet" / "fork_checkpoints" / "p1.a1.db"
+    assert stamped.is_file()
+    assert (seed / "opencode" / "opencode.db").read_bytes() == stamped.read_bytes()
+    assert prepared["fork"]["db_path"].endswith("/.fleet/fork_checkpoints/p1.a1.db")
+    assert built["command"]  # the sibling command still builds
+
+
+def test_fork_checkpoint_missing_refuses_before_launch(tmp_path):
+    """Declared-but-missing never degrades to a fresh session: it raises, no request built."""
+    import pytest
+
+    clone = tmp_path / "runs" / "run-abc" / "repo"
+    clone.mkdir(parents=True)
+    executor = _executor(run_clone=str(clone))
+    request = _request()
+    request.phase_def = {"scope": "implementation", "fork_checkpoint": str(tmp_path / "nope")}
+    with pytest.raises(RuntimeError, match="no session db"):
+        executor.build_request(request)

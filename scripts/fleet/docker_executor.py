@@ -127,6 +127,20 @@ class DockerAgentExecutor(StepExecutor):
             sibling_cmd += ["--output-token-limit", str(self._output_token_limit)]
         if self._backend or request.backend:
             sibling_cmd += ["--backend", self._backend or request.backend]
+        # Isolated conversation forks: a phase may declare
+        # ``fork_checkpoint: <repo-relative or absolute path to a seed run's data dir>``.
+        # The parent stages the seed session's db beside the prepared step (same transport
+        # dir, same .fleet commit exclusion) and stamps its identity onto the prepared step;
+        # every child then stages its OWN copy into its isolated state dir. A declared fork
+        # whose checkpoint is missing REFUSES here — before any launch, never a fresh session.
+        fork_decl = (
+            request.phase_def.get("fork_checkpoint")
+            if isinstance(request.phase_def, dict)
+            else None
+        )
+        if fork_decl:
+            self._stage_fork_checkpoint(request, str(fork_decl))
+
         # Step 3 (prepared-step transport): the parent readies the EXACT step (prompt + hash +
         # settings + attempt) and the child consumes it — never a re-derivation from the spec.
         # The transport's workdir is stamped with the CHILD-visible path (``sibling_workdir``),
@@ -174,6 +188,57 @@ class DockerAgentExecutor(StepExecutor):
             # call of its own; the broker validates + executes them.
             image=self._cell_image,
             timeout_seconds=request.timeout or self._timeout or 0,
+        )
+
+    def _stage_fork_checkpoint(self, request: StepRequest, seed_data_dir: str) -> None:
+        """Copy a seed run's parent-session db into the run clone + stamp the fork identity.
+
+        ``seed_data_dir`` is the seed run's per-attempt OpenCode DATA dir (the one holding
+        ``opencode/opencode.db`` with the approved parent conversation). The db is copied to
+        ``<clone>/.fleet/fork_checkpoints/<phase>.a<attempt>.db`` (the transport directory,
+        excluded from commits), its sha256 and newest session id are stamped onto ``request``,
+        and the child-visible path is set to the clone's ``/repo`` mount. Missing db or empty
+        session table REFUSES — a declared fork never degrades to a fresh session.
+        """
+        import hashlib
+        import shutil
+        import sqlite3
+
+        from agentic_dynamics.core.paths import PROJECT_ROOT
+
+        seed = Path(seed_data_dir)
+        if not seed.is_absolute():
+            seed = Path(PROJECT_ROOT) / seed
+        seed_db = seed / "opencode" / "opencode.db"
+        if not seed_db.is_file():
+            raise RuntimeError(
+                f"fork_checkpoint declared but no session db at {seed_db} — refusing"
+            )
+        if not self._run_clone:
+            raise RuntimeError(
+                "fork_checkpoint requires a run clone (the checkpoint travels beside the "
+                "prepared step inside the run clone)"
+            )
+        con = sqlite3.connect(f"file:{seed_db}?mode=ro", uri=True)
+        try:
+            row = con.execute(
+                "select id from session order by time_created desc limit 1"
+            ).fetchone()
+        finally:
+            con.close()
+        if not row:
+            raise RuntimeError(
+                f"fork_checkpoint db at {seed_db} carries no session — refusing"
+            )
+        digest = hashlib.sha256(seed_db.read_bytes()).hexdigest()
+        dest_dir = Path(self._run_clone) / ".fleet" / "fork_checkpoints"
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / f"{request.phase_name}.a{max(int(request.attempt), 1)}.db"
+        shutil.copy2(seed_db, dest)
+        request.fork_session_id = str(row[0])
+        request.fork_checkpoint_sha256 = digest
+        request.fork_db_path = (
+            f"{spawn_wrapper.REPO_TARGET}/.fleet/fork_checkpoints/{dest.name}"
         )
 
     def _prepared_relative_path(self, request: StepRequest) -> str:

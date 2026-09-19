@@ -112,6 +112,7 @@ never again mean "global".
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import os
 import re
@@ -1938,6 +1939,44 @@ def _format_stall_evidence(ev: dict[str, Any]) -> str:
     )
 
 
+def _stage_fork_checkpoint(request: StepRequest) -> None:
+    """Verify the carried fork checkpoint and stage it into the child's ISOLATED state.
+
+    The transport contract for isolated conversation forks: the parent readies the frozen
+    parent-session db beside the prepared step (``fork_db_path``) and the child verifies its
+    sha256 against the prepared ``fork.checkpoint_sha256`` before copying it into the child's
+    OWN state dir (``FINOPS_OPENCODE_STATE_DIR`` / ``$XDG_DATA_HOME/opencode``). Every sibling
+    stages its own copy — no writable OpenCode database is ever shared between cells — and a
+    declared fork whose bytes are missing or changed REFUSES to execute rather than falling
+    back to a fresh session.
+    """
+    if not request.fork_db_path:
+        raise ValueError("fork declared without a checkpoint db path — refusing a fresh session")
+    src = Path(request.fork_db_path)
+    if not src.is_file():
+        raise ValueError(
+            f"fork checkpoint missing at {src} — refusing to start a fresh session"
+        )
+    actual = hashlib.sha256(src.read_bytes()).hexdigest()
+    if request.fork_checkpoint_sha256 and actual != request.fork_checkpoint_sha256:
+        raise ValueError(
+            "fork checkpoint hash mismatch "
+            f"({actual[:12]} != {request.fork_checkpoint_sha256[:12]}): the checkpoint bytes "
+            "changed in transit — refusing to fork"
+        )
+    data_home = os.environ.get("FINOPS_OPENCODE_STATE_DIR") or os.environ.get("XDG_DATA_HOME") or ""
+    if not data_home:
+        raise ValueError(
+            "fork declared but the child has no isolated OpenCode data dir "
+            "(FINOPS_OPENCODE_STATE_DIR / XDG_DATA_HOME) — refusing"
+        )
+    # The adapter's OpenCode reads its session db from ``$XDG_DATA_HOME/opencode/opencode.db``
+    # (the cell layout: FINOPS_OPENCODE_STATE_DIR == XDG_DATA_HOME == /state/data).
+    dest = Path(data_home) / "opencode" / "opencode.db"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dest)
+
+
 def run_concrete_step(
     request: StepRequest,
     *,
@@ -1956,7 +1995,19 @@ def run_concrete_step(
     ``run_agent`` is injectable so the provider seam can be faked (exactly-once assertions);
     it defaults to the real adapter (:func:`agentic_dynamics.adapters.backends.run_agentic`).
     """
-    executor = LocalAgentExecutor(run_agent or run_agentic)
+    agent = run_agent or run_agentic
+    if request.fork_session_id:
+        _stage_fork_checkpoint(request)
+        base_agent = agent
+
+        def agent(prompt: str, **kwargs: Any) -> Any:  # noqa: F811 — the fork wrapper
+            """Fork the declared parent session: the isolated child runs opencode with
+            ``--session <parent> --fork`` against ITS OWN copy of the checkpoint db."""
+            return base_agent(
+                prompt, session_id=request.fork_session_id, fork=True, **kwargs
+            )
+
+    executor = LocalAgentExecutor(agent)
     step = executor.execute(request)
     phase = PhaseResult(
         phase=request.phase_name or "?",
