@@ -33,6 +33,8 @@ from agentic_dynamics.control.control_db import (  # noqa: E402
     RunState,
 )
 from apps.control_room.routes import glance  # noqa: E402
+from apps.control_room.services import operations as ops  # noqa: E402
+from apps.control_room.services import run_evidence  # noqa: E402
 
 pytestmark = pytest.mark.fast
 
@@ -354,21 +356,21 @@ def test_recorded_ledger_resolves_the_container_spelled_path(tmp_path, monkeypat
 
     monkeypatch.setattr(paths_mod, "PROJECT_ROOT", tmp_path)
     detail = {"run": {"ledger_path": "/repo/experiments/results/workflows/spec/run.json"}}
-    assert glance._recorded_ledger(detail) == ledger
+    assert run_evidence._recorded_ledger(detail) == ledger
     # An unresolvable pointer stays None (unknown), never a fabricated read.
-    assert glance._recorded_ledger({"run": {"ledger_path": "/repo/nope.json"}}) is None
+    assert run_evidence._recorded_ledger({"run": {"ledger_path": "/repo/nope.json"}}) is None
 
 
 def test_cost_provenance_reports_the_aggregate_label_or_unknown():
     # No phase evidence: the amount is recorded, its provenance is not — say exactly that.
     assert (
-        glance._cost_provenance({}, {"run": {"cost_usd": 0.027517302}}, None)
+        run_evidence._cost_provenance({}, {"run": {"cost_usd": 0.027517302}}, None)
         == "$0.0275 · source unknown"
     )
-    assert glance._cost_provenance({"cost_usd": 0.25}, None, None) == "$0.2500 · source unknown"
+    assert run_evidence._cost_provenance({"cost_usd": 0.25}, None, None) == "$0.2500 · source unknown"
     # The aggregate's own label: one uniform recorded source across the contributors.
     assert (
-        glance._cost_provenance(
+        run_evidence._cost_provenance(
             {},
             {"run": {"cost_usd": 5.0}},
             {"phases": [
@@ -380,7 +382,7 @@ def test_cost_provenance_reports_the_aggregate_label_or_unknown():
     )
     # MIXED contributors never inherit the first phase's label (review finding P2).
     assert (
-        glance._cost_provenance(
+        run_evidence._cost_provenance(
             {},
             {"run": {"cost_usd": 5.0}},
             {"phases": [
@@ -393,7 +395,7 @@ def test_cost_provenance_reports_the_aggregate_label_or_unknown():
     # A RECORDED zero with a recognized source is a measurement, not an unknown
     # (review finding P3; the cost contract distinguishes metered zero from absence).
     assert (
-        glance._cost_provenance(
+        run_evidence._cost_provenance(
             {},
             {"run": {"cost_usd": 0.0}},
             {"total_cost_usd": 0.0, "phases": [{"cost_usd": 0.0, "cost_source": "metered"}]},
@@ -401,12 +403,12 @@ def test_cost_provenance_reports_the_aggregate_label_or_unknown():
         == "$0.0000 · metered"
     )
     # Absence stays unknown: no amount, no recognized source.
-    assert glance._cost_provenance({}, {"run": {"cost_usd": 0.0}}, None) == "unknown"
-    assert glance._cost_provenance({}, None, None) == "unknown"
+    assert run_evidence._cost_provenance({}, {"run": {"cost_usd": 0.0}}, None) == "unknown"
+    assert run_evidence._cost_provenance({}, None, None) == "unknown"
     # A provenance LABEL alone never establishes an amount (review finding P2 repro 1):
     # no aggregate, a phase carrying only a source -> unknown, never $0.0000.
     assert (
-        glance._cost_provenance(
+        run_evidence._cost_provenance(
             {}, {"run": {"cost_usd": 0.0}}, {"phases": [{"cost_source": "metered"}]}
         )
         == "unknown"
@@ -414,7 +416,7 @@ def test_cost_provenance_reports_the_aggregate_label_or_unknown():
     # A COMPLETE aggregate is derivable from the phase amounts (review finding P2 repro 2):
     # no top-level total, one phase recording $3.50 metered -> $3.5000 · metered.
     assert (
-        glance._cost_provenance(
+        run_evidence._cost_provenance(
             {},
             {"run": {"cost_usd": 0.0}},
             {"phases": [{"cost_usd": 3.50, "cost_source": "metered"}]},
@@ -423,7 +425,7 @@ def test_cost_provenance_reports_the_aggregate_label_or_unknown():
     )
     # An INCOMPLETE aggregate (a phase without a recorded amount) stays unknown.
     assert (
-        glance._cost_provenance(
+        run_evidence._cost_provenance(
             {},
             {"run": {"cost_usd": 0.0}},
             {"phases": [{"cost_usd": 3.50, "cost_source": "metered"}, {"kind": "test"}]},
@@ -436,33 +438,33 @@ def test_measured_state_names_independent_verification():
     independent = {
         "phases": [{"kind": "test", "test_executed_success": True, "evaluator_independent": True}]
     }
-    assert glance._measured_state(None, independent) == "independent tests passed"
+    assert run_evidence._measured_state(None, independent) == "independent tests passed"
     failed = {
         "phases": [{"kind": "test", "test_executed_success": False, "evaluator_independent": True}]
     }
-    assert glance._measured_state(None, failed) == "independent tests failed"
+    assert run_evidence._measured_state(None, failed) == "independent tests failed"
     participant = {"phases": [{"kind": "test", "test_executed_success": True}]}
-    assert glance._measured_state(None, participant) == "tests passed (independence unrecorded)"
+    assert run_evidence._measured_state(None, participant) == "tests passed (independence unrecorded)"
     # A passing NON-independent test alongside a failing independent one is a FAILURE — the
     # verdict and independence belong to the same phase, never pooled across phases.
     mixed_failure = {"phases": [
         {"kind": "test", "test_executed_success": True, "evaluator_independent": False},
         {"kind": "test", "test_executed_success": False, "evaluator_independent": True},
     ]}
-    assert glance._measured_state(None, mixed_failure) == "independent tests failed"
+    assert run_evidence._measured_state(None, mixed_failure) == "independent tests failed"
     # An independent pending result is not a pass.
     mixed_pending = {"phases": [
         {"kind": "test", "test_executed_success": True, "evaluator_independent": True},
         {"kind": "test", "test_executed_success": None, "evaluator_independent": True},
     ]}
-    assert glance._measured_state(None, mixed_pending) == "test result pending"
+    assert run_evidence._measured_state(None, mixed_pending) == "test result pending"
     # All pass, but not all recorded-independent: the weaker, truthful claim.
     mixed_pass = {"phases": [
         {"kind": "test", "test_executed_success": True, "evaluator_independent": False},
         {"kind": "test", "test_executed_success": True, "evaluator_independent": True},
     ]}
-    assert glance._measured_state(None, mixed_pass) == "tests passed (independence unrecorded)"
-    assert glance._measured_state(None, {"phases": []}) == "no test recorded"
+    assert run_evidence._measured_state(None, mixed_pass) == "tests passed (independence unrecorded)"
+    assert run_evidence._measured_state(None, {"phases": []}) == "no test recorded"
 
 
 def test_run_detail_drawer_escape_is_drawer_first() -> None:
@@ -486,3 +488,57 @@ def test_run_detail_drawer_escape_is_drawer_first() -> None:
     open_detail = parity[parity.index("function openRunDetail(") :]
     open_detail = open_detail[: open_detail.index("\n  }") + 4]
     assert "run-detail-close" in open_detail
+
+
+def test_glance_row_and_run_detail_share_the_same_derivations(monkeypatch, tmp_path):
+    """One run, one answer: the glance row and the drawer read the SAME derivations.
+
+    The service-owned ``run_evidence`` module is what makes this true; a duplicate
+    implementation in either surface would let the cost label or the verification verdict
+    drift between them.
+    """
+    db_path = tmp_path / "control.db"
+    run_id, _sha = _seed_awaiting(db_path)
+    ledger_path = tmp_path / "shared_ledger.json"
+    ledger_path.write_text(
+        json.dumps(
+            {
+                "run_id": run_id,
+                "workdir": "/tmp/wt_shared",
+                "total_cost_usd": 0.0,
+                "phases": [
+                    {
+                        "phase": "implement",
+                        "kind": "test",
+                        "status": "ok",
+                        "test_executed_success": True,
+                        "evaluator_independent": True,
+                        "cost_usd": 0.0,
+                        "cost_source": "metered",
+                        "final_response": "done",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    db = ControlDB.open(db_path)
+    try:
+        db.transition_run(
+            run_id,
+            RunState.AWAITING_APPROVAL,
+            reason="checkpoint",
+            ledger_path=str(ledger_path),
+        )
+    finally:
+        db.close()
+    _stub_glance(monkeypatch, db_path)
+
+    row = _row_for(glance.build_glance(object()), run_id)
+    with ControlDB.open(db_path) as detail_db:
+        detail = ops.run_detail(detail_db, run_id)
+
+    assert detail is not None
+    assert row["cost.provenance"] == detail["cost"]["provenance"] == "$0.0000 \u00b7 metered"
+    assert row["evidence.measured"] == detail["evidence"]["measured"] == "independent tests passed"
+    assert row["evidence.advisory"] == detail["evidence"]["narration"] == "narration recorded"

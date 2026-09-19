@@ -193,3 +193,31 @@ def test_unavailable_payloads_render_their_names_not_blanks():
     assert "data.degraded.map((d) => d.surface)" in source
     # a failed surface panel names its reason and URL
     assert "unavailable — " in source
+
+
+def test_run_drawer_renders_the_run_inspection_blocks():
+    """The loaded drawer renders the additive run-inspection slice.
+
+    The drawer must show the cost's provenance, the independent verification SEPARATE from the
+    agent's own claim (SAID vs MEASURED), the delivered knowledge, the prepared-step reference,
+    and timings carrying a measured/unknown state — the anchors the render gate then exercises
+    behaviorally.
+    """
+    app = (STATIC / "app.js").read_text(encoding="utf-8")
+    for anchor in (
+        "Delivered knowledge",
+        "Prepared step",
+        "Timings",
+        "Verification",
+        "renderDeliveredKnowledge",
+        "renderPreparedStep",
+        "renderTimings",
+        "verificationLine",
+        "dataset.costProvenance",
+        "dataset.verification",
+        "dataset.deliveredPhase",
+        "dataset.preparedStepPath",
+        "selected — use not established",
+        'tr.dataset.state',
+    ):
+        assert anchor in app, anchor

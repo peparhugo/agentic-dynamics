@@ -65,51 +65,76 @@
     "unhealthy_workers": []
   },
   "run_detail": {
+    "schema": "control-room-run-detail/v1",
     "run": {
+      "run_id": "run-fixture-0001",
       "spec_name": "control_room_followups",
+      "workflow_revision_id": "control_room_followups@1",
+      "candidate_sha": "bc2c728633273947d278f285c2e8929946aaa082",
       "state": "promotable",
       "model": "deepseek/deepseek-v4-flash",
-      "candidate_sha": "bc2c728633273947d278f285c2e8929946aaa082",
       "started_at": "2026-09-18T19:18:09Z",
-      "cost_usd": 1.23
+      "ended_at": "2026-09-18T19:42:11Z",
+      "ledger_path": "/repo/experiments/results/workflows/control_room_followups/20260918T191809000000Z_run-fixture-0001.json",
+      "cost_usd": 0.0,
+      "result_digest": "",
+      "parent_run_id": "",
+      "family_id": ""
     },
     "attempts": [
       {
-        "attempt_number": 1,
-        "phase": "build",
+        "attempt_id": "att-fixture-0001",
+        "run_id": "run-fixture-0001",
+        "step_id": "implement",
+        "attempt_no": 1,
         "model": "deepseek/deepseek-v4-flash",
-        "status": "ok",
-        "first_pass": true,
-        "accepted": true,
-        "cost_usd": 0.41
+        "state": "ok",
+        "started_at": "2026-09-18T19:18:09Z",
+        "ended_at": "2026-09-18T19:25:00Z",
+        "tokens": 1200,
+        "cost_usd": 0.0,
+        "exit_code": 0,
+        "error": ""
       },
       {
-        "attempt_number": 2,
-        "phase": "verify",
+        "attempt_id": "att-fixture-0002",
+        "run_id": "run-fixture-0001",
+        "step_id": "verify",
+        "attempt_no": 1,
         "model": "deepseek/deepseek-v4-flash",
-        "status": "ok",
-        "first_pass": false,
-        "accepted": true,
-        "retry_reason": "test_first",
-        "cost_usd": 0.82
+        "state": "ok",
+        "started_at": "2026-09-18T19:25:00Z",
+        "ended_at": "2026-09-18T19:26:00Z",
+        "tokens": 300,
+        "cost_usd": 0.0,
+        "exit_code": 0,
+        "error": ""
       }
     ],
     "gates": [
       {
         "gate_id": "gate-fixture",
+        "run_id": "run-fixture-0001",
+        "step_id": "verify",
         "candidate_sha": "bc2c7286",
-        "status": "awaiting_approval",
-        "verdict": "pending",
-        "created_at": "2026-09-18T19:40:00Z"
+        "verdict": "pass",
+        "evidence_json": "{\"tests_passed\": 4}",
+        "executor": "pytest",
+        "started_at": "2026-09-18T19:25:00Z",
+        "ended_at": "2026-09-18T19:26:00Z"
       }
     ],
     "approvals": [
       {
+        "approval_id": "apr-fixture",
+        "run_id": "run-fixture-0001",
         "gate_id": "gate-fixture",
         "candidate_sha": "bc2c7286",
-        "purpose": "browser acceptance retarget",
         "operator": "fixture",
-        "created_at": "2026-09-18T19:45:00Z"
+        "decided_at": "2026-09-18T19:45:00Z",
+        "artifact_path": "approvals/fixture/implement_approval.md",
+        "purpose": "checkpoint",
+        "decision_json": "{}"
       }
     ],
     "commands": [
@@ -121,7 +146,165 @@
         "candidate_sha": "bc2c7286",
         "created_at": "2026-09-18T19:46:00Z"
       }
+    ],
+    "cost": {
+      "provenance": "$0.0000 · metered"
+    },
+    "evidence": {
+      "measured": "independent tests passed",
+      "receipt": "recorded",
+      "narration": "narration recorded"
+    },
+    "recorded": {
+      "ledger_path": "/repo/experiments/results/workflows/control_room_followups/20260918T191809000000Z_run-fixture-0001.json",
+      "present": true
+    },
+    "delivered_knowledge": {
+      "state": "recorded",
+      "reason": null,
+      "use": "not_established",
+      "phases": [
+        {
+          "phase": "implement",
+          "selected_evidence_ids": ["kb-fixture-aaa", "kb-fixture-bbb"],
+          "augmentation_evidence": [
+            {
+              "id": "kb-fixture-aaa",
+              "revision": "r3",
+              "source_type": "finding",
+              "locator": "experiments/results/kb/kb-fixture-aaa.json"
+            },
+            {
+              "id": "kb-fixture-bbb",
+              "revision": "r1",
+              "source_type": "story",
+              "locator": "experiments/results/kb/kb-fixture-bbb.json"
+            }
+          ],
+          "fallback_mode": "",
+          "retrieval_leg_errors": {
+            "dense": "timeout"
+          },
+          "augmentation_versions": {
+            "constructor": "v1"
+          },
+          "augmentation_tokens": {
+            "in": 100,
+            "out": 20
+          },
+          "augmentation_cost_usd": 0.0
+        }
+      ]
+    },
+    "prepared": {
+      "state": "recorded",
+      "reason": null,
+      "phases": [
+        {
+          "phase": "implement",
+          "state": "recorded",
+          "prepared_step_path": ".fleet/prepared_steps/implement.a1.json",
+          "prompt_sha256": "bf13b18ef53782b538e9fb5f66d1eb9a4292bb9648db1a96745ef1c6ab77491e"
+        }
+      ]
+    },
+    "timings": [
+      {
+        "field": "run.started_at",
+        "value": "2026-09-18T19:18:09Z",
+        "state": "measured"
+      },
+      {
+        "field": "run.ended_at",
+        "value": null,
+        "state": "unknown"
+      },
+      {
+        "field": "attempt.started_at",
+        "value": "2026-09-18T19:18:09Z",
+        "scope": "att-fixture-0001",
+        "state": "measured"
+      },
+      {
+        "field": "attempt.ended_at",
+        "value": "2026-09-18T19:25:00Z",
+        "scope": "att-fixture-0001",
+        "state": "measured"
+      },
+      {
+        "field": "phase.duration_s",
+        "value": 0.0,
+        "scope": "implement",
+        "state": "measured"
+      },
+      {
+        "field": "phase.first_token_at",
+        "value": null,
+        "scope": "implement",
+        "state": "unknown"
+      }
     ]
+  },
+  "run_detail_unknown": {
+    "schema": "control-room-run-detail/v1",
+    "run": {
+      "run_id": "run-fixture-0007",
+      "spec_name": "control_room_followups",
+      "workflow_revision_id": "control_room_followups@1",
+      "candidate_sha": "bc2c728633273947d278f285c2e8929946aaa082",
+      "state": "promotable",
+      "model": "deepseek/deepseek-v4-flash",
+      "started_at": "2026-09-18T19:18:09Z",
+      "ended_at": "",
+      "ledger_path": "",
+      "cost_usd": 0.0,
+      "result_digest": "",
+      "parent_run_id": "",
+      "family_id": ""
+    },
+    "attempts": [],
+    "gates": [],
+    "approvals": [],
+    "commands": [],
+    "cost": {
+      "provenance": "unknown"
+    },
+    "evidence": {
+      "measured": "test result unknown",
+      "receipt": "missing",
+      "narration": "narration unknown"
+    },
+    "recorded": {
+      "ledger_path": null,
+      "present": false
+    },
+    "delivered_knowledge": {
+      "state": "absent",
+      "reason": "no ledger recorded",
+      "use": "not_established",
+      "phases": []
+    },
+    "prepared": {
+      "state": "absent",
+      "reason": "no ledger recorded",
+      "phases": []
+    },
+    "timings": [
+      {
+        "field": "run.started_at",
+        "value": "2026-09-18T19:18:09Z",
+        "state": "measured"
+      },
+      {
+        "field": "run.ended_at",
+        "value": null,
+        "state": "unknown"
+      }
+    ]
+  },
+  "run_detail_error": {
+    "error": "control_db_unavailable",
+    "reason": "fixture: the control database could not be read"
   },
   "design_sessions": {
     "sessions": [

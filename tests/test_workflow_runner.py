@@ -107,6 +107,46 @@ def test_phase_result_carries_change_detection_availability(tmp_path):
     assert ledger["change_observation_partial"] is True
 
 
+def test_phase_result_carries_the_prepared_step_reference(tmp_path):
+    """Run-inspection slice: the executor's prepared-step reference reaches the phase ledger.
+
+    The parent (the Docker executor) is the only actor that writes the transport, so the
+    clone-relative path + prompt hash ride the StepResult and are copied onto the PhaseResult.
+    The engine never re-derives either value from the spec.
+    """
+    from agentic_dynamics.runtime.executor import StepResult
+
+    class _PreparedExecutor:
+        def execute(self, request):
+            return StepResult(
+                ok=True,
+                state="ok",
+                exit_code=0,
+                prepared_step_path=".fleet/prepared_steps/scope.a1.json",
+                prepared_step_prompt_sha256="b" * 64,
+            )
+
+    spec = load_spec(SPEC)
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path, commit=False,
+        run_agentic_fn=lambda *a, **k: _fake_agent(), step_executor=_PreparedExecutor(),
+    )
+
+    phase = result.phases[0]
+    assert phase.prepared_step_path == ".fleet/prepared_steps/scope.a1.json"
+    assert phase.prepared_step_prompt_sha256 == "b" * 64
+    ledger = result.to_dict()["phases"][0]
+    assert ledger["prepared_step_path"] == ".fleet/prepared_steps/scope.a1.json"
+    assert ledger["prepared_step_prompt_sha256"] == "b" * 64
+    # A locally-executed phase (the default executor) records the named absence, not a guess.
+    local = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path, commit=False,
+        run_agentic_fn=lambda *a, **k: _fake_agent(),
+    )
+    assert local.phases[0].prepared_step_path == ""
+    assert local.phases[0].prepared_step_prompt_sha256 == ""
+
+
 def test_run_workflow_publishes_phase_per_phase(tmp_path, monkeypatch):
     """Each phase start publishes {name, index, total} to the live publisher."""
     published = []
