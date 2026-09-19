@@ -794,34 +794,34 @@ def test_rag_fallback_on_construct_failure(tmp_path):
 
 
 def test_default_retrieve_fn_binds_dense_and_graph_stores(monkeypatch):
-    """The default retrieval wiring builds both stores and binds them to ``retrieve``.
+    """The default retrieval builds ONE Neo4j client and binds both legs to it.
 
-    ``default_retrieve_fn`` constructs ``ChromaStore`` with the dedicated
-    ``knowledge_chunks_v1`` collection and ``Neo4jClient`` with its own defaults,
-    then returns a ``functools.partial`` carrying both as keyword args.
+    2026-09-19 (review: perf): the dense store receives the SAME client the lexical leg
+    uses — one client per factory call, one connection pool; the vector store does not mint
+    its own.
     """
-    import agentic_dynamics.knowledge.embeddings as embeddings
     import agentic_dynamics.knowledge.graph as graph
+    import agentic_dynamics.knowledge.neo4j_vectors as vectors
 
-    constructed = {}
-
-    class _FakeChroma:
-        def __init__(self, **kwargs):
-            constructed["chroma_kwargs"] = kwargs
+    constructed: dict = {"neo4j_calls": []}
 
     class _FakeNeo4j:
         def __init__(self, **kwargs):
-            constructed["neo4j_kwargs"] = kwargs
+            constructed["neo4j_calls"].append(kwargs)
 
-    monkeypatch.setattr(embeddings, "ChromaStore", _FakeChroma)
+    class _FakeVector:
+        def __init__(self, client=None, **kwargs):
+            constructed["vector_client"] = client
+
     monkeypatch.setattr(graph, "Neo4jClient", _FakeNeo4j)
+    monkeypatch.setattr(vectors, "Neo4jVectorStore", _FakeVector)
 
     fn = default_retrieve_fn()
 
-    assert isinstance(fn.keywords["dense_store"], _FakeChroma)
+    assert isinstance(fn.keywords["dense_store"], _FakeVector)
     assert isinstance(fn.keywords["graph_client"], _FakeNeo4j)
-    assert constructed["chroma_kwargs"]["collection_name"] == "knowledge_chunks_v1"
-    assert constructed["neo4j_kwargs"] == {}
+    assert len(constructed["neo4j_calls"]) == 1, "one client for both legs"
+    assert constructed["vector_client"] is fn.keywords["graph_client"]
 
 
 def test_default_retrieve_fn_degrades_to_no_rag_when_stores_down(tmp_path, monkeypatch):

@@ -357,19 +357,17 @@ def build_handler(group: str, r: redis.Redis):
         return handler
 
     if group == "kb-chroma-v1":
-        # ONE store per worker process (2026-09-18 stall diagnosis): a ChromaStore constructed
-        # per record leaked its HTTP session with the record — 1,018 sockets in CLOSE-WAIT to
-        # chroma:8100 and the process at its 1024-FD limit, after which every artifact read
-        # dead-lettered ("Too many open files") and the watermark DB could not open ("unable to
-        # open database file"), so the projection's REPORTING froze while the stream itself was
-        # acked. The store is a long-lived handle; build it once and reuse it.
+        # The dense leg's projection: embed the record's Knowledge node in the SAME store the
+        # lexical leg reads (operator decision 2026-09-19, retiring the Chroma service). One
+        # store per worker process — the per-record client was the 2026-09-18 EMFILE stall
+        # (1,018 CLOSE-WAIT sockets, dead-lettered reads, frozen watermark reporting).
         _stores: list[object] = []
 
-        def _chroma_store():
+        def _vector_store():
             if not _stores:
-                from agentic_dynamics.knowledge.embeddings import ChromaStore
+                from agentic_dynamics.knowledge.neo4j_vectors import Neo4jVectorStore
 
-                _stores.append(ChromaStore(collection_name="knowledge_chunks_v1"))
+                _stores.append(Neo4jVectorStore())
             return _stores[0]
 
         def handler(record):
@@ -379,7 +377,7 @@ def build_handler(group: str, r: redis.Redis):
             # structural, not a convention.
             if record.source_type == "fact":
                 return
-            store = _chroma_store()
+            store = _vector_store()
             store.upsert(
                 [record.knowledge_id],
                 [record.text],

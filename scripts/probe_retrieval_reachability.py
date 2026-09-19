@@ -28,7 +28,6 @@ try:
 except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
-from agentic_dynamics.knowledge.embeddings import ChromaStore
 from agentic_dynamics.knowledge.graph import Neo4jClient
 from agentic_dynamics.knowledge.retrieval import _dense_filter, build_query_plan, retrieve
 
@@ -83,11 +82,9 @@ def main(argv: list[str] | None = None) -> int:
 
     store = None
     try:
-        store = ChromaStore(
-            host=os.environ.get("CHROMA_HOST", "127.0.0.1"),
-            port=int(os.environ.get("CHROMA_PORT", "8100")),
-            collection_name="knowledge_chunks_v1",
-        )
+        from agentic_dynamics.knowledge.neo4j_vectors import Neo4jVectorStore
+
+        store = Neo4jVectorStore()
     except Exception as exc:  # noqa: BLE001 — a missing dense store is REPORTED, not a crash
         print(f"dense store construction failed: {exc!r}", file=sys.stderr)
 
