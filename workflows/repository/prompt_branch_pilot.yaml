@@ -1,0 +1,66 @@
+name: prompt_branch_pilot
+question: >-
+  For the same approved task checkpoint, do different investigation instructions improve
+  independently accepted outcomes, knowledge use, operator effort, cost and elapsed time while
+  retaining useful prefix-cache reuse? Four arms (A0 baseline, A1 evidence-first principal
+  engineer, A2 adversarial pre-mortem, A3 goal-conditioned constructor instruction) x three
+  repetitions = twelve scored attempts on one bounded task with a fixed objective oracle
+  (tests/flash_ladder/taskman_contract_test.py), executed sequentially through the ordinary
+  fleet submit path as independent Docker sessions that receive an immutable, approved common
+  context prefix plus a different appended instruction (shared-prefix prompt branching; NOT a
+  native conversation-history fork). The frozen checkpoint, allocation, evaluator protocol,
+  budget and stop rules live in docs/experiments/preregistrations/prompt_branch_pilot_preregistration.md
+  and experiments/results/prompt_branch_pilot/checkpoint.json.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+factors:
+  - {name: prompt_arm, levels: [A0, A1, A2, A3]}
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+comparison: {kind: per_cost, arm_factor: prompt_arm, loss: cost}
+writeup: {format: lab_book, sections: [question, checkpoint, cells, comparison, limitations]}
+stop: {budget_usd: 2.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_uncertainty}
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: false
+    rag:
+      emit_self: false
+    context:
+      domain_context: >-
+        FROZEN CHECKPOINT prompt_branch_pilot-2026-09-19. Source commit
+        0eb4b4592ccf72eac526da1d500bf9747e455f48. Acceptance oracle:
+        tests/flash_ladder/taskman_contract_test.py at that commit — read it, never modify it.
+        Write scope: this worktree only; do not touch tests/ or any file outside your
+        implementation. This run is one arm of a controlled prompt-branch experiment: this
+        context block and the task text that follows it are the frozen shared prefix; only the
+        instruction appended after the task text varies by arm.
+    phases:
+      - name: generate
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 5400
+        prompt: |
+          {domain_context}
+
+          {goal}
+      - name: g_test
+        kind: test
+        scope: implementation
+        timeout: 900
+        tests:
+          - tests/flash_ladder/taskman_contract_test.py
+        prompt: |
+          Independently verify the implementation against the frozen contract test. Do not
+          modify any test file; fix the implementation only.
