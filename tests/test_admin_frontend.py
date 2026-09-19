@@ -304,3 +304,15 @@ def test_glance_projection_exposes_the_resting_schema() -> None:
     for run in data["run_sample"]:
         assert set(ROW_FIELDS) <= set(run)
         assert re.fullmatch(r"\d+/\d+", str(run["phase.progress"]))
+
+
+def test_client_renders_the_run_inspection_drawer_blocks() -> None:
+    """The drawer's additive run-inspection sections are literals in the served client."""
+    client = _read("app.js")
+    for literal in ("Cost", "Verification", "Delivered knowledge", "Prepared step", "Timings"):
+        assert f'"{literal}"' in client, literal
+    # The server's labels are rendered through data attributes (the render gate reads them).
+    assert "dataset.costProvenance" in client
+    assert "dataset.verification" in client
+    assert "dataset.deliveredPhase" in client
+    assert "dataset.preparedStepPath" in client

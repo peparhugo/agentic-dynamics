@@ -306,6 +306,14 @@ class PhaseResult:
     augmentation_cost_usd: float = 0.0
     augmentation_latency_ms: float = 0.0
     fallback_mode: str = ""
+    #: Run-inspection slice: the prepared-step reference for this phase — the CLONE-RELATIVE
+    #: path of the ``prepared-step/v1`` transport the parent wrote for a sibling child, and
+    #: the sha256 of the exact prompt in it. Empty for a locally-executed phase (no transport
+    #: was written) and for legacy ledgers; the reader treats empty as a named absence. The
+    #: values come from the executor's :class:`~agentic_dynamics.runtime.executor.StepResult`
+    #: (the parent is the only actor that writes the transport), never re-derived downstream.
+    prepared_step_path: str = ""
+    prepared_step_prompt_sha256: str = ""
     # test phases
     test_executed_success: bool | None = None
     # G-14 — True when the verdict above came from the independent test_runner (the harness),
@@ -390,6 +398,11 @@ class PhaseResult:
             "augmentation_cost_usd": self.augmentation_cost_usd,
             "augmentation_latency_ms": self.augmentation_latency_ms,
             "fallback_mode": self.fallback_mode,
+            # ADDED keys (run-inspection slice — never renames an existing key): the
+            # prepared-step transport reference. Old ledgers lack them; consumers read them
+            # via ``.get(...)`` and render a named absence.
+            "prepared_step_path": self.prepared_step_path,
+            "prepared_step_prompt_sha256": self.prepared_step_prompt_sha256,
             "test_executed_success": self.test_executed_success,
             "evaluator_independent": self.evaluator_independent,
             "tests_passed": self.tests_passed,
@@ -4514,6 +4527,14 @@ def run_workflow(
                         getattr(ar, "change_observation_partial", False)
                     )
                     pr.final_response = getattr(ar, "final_response", "")
+                    # Run-inspection slice: copy the prepared-step reference the executor
+                    # recorded for this step (the Docker executor writes the transport and
+                    # carries the clone-relative path + prompt hash). The local executor leaves
+                    # both empty — a named absence, never a guessed path.
+                    pr.prepared_step_path = str(getattr(ar, "prepared_step_path", "") or "")
+                    pr.prepared_step_prompt_sha256 = str(
+                        getattr(ar, "prepared_step_prompt_sha256", "") or ""
+                    )
                     if not getattr(ar, "ok", True):
                         pr.status = "failed"
                         pr.error = getattr(ar, "error", "") or f"exit_code={getattr(ar, 'exit_code', '?')}"

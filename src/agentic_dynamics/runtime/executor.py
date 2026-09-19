@@ -271,6 +271,14 @@ class StepResult:
     change_detection: str = ""
     change_observation_partial: bool = False
     final_response: str = ""
+    #: Run-inspection slice: the prepared-step reference the parent recorded for this step.
+    #: ``prepared_step_path`` is CLONE-RELATIVE (``.fleet/prepared_steps/<phase>.aN.json``) and
+    #: ``prepared_step_prompt_sha256`` is the hash of the exact prompt in that transport. Empty
+    #: when the step was not prepared through the transport (the local executor). Additive:
+    #: an executor that never prepares a step leaves both empty — a named absence, never a
+    #: guessed path.
+    prepared_step_path: str = ""
+    prepared_step_prompt_sha256: str = ""
     # test-verdict fields (w1, engine_gaps_verifier_revision): filled ONLY by a verifier
     # executor — the object a ``kind: test`` phase's dispatch returns. The engine reads the
     # SAME fields whether the suite ran in-process (LocalVerifier) or in a verifier container

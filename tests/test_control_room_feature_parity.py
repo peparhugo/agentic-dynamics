@@ -361,3 +361,28 @@ def test_the_operations_board_is_the_restored_destination_board() -> None:
     assert 'id="run-detail-drawer"' in section.group(0), (
         "the durable run-detail drawer must live on the operations board"
     )
+
+
+# ── 11. Run-detail drawer content (run-inspection slice) ──────────────────────────────────────
+
+
+def test_run_detail_drawer_renders_the_run_inspection_blocks() -> None:
+    """The served drawer keeps the additive run-inspection blocks (cost provenance,
+    verification separate from the agent's claim, delivered knowledge, prepared step,
+    timings) — the features the run-evidence slice added to the read model."""
+    source = _refresh_text()
+    missing = _missing(
+        source,
+        (
+            "Verification",
+            "Delivered knowledge",
+            "Prepared step",
+            "Timings",
+            "dataset.costProvenance",
+            "dataset.verification",
+            "dataset.deliveredPhase",
+            "dataset.preparedStepPath",
+            "tr.dataset.state",
+        ),
+    )
+    assert not missing, f"the drawer lost its run-inspection blocks: {missing}"
