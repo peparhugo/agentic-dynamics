@@ -7,7 +7,7 @@ question: >-
   and a missing/mismatched checkpoint REFUSES rather than starting fresh.
 version: "0.1"
 artifact_kind: workflow
-intent: discover
+intent: measure
 side_effects:
   repository: false
   external_services: false
@@ -32,7 +32,7 @@ workflow:
     phases:
       - name: branch
         kind: agent
-        scope: analysis
+        scope: research_readonly
         fork_checkpoint: experiments/results/fork_checkpoint/seed
         timeout: 900
         prompt: |

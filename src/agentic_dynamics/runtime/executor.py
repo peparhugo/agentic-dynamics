@@ -112,6 +112,11 @@ class StepRequest:
     fork_session_id: str = ""
     fork_checkpoint_sha256: str = ""
     fork_db_path: str = ""
+    #: Runner-owned session transcript path. The adapter defaults to
+    #: ``<workdir>/.instrument/session.jsonl``; a read-only scope mount cannot accept it, so
+    #: the parent stamps a WRITABLE path under the cell's private state mount here (carried
+    #: through the prepared step like every other concrete setting).
+    transcript_path: str = ""
 
     @property
     def prompt_sha256(self) -> str:
@@ -150,6 +155,7 @@ class StepRequest:
             "silent_mode": self.silent_mode,
             "enforce_pytest": self.enforce_pytest,
             "attempt": self.attempt,
+            **({"transcript_path": self.transcript_path} if self.transcript_path else {}),
             **(
                 {
                     "fork": {
@@ -216,6 +222,7 @@ class StepRequest:
                 (payload.get("fork") or {}).get("checkpoint_sha256") or ""
             ),
             fork_db_path=str((payload.get("fork") or {}).get("db_path") or ""),
+            transcript_path=str(payload.get("transcript_path") or ""),
             phase_def={},
         )
 
@@ -357,6 +364,8 @@ class LocalAgentExecutor:
         # forwarded here so the local watchdog keeps working through the executor seam.
         if request.phase_def.get("run_model"):
             kwargs["model"] = str(request.phase_def["run_model"])
+        if request.transcript_path:
+            kwargs["transcript_path"] = request.transcript_path
         kwargs.update(request.phase_def.get("_agent_kwargs", {}) or {})
         ar = self._run_agent(request.prompt, **kwargs)
         return _result_from_agentic(ar)

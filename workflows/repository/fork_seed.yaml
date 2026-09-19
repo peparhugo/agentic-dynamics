@@ -7,7 +7,7 @@ question: >-
   own copy (see the fork_checkpoint transport in prepared-step/v1).
 version: "0.1"
 artifact_kind: workflow
-intent: discover
+intent: measure
 side_effects:
   repository: false
   external_services: false
@@ -32,7 +32,7 @@ workflow:
     phases:
       - name: seed
         kind: agent
-        scope: analysis
+        scope: research_readonly
         timeout: 900
         prompt: |
           {goal}

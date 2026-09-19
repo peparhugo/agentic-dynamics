@@ -32,6 +32,8 @@ if _FLEET_DIR not in sys.path:
 
 import spawn_wrapper  # noqa: E402
 
+from agentic_dynamics.experiment.experiment_spec import SCOPE_CONFIGS  # noqa: E402
+
 
 class DockerAgentExecutor(StepExecutor):
     """Run each agent phase as a sibling cell container with its scope config.
@@ -140,7 +142,17 @@ class DockerAgentExecutor(StepExecutor):
             else None
         )
         if fork_decl:
-            self._stage_fork_checkpoint(request, str(fork_decl))
+            self._stage_fork_checkpoint(request, fork_decl)
+        # Runner-owned transcripts default beneath the workdir; a read-only scope mount
+        # (research_readonly / review_readonly / adversarial_readonly) cannot accept them.
+        # Stamp a WRITABLE path under the cell's private state mount (``/state`` is rw) —
+        # the adapter creates it on write; the default stays untouched for other scopes.
+        scope = str(request.phase_def.get("scope") or "")
+        if SCOPE_CONFIGS.get(scope, {}).get("results_mode") == "ro":
+            attempt = max(int(request.attempt), 1)
+            request.transcript_path = (
+                f"/state/transcripts/{request.phase_name}.a{attempt}.session.jsonl"
+            )
 
         # Step 3 (prepared-step transport): the parent readies the EXACT step (prompt + hash +
         # settings + attempt) and the child consumes it — never a re-derivation from the spec.
