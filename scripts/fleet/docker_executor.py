@@ -454,7 +454,7 @@ class DockerAgentExecutor(StepExecutor):
                 raise RuntimeError(
                     f"receipt {receipt_path} is unreadable/malformed ({exc}) — refusing; "
                     "remove it deliberately to re-publish"
-                )
+                ) from exc
             published = store / str(prior.get("snapshot") or snapshot_rel)
             import hashlib
 
