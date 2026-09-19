@@ -112,14 +112,22 @@ class DockerAgentExecutor(StepExecutor):
         # command already use the PATH-resolved python3; the executors' sys.executable was the
         # one spot that baked a host path into a container argv.
         sibling_cmd = [
-            "python3", "scripts/run_workflow.py",
-            "--spec", self._spec_path,
-            "--goal", self._goal,
-            "--model", request.model or self._model,
-            "--workdir", sibling_workdir,
-            "--only-phase", request.phase_name,
-            "--timeout", str(request.timeout or self._timeout),
-            "--thinking-effort", self._thinking_effort,
+            "python3",
+            "scripts/run_workflow.py",
+            "--spec",
+            self._spec_path,
+            "--goal",
+            self._goal,
+            "--model",
+            request.model or self._model,
+            "--workdir",
+            sibling_workdir,
+            "--only-phase",
+            request.phase_name,
+            "--timeout",
+            str(request.timeout or self._timeout),
+            "--thinking-effort",
+            self._thinking_effort,
         ]
         if self._thinking_budget_tokens:
             sibling_cmd += ["--thinking-budget-tokens", str(self._thinking_budget_tokens)]
@@ -190,6 +198,14 @@ class DockerAgentExecutor(StepExecutor):
             host_dir = Path(self._run_clone) / ".fleet" / "prepared_steps"
             child_path = f"{spawn_wrapper.REPO_TARGET}/.fleet/prepared_steps/{phase_file}"
             exclude = Path(self._run_clone) / ".git" / "info" / "exclude"
+            # A fresh run clone may not carry ``.git/info/`` at all (git init/clone shapes
+            # differ). The original ``is_dir()`` guard skipped the exclusion SILENTLY in that
+            # case, and the engine's post-phase ``git add -A`` then committed the transport
+            # file into the candidate (observed on main: ``.fleet/prepared_steps/fit.a1.json``
+            # and ``journey.a1.json``). Create ``info/`` when the clone's own ``.git`` is a
+            # directory so the documented exclusion always lands.
+            if (exclude.parent.parent).is_dir():
+                exclude.parent.mkdir(parents=True, exist_ok=True)
             if exclude.parent.is_dir():
                 line = ".fleet/prepared_steps/"
                 text = exclude.read_text(encoding="utf-8") if exclude.exists() else ""
