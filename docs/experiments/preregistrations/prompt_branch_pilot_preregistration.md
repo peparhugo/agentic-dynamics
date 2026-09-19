@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Prompt-branch pilot — pre-registration (2026-09-19)
