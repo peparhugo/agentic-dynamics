@@ -235,6 +235,14 @@ class DockerAgentExecutor(StepExecutor):
         dest_dir.mkdir(parents=True, exist_ok=True)
         dest = dest_dir / f"{request.phase_name}.a{max(int(request.attempt), 1)}.db"
         shutil.copy2(seed_db, dest)
+        # Carry SQLite companions when present: a db whose latest writes still sit in its WAL
+        # must travel as a consistent SET, or the child could open a stale snapshot. The
+        # hash above covers the main db file; the frozen checkpoint (the recommended source)
+        # is WAL-checkpointed first, so the companions are normally absent.
+        for suffix in ("-wal", "-shm"):
+            side = Path(str(seed_db) + suffix)
+            if side.is_file():
+                shutil.copy2(side, Path(str(dest) + suffix))
         request.fork_session_id = str(row[0])
         request.fork_checkpoint_sha256 = digest
         request.fork_db_path = (

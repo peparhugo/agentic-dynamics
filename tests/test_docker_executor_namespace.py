@@ -184,3 +184,29 @@ def test_fork_checkpoint_missing_refuses_before_launch(tmp_path):
     request.phase_def = {"scope": "implementation", "fork_checkpoint": str(tmp_path / "nope")}
     with pytest.raises(RuntimeError, match="no session db"):
         executor.build_request(request)
+
+
+def test_fork_checkpoint_carries_sqlite_companions_when_present(tmp_path):
+    """A live seed db travels as a consistent SET: -wal/-shm ride along when present."""
+    import sqlite3
+
+    seed = tmp_path / "seed-data"
+    (seed / "opencode").mkdir(parents=True)
+    db = seed / "opencode" / "opencode.db"
+    con = sqlite3.connect(db)
+    con.execute("create table session (id text primary key, time_created integer)")
+    con.execute("insert into session values ('ses_parent_wal', 7)")
+    con.commit()
+    con.close()
+    # Simulate a db whose latest writes still sit in the WAL.
+    (seed / "opencode" / "opencode.db-wal").write_bytes(b"wal-bytes")
+
+    clone = tmp_path / "runs" / "run-abc" / "repo"
+    clone.mkdir(parents=True)
+    executor = _executor(run_clone=str(clone))
+    request = _request()
+    request.phase_def = {"scope": "implementation", "fork_checkpoint": str(seed)}
+    executor.build_request(request)
+
+    dest_dir = clone / ".fleet" / "fork_checkpoints"
+    assert (dest_dir / "p1.a1.db-wal").read_bytes() == b"wal-bytes"

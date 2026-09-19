@@ -1975,6 +1975,11 @@ def _stage_fork_checkpoint(request: StepRequest) -> None:
     dest = Path(data_home) / "opencode" / "opencode.db"
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dest)
+    # Consistent-set rule: carry the SQLite companions too when the transport carries them.
+    for suffix in ("-wal", "-shm"):
+        side = Path(str(src) + suffix)
+        if side.is_file():
+            shutil.copy2(side, Path(str(dest) + suffix))
 
 
 def run_concrete_step(
