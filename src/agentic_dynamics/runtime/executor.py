@@ -193,6 +193,20 @@ class StepRequest:
             raise ValueError("prepared step carries no prompt")
         if not payload.get("phase_name"):
             raise ValueError("prepared step carries no phase_name")
+        fork_block = payload.get("fork")
+        if fork_block is not None:
+            if not isinstance(fork_block, dict):
+                raise ValueError("prepared step fork block is not a mapping")
+            missing = [
+                key
+                for key in ("session_id", "checkpoint_sha256", "db_path")
+                if not str(fork_block.get(key) or "")
+            ]
+            if missing:
+                raise ValueError(
+                    f"prepared step fork block is incomplete (missing {missing}) — refusing to "
+                    "execute; an incomplete fork never degrades to a fresh session"
+                )
         carried = str(payload.get("prompt_sha256") or "")
         actual = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
         if carried != actual:
@@ -309,6 +323,13 @@ class StepResult:
     #: an executor that never prepares a step leaves both empty — a named absence, never a
     #: guessed path.
     prepared_step_path: str = ""
+    #: The durable checkpoint reference the parent published for this step's session
+    #: (``<workflow>/<run>-<phase>.a<n>``) — what a later branch consumes via
+    #: ``fork_checkpoint: {ref: latest:<workflow>}``. Empty when unpublished.
+    checkpoint_ref: str = ""
+    #: Why archival produced no checkpoint (named cause), so "no checkpoint" is visible and
+    #: never reads as success. A workflow without a receipt is not fork-ready.
+    archive_error: str = ""
     prepared_step_prompt_sha256: str = ""
     # test-verdict fields (w1, engine_gaps_verifier_revision): filled ONLY by a verifier
     # executor — the object a ``kind: test`` phase's dispatch returns. The engine reads the

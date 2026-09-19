@@ -16,7 +16,6 @@ pre-contract child that exits 0 with ``ok:false`` is failed, never success.
 
 from __future__ import annotations
 
-import contextlib
 import json
 import os
 import sys
@@ -203,64 +202,258 @@ class DockerAgentExecutor(StepExecutor):
             timeout_seconds=request.timeout or self._timeout or 0,
         )
 
-    def _stage_fork_checkpoint(self, request: StepRequest, seed_data_dir: str) -> None:
-        """Copy a seed run's parent-session db into the run clone + stamp the fork identity.
+    # ── checkpoint snapshots, receipts, and fork resolution ────────────────────────────
 
-        ``seed_data_dir`` is the seed run's per-attempt OpenCode DATA dir (the one holding
-        ``opencode/opencode.db`` with the approved parent conversation). The db is copied to
-        ``<clone>/.fleet/fork_checkpoints/<phase>.a<attempt>.db`` (the transport directory,
-        excluded from commits), its sha256 and newest session id are stamped onto ``request``,
-        and the child-visible path is set to the clone's ``/repo`` mount. Missing db or empty
-        session table REFUSES — a declared fork never degrades to a fresh session.
+    def _snapshot_sqlite(self, src_db: Path, dest_db: Path) -> str:
+        """Publish a COMPLETE standalone snapshot of ``src_db``; return the sha256 of the
+        PUBLISHED bytes.
+
+        SQLite's backup API copies a live database correctly (including content still in the
+        source's WAL) into a fresh destination; the destination is switched out of WAL, closed
+        and integrity-checked BEFORE hashing, so the digest covers the exact published bytes
+        and never depends on a live sidecar. Publication is atomic (temp + ``os.replace``) and
+        any stale destination sidecars are removed, so an earlier WAL can never resurrect.
         """
         import hashlib
-        import shutil
+        import os
         import sqlite3
+        import tempfile
+
+        dest_db.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp_name = tempfile.mkstemp(dir=str(dest_db.parent), prefix=dest_db.name + ".")
+        os.close(fd)
+        tmp = Path(tmp_name)
+        try:
+            src = sqlite3.connect(f"file:{src_db}?mode=ro", uri=True)
+            dst = sqlite3.connect(str(tmp))
+            try:
+                src.backup(dst)
+                dst.execute("PRAGMA journal_mode=DELETE")
+                row = dst.execute("PRAGMA integrity_check").fetchone()
+                if not row or row[0] != "ok":
+                    raise RuntimeError(f"snapshot integrity_check failed for {src_db}: {row}")
+            finally:
+                dst.close()
+                src.close()
+            digest = hashlib.sha256()
+            with tmp.open("rb") as fh:
+                for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            os.replace(tmp, dest_db)
+            for suffix in ("-wal", "-shm"):
+                side = Path(str(dest_db) + suffix)
+                if side.exists():
+                    side.unlink()
+            return digest.hexdigest()
+        finally:
+            if tmp.exists():
+                tmp.unlink()
+
+    @staticmethod
+    def _session_present(db: Path, session_id: str) -> bool:
+        import sqlite3
+
+        con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        try:
+            row = con.execute(
+                "select 1 from session where id = ? limit 1", (session_id,)
+            ).fetchone()
+            return row is not None
+        finally:
+            con.close()
+
+    @staticmethod
+    def _source_digest(src_db: Path) -> str:
+        """Digest of the LIVE source set (db + WAL + shm) — the idempotency discriminator.
+
+        Publication identity must not silently replace evidence; comparing the source SET
+        (not a re-snapshot, whose bytes need not be deterministic) tells an identical
+        re-publication from a changed attempt.
+        """
+        import hashlib
+
+        digest = hashlib.sha256()
+        for suffix in ("", "-wal", "-shm"):
+            side = Path(str(src_db) + suffix)
+            digest.update(f"{side.name}:{side.stat().st_size if side.exists() else 0}:".encode())
+            if side.exists():
+                with side.open("rb") as fh:
+                    for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                        digest.update(chunk)
+        return digest.hexdigest()
+
+    def _store_root(self) -> Path:
+        from agentic_dynamics.core.paths import PROJECT_ROOT
+
+        return Path(PROJECT_ROOT) / "experiments" / "results" / "opencode"
+
+    def _resolve_fork_source(self, decl: object) -> tuple[Path, str, str]:
+        """Resolve a ``fork_checkpoint`` declaration to (snapshot db, session id, receipt sha).
+
+        Accepted forms — every field REQUIRED (an incomplete declaration refuses):
+
+        * ``{ref: "latest:<workflow>"}``    — the workflow's latest published receipt;
+        * ``{ref: "<workflow>/<receipt>"}`` — a named per-attempt receipt;
+        * ``{path: "...", session_id: "ses_..."}`` — an explicit snapshot/data-dir + parent.
+        """
+        import json
 
         from agentic_dynamics.core.paths import PROJECT_ROOT
 
-        seed = Path(seed_data_dir)
+        store_root = self._store_root()
+        if isinstance(decl, str):
+            decl = {"path": decl}
+        if not isinstance(decl, dict):
+            raise RuntimeError(
+                f"fork_checkpoint declaration must be a mapping or path, got {type(decl).__name__}"
+            )
+        ref = str(decl.get("ref") or "")
+        if ref:
+            if ref.startswith("latest:"):
+                workflow = ref.split(":", 1)[1]
+                receipt_path = store_root / workflow / "latest.json"
+            else:
+                workflow, _, rid = ref.partition("/")
+                receipt_path = store_root / workflow / "receipts" / f"{rid}.json"
+            if not receipt_path.is_file():
+                raise RuntimeError(
+                    f"fork_checkpoint ref {ref!r}: no published receipt at {receipt_path} — refusing"
+                )
+            rec = json.loads(receipt_path.read_text(encoding="utf-8"))
+            session_id = str(rec.get("session_id") or "")
+            snapshot = str(rec.get("snapshot") or "")
+            wf = str(rec.get("workflow") or workflow)
+            if not session_id or not snapshot:
+                raise RuntimeError(
+                    f"fork_checkpoint ref {ref!r}: receipt lacks session_id/snapshot — refusing"
+                )
+            return store_root / wf / snapshot, session_id, str(rec.get("sha256") or "")
+        path = str(decl.get("path") or "")
+        session_id = str(decl.get("session_id") or "")
+        if not path or not session_id:
+            raise RuntimeError(
+                "fork_checkpoint requires an explicit parent session_id and a path — refusing"
+            )
+        seed = Path(path)
         if not seed.is_absolute():
             seed = Path(PROJECT_ROOT) / seed
-        seed_db = seed / "opencode" / "opencode.db"
-        if not seed_db.is_file():
-            raise RuntimeError(
-                f"fork_checkpoint declared but no session db at {seed_db} — refusing"
-            )
+        return seed / "opencode" / "opencode.db", session_id, ""
+
+    def _stage_fork_checkpoint(self, request: StepRequest, decl: object) -> None:
+        """Publish the approved parent snapshot beside the prepared step + stamp the identity.
+
+        The declaration resolves to an explicit parent session; the session must EXIST in the
+        source (a newer delegated session is never chosen implicitly); the source bytes must
+        match the receipt's advertised digest when it carries one; the transported bytes are a
+        fresh standalone snapshot whose digest the child re-verifies. Any failure refuses
+        before launch — a declared fork never degrades to a fresh session.
+        """
         if not self._run_clone:
+            raise RuntimeError("fork_checkpoint requires a run clone")
+        src_db, session_id, receipt_sha = self._resolve_fork_source(decl)
+        if not src_db.is_file():
+            raise RuntimeError(f"fork_checkpoint source missing at {src_db} — refusing")
+        if receipt_sha:
+            import hashlib
+
+            actual = hashlib.sha256(src_db.read_bytes()).hexdigest()
+            if actual != receipt_sha:
+                raise RuntimeError(
+                    f"fork_checkpoint source {src_db} changed since publication "
+                    f"({actual[:12]} != {receipt_sha[:12]}) — refusing"
+                )
+        if not self._session_present(src_db, session_id):
             raise RuntimeError(
-                "fork_checkpoint requires a run clone (the checkpoint travels beside the "
-                "prepared step inside the run clone)"
+                f"fork_checkpoint: parent session {session_id} is not present in {src_db} — refusing"
             )
-        con = sqlite3.connect(f"file:{seed_db}?mode=ro", uri=True)
-        try:
-            row = con.execute(
-                "select id from session order by time_created desc limit 1"
-            ).fetchone()
-        finally:
-            con.close()
-        if not row:
-            raise RuntimeError(
-                f"fork_checkpoint db at {seed_db} carries no session — refusing"
-            )
-        digest = hashlib.sha256(seed_db.read_bytes()).hexdigest()
         dest_dir = Path(self._run_clone) / ".fleet" / "fork_checkpoints"
-        dest_dir.mkdir(parents=True, exist_ok=True)
         dest = dest_dir / f"{request.phase_name}.a{max(int(request.attempt), 1)}.db"
-        shutil.copy2(seed_db, dest)
-        # Carry SQLite companions when present: a db whose latest writes still sit in its WAL
-        # must travel as a consistent SET, or the child could open a stale snapshot. The
-        # hash above covers the main db file; the frozen checkpoint (the recommended source)
-        # is WAL-checkpointed first, so the companions are normally absent.
-        for suffix in ("-wal", "-shm"):
-            side = Path(str(seed_db) + suffix)
-            if side.is_file():
-                shutil.copy2(side, Path(str(dest) + suffix))
-        request.fork_session_id = str(row[0])
+        digest = self._snapshot_sqlite(src_db, dest)
+        request.fork_session_id = session_id
         request.fork_checkpoint_sha256 = digest
         request.fork_db_path = (
             f"{spawn_wrapper.REPO_TARGET}/.fleet/fork_checkpoints/{dest.name}"
         )
+
+    def _persist_session_state(
+        self, request: StepRequest, *, session_id: str = ""
+    ) -> tuple[str, str]:
+        """Publish the completed cell's session as an immutable per-attempt receipt.
+
+        Returns ``(checkpoint_ref, archive_error)``. The snapshot is a complete standalone db
+        (SQLite backup API) published atomically under
+        ``experiments/results/opencode/<workflow>/snapshots/<run>-<phase>.a<n>.db``; the receipt
+        at ``receipts/<run>-<phase>.a<n>.json`` is IMMUTABLE (re-publishing identical bytes is
+        idempotent; different bytes at the same identity are refused, never silently replaced);
+        ``latest.json`` is an atomically replaced pointer for ``ref: latest:<workflow>``. A
+        missing cell db is ``unavailable`` — an ordinary run keeps its result, but a workflow
+        without a receipt is not fork-ready.
+        """
+        import json
+        import os
+        from datetime import datetime, timezone
+
+        if not self._run_clone:
+            return "", "no run clone"
+        run_key = Path(self._run_clone).parent.name
+        attempt = max(int(request.attempt), 1)
+        namespace = f"{self._spec_name}/{run_key}/{request.phase_name}/a{attempt}"
+        src = Path(spawn_wrapper.STATE_ROOT) / namespace / "data" / "opencode" / "opencode.db"
+        if not src.is_file():
+            return "", f"no cell session db at {src}"
+        store = self._store_root() / self._spec_name
+        (store / "snapshots").mkdir(parents=True, exist_ok=True)
+        (store / "receipts").mkdir(parents=True, exist_ok=True)
+        attempt_id = f"{run_key}-{request.phase_name}.a{attempt}"
+        snapshot_rel = f"snapshots/{attempt_id}.db"
+        snapshot = store / snapshot_rel
+        receipt_path = store / "receipts" / f"{attempt_id}.json"
+        source_digest = self._source_digest(src)
+        if receipt_path.is_file():
+            import json as _json
+
+            prior = _json.loads(receipt_path.read_text(encoding="utf-8"))
+            if str(prior.get("source_digest") or "") != source_digest:
+                raise RuntimeError(
+                    f"checkpoint identity {attempt_id} already published with different source "
+                    f"bytes — refusing to replace evidence (publish a new attempt instead)"
+                )
+            published = store / str(prior.get("snapshot") or snapshot_rel)
+            import hashlib
+
+            if not published.is_file() or hashlib.sha256(published.read_bytes()).hexdigest() != str(prior.get("sha256") or ""):
+                raise RuntimeError(
+                    f"published snapshot {published} is missing or does not match its receipt — refusing"
+                )
+            return f"{self._spec_name}/{attempt_id}", ""
+        digest = self._snapshot_sqlite(src, snapshot)
+        receipt = {
+            "schema": "opencode-checkpoint/v1",
+            "workflow": self._spec_name,
+            "attempt_id": attempt_id,
+            "run_id": run_key,
+            "phase": request.phase_name,
+            "attempt": attempt,
+            "snapshot": snapshot_rel,
+            "sha256": digest,
+            "source_digest": source_digest,
+            "session_id": session_id,
+            "forked_from": request.fork_session_id or "",
+            "prepared_prompt_sha256": request.prompt_sha256,
+            "runtime": {"opencode": "1.18.15"},
+            "persisted_at": datetime.now(timezone.utc).isoformat(),
+        }
+        payload = json.dumps(receipt, indent=2, sort_keys=True) + "\n"
+        if receipt_path.is_file() and receipt_path.read_text(encoding="utf-8") != payload:
+            raise RuntimeError(
+                f"receipt {receipt_path} already exists with different content — refusing"
+            )
+        receipt_path.write_text(payload, encoding="utf-8")
+        latest = store / "latest.json"
+        tmp_latest = store / ".latest.json.tmp"
+        tmp_latest.write_text(payload, encoding="utf-8")
+        os.replace(tmp_latest, latest)
+        return f"{self._spec_name}/{attempt_id}", ""
 
     def _prepared_relative_path(self, request: StepRequest) -> str:
         """The CLONE-RELATIVE prepared-step path for ``request`` (the reference the ledger keeps).
@@ -354,6 +547,16 @@ class DockerAgentExecutor(StepExecutor):
             sr.estimated_cost_usd = float(phase.get("cost_usd", 0.0) or 0.0)
             sr.files_created = list(phase.get("files_created", []) or [])
             sr.files_modified = list(phase.get("files_modified", []) or [])
+            # Measurement carry-through (Astra review item 9/6): the child envelope carries
+            # cache economics + cost provenance; the parent ledger must see them or the
+            # experiment cannot report anything but manual SQLite numbers.
+            sr.cache_read_tokens = int(phase.get("cache_read_tokens", 0) or 0)
+            sr.cache_write_tokens = int(phase.get("cache_write_tokens", 0) or 0)
+            sr.cache_hit_rate = float(phase.get("cache_hit_rate", 0.0) or 0.0)
+            sr.first_token_at = phase.get("first_token_at")
+            sr.cost_source = str(phase.get("cost_source", "") or "") or sr.cost_source
+            sr.reported_cost_usd = phase.get("reported_cost_usd")
+            sr.estimation_method = phase.get("estimation_method")
             # Changed-set availability (evidence-validity finding 8b): a snapshot-skipped
             # git-status observation is partial; carry the provenance across the container
             # boundary exactly as the in-process path does.
@@ -366,77 +569,13 @@ class DockerAgentExecutor(StepExecutor):
         # session is PERSISTED as its OWN file under experiments/results/opencode/<workflow>/,
         # with a lineage entry in the workflow manifest. Best-effort: no db records nothing and
         # never fails the phase.
-        with contextlib.suppress(Exception):
-            self._persist_session_state(request, session_id=sr.session_id)
+        try:
+            sr.checkpoint_ref, sr.archive_error = self._persist_session_state(
+                request, session_id=sr.session_id
+            )
+        except Exception as exc:  # a seed without a checkpoint is not fork-ready; surface it
+            sr.checkpoint_ref, sr.archive_error = "", str(exc)[:300]
         return sr
-
-
-    def _persist_session_state(self, request: StepRequest, *, session_id: str = "") -> str:
-        """Persist the cell's finished session db as its OWN file in the workflow store.
-
-        Store layout (host-persisted, AIO-readable, gitignored data plane)::
-
-            experiments/results/opencode/<workflow>/<run-id>-<phase>.a<n>/opencode/opencode.db
-            experiments/results/opencode/<workflow>/manifest.json
-
-        Each completed cell keeps a SEPARATE db file — nothing is merged into one shared
-        database, so no writable db is ever shared, before or after the run. The manifest
-        carries the lineage (run, phase, attempt, sha256, ``forked_from``, prepared prompt
-        hash). Returns the store directory; ``""`` when the child left no db.
-        """
-        import hashlib
-        import shutil
-        from datetime import datetime, timezone
-
-        from agentic_dynamics.core.paths import PROJECT_ROOT
-
-        if not self._run_clone:
-            return ""
-        run_key = Path(self._run_clone).parent.name
-        attempt = max(int(request.attempt), 1)
-        namespace = f"{self._spec_name}/{run_key}/{request.phase_name}/a{attempt}"
-        src = Path(spawn_wrapper.STATE_ROOT) / namespace / "data" / "opencode" / "opencode.db"
-        if not src.is_file():
-            return ""
-        store = Path(PROJECT_ROOT) / "experiments" / "results" / "opencode" / self._spec_name
-        dest_dir = store / f"{run_key}-{request.phase_name}.a{attempt}" / "opencode"
-        dest_dir.mkdir(parents=True, exist_ok=True)
-        dest = dest_dir / "opencode.db"
-        shutil.copy2(src, dest)
-        for suffix in ("-wal", "-shm"):
-            side = Path(str(src) + suffix)
-            if side.is_file():
-                shutil.copy2(side, Path(str(dest) + suffix))
-        digest = hashlib.sha256(dest.read_bytes()).hexdigest()
-        manifest_path = store / "manifest.json"
-        manifest: dict[str, Any] = {"schema": "opencode-store/v1", "workflow": self._spec_name,
-                                    "sessions": []}
-        if manifest_path.is_file():
-            try:
-                loaded = json.loads(manifest_path.read_text(encoding="utf-8"))
-                if isinstance(loaded, dict):
-                    manifest = loaded
-            except Exception:
-                pass
-        entry = {
-            "run_id": run_key,
-            "phase": request.phase_name,
-            "attempt": attempt,
-            "file": str(dest.relative_to(store)),
-            "sha256": digest,
-            "session_id": session_id,
-            "forked_from": request.fork_session_id or "",
-            "prepared_prompt_sha256": request.prompt_sha256,
-            "persisted_at": datetime.now(timezone.utc).isoformat(),
-        }
-        sessions = [e for e in manifest.get("sessions", [])
-                    if not (e.get("run_id") == run_key and e.get("phase") == request.phase_name
-                            and e.get("attempt") == attempt)]
-        sessions.append(entry)
-        manifest["sessions"] = sessions
-        manifest_path.parent.mkdir(parents=True, exist_ok=True)
-        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-        return str(dest_dir.parent)
 
 
 def _phase_from_envelope(envelope: dict[str, Any]) -> dict[str, Any] | None:

@@ -141,93 +141,106 @@ def test_prepared_relative_path_names_the_written_transport(tmp_path):
     assert child_path.endswith(executor._prepared_relative_path(_request()))
 
 
-# ── isolated conversation forks: the parent-side checkpoint staging ───────────────────────
+# ── isolated conversation forks + the workflow session store ──────────────────────────────
 
-def test_fork_checkpoint_is_staged_into_the_clone_and_stamped(tmp_path):
-    """A declared fork_checkpoint: session id + hash stamped, db copied beside the step."""
+def _seed_data_dir(tmp_path, name="seed-data"):
+    """A LIVE seed data dir whose latest write is still in the WAL (the review's case).
+
+    The writer connection stays open (autocheckpoint off) so the WAL genuinely carries the
+    late row at snapshot time — exactly the live-source condition the backup API must handle.
+    """
     import sqlite3
 
-    seed = tmp_path / "seed-data"
+    seed = tmp_path / name
     (seed / "opencode").mkdir(parents=True)
-    con = sqlite3.connect(seed / "opencode" / "opencode.db")
+    db = seed / "opencode" / "opencode.db"
+    con = sqlite3.connect(db)
+    con.execute("pragma journal_mode=wal")
+    con.execute("pragma wal_autocheckpoint=0")
     con.execute("create table session (id text primary key, time_created integer)")
     con.execute("insert into session values ('ses_parent_abc', 5)")
     con.commit()
-    con.close()
+    con.execute("insert into session values ('ses_late_wal', 9)")  # stays in the WAL
+    con.commit()
+    assert (seed / "opencode" / "opencode.db-wal").exists()
+    return seed, con
 
+
+def _fork_decl(seed, session="ses_parent_abc"):
+    return {"path": str(seed), "session_id": session}
+
+
+def test_fork_snapshot_is_standalone_and_contains_wal_content(tmp_path):
+    """The transported snapshot is a complete db (WAL content included, no sidecars)."""
+    import sqlite3
+
+    seed, con = _seed_data_dir(tmp_path)
     clone = tmp_path / "runs" / "run-abc" / "repo"
     clone.mkdir(parents=True)
     executor = _executor(run_clone=str(clone))
     request = _request()
-    request.phase_def = {"scope": "implementation", "fork_checkpoint": str(seed)}
-    built = executor.build_request(request)
+    request.phase_def = {"scope": "implementation", "fork_checkpoint": _fork_decl(seed)}
+    executor.build_request(request)
 
+    dest = clone / ".fleet" / "fork_checkpoints" / "p1.a1.db"
+    assert dest.is_file()
+    assert not (clone / ".fleet" / "fork_checkpoints" / "p1.a1.db-wal").exists()
+    con = sqlite3.connect(f"file:{dest}?mode=ro", uri=True)
+    ids = {r[0] for r in con.execute("select id from session")}
+    con.close()
+    assert ids == {"ses_parent_abc", "ses_late_wal"}  # the WAL row survived the snapshot
     prepared = json.loads(
         (clone / ".fleet" / "prepared_steps" / "p1.a1.json").read_text(encoding="utf-8")
     )
     assert prepared["fork"]["session_id"] == "ses_parent_abc"
-    stamped = clone / ".fleet" / "fork_checkpoints" / "p1.a1.db"
-    assert stamped.is_file()
-    assert (seed / "opencode" / "opencode.db").read_bytes() == stamped.read_bytes()
     assert prepared["fork"]["db_path"].endswith("/.fleet/fork_checkpoints/p1.a1.db")
-    assert built["command"]  # the sibling command still builds
+    con.close()
 
 
-def test_fork_checkpoint_missing_refuses_before_launch(tmp_path):
-    """Declared-but-missing never degrades to a fresh session: it raises, no request built."""
+def test_fork_requires_an_explicit_parent_session(tmp_path):
+    """A declaration without session_id (or with an absent session) refuses before launch."""
     import pytest
 
+    seed, con = _seed_data_dir(tmp_path)
     clone = tmp_path / "runs" / "run-abc" / "repo"
     clone.mkdir(parents=True)
     executor = _executor(run_clone=str(clone))
-    request = _request()
-    request.phase_def = {"scope": "implementation", "fork_checkpoint": str(tmp_path / "nope")}
-    with pytest.raises(RuntimeError, match="no session db"):
-        executor.build_request(request)
 
+    no_session = _request()
+    no_session.phase_def = {"scope": "implementation", "fork_checkpoint": {"path": str(seed)}}
+    with pytest.raises(RuntimeError, match="explicit parent session_id"):
+        executor.build_request(no_session)
 
-def test_fork_checkpoint_carries_sqlite_companions_when_present(tmp_path):
-    """A live seed db travels as a consistent SET: -wal/-shm ride along when present."""
-    import sqlite3
+    absent = _request()
+    absent.phase_def = {"scope": "implementation", "fork_checkpoint": _fork_decl(seed, "ses_nope")}
+    with pytest.raises(RuntimeError, match="is not present"):
+        executor.build_request(absent)
 
-    seed = tmp_path / "seed-data"
-    (seed / "opencode").mkdir(parents=True)
-    db = seed / "opencode" / "opencode.db"
-    con = sqlite3.connect(db)
-    con.execute("create table session (id text primary key, time_created integer)")
-    con.execute("insert into session values ('ses_parent_wal', 7)")
-    con.commit()
+    missing_src = _request()
+    missing_src.phase_def = {
+        "scope": "implementation",
+        "fork_checkpoint": {"path": str(tmp_path / "nope"), "session_id": "ses_x"},
+    }
+    with pytest.raises(RuntimeError, match="source missing"):
+        executor.build_request(missing_src)
     con.close()
-    # Simulate a db whose latest writes still sit in the WAL.
-    (seed / "opencode" / "opencode.db-wal").write_bytes(b"wal-bytes")
-
-    clone = tmp_path / "runs" / "run-abc" / "repo"
-    clone.mkdir(parents=True)
-    executor = _executor(run_clone=str(clone))
-    request = _request()
-    request.phase_def = {"scope": "implementation", "fork_checkpoint": str(seed)}
-    executor.build_request(request)
-
-    dest_dir = clone / ".fleet" / "fork_checkpoints"
-    assert (dest_dir / "p1.a1.db-wal").read_bytes() == b"wal-bytes"
 
 
-def test_completed_session_is_persisted_as_its_own_file(tmp_path, monkeypatch):
-    """The finished cell db lands as a SEPARATE file in the workflow store + a manifest entry."""
+def test_persist_publishes_receipt_and_latest_idempotently(tmp_path, monkeypatch):
+    """Per-attempt receipt + latest pointer; identical re-publication is idempotent."""
     import json as _json
     import sqlite3
 
     import agentic_dynamics.core.paths as core_paths
     import scripts.fleet.docker_executor as de
 
-    # state namespace the executor derived: <spec>/<run>/<phase>/a<attempt>
     run_dir = tmp_path / "runs" / "run-abc"
     clone = run_dir / "repo"
     clone.mkdir(parents=True)
     state_root = tmp_path / "state"
-    # docker_executor holds its own top-level ``spawn_wrapper`` module reference: patch THAT.
     monkeypatch.setattr(de.spawn_wrapper, "STATE_ROOT", str(state_root), raising=True)
     monkeypatch.setattr(core_paths, "PROJECT_ROOT", tmp_path, raising=True)
+    (tmp_path / ".git").mkdir(exist_ok=True)
 
     ns = state_root / "t" / "run-abc" / "p1" / "a1" / "data" / "opencode"
     ns.mkdir(parents=True)
@@ -239,17 +252,134 @@ def test_completed_session_is_persisted_as_its_own_file(tmp_path, monkeypatch):
     con.close()
 
     executor = _executor(run_clone=str(clone))
-    store_dir = executor._persist_session_state(_request(), session_id="ses_child_1")
+    ref, err = executor._persist_session_state(_request(), session_id="ses_child_1")
+    assert ref == "t/run-abc-p1.a1" and err == ""
+    store = tmp_path / "experiments" / "results" / "opencode" / "t"
+    snapshot = store / "snapshots" / "run-abc-p1.a1.db"
+    receipt = store / "receipts" / "run-abc-p1.a1.json"
+    latest = store / "latest.json"
+    assert snapshot.is_file() and receipt.is_file() and latest.is_file()
+    rec = _json.loads(receipt.read_text())
+    assert rec["session_id"] == "ses_child_1" and rec["sha256"]
+    assert _json.loads(latest.read_text())["attempt_id"] == "run-abc-p1.a1"
 
-    assert store_dir
-    persisted = tmp_path / "experiments" / "results" / "opencode" / "t" / "run-abc-p1.a1" / "opencode" / "opencode.db"
-    assert persisted.is_file()
-    manifest = _json.loads((persisted.parent.parent.parent / "manifest.json").read_text())
-    entry = manifest["sessions"][0]
-    assert entry["session_id"] == "ses_child_1"
-    assert entry["file"] == "run-abc-p1.a1/opencode/opencode.db"
-    assert entry["sha256"]
-    # idempotent: re-persisting replaces the entry rather than duplicating the lineage row
+    # identical re-publication is idempotent (no error, same bytes)
+    ref2, err2 = executor._persist_session_state(_request(), session_id="ses_child_1")
+    assert (ref2, err2) == (ref, "")
+
+
+def test_persist_refuses_different_bytes_at_the_same_identity(tmp_path, monkeypatch):
+    """Different bytes at an already-published identity are refused, never silently replaced."""
+    import sqlite3
+
+    import pytest
+
+    import agentic_dynamics.core.paths as core_paths
+    import scripts.fleet.docker_executor as de
+
+    run_dir = tmp_path / "runs" / "run-abc"
+    clone = run_dir / "repo"
+    clone.mkdir(parents=True)
+    state_root = tmp_path / "state"
+    monkeypatch.setattr(de.spawn_wrapper, "STATE_ROOT", str(state_root), raising=True)
+    monkeypatch.setattr(core_paths, "PROJECT_ROOT", tmp_path, raising=True)
+    (tmp_path / ".git").mkdir(exist_ok=True)
+
+    ns = state_root / "t" / "run-abc" / "p1" / "a1" / "data" / "opencode"
+    ns.mkdir(parents=True)
+    db = ns / "opencode.db"
+    con = sqlite3.connect(db)
+    con.execute("create table session (id text primary key, time_created integer)")
+    con.execute("insert into session values ('ses_child_1', 9)")
+    con.commit()
+    con.close()
+
+    executor = _executor(run_clone=str(clone))
     executor._persist_session_state(_request(), session_id="ses_child_1")
-    manifest2 = _json.loads((persisted.parent.parent.parent / "manifest.json").read_text())
-    assert len(manifest2["sessions"]) == 1
+
+    con = sqlite3.connect(db)
+    con.execute("insert into session values ('ses_changed', 10)")
+    con.commit()
+    con.close()
+    with pytest.raises(RuntimeError, match="refusing to replace evidence"):
+        executor._persist_session_state(_request(), session_id="ses_child_1")
+
+
+def test_latest_ref_resolves_the_published_checkpoint(tmp_path, monkeypatch):
+    """ref: latest:<workflow> resolves to the published snapshot + explicit session."""
+    import sqlite3
+
+    import pytest
+
+    import agentic_dynamics.core.paths as core_paths
+    import scripts.fleet.docker_executor as de
+
+    run_dir = tmp_path / "runs" / "run-abc"
+    clone = run_dir / "repo"
+    clone.mkdir(parents=True)
+    state_root = tmp_path / "state"
+    monkeypatch.setattr(de.spawn_wrapper, "STATE_ROOT", str(state_root), raising=True)
+    monkeypatch.setattr(core_paths, "PROJECT_ROOT", tmp_path, raising=True)
+    (tmp_path / ".git").mkdir(exist_ok=True)
+
+    ns = state_root / "t" / "run-abc" / "seed" / "a1" / "data" / "opencode"
+    ns.mkdir(parents=True)
+    db = ns / "opencode.db"
+    con = sqlite3.connect(db)
+    con.execute("create table session (id text primary key, time_created integer)")
+    con.execute("insert into session values ('ses_seed', 1)")
+    con.commit()
+    con.close()
+
+    executor = _executor(run_clone=str(clone))
+    request = _request()
+    request.phase_name = "seed"
+    executor._persist_session_state(request, session_id="ses_seed")
+
+    snapshot, session, sha = executor._resolve_fork_source({"ref": "latest:t"})
+    assert snapshot.is_file() and session == "ses_seed" and sha
+    with pytest.raises(RuntimeError, match="no published receipt"):
+        executor._resolve_fork_source({"ref": "latest:nope"})
+    executor.build_request  # sanity: attribute still exists
+
+
+def test_store_membership_is_the_checkpoint(tmp_path, monkeypatch):
+    """A published snapshot carries the parent session; an absent one refuses at stage time."""
+    import sqlite3
+
+    import pytest
+
+    import agentic_dynamics.core.paths as core_paths
+    import scripts.fleet.docker_executor as de
+
+    run_dir = tmp_path / "runs" / "run-abc"
+    clone = run_dir / "repo"
+    clone.mkdir(parents=True)
+    state_root = tmp_path / "state"
+    monkeypatch.setattr(de.spawn_wrapper, "STATE_ROOT", str(state_root), raising=True)
+    monkeypatch.setattr(core_paths, "PROJECT_ROOT", tmp_path, raising=True)
+    (tmp_path / ".git").mkdir(exist_ok=True)
+    ns = state_root / "t" / "run-abc" / "seed" / "a1" / "data" / "opencode"
+    ns.mkdir(parents=True)
+    con = sqlite3.connect(ns / "opencode.db")
+    con.execute("create table session (id text primary key, time_created integer)")
+    con.execute("insert into session values ('ses_seed', 1)")
+    con.commit()
+    con.close()
+    executor = _executor(run_clone=str(clone))
+    seed_request = _request()
+    seed_request.phase_name = "seed"
+    executor._persist_session_state(seed_request, session_id="ses_seed")
+
+    branch = _request()
+    branch.phase_def = {"scope": "research_readonly", "fork_checkpoint": {"ref": "latest:t"}}
+    executor.build_request(branch)  # resolves, snapshots into the clone, stamps
+    prepared = json.loads(
+        (clone / ".fleet" / "prepared_steps" / "p1.a1.json").read_text(encoding="utf-8")
+    )
+    assert prepared["fork"]["session_id"] == "ses_seed"
+
+    wrong = _request()
+    wrong.phase_def = {"scope": "research_readonly", "fork_checkpoint": {"ref": "latest:nope"}}
+    with pytest.raises(RuntimeError, match="no published receipt"):
+        executor.build_request(wrong)

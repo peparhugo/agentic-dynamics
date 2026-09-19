@@ -314,6 +314,10 @@ class PhaseResult:
     #: values come from the executor's :class:`~agentic_dynamics.runtime.executor.StepResult`
     #: (the parent is the only actor that writes the transport), never re-derived downstream.
     prepared_step_path: str = ""
+    #: The published checkpoint reference for this phase's session (see StepResult).
+    checkpoint_ref: str = ""
+    #: Named archival failure (no checkpoint produced) — visible, never silent success.
+    archive_error: str = ""
     prepared_step_prompt_sha256: str = ""
     # test phases
     test_executed_success: bool | None = None
@@ -404,6 +408,8 @@ class PhaseResult:
             # via ``.get(...)`` and render a named absence.
             "prepared_step_path": self.prepared_step_path,
             "prepared_step_prompt_sha256": self.prepared_step_prompt_sha256,
+            "checkpoint_ref": self.checkpoint_ref,
+            "archive_error": self.archive_error,
             "test_executed_success": self.test_executed_success,
             "evaluator_independent": self.evaluator_independent,
             "tests_passed": self.tests_passed,
@@ -2001,7 +2007,15 @@ def run_concrete_step(
     it defaults to the real adapter (:func:`agentic_dynamics.adapters.backends.run_agentic`).
     """
     agent = run_agent or run_agentic
-    if request.fork_session_id:
+    fork_declared = bool(
+        request.fork_session_id or request.fork_db_path or request.fork_checkpoint_sha256
+    )
+    if fork_declared:
+        if not (request.fork_session_id and request.fork_db_path and request.fork_checkpoint_sha256):
+            raise ValueError(
+                "incomplete fork declaration (session_id/db_path/checkpoint_sha256) — refusing "
+                "before any provider call; a declared fork never starts a fresh session"
+            )
         _stage_fork_checkpoint(request)
         base_agent = agent
 
@@ -4593,6 +4607,8 @@ def run_workflow(
                     pr.prepared_step_prompt_sha256 = str(
                         getattr(ar, "prepared_step_prompt_sha256", "") or ""
                     )
+                    pr.checkpoint_ref = str(getattr(ar, "checkpoint_ref", "") or "")
+                    pr.archive_error = str(getattr(ar, "archive_error", "") or "")
                     if not getattr(ar, "ok", True):
                         pr.status = "failed"
                         pr.error = getattr(ar, "error", "") or f"exit_code={getattr(ar, 'exit_code', '?')}"

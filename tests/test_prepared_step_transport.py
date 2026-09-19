@@ -202,3 +202,40 @@ def test_fork_refuses_a_missing_or_tampered_checkpoint(tmp_path, monkeypatch):
     )
     with pytest.raises(ValueError, match="hash mismatch"):
         run_concrete_step(bad, run_agent=fake_agent)
+
+
+def test_incomplete_fork_declaration_refuses_before_any_provider_call(tmp_path, monkeypatch):
+    """A partial fork block (db path but no session/hash) raises BEFORE the agent runs."""
+    monkeypatch.setenv("FINOPS_OPENCODE_STATE_DIR", str(tmp_path / "state" / "data"))
+    called = {"n": 0}
+
+    def fake_agent(prompt, **kwargs):  # pragma: no cover — must never run
+        called["n"] += 1
+        raise AssertionError("a provider call happened for an incomplete fork")
+
+    db = tmp_path / "x.db"
+    db.write_bytes(b"bytes")
+    request = StepRequest(
+        phase_name="p1", phase_kind="agent", prompt="q", model="m", goal="g",
+        spec_name="t", workdir=str(tmp_path),
+        fork_session_id="", fork_checkpoint_sha256="", fork_db_path=str(db),
+    )
+    with pytest.raises(ValueError, match="incomplete fork declaration"):
+        run_concrete_step(request, run_agent=fake_agent)
+    assert called["n"] == 0
+
+
+def test_prepared_fork_block_must_be_complete_on_load():
+    """load-side validation: a partial fork block never deserializes."""
+    import pytest
+
+    payload = {
+        "schema": "prepared-step/v1",
+        "phase_name": "p1", "phase_kind": "agent", "prompt": "q",
+    }
+    import hashlib
+
+    payload["prompt_sha256"] = hashlib.sha256(b"q").hexdigest()
+    payload["fork"] = {"session_id": "ses_x"}  # incomplete: no hash, no path
+    with pytest.raises(ValueError, match="incomplete"):
+        StepRequest.from_prepared_dict(payload)

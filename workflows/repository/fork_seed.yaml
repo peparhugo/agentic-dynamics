@@ -1,10 +1,13 @@
 name: fork_seed
 question: >-
-  Seed conversation for the isolated fork experiment: one approved parent context (the measured
-  milestone state) is established once in an ordinary isolated cell; its session state becomes
-  the immutable checkpoint that later branch cells fork from. No shared OpenCode database is
-  involved: the seed's state lives in its own per-attempt namespace, and each fork stages its
-  own copy (see the fork_checkpoint transport in prepared-step/v1).
+  Seed conversation for the isolated fork experiment. Context source (explicit): this is a
+  DELIBERATELY CURATED new conversation carrying a short measured-state dossier - it is NOT a
+  native fork of the coordinator's own conversation, and no claim of inherited coordinator
+  history is made. The seed runs once in an ordinary isolated cell; its session is published
+  as an immutable checkpoint receipt (SQLite-backup snapshot + sha256 + explicit session id)
+  that later branch cells fork from. No shared OpenCode database is involved: the seed's state
+  lives in its own per-attempt namespace, and each fork stages its own snapshot copy (see the
+  fork_checkpoint transport in prepared-step/v1).
 version: "0.1"
 artifact_kind: workflow
 intent: measure
