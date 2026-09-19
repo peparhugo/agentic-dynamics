@@ -525,6 +525,33 @@ def test_run_workflow_excludes_instrument_from_commit(tmp_path):
     assert "docs/scope.md" in tracked.stdout
 
 
+def test_run_workflow_excludes_fleet_transport_from_commit(tmp_path):
+    """The prepared-step transport (``.fleet/``) never enters history.
+
+    The 2026-09-19 leak: the engine's post-phase ``git add -A`` committed
+    ``.fleet/prepared_steps/<phase>.aN.json`` into the candidate (two such files already sit
+    on main from earlier merges). The commit pathspec excludes it explicitly, mirroring
+    ``.instrument/``.
+    """
+    spec = load_spec(SPEC)
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        (Path(workdir) / ".fleet" / "prepared_steps").mkdir(parents=True, exist_ok=True)
+        (Path(workdir) / ".fleet" / "prepared_steps" / "p1.a1.json").write_text("{}")
+        (Path(workdir) / "docs").mkdir(exist_ok=True)
+        (Path(workdir) / "docs" / "scope.md").write_text("---\nstatus: accepted\n---\n\nscope")
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    assert result.phases[0].commit_hash
+    tracked = subprocess.run(["git", "ls-files"], cwd=tmp_path, capture_output=True, text=True)
+    assert ".fleet" not in tracked.stdout
+    assert "docs/scope.md" in tracked.stdout
+
+
 def test_run_workflow_resume_skips_committed_phases(tmp_path):
     spec = load_spec(SPEC)
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)

@@ -91,6 +91,38 @@ def test_prepared_step_is_written_and_passed_to_the_child(tmp_path):
         clone / ".git" / "info" / "exclude"
     ).read_text(encoding="utf-8")
 
+def test_prepared_step_exclusion_lands_without_a_git_info_dir(tmp_path):
+    """A run clone with ``.git`` but WITHOUT ``.git/info/`` still excludes the transport.
+
+    The original write skipped the exclusion silently when ``info/`` was absent (fresh clone
+    shapes), and the engine's post-phase ``git add -A`` then committed the transport file into
+    the candidate — observed on main as committed ``.fleet/prepared_steps/*.json``. The
+    exclusion must be CREATED, not skipped.
+    """
+    import shutil
+    import subprocess
+
+    clone = tmp_path / "runs" / "run-abc" / "repo"
+    clone.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=clone, check=True)
+    info = clone / ".git" / "info"
+    if info.exists():  # git versions differ on whether init materializes info/
+        shutil.rmtree(info)
+    assert not (clone / ".git" / "info").exists()
+
+    executor = _executor(run_clone=str(clone))
+    executor.build_request(_request())
+
+    exclude = clone / ".git" / "info" / "exclude"
+    assert exclude.is_file()
+    assert ".fleet/prepared_steps/" in exclude.read_text(encoding="utf-8")
+    # The exclusion is REAL: git refuses to see the transport as a candidate addition.
+    ignored = subprocess.run(
+        ["git", "check-ignore", "-q", ".fleet/prepared_steps/p1.a1.json"],
+        cwd=clone,
+        capture_output=True,
+    )
+    assert ignored.returncode == 0
 
 # ── run-inspection slice: the executor records the clone-relative prepared-step reference ─────
 
