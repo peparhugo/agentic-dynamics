@@ -378,24 +378,44 @@ def test_degraded_leg_causes_reach_the_run_result(tmp_path):
 
 def test_construction_causes_reach_the_run_result(monkeypatch):
     """Diagnostic acceptance gap: a store that fails to CONSTRUCT must name its cause in
-    ``leg_errors`` rather than vanishing into a silent ``None``."""
-    from agentic_dynamics.knowledge import augment as aug
+    ``leg_errors`` rather than vanishing into a silent ``None``.
 
-    class _BoomChroma:
-        def __init__(self, *args, **kwargs):
-            raise RuntimeError("chroma init refused")
+    Two shapes (2026-09-19, one shared client): the Neo4j client refusing names the cause on
+    BOTH legs; a vector-store-only failure names it on the dense leg while the lexical leg
+    stays available.
+    """
+    from agentic_dynamics.knowledge import augment as aug
 
     class _BoomNeo4j:
         def __init__(self, *args, **kwargs):
             raise RuntimeError("neo4j init refused")
 
-    monkeypatch.setattr("agentic_dynamics.knowledge.embeddings.ChromaStore", _BoomChroma)
     monkeypatch.setattr("agentic_dynamics.knowledge.graph.Neo4jClient", _BoomNeo4j)
-
     retrieve_fn = aug.default_retrieve_fn()
     attempt = retrieve_fn(
         raw_work_item="q", repository_id="agentic-dynamics", acl_scope="public"
     )
     assert attempt.fallback_mode == "no_rag"
-    assert "chroma init refused" in attempt.leg_errors.get("dense", "")
+    assert "neo4j init refused" in attempt.leg_errors.get("dense", "")
     assert "neo4j init refused" in attempt.leg_errors.get("lexical", "")
+
+    monkeypatch.undo()
+    import agentic_dynamics.knowledge.graph as graph
+    import agentic_dynamics.knowledge.neo4j_vectors as vectors
+
+    class _FakeNeo4j:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class _BoomVector:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("vector store init refused")
+
+    monkeypatch.setattr(graph, "Neo4jClient", _FakeNeo4j)
+    monkeypatch.setattr(vectors, "Neo4jVectorStore", _BoomVector)
+    retrieve_fn = aug.default_retrieve_fn()
+    attempt = retrieve_fn(
+        raw_work_item="q", repository_id="agentic-dynamics", acl_scope="public"
+    )
+    assert "vector store init refused" in attempt.leg_errors.get("dense", "")
+    assert "lexical" not in attempt.leg_errors or "refused" not in attempt.leg_errors["lexical"]

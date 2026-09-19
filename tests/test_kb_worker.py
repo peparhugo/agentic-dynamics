@@ -677,24 +677,24 @@ def test_kb_chroma_v1_handler_reuses_one_store_across_records(monkeypatch):
     import sys
     import types
 
-    fake = types.ModuleType("agentic_dynamics.knowledge.embeddings")
-    built: list[str | None] = []
+    fake = types.ModuleType("agentic_dynamics.knowledge.neo4j_vectors")
+    built: list[int] = []
 
     class CountingStore:
         def __init__(self, *a, **k):
-            built.append(k.get("collection_name"))
+            built.append(1)
 
         def upsert(self, *a, **k):
             return 1
 
-    fake.ChromaStore = CountingStore
-    monkeypatch.setitem(sys.modules, "agentic_dynamics.knowledge.embeddings", fake)
+    fake.Neo4jVectorStore = CountingStore
+    monkeypatch.setitem(sys.modules, "agentic_dynamics.knowledge.neo4j_vectors", fake)
 
     handler = kb_worker.build_handler("kb-chroma-v1", _FakeRedis())
     for _ in range(25):
         handler(_record())
 
-    assert built == ["knowledge_chunks_v1"], "25 records must reuse ONE ChromaStore"
+    assert built == [1], "25 records must reuse ONE vector store"
 
 
 # ── the poll-loop termination contract (graph-leg closeout, Thread 1) ──

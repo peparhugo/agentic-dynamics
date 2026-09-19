@@ -1407,8 +1407,10 @@ class Neo4jClient:
                 query_str += "OR node.authority IN $exempt "
                 params["exempt"] = list(exempt_authorities)
         query_str += (
+            # The embedding is projected out SERVER-side: an ordinary lexical response must
+            # not transfer 1,024 floats per row it will never use (review: perf).
             "RETURN elementId(node) AS node_id, labels(node) AS labels, "
-            "properties(node) AS properties, score "
+            "node{.*, embedding: null} AS properties, score "
             "LIMIT $limit"
         )
         records = self._run(query_str, params)
