@@ -3212,6 +3212,8 @@
     const content = $("#run-detail-content")
     const run = data.run || {}
     const children = []
+    const cost = data.cost || {}
+    const evidence = data.evidence || {}
     const identity = element("div", "metric-grid")
     ;[
       ["Spec", run.spec_name || "—"],
@@ -3219,7 +3221,9 @@
       ["Model", run.model || "—"],
       ["Candidate", run.candidate_sha ? String(run.candidate_sha).slice(0, 12) : "—"],
       ["Started", run.started_at ? formatAge(run.started_at) : "—"],
-      ["Cost", formatCost(run.cost_usd) ?? "unavailable"],
+      // The identity card shows the cost's PROVENANCE, never a bare number: an absent cost is
+      // "unavailable" and a measured zero is the server's own "$0.0000 · metered" label.
+      ["Cost", cost.provenance || "unavailable"],
     ].forEach(([label, value]) => {
       const card = element("article", "metric-card")
       card.appendChild(element("span", "metric-label", label))
@@ -3228,6 +3232,27 @@
     })
     children.push(identity)
 
+    // Cost provenance: the server's aggregate label, or a named "unavailable". The client
+    // never derives an amount — it renders the label the service produced (or says so).
+    const costBlock = element("section", "surface-block")
+    costBlock.appendChild(element("h3", "", "Cost"))
+    const costLine = element("p", "pane-note")
+    costLine.dataset.costProvenance = cost.provenance || "unavailable"
+    costLine.textContent = `provenance: ${cost.provenance || "unavailable"}`
+    costBlock.appendChild(costLine)
+    children.push(costBlock)
+
+    // Verification: the INDEPENDENT verdict (MEASURED) is a separate line from the agent's own
+    // narration (SAID) and from the decision receipt. A claim is never shown as acceptance.
+    const verifyBlock = element("section", "surface-block")
+    verifyBlock.appendChild(element("h3", "", "Verification"))
+    verifyBlock.appendChild(
+      verificationLine("measured", "MEASURED (independent)", evidence.measured),
+    )
+    verifyBlock.appendChild(verificationLine("said", "SAID (agent narration)", evidence.narration))
+    verifyBlock.appendChild(verificationLine("receipt", "Receipt", evidence.receipt))
+    children.push(verifyBlock)
+
     const attempts = data.attempts || []
     const attemptBlock = element("section", "surface-block")
     attemptBlock.appendChild(element("h3", "", "Attempts"))
@@ -3235,28 +3260,159 @@
       objectTable(
         "Attempts",
         attempts,
-        ["attempt_number", "phase", "model", "status", "first_pass", "accepted", "retry_reason", "escalation_from", "escalation_to", "cost_usd"],
+        ["attempt_id", "step_id", "attempt_no", "attempt_number", "phase", "model", "state", "status", "first_pass", "accepted", "retry_reason", "escalation_from", "escalation_to", "cost_usd", "started_at", "ended_at", "exit_code"],
       ),
     )
     children.push(attemptBlock)
 
     const gates = element("section", "surface-block")
     gates.appendChild(element("h3", "", "Gates"))
-    gates.appendChild(objectTable("Gates", data.gates || [], ["gate_id", "candidate_sha", "status", "verdict", "created_at"]))
+    gates.appendChild(objectTable("Gates", data.gates || [], ["gate_id", "step_id", "candidate_sha", "status", "verdict", "executor", "started_at", "ended_at", "created_at"]))
     children.push(gates)
 
     const approvals = element("section", "surface-block")
     approvals.appendChild(element("h3", "", "Approvals"))
-    approvals.appendChild(objectTable("Approvals", data.approvals || [], ["gate_id", "candidate_sha", "purpose", "operator", "created_at"]))
+    approvals.appendChild(objectTable("Approvals", data.approvals || [], ["approval_id", "gate_id", "candidate_sha", "purpose", "operator", "decided_at", "created_at"]))
     children.push(approvals)
 
     const commands = element("section", "surface-block")
     commands.appendChild(element("h3", "", "Command journal"))
     commands.appendChild(
-      objectTable("Command journal", data.commands || [], ["verb", "state", "actor", "rationale", "candidate_sha", "created_at"]),
+      objectTable("Command journal", data.commands || [], ["command_id", "verb", "state", "actor", "rationale", "candidate_sha", "created_at"]),
     )
     children.push(commands)
+
+    children.push(renderDeliveredKnowledge(data.delivered_knowledge || {}))
+    children.push(renderPreparedStep(data.prepared || {}))
+    children.push(renderTimings(data.timings || []))
     content.replaceChildren(...children)
+  }
+
+  /** One verification line: an explicit kind anchor plus the server's own label. */
+  function verificationLine(kind, label, value) {
+    const line = element("p", "pane-note")
+    line.dataset.verification = kind
+    line.appendChild(element("strong", "", `${label}: `))
+    line.appendChild(document.createTextNode(value || "unknown"))
+    return line
+  }
+
+  /**
+   * The delivered-knowledge section: what was SELECTED and DELIVERED into a phase's prepared
+   * prompt. Selection/delivery ONLY — the id list proves neither relevance nor use, so the
+   * section says "selected — use not established" and never implies the model used it.
+   */
+  function renderDeliveredKnowledge(delivered) {
+    const block = element("section", "surface-block")
+    block.appendChild(element("h3", "", "Delivered knowledge"))
+    if (delivered.state !== "recorded") {
+      block.appendChild(paragraph(`No delivered knowledge recorded — ${delivered.reason || "no ledger"}.`))
+      return block
+    }
+    const phases = Array.isArray(delivered.phases) ? delivered.phases : []
+    if (!phases.length) {
+      block.appendChild(paragraph("No phases recorded in the ledger."))
+      return block
+    }
+    for (const phase of phases) {
+      const row = element("div", "delivered-phase")
+      row.dataset.deliveredPhase = phase.phase || "?"
+      row.appendChild(
+        element("p", "pane-note", `phase ${phase.phase || "?"} — selected — use not established`),
+      )
+      const ids = Array.isArray(phase.selected_evidence_ids) ? phase.selected_evidence_ids : null
+      row.appendChild(
+        element("p", "pane-note", `selected ids: ${ids === null ? "not recorded" : (ids.length ? ids.join(", ") : "none selected")}`),
+      )
+      const items = Array.isArray(phase.augmentation_evidence) ? phase.augmentation_evidence : []
+      if (items.length) {
+        row.appendChild(
+          dataTable(
+            "Delivered evidence",
+            ["Id", "Revision", "Source", "Locator"],
+            items.map((item) => [item.id, item.revision, item.source_type, item.locator]),
+          ),
+        )
+      }
+      const legErrors = phase.retrieval_leg_errors
+      const legText = legErrors && Object.keys(legErrors).length
+        ? Object.entries(legErrors).map(([leg, reason]) => `${leg}: ${reason}`).join("; ")
+        : (legErrors === null ? "not recorded" : "none")
+      row.appendChild(
+        element("p", "pane-note", `fallback mode: ${phase.fallback_mode === null ? "not recorded" : (phase.fallback_mode || "none")}`),
+      )
+      row.appendChild(element("p", "pane-note", `retrieval leg errors: ${legText}`))
+      block.appendChild(row)
+    }
+    return block
+  }
+
+  /**
+   * The prepared-step reference section: the exact transport path + prompt hash the parent
+   * recorded per phase, or a named gap. The client never guesses a path.
+   */
+  function renderPreparedStep(prepared) {
+    const block = element("section", "surface-block")
+    block.appendChild(element("h3", "", "Prepared step"))
+    if (prepared.state !== "recorded") {
+      block.appendChild(paragraph(`No prepared-step reference recorded — ${prepared.reason || "no ledger"}.`))
+      return block
+    }
+    for (const phase of prepared.phases || []) {
+      if (phase.state === "recorded") {
+        const line = element("p", "pane-note")
+        line.dataset.preparedStepPath = phase.prepared_step_path
+        line.textContent = `phase ${phase.phase}: ${phase.prepared_step_path} · sha256 ${phase.prompt_sha256}`
+        block.appendChild(line)
+      } else {
+        block.appendChild(
+          element("p", "pane-note", `phase ${phase.phase}: prepared-step reference missing`),
+        )
+      }
+    }
+    return block
+  }
+
+  /**
+   * The timings table: one row per timing field the server actually recorded, each carrying
+   * its measured/unknown state in `data-state`. The client formats only — it never invents a
+   * duration or a queue wait.
+   */
+  function renderTimings(timings) {
+    const block = element("section", "surface-block")
+    block.appendChild(element("h3", "", "Timings"))
+    if (!timings.length) {
+      block.appendChild(paragraph("No timing fields recorded."))
+      return block
+    }
+    const table = element("table", "routing-table")
+    table.appendChild(element("caption", "sr-only", "Timings"))
+    const head = element("thead")
+    const headRow = element("tr")
+    for (const header of ["Field", "Value", "State"]) {
+      const cell = element("th", "", header)
+      cell.scope = "col"
+      headRow.appendChild(cell)
+    }
+    head.appendChild(headRow)
+    table.appendChild(head)
+    const body = element("tbody")
+    for (const timing of timings) {
+      const tr = element("tr")
+      tr.dataset.state = timing.state === "measured" ? "measured" : "unknown"
+      if (timing.scope) tr.dataset.scope = String(timing.scope)
+      tr.appendChild(element("td", "", timing.field || "—"))
+      tr.appendChild(
+        element("td", "", timing.value === null || timing.value === undefined ? "—" : String(timing.value)),
+      )
+      tr.appendChild(element("td", "", tr.dataset.state))
+      body.appendChild(tr)
+    }
+    table.appendChild(body)
+    const scroll = element("div", "table-scroll")
+    scroll.appendChild(table)
+    block.appendChild(scroll)
+    return block
   }
 
   /* ── The Surfaces board: the step-6/7 read models, each panel independent ─────────────── */

@@ -25,6 +25,7 @@ from dataclasses import asdict
 from typing import Any
 
 from agentic_dynamics.control.control_status import build_packet
+from apps.control_room.services import run_evidence
 
 #: The read model's schema id (additive; the source packet's schema rides in ``source``).
 SCHEMA = "control-room-operations/v1"
@@ -78,15 +79,27 @@ def operational_snapshot(
 def run_detail(db: Any, run_id: str) -> dict[str, Any] | None:
     """The P1/P2 per-run view: identity, attempts, gates, approvals, command receipts.
 
-    Every block is read from the control records AS THEY ARE: a record the database has never
-    seen yields an empty list (the DB said none), and an unknown run is ``None`` (the route
-    renders 404) — never an invented skeleton. Records pass through via ``dataclasses.asdict``
-    so this layer can not curate away a field or invent one.
+    Every raw block is read from the control records AS THEY ARE: a record the database has
+    never seen yields an empty list (the DB said none), and an unknown run is ``None`` (the
+    route renders 404) — never an invented skeleton. Records pass through via
+    ``dataclasses.asdict`` so this layer can not curate away a field or invent one.
+
+    The derived blocks are ADDITIVE (the six raw keys above keep their shape) and reuse the
+    service-owned derivations ``glance`` also uses, so the drawer and the glance row can never
+    disagree about the same run:
+
+    * ``cost`` — the aggregate's provenance label (measured zero stays metered, absent stays
+      unknown, mixed stays mixed);
+    * ``evidence`` — the measured verdict, the decision receipt, and the agent's narration;
+    * ``recorded`` — the ledger pointer and whether it resolved;
+    * ``delivered_knowledge`` — per phase, what was SELECTED and DELIVERED (never "used");
+    * ``prepared`` — per phase, the prepared-step reference or a named missing;
+    * ``timings`` — one row per timing field actually recorded, each with a measured state.
     """
     run = db.get_run(run_id)
     if run is None:
         return None
-    return {
+    detail: dict[str, Any] = {
         "schema": RUN_DETAIL_SCHEMA,
         "run": asdict(run) | {"state": run.state.value},
         "attempts": [asdict(row) for row in db.attempts(run_id)],
@@ -94,3 +107,13 @@ def run_detail(db: Any, run_id: str) -> dict[str, Any] | None:
         "approvals": [asdict(row) for row in db.approvals(run_id)],
         "commands": [asdict(row) for row in db.commands(run_id=run_id)],
     }
+    # The ledger is read ONCE and shared by every ledger-derived block, so cost, evidence,
+    # delivery, and prepared-step references all describe the same recorded artifact.
+    ledger = run_evidence.recorded_ledger(detail)
+    detail["cost"] = run_evidence.cost_block(detail["run"], detail, ledger)
+    detail["evidence"] = run_evidence.evidence_block(detail, ledger)
+    detail["recorded"] = run_evidence.recorded_block(detail, ledger)
+    detail["delivered_knowledge"] = run_evidence.delivered_knowledge_block(ledger)
+    detail["prepared"] = run_evidence.prepared_block(ledger)
+    detail["timings"] = run_evidence.timings_block(detail, ledger)
+    return detail

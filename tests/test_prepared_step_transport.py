@@ -94,3 +94,23 @@ def test_from_prepared_dict_refuses_a_changed_prompt():
     payload["prompt"] = "tampered"
     with pytest.raises(ValueError, match="hash mismatch"):
         StepRequest.from_prepared_dict(payload)
+
+
+# ── run-inspection slice: the prepared-step reference is durable on the phase ledger ──────────
+
+
+def test_phase_result_serializes_the_prepared_step_reference():
+    """The clone-relative path + prompt hash survive onto the phase ledger (additive keys)."""
+    from agentic_dynamics.runtime.workflow_runner import PhaseResult
+
+    phase = PhaseResult(
+        phase="p1",
+        kind="agent",
+        status="ok",
+        prepared_step_path=".fleet/prepared_steps/p1.a2.json",
+        prepared_step_prompt_sha256="c" * 64,
+    )
+
+    serialized = phase.to_dict()
+    assert serialized["prepared_step_path"] == ".fleet/prepared_steps/p1.a2.json"
+    assert serialized["prepared_step_prompt_sha256"] == "c" * 64

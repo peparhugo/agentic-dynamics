@@ -176,6 +176,16 @@ class DockerAgentExecutor(StepExecutor):
             timeout_seconds=request.timeout or self._timeout or 0,
         )
 
+    def _prepared_relative_path(self, request: StepRequest) -> str:
+        """The CLONE-RELATIVE prepared-step path for ``request`` (the reference the ledger keeps).
+
+        ``_write_prepared_step`` names the transport ``<phase>.a<attempt>.json``; this is the
+        same name without the absolute mount root (``/repo`` or the host workdir), so the run
+        ledger and the drawer can point at the exact instruction that was delivered without
+        baking a host- or container-specific prefix into durable evidence.
+        """
+        return f".fleet/prepared_steps/{request.phase_name}.a{max(int(request.attempt), 1)}.json"
+
     def _write_prepared_step(self, request: StepRequest, *, workdir: str | None = None) -> str:
         """Write the prepared step where the CHILD reads it; return the child-visible path.
 
@@ -235,8 +245,19 @@ class DockerAgentExecutor(StepExecutor):
             error=str(envelope.get("error") or outcome.get("stderr", ""))[:800],
             exit_code=int(outcome.get("returncode", -1) or -1),
         )
+        # Run-inspection slice: the parent wrote the prepared-step transport for this step in
+        # ``build_request`` above. Record its clone-relative path + prompt hash so the phase
+        # result (and the run ledger) can point at the exact instruction delivered. The parent
+        # computed value is the default; a child envelope that already carries the reference
+        # wins because it is first-hand.
+        sr.prepared_step_path = self._prepared_relative_path(request)
+        sr.prepared_step_prompt_sha256 = request.prompt_sha256
         phase = _phase_from_envelope(envelope)
         if phase is not None:
+            if phase.get("prepared_step_path"):
+                sr.prepared_step_path = str(phase["prepared_step_path"])
+            if phase.get("prepared_step_prompt_sha256"):
+                sr.prepared_step_prompt_sha256 = str(phase["prepared_step_prompt_sha256"])
             sr.session_id = str(phase.get("session_id", "") or "")
             sr.total_tokens = int(phase.get("tokens", {}).get("total", 0) or 0)
             sr.prompt_tokens = int(phase.get("tokens", {}).get("in", 0) or 0)

@@ -2220,6 +2220,38 @@ BOARDS_PROBE_JS = r"""
 }
 """
 
+#: The drawer-content probe: reads the additive blocks the run-inspection slice renders. The
+#: gate asserts the drawer SHOWS the service's own labels (cost provenance incl. a measured
+#: zero, the independent verification kept separate from the agent's claim, delivered-knowledge
+#: ids, the prepared-step reference, and a timing row carrying an unknown state) — a browser
+#: that silently dropped a block fails here rather than passing on a non-empty drawer.
+DRAWER_PROBE_JS = r"""
+() => {
+  const content = document.getElementById('run-detail-content');
+  if (!content) return { present: false };
+  const text = (content.innerText || content.textContent || '').trim();
+  const cost = content.querySelector('[data-cost-provenance]');
+  const verification = {};
+  content.querySelectorAll('[data-verification]').forEach((node) => {
+    verification[node.dataset.verification] = (node.innerText || node.textContent || '').trim();
+  });
+  const delivered = content.querySelector('[data-delivered-phase]');
+  const deliveredText = delivered ? (delivered.innerText || delivered.textContent || '') : '';
+  const prepared = content.querySelector('[data-prepared-step-path]');
+  const unknownTiming = content.querySelector('tr[data-state="unknown"]');
+  return {
+    present: true,
+    text: text,
+    costProvenance: cost ? cost.dataset.costProvenance : null,
+    verification: verification,
+    deliveredPhase: delivered ? delivered.dataset.deliveredPhase : null,
+    deliveredText: deliveredText,
+    preparedPath: prepared ? prepared.dataset.preparedStepPath : null,
+    hasUnknownTiming: Boolean(unknownTiming),
+  };
+}
+"""
+
 
 def load_boards_fixture() -> dict[str, Any]:
     """Load the restored-board fixture (the committed seeds, no ``_note`` keys)."""
@@ -2266,6 +2298,8 @@ def check_boards_fixtures() -> list[str]:
         "operations",
         "operations_degraded",
         "run_detail",
+        "run_detail_unknown",
+        "run_detail_error",
         "design_sessions",
         "routing",
         "surfaces",
@@ -2274,6 +2308,37 @@ def check_boards_fixtures() -> list[str]:
             problems.append(f"boards fixture missing {key!r}")
     if problems:
         return problems
+    # The run-detail seed must carry the real payload shape (the six raw keys the control
+    # records actually produce) PLUS the additive derived blocks the drawer renders. The old
+    # seed used attempt fields the real record does not have (`attempt_number`/`phase` instead
+    # of `attempt_no`/`step_id`), which let a mismatched renderer pass the gate unseen.
+    detail = fixture["run_detail"]
+    for key in ("schema", "run", "attempts", "gates", "approvals", "commands"):
+        if key not in detail:
+            problems.append(f"boards fixture: run_detail missing raw key {key!r}")
+    for key in ("cost", "evidence", "recorded", "delivered_knowledge", "prepared", "timings"):
+        if key not in detail:
+            problems.append(f"boards fixture: run_detail missing derived block {key!r}")
+    cost = detail.get("cost") or {}
+    if cost.get("provenance") != "$0.0000 \u00b7 metered":
+        problems.append(
+            "boards fixture: run_detail must carry the measured-zero cost case "
+            f"(got {cost.get('provenance')!r})"
+        )
+    if not any(row.get("state") == "unknown" for row in detail.get("timings") or []):
+        problems.append("boards fixture: run_detail needs at least one unknown timing row")
+    if detail.get("evidence", {}).get("measured") != "independent tests passed":
+        problems.append("boards fixture: run_detail needs a measured independent verification case")
+    delivered = detail.get("delivered_knowledge") or {}
+    if not delivered.get("phases") or not delivered["phases"][0].get("selected_evidence_ids"):
+        problems.append("boards fixture: run_detail needs a delivered-knowledge id case")
+    if not detail.get("prepared", {}).get("phases"):
+        problems.append("boards fixture: run_detail needs a prepared-step reference case")
+    unknown = fixture.get("run_detail_unknown") or {}
+    if (unknown.get("cost") or {}).get("provenance") != "unknown":
+        problems.append("boards fixture: run_detail_unknown must carry the unknown cost case")
+    if "error" not in (fixture.get("run_detail_error") or {}):
+        problems.append("boards fixture: run_detail_error must carry an error envelope")
     normal = build_operations_payload(False)
     rows = normal.get("active_runs", []) + normal.get("promotable_runs", [])
     if len(rows) < 12:
@@ -2352,8 +2417,19 @@ def _boards_router(
             # posture as /api/status: a served frame, never an abort.
             route.fulfill(status=200, content_type="text/event-stream", body="data: {}\n\n")
         elif path.startswith("/api/runs/"):
+            # Two drawer variants ride the restored-board fixture: the rich measured payload
+            # (cost measured-zero, delivered knowledge, prepared step, an unknown timing) and
+            # an unknown-cost/no-ledger payload, plus an HTTP-200 error envelope. The run row
+            # ids select them so the gate can open each through the real click-through path.
+            run_id = path.rsplit("/", 1)[-1]
+            if run_id == "run-fixture-0007":
+                body = fixture["run_detail_unknown"]
+            elif run_id == "run-fixture-0008":
+                body = fixture["run_detail_error"]
+            else:
+                body = fixture["run_detail"]
             route.fulfill(
-                status=200, content_type="application/json", body=json.dumps(fixture["run_detail"])
+                status=200, content_type="application/json", body=json.dumps(body)
             )
         elif path == "/api/routing" and routing_failure:
             route.fulfill(
@@ -3169,8 +3245,16 @@ def _check_board_keyboard(
             )
             context.close()
             continue
-        origin = rows.first.get_attribute("data-run-id") or ""
-        rows.first.focus()
+        # The rich run-inspection assertions need the RICH fixture row EXPLICITLY: the first
+        # row in DOM order is the Operations attention table's unknown-cost run
+        # (run-fixture-0007), which deliberately lacks the rich blocks this class asserts
+        # (measured-zero cost, delivered knowledge, prepared step). Selecting the rich row by
+        # id keeps each assertion on the payload it is written for; other fixtures fall back
+        # to the first row.
+        rich_rows = page.locator('tr[data-run-id="run-fixture-0001"]')
+        rich = rich_rows.first if rich_rows.count() else rows.first
+        origin = rich.get_attribute("data-run-id") or ""
+        rich.focus()
         page.keyboard.press("Enter")
         try:
             page.locator("#run-detail-drawer:not([hidden])").wait_for(timeout=5000)
@@ -3207,6 +3291,75 @@ def _check_board_keyboard(
                     "drawer-content",
                     "the run detail drawer never rendered its content",
                 )
+            # Drawer content: the additive run-inspection blocks must actually render — a
+            # non-empty drawer is not enough. Each assertion names the block the slice exists
+            # to surface (cost provenance incl. measured-zero, the independent verdict kept
+            # separate from the agent's claim, delivered-knowledge ids, the prepared-step
+            # reference, and a timing row whose state is unknown).
+            drawer = page.evaluate(DRAWER_PROBE_JS)
+            if not drawer.get("present"):
+                _row(
+                    errors,
+                    label,
+                    "keyboard",
+                    "drawer-blocks",
+                    "the drawer has no content node to inspect",
+                )
+            else:
+                if drawer.get("costProvenance") != "$0.0000 \u00b7 metered":
+                    _row(
+                        errors,
+                        label,
+                        "keyboard",
+                        "drawer-cost",
+                        "the drawer must show the measured-zero cost provenance "
+                        f"(got {drawer.get('costProvenance')!r})",
+                    )
+                measured = (drawer.get("verification") or {}).get("measured", "")
+                if "independent" not in measured:
+                    _row(
+                        errors,
+                        label,
+                        "keyboard",
+                        "drawer-verification",
+                        "the drawer must show the independent verification separately "
+                        f"(got {measured!r})",
+                    )
+                said = (drawer.get("verification") or {}).get("said", "")
+                if "narration" not in said:
+                    _row(
+                        errors,
+                        label,
+                        "keyboard",
+                        "drawer-said",
+                        "the agent's own narration must be shown separately as SAID "
+                        f"(got {said!r})",
+                    )
+                delivered_text = drawer.get("deliveredText") or ""
+                if not drawer.get("deliveredPhase") or "kb-fixture-aaa" not in delivered_text:
+                    _row(
+                        errors,
+                        label,
+                        "keyboard",
+                        "drawer-delivered",
+                        "the drawer must show the delivered-knowledge ids",
+                    )
+                if drawer.get("preparedPath") != ".fleet/prepared_steps/implement.a1.json":
+                    _row(
+                        errors,
+                        label,
+                        "keyboard",
+                        "drawer-prepared",
+                        "the drawer must show the prepared-step reference",
+                    )
+                if not drawer.get("hasUnknownTiming"):
+                    _row(
+                        errors,
+                        label,
+                        "keyboard",
+                        "drawer-timing-unknown",
+                        "the drawer must render an unknown-state timing row",
+                    )
             if screenshots:
                 shot = out / f"boards_keyboard_drawer_{theme}_1440x900.png"
                 page.screenshot(path=str(shot), full_page=False)
@@ -3240,6 +3393,45 @@ def _check_board_keyboard(
                     f"focus returned to {probe['activeRunId']!r}, not the originating row "
                     f"{origin!r}",
                 )
+            # Unknown-cost case: a run with no ledger must render an EXPLICIT unknown
+            # provenance — never a fabricated $0.0000.
+            unknown_row = page.locator('tr[data-run-id="run-fixture-0007"]')
+            if unknown_row.count():
+                unknown_row.first.focus()
+                page.keyboard.press("Enter")
+                try:
+                    page.locator('#run-detail-content [data-cost-provenance="unknown"]').wait_for(
+                        timeout=5000
+                    )
+                except Exception:  # noqa: BLE001 — the failed state is the finding
+                    _row(
+                        errors,
+                        label,
+                        "keyboard",
+                        "drawer-cost-unknown",
+                        "the unknown-cost run must render an explicit unknown provenance",
+                    )
+                page.keyboard.press("Escape")
+                _settle(page, 150)
+            # HTTP-200 error envelope: the service's named error renders by name, never a blank.
+            error_row = page.locator('tr[data-run-id="run-fixture-0008"]')
+            if error_row.count():
+                error_row.first.focus()
+                page.keyboard.press("Enter")
+                try:
+                    page.locator(
+                        '#run-detail-content:has-text("Run detail unavailable")'
+                    ).wait_for(timeout=5000)
+                except Exception:  # noqa: BLE001 — the failed state is the finding
+                    _row(
+                        errors,
+                        label,
+                        "keyboard",
+                        "drawer-error-envelope",
+                        "a 200 error envelope must render the named error, not a blank",
+                    )
+                page.keyboard.press("Escape")
+                _settle(page, 150)
         _settle(page, 200)
         for message in console_errors:
             _row(errors, label, "keyboard", "console", message[:200])
@@ -3273,7 +3465,10 @@ def boards_coverage(*, legacy_ran: bool = False) -> dict[str, list[str]]:
         "scrolling: real wheel input reaches the last below-fold run row; an overflow-y:hidden "
         "page fails the same check",
         "keyboard: Enter opens the run drawer with focus on its close control; Escape closes it "
-        "and returns focus to the originating row",
+        "and returns focus to the originating row; the loaded drawer renders the run-inspection "
+        "blocks (measured-zero and unknown cost provenance, independent verification separate "
+        "from the agent's claim, delivered-knowledge ids, the prepared-step reference, an "
+        "unknown-state timing), and a 200 error envelope renders by name",
     ]
     omitted: list[str] = []
     if legacy_ran:

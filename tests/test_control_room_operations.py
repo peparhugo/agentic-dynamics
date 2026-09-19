@@ -11,6 +11,7 @@ The properties pinned here are the Phase-0 truth rules:
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -20,6 +21,7 @@ for _path in (_REPO_ROOT, _REPO_ROOT / "src"):
         sys.path.insert(0, str(_path))
 
 from agentic_dynamics.control.control_db import (  # noqa: E402
+    AttemptState,
     ControlDB,
     GateVerdict,
     RunState,
@@ -140,8 +142,164 @@ def test_run_detail_carries_every_control_record(tmp_path):
     assert [apr["operator"] for apr in detail["approvals"]] == ["dr-seuss"]
     assert [(c["verb"], c["state"]) for c in detail["commands"]] == [("approve", "completed")]
     assert '"approval_id"' in detail["commands"][0]["receipt_json"]
-    # no invented keys: exactly the documented blocks, each as the database returned it.
-    assert set(detail) == {"schema", "run", "attempts", "gates", "approvals", "commands"}
+    # the raw blocks keep their shape; the derived blocks are ADDITIVE (never a re-shape).
+    assert {"schema", "run", "attempts", "gates", "approvals", "commands"} <= set(detail)
+    assert {
+        "cost",
+        "evidence",
+        "recorded",
+        "delivered_knowledge",
+        "prepared",
+        "timings",
+    } <= set(detail)
+
+
+def _seed_with_ledger(db: ControlDB, ledger_path: Path) -> str:
+    """A run awaiting a checkpoint, one attempt recorded, and a ledger pointer stamped."""
+    run = db.create_run(
+        spec_name="flow",
+        model="m",
+        state=RunState.RUNNING,
+        reason="start",
+        candidate_sha="a" * 40,
+    )
+    attempt = db.start_attempt(
+        run.run_id,
+        step_id="implement",
+        model=run.model,
+        state=AttemptState.RUNNING,
+        started_at="2026-09-12T00:00:00Z",
+    )
+    db.finish_attempt(attempt.attempt_id, AttemptState.OK, ended_at="2026-09-12T00:01:00Z")
+    db.transition_run(
+        run.run_id,
+        RunState.AWAITING_APPROVAL,
+        reason="checkpoint",
+        ledger_path=str(ledger_path),
+    )
+    return run.run_id
+
+
+_LEDGER = {
+    "spec_name": "flow",
+    "workdir": "/tmp/wt_flow_recorded",
+    "cell_id": "cell-9",
+    "total_cost_usd": 0.0,
+    "phases": [
+        {
+            "phase": "implement",
+            "kind": "agent",
+            "status": "ok",
+            "cost_usd": 0.0,
+            "cost_source": "metered",
+            "duration_s": 0.0,
+            "leased_at": "2026-09-12T00:00:00Z",
+            "first_token_at": None,
+            "selected_evidence_ids": ["kb-1"],
+            "augmentation_evidence": [
+                {
+                    "id": "kb-1",
+                    "revision": "r1",
+                    "source_type": "finding",
+                    "locator": "experiments/results/kb/kb-1.json",
+                }
+            ],
+            "fallback_mode": "",
+            "retrieval_leg_errors": {"dense": "timeout"},
+            "augmentation_versions": {"constructor": "v1"},
+            "augmentation_tokens": {"in": 1, "out": 2},
+            "augmentation_cost_usd": 0.0,
+            "prepared_step_path": ".fleet/prepared_steps/implement.a1.json",
+            "prepared_step_prompt_sha256": "a" * 64,
+            "final_response": "implemented the endpoint",
+        },
+        {
+            "phase": "verify",
+            "kind": "test",
+            "status": "ok",
+            "test_executed_success": True,
+            "evaluator_independent": True,
+        },
+    ],
+}
+
+
+def test_run_detail_derived_blocks_read_the_recorded_ledger(tmp_path):
+    """With a ledger: measured-zero cost, independent verification, delivery, prepared step."""
+    ledger_path = tmp_path / "ledger.json"
+    ledger_path.write_text(json.dumps(_LEDGER), encoding="utf-8")
+    with _db(tmp_path) as db:
+        run_id = _seed_with_ledger(db, ledger_path)
+        detail = run_detail(db, run_id)
+
+    assert detail is not None
+    # A MEASURED zero stays a measured zero; it is never collapsed to unknown.
+    assert detail["cost"] == {"provenance": "$0.0000 \u00b7 metered"}
+    assert detail["evidence"]["measured"] == "independent tests passed"
+    assert detail["evidence"]["narration"] == "narration recorded"
+    assert detail["evidence"]["receipt"] == "missing"
+    assert detail["recorded"] == {"ledger_path": str(ledger_path), "present": True}
+
+    delivered = detail["delivered_knowledge"]
+    assert delivered["state"] == "recorded"
+    assert delivered["use"] == "not_established"  # selection/delivery only
+    phase = delivered["phases"][0]
+    assert phase["selected_evidence_ids"] == ["kb-1"]
+    assert phase["augmentation_evidence"][0]["locator"] == "experiments/results/kb/kb-1.json"
+    assert phase["retrieval_leg_errors"] == {"dense": "timeout"}
+
+    prepared = detail["prepared"]["phases"][0]
+    assert prepared["prepared_step_path"] == ".fleet/prepared_steps/implement.a1.json"
+    assert prepared["prompt_sha256"] == "a" * 64
+
+    timings = {row["field"]: row for row in detail["timings"] if row.get("scope") is None}
+    assert timings["run.started_at"]["state"] == "measured"
+    # A duration recorded as 0.0 is a measured zero, not a missing value.
+    duration = next(row for row in detail["timings"] if row["field"] == "phase.duration_s")
+    assert duration == {"field": "phase.duration_s", "value": 0.0, "state": "measured", "scope": "implement"}
+    # A field the record does not carry stays an explicit unknown — never a fabricated 0.
+    first_token = next(
+        row for row in detail["timings"] if row["field"] == "phase.first_token_at"
+    )
+    assert first_token["state"] == "unknown" and first_token["value"] is None
+
+
+def test_run_detail_without_a_ledger_names_every_absence(tmp_path):
+    """No ledger: cost/provenance, delivery, and the prepared step are NAMED absences."""
+    with _db(tmp_path) as db:
+        run_id = _seed_awaiting(db)
+        detail = run_detail(db, run_id)
+
+    assert detail is not None
+    assert detail["cost"] == {"provenance": "unknown"}
+    assert detail["evidence"]["measured"] == "test result unknown"
+    assert detail["recorded"] == {"ledger_path": None, "present": False}
+    assert detail["delivered_knowledge"] == {
+        "state": "absent",
+        "reason": "no ledger recorded",
+        "use": "not_established",
+        "phases": [],
+    }
+    assert detail["prepared"] == {
+        "state": "absent",
+        "reason": "no ledger recorded",
+        "phases": [],
+    }
+    # Timing rows exist for the run/attempt records even without a ledger; absent fields are
+    # explicit unknowns rather than invented zeros.
+    assert any(row["state"] == "unknown" for row in detail["timings"])
+
+
+def test_run_detail_error_envelope_is_http_200_through_the_services_layer(monkeypatch, tmp_path):
+    """An unreadable control plane renders as a named 200 envelope, never a 500."""
+    from apps.control_room import server
+
+    monkeypatch.setenv("FINOPS_CONTROL_DB", str(tmp_path / "missing" / "control.db"))
+    response = server.app.test_client().get("/api/runs/run-anything")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["error"] == "control_db_unavailable"
+    assert payload["reason"]
 
 
 def test_run_detail_unknown_run_is_none_not_a_skeleton(tmp_path):

@@ -123,3 +123,19 @@ def test_prepared_step_exclusion_lands_without_a_git_info_dir(tmp_path):
         capture_output=True,
     )
     assert ignored.returncode == 0
+
+# ── run-inspection slice: the executor records the clone-relative prepared-step reference ─────
+
+
+def test_prepared_relative_path_names_the_written_transport(tmp_path):
+    """The recorded reference is the same transport the child is pointed at, minus the mount."""
+    clone = tmp_path / "runs" / "run-abc" / "repo"
+    (clone / ".git" / "info").mkdir(parents=True)
+    (clone / ".git" / "info" / "exclude").write_text("", encoding="utf-8")
+    executor = _executor(run_clone=str(clone))
+
+    assert executor._prepared_relative_path(_request()) == ".fleet/prepared_steps/p1.a1.json"
+    command = executor.build_request(_request())["command"]
+    child_path = command[command.index("--prepared-step") + 1]
+    assert child_path == "/repo/.fleet/prepared_steps/p1.a1.json"
+    assert child_path.endswith(executor._prepared_relative_path(_request()))
