@@ -533,6 +533,7 @@ def _build_orchestrator_executors(
         thinking_effort=args.thinking_effort,
         thinking_budget_tokens=args.thinking_budget_tokens,
         output_token_limit=args.output_token_limit,
+        fork_checkpoint=getattr(args, "fork_checkpoint", None),
     )
     verifier_executor = DockerVerifierExecutor(**common)
 
@@ -645,6 +646,10 @@ def main() -> None:
                          "one-time sonar-scanner docker run, scripts/archive/backfill_sonar.py, "
                          "ws3_stragglers) executes it; a phase "
                          "whose scope fails validation refuses BEFORE the broker is reached.")
+    ap.add_argument("--fork-checkpoint", default=None, metavar="REF",
+                    help="pinned checkpoint id '<workflow>/<attempt_id>' (or a 'latest:<workflow>' "
+                         "alias resolved once at submit time): phases that declare 'fork: true' "
+                         "fork this exact parent; a fork phase without it refuses")
     ap.add_argument("--prepared-step", default=None, metavar="PATH",
                     help="path to a prepared-step/v1 transport file (step 3): the child "
                          "executes the parent's exact step — prompt + hash verified — instead "

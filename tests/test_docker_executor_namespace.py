@@ -139,3 +139,395 @@ def test_prepared_relative_path_names_the_written_transport(tmp_path):
     child_path = command[command.index("--prepared-step") + 1]
     assert child_path == "/repo/.fleet/prepared_steps/p1.a1.json"
     assert child_path.endswith(executor._prepared_relative_path(_request()))
+
+
+# ── isolated conversation forks + the workflow session store ──────────────────────────────
+
+def _seed_data_dir(tmp_path, name="seed-data"):
+    """A LIVE seed data dir whose latest write is still in the WAL (the review's case).
+
+    The writer connection stays open (autocheckpoint off) so the WAL genuinely carries the
+    late row at snapshot time — exactly the live-source condition the backup API must handle.
+    """
+    import sqlite3
+
+    seed = tmp_path / name
+    (seed / "opencode").mkdir(parents=True)
+    db = seed / "opencode" / "opencode.db"
+    con = sqlite3.connect(db)
+    con.execute("pragma journal_mode=wal")
+    con.execute("pragma wal_autocheckpoint=0")
+    con.execute("create table session (id text primary key, time_created integer)")
+    con.execute("insert into session values ('ses_parent_abc', 5)")
+    con.commit()
+    con.execute("insert into session values ('ses_late_wal', 9)")  # stays in the WAL
+    con.commit()
+    assert (seed / "opencode" / "opencode.db-wal").exists()
+    return seed, con
+
+
+def _fork_decl(seed, session="ses_parent_abc"):
+    return {"path": str(seed), "session_id": session}
+
+
+def test_fork_snapshot_is_standalone_and_contains_wal_content(tmp_path):
+    """The transported snapshot is a complete db (WAL content included, no sidecars)."""
+    import sqlite3
+
+    seed, con = _seed_data_dir(tmp_path)
+    clone = tmp_path / "runs" / "run-abc" / "repo"
+    clone.mkdir(parents=True)
+    executor = _executor(run_clone=str(clone))
+    request = _request()
+    request.phase_def = {"scope": "implementation", "fork_checkpoint": _fork_decl(seed)}
+    executor.build_request(request)
+
+    dest = clone / ".fleet" / "fork_checkpoints" / "p1.a1.db"
+    assert dest.is_file()
+    assert not (clone / ".fleet" / "fork_checkpoints" / "p1.a1.db-wal").exists()
+    con = sqlite3.connect(f"file:{dest}?mode=ro", uri=True)
+    ids = {r[0] for r in con.execute("select id from session")}
+    con.close()
+    assert ids == {"ses_parent_abc", "ses_late_wal"}  # the WAL row survived the snapshot
+    prepared = json.loads(
+        (clone / ".fleet" / "prepared_steps" / "p1.a1.json").read_text(encoding="utf-8")
+    )
+    assert prepared["fork"]["session_id"] == "ses_parent_abc"
+    assert prepared["fork"]["db_path"].endswith("/.fleet/fork_checkpoints/p1.a1.db")
+    con.close()
+
+
+def test_fork_requires_an_explicit_parent_session(tmp_path):
+    """A declaration without session_id (or with an absent session) refuses before launch."""
+    import pytest
+
+    seed, con = _seed_data_dir(tmp_path)
+    clone = tmp_path / "runs" / "run-abc" / "repo"
+    clone.mkdir(parents=True)
+    executor = _executor(run_clone=str(clone))
+
+    no_session = _request()
+    no_session.phase_def = {"scope": "implementation", "fork_checkpoint": {"path": str(seed)}}
+    with pytest.raises(RuntimeError, match="explicit parent session_id"):
+        executor.build_request(no_session)
+
+    absent = _request()
+    absent.phase_def = {"scope": "implementation", "fork_checkpoint": _fork_decl(seed, "ses_nope")}
+    with pytest.raises(RuntimeError, match="is not present"):
+        executor.build_request(absent)
+
+    missing_src = _request()
+    missing_src.phase_def = {
+        "scope": "implementation",
+        "fork_checkpoint": {"path": str(tmp_path / "nope"), "session_id": "ses_x"},
+    }
+    with pytest.raises(RuntimeError, match="source missing"):
+        executor.build_request(missing_src)
+    con.close()
+
+
+def test_persist_publishes_receipt_and_latest_idempotently(tmp_path, monkeypatch):
+    """Per-attempt receipt + latest pointer; identical re-publication is idempotent."""
+    import json as _json
+    import sqlite3
+
+    import agentic_dynamics.core.paths as core_paths
+    import scripts.fleet.docker_executor as de
+
+    run_dir = tmp_path / "runs" / "run-abc"
+    clone = run_dir / "repo"
+    clone.mkdir(parents=True)
+    state_root = tmp_path / "state"
+    monkeypatch.setattr(de.spawn_wrapper, "STATE_ROOT", str(state_root), raising=True)
+    monkeypatch.setattr(core_paths, "PROJECT_ROOT", tmp_path, raising=True)
+    (tmp_path / ".git").mkdir(exist_ok=True)
+
+    ns = state_root / "t" / "run-abc" / "p1" / "a1" / "data" / "opencode"
+    ns.mkdir(parents=True)
+    db = ns / "opencode.db"
+    con = sqlite3.connect(db)
+    con.execute("create table session (id text primary key, time_created integer)")
+    con.execute("insert into session values ('ses_child_1', 9)")
+    con.commit()
+    con.close()
+
+    executor = _executor(run_clone=str(clone))
+    ref, err = executor._persist_session_state(_request(), session_id="ses_child_1")
+    assert ref == "t/run-abc-p1.a1" and err == ""
+    store = tmp_path / "experiments" / "results" / "opencode" / "t"
+    snapshot = store / "snapshots" / "run-abc-p1.a1.db"
+    receipt = store / "receipts" / "run-abc-p1.a1.json"
+    latest = store / "latest.json"
+    assert snapshot.is_file() and receipt.is_file() and latest.is_file()
+    rec = _json.loads(receipt.read_text())
+    assert rec["session_id"] == "ses_child_1" and rec["sha256"]
+    assert _json.loads(latest.read_text())["attempt_id"] == "run-abc-p1.a1"
+
+    # identical re-publication is idempotent (no error, same bytes)
+    ref2, err2 = executor._persist_session_state(_request(), session_id="ses_child_1")
+    assert (ref2, err2) == (ref, "")
+
+
+def test_persist_refuses_different_bytes_at_the_same_identity(tmp_path, monkeypatch):
+    """Different bytes at an already-published identity are refused, never silently replaced."""
+    import sqlite3
+
+    import pytest
+
+    import agentic_dynamics.core.paths as core_paths
+    import scripts.fleet.docker_executor as de
+
+    run_dir = tmp_path / "runs" / "run-abc"
+    clone = run_dir / "repo"
+    clone.mkdir(parents=True)
+    state_root = tmp_path / "state"
+    monkeypatch.setattr(de.spawn_wrapper, "STATE_ROOT", str(state_root), raising=True)
+    monkeypatch.setattr(core_paths, "PROJECT_ROOT", tmp_path, raising=True)
+    (tmp_path / ".git").mkdir(exist_ok=True)
+
+    ns = state_root / "t" / "run-abc" / "p1" / "a1" / "data" / "opencode"
+    ns.mkdir(parents=True)
+    db = ns / "opencode.db"
+    con = sqlite3.connect(db)
+    con.execute("create table session (id text primary key, time_created integer)")
+    con.execute("insert into session values ('ses_child_1', 9)")
+    con.commit()
+    con.close()
+
+    executor = _executor(run_clone=str(clone))
+    executor._persist_session_state(_request(), session_id="ses_child_1")
+
+    con = sqlite3.connect(db)
+    con.execute("insert into session values ('ses_changed', 10)")
+    con.commit()
+    con.close()
+    with pytest.raises(RuntimeError, match="refusing to replace evidence"):
+        executor._persist_session_state(_request(), session_id="ses_child_1")
+
+
+def test_latest_ref_resolves_the_published_checkpoint(tmp_path, monkeypatch):
+    """ref: latest:<workflow> resolves to the published snapshot + explicit session."""
+    import sqlite3
+
+    import pytest
+
+    import agentic_dynamics.core.paths as core_paths
+    import scripts.fleet.docker_executor as de
+
+    run_dir = tmp_path / "runs" / "run-abc"
+    clone = run_dir / "repo"
+    clone.mkdir(parents=True)
+    state_root = tmp_path / "state"
+    monkeypatch.setattr(de.spawn_wrapper, "STATE_ROOT", str(state_root), raising=True)
+    monkeypatch.setattr(core_paths, "PROJECT_ROOT", tmp_path, raising=True)
+    (tmp_path / ".git").mkdir(exist_ok=True)
+
+    ns = state_root / "t" / "run-abc" / "seed" / "a1" / "data" / "opencode"
+    ns.mkdir(parents=True)
+    db = ns / "opencode.db"
+    con = sqlite3.connect(db)
+    con.execute("create table session (id text primary key, time_created integer)")
+    con.execute("insert into session values ('ses_seed', 1)")
+    con.commit()
+    con.close()
+
+    executor = _executor(run_clone=str(clone))
+    request = _request()
+    request.phase_name = "seed"
+    executor._persist_session_state(request, session_id="ses_seed")
+
+    snapshot, session, sha = executor._resolve_fork_source({"ref": "latest:t"})
+    assert snapshot.is_file() and session == "ses_seed" and sha
+    with pytest.raises(RuntimeError, match="no published receipt"):
+        executor._resolve_fork_source({"ref": "latest:nope"})
+
+
+def test_store_membership_is_the_checkpoint(tmp_path, monkeypatch):
+    """A published snapshot carries the parent session; an absent one refuses at stage time."""
+    import sqlite3
+
+    import pytest
+
+    import agentic_dynamics.core.paths as core_paths
+    import scripts.fleet.docker_executor as de
+
+    run_dir = tmp_path / "runs" / "run-abc"
+    clone = run_dir / "repo"
+    clone.mkdir(parents=True)
+    state_root = tmp_path / "state"
+    monkeypatch.setattr(de.spawn_wrapper, "STATE_ROOT", str(state_root), raising=True)
+    monkeypatch.setattr(core_paths, "PROJECT_ROOT", tmp_path, raising=True)
+    (tmp_path / ".git").mkdir(exist_ok=True)
+    ns = state_root / "t" / "run-abc" / "seed" / "a1" / "data" / "opencode"
+    ns.mkdir(parents=True)
+    con = sqlite3.connect(ns / "opencode.db")
+    con.execute("create table session (id text primary key, time_created integer)")
+    con.execute("insert into session values ('ses_seed', 1)")
+    con.commit()
+    con.close()
+    executor = _executor(run_clone=str(clone))
+    seed_request = _request()
+    seed_request.phase_name = "seed"
+    executor._persist_session_state(seed_request, session_id="ses_seed")
+
+    branch = _request()
+    branch.phase_def = {"scope": "research_readonly", "fork_checkpoint": {"ref": "latest:t"}}
+    executor.build_request(branch)  # resolves, snapshots into the clone, stamps
+    prepared = json.loads(
+        (clone / ".fleet" / "prepared_steps" / "p1.a1.json").read_text(encoding="utf-8")
+    )
+    assert prepared["fork"]["session_id"] == "ses_seed"
+
+    wrong = _request()
+    wrong.phase_def = {"scope": "research_readonly", "fork_checkpoint": {"ref": "latest:nope"}}
+    with pytest.raises(RuntimeError, match="no published receipt"):
+        executor.build_request(wrong)
+
+
+def test_branch_phase_forks_the_pinned_submission_checkpoint(tmp_path, monkeypatch):
+    """The checked-in branch flow: seed receipt -> pinned ref -> fork phase stamps it."""
+    import sqlite3
+
+    import agentic_dynamics.core.paths as core_paths
+    import scripts.fleet.docker_executor as de
+
+    run_dir = tmp_path / "runs" / "run-seed1"
+    clone = run_dir / "repo"
+    clone.mkdir(parents=True)
+    state_root = tmp_path / "state"
+    monkeypatch.setattr(de.spawn_wrapper, "STATE_ROOT", str(state_root), raising=True)
+    monkeypatch.setattr(core_paths, "PROJECT_ROOT", tmp_path, raising=True)
+    (tmp_path / ".git").mkdir(exist_ok=True)
+
+    ns = state_root / "fork_seed" / "run-seed1" / "seed" / "a1" / "data" / "opencode"
+    ns.mkdir(parents=True)
+    con = sqlite3.connect(ns / "opencode.db")
+    con.execute("create table session (id text primary key, time_created integer)")
+    con.execute("insert into session values ('ses_seed_parent', 1)")
+    con.commit()
+    con.close()
+
+    seed_executor = _executor(run_clone=str(clone))
+    seed_executor._spec_name = "fork_seed"
+    seed_request = _request()
+    seed_request.phase_name = "seed"
+    ref, err = seed_executor._persist_session_state(seed_request, session_id="ses_seed_parent")
+    assert err == ""
+
+    # resolve ONCE (as the submit path does) and pin the exact receipt
+    pinned = de.resolve_checkpoint_ref("latest:fork_seed")
+    assert pinned == ref
+
+    # the branch run: a fork phase with the pinned submission input — no spec edits, no copies
+    branch_dir = tmp_path / "runs" / "run-branch1" / "repo"
+    branch_dir.mkdir(parents=True)
+    branch_executor = _executor(run_clone=str(branch_dir), fork_checkpoint=pinned)
+    branch_executor._spec_name = "fork_branch"
+    branch = _request()
+    branch.phase_def = {"scope": "research_readonly", "fork": True}
+    branch_executor.build_request(branch)
+    prepared = json.loads(
+        (branch_dir / ".fleet" / "prepared_steps" / "p1.a1.json").read_text(encoding="utf-8")
+    )
+    assert prepared["fork"]["session_id"] == "ses_seed_parent"
+    assert prepared["fork"]["db_path"].endswith("/.fleet/fork_checkpoints/p1.a1.db")
+
+
+def test_fork_phase_without_a_pinned_checkpoint_refuses(tmp_path, monkeypatch):
+    """fork: true with no submission pin refuses — never a fresh session."""
+    import pytest
+
+    import agentic_dynamics.core.paths as core_paths
+
+    monkeypatch.setattr(core_paths, "PROJECT_ROOT", tmp_path, raising=True)
+    (tmp_path / ".git").mkdir(exist_ok=True)
+    clone = tmp_path / "runs" / "run-x" / "repo"
+    clone.mkdir(parents=True)
+    executor = _executor(run_clone=str(clone))
+    request = _request()
+    request.phase_def = {"scope": "research_readonly", "fork": True}
+    with pytest.raises(RuntimeError, match="pinned no --fork-checkpoint"):
+        executor.build_request(request)
+
+
+def test_concurrent_publication_keeps_both_receipts(tmp_path, monkeypatch):
+    """Two completions publishing at once: both receipts survive, latest stays valid."""
+    import json as _json
+    import sqlite3
+    import threading
+
+    import agentic_dynamics.core.paths as core_paths
+    import scripts.fleet.docker_executor as de
+
+    monkeypatch.setattr(core_paths, "PROJECT_ROOT", tmp_path, raising=True)
+    (tmp_path / ".git").mkdir(exist_ok=True)
+    state_root = tmp_path / "state"
+    monkeypatch.setattr(de.spawn_wrapper, "STATE_ROOT", str(state_root), raising=True)
+
+    def make_cell(run_key, session_id):
+        ns = state_root / "t" / run_key / "p1" / "a1" / "data" / "opencode"
+        ns.mkdir(parents=True, exist_ok=True)
+        con = sqlite3.connect(ns / "opencode.db")
+        con.execute("create table session (id text primary key, time_created integer)")
+        con.execute("create table message (id text primary key, session_id text)")
+        con.execute("insert into session values (?, 1)", (session_id,))
+        con.execute("insert into message values (?, ?)", (session_id + "-m1", session_id))
+        con.commit()
+        con.close()
+
+    make_cell("run-a", "ses_a")
+    make_cell("run-b", "ses_b")
+    ex_a = _executor(run_clone=str(tmp_path / "runs" / "run-a" / "repo"))
+    ex_b = _executor(run_clone=str(tmp_path / "runs" / "run-b" / "repo"))
+    errors = []
+
+    def publish(ex, sid):
+        try:
+            ex._persist_session_state(_request(), session_id=sid)
+        except Exception as exc:  # pragma: no cover
+            errors.append(exc)
+
+    threads = [threading.Thread(target=publish, args=(ex_a, "ses_a")),
+               threading.Thread(target=publish, args=(ex_b, "ses_b"))]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+    assert not errors
+    store = tmp_path / "experiments" / "results" / "opencode" / "t"
+    receipts = sorted(p.name for p in (store / "receipts").glob("*.json"))
+    assert receipts == ["run-a-p1.a1.json", "run-b-p1.a1.json"]
+    latest = _json.loads((store / "latest.json").read_text())
+    assert latest["attempt_id"] in {"run-a-p1.a1", "run-b-p1.a1"}
+
+
+def test_identity_is_stable_against_sqlite_bookkeeping_churn(tmp_path, monkeypatch):
+    """A changed -shm (or an emptied -wal) must not read as changed conversation contents."""
+    import sqlite3
+
+    import agentic_dynamics.core.paths as core_paths
+    import scripts.fleet.docker_executor as de
+
+    monkeypatch.setattr(core_paths, "PROJECT_ROOT", tmp_path, raising=True)
+    (tmp_path / ".git").mkdir(exist_ok=True)
+    state_root = tmp_path / "state"
+    monkeypatch.setattr(de.spawn_wrapper, "STATE_ROOT", str(state_root), raising=True)
+    ns = state_root / "t" / "run-a" / "p1" / "a1" / "data" / "opencode"
+    ns.mkdir(parents=True)
+    db = ns / "opencode.db"
+    con = sqlite3.connect(db)
+    con.execute("create table session (id text primary key, time_created integer)")
+    con.execute("create table message (id text primary key, session_id text)")
+    con.execute("insert into session values ('ses_a', 1)")
+    con.execute("insert into message values ('m1', 'ses_a')")
+    con.commit()
+    con.close()
+    executor = _executor(run_clone=str(tmp_path / "runs" / "run-a" / "repo"))
+    ref, err = executor._persist_session_state(_request(), session_id="ses_a")
+    assert err == ""
+
+    # churn the transient sidecars; the conversation is unchanged
+    (ns / "opencode.db-shm").write_bytes(b"churned")
+    (ns / "opencode.db-wal").write_bytes(b"")
+    ref2, err2 = executor._persist_session_state(_request(), session_id="ses_a")
+    assert (ref2, err2) == (ref, "")

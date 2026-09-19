@@ -104,6 +104,19 @@ class StepRequest:
     #: executes the suite against the candidate WITHOUT reloading the producing phase by name.
     #: ``None`` for an agent step (an agent is not a verifier).
     test_boundary: TestBoundary | None = None
+    #: Isolated conversation-fork transport: when ``fork_session_id`` is set, the child
+    #: forks THIS parent session (``--session <id> --fork``) from the checkpoint bytes the
+    #: parent readied beside the prepared step (``fork_db_path``, child-visible) and verifies
+    #: them against ``fork_checkpoint_sha256``. A declared fork whose checkpoint is missing or
+    #: mismatched REFUSES to execute — never a silent fresh session.
+    fork_session_id: str = ""
+    fork_checkpoint_sha256: str = ""
+    fork_db_path: str = ""
+    #: Runner-owned session transcript path. The adapter defaults to
+    #: ``<workdir>/.instrument/session.jsonl``; a read-only scope mount cannot accept it, so
+    #: the parent stamps a WRITABLE path under the cell's private state mount here (carried
+    #: through the prepared step like every other concrete setting).
+    transcript_path: str = ""
 
     @property
     def prompt_sha256(self) -> str:
@@ -142,6 +155,18 @@ class StepRequest:
             "silent_mode": self.silent_mode,
             "enforce_pytest": self.enforce_pytest,
             "attempt": self.attempt,
+            **({"transcript_path": self.transcript_path} if self.transcript_path else {}),
+            **(
+                {
+                    "fork": {
+                        "session_id": self.fork_session_id,
+                        "checkpoint_sha256": self.fork_checkpoint_sha256,
+                        "db_path": self.fork_db_path,
+                    }
+                }
+                if self.fork_session_id
+                else {}
+            ),
         }
 
     @classmethod
@@ -168,6 +193,20 @@ class StepRequest:
             raise ValueError("prepared step carries no prompt")
         if not payload.get("phase_name"):
             raise ValueError("prepared step carries no phase_name")
+        fork_block = payload.get("fork")
+        if fork_block is not None:
+            if not isinstance(fork_block, dict):
+                raise ValueError("prepared step fork block is not a mapping")
+            missing = [
+                key
+                for key in ("session_id", "checkpoint_sha256", "db_path")
+                if not str(fork_block.get(key) or "")
+            ]
+            if missing:
+                raise ValueError(
+                    f"prepared step fork block is incomplete (missing {missing}) — refusing to "
+                    "execute; an incomplete fork never degrades to a fresh session"
+                )
         carried = str(payload.get("prompt_sha256") or "")
         actual = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
         if carried != actual:
@@ -192,6 +231,12 @@ class StepRequest:
             silent_mode=bool(payload.get("silent_mode", False)),
             enforce_pytest=bool(payload.get("enforce_pytest", False)),
             attempt=int(payload.get("attempt") or 1),
+            fork_session_id=str((payload.get("fork") or {}).get("session_id") or ""),
+            fork_checkpoint_sha256=str(
+                (payload.get("fork") or {}).get("checkpoint_sha256") or ""
+            ),
+            fork_db_path=str((payload.get("fork") or {}).get("db_path") or ""),
+            transcript_path=str(payload.get("transcript_path") or ""),
             phase_def={},
         )
 
@@ -278,6 +323,13 @@ class StepResult:
     #: an executor that never prepares a step leaves both empty — a named absence, never a
     #: guessed path.
     prepared_step_path: str = ""
+    #: The durable checkpoint reference the parent published for this step's session
+    #: (``<workflow>/<run>-<phase>.a<n>``) — what a later branch consumes via
+    #: ``fork_checkpoint: {ref: latest:<workflow>}``. Empty when unpublished.
+    checkpoint_ref: str = ""
+    #: Why archival produced no checkpoint (named cause), so "no checkpoint" is visible and
+    #: never reads as success. A workflow without a receipt is not fork-ready.
+    archive_error: str = ""
     prepared_step_prompt_sha256: str = ""
     # test-verdict fields (w1, engine_gaps_verifier_revision): filled ONLY by a verifier
     # executor — the object a ``kind: test`` phase's dispatch returns. The engine reads the
@@ -333,6 +385,8 @@ class LocalAgentExecutor:
         # forwarded here so the local watchdog keeps working through the executor seam.
         if request.phase_def.get("run_model"):
             kwargs["model"] = str(request.phase_def["run_model"])
+        if request.transcript_path:
+            kwargs["transcript_path"] = request.transcript_path
         kwargs.update(request.phase_def.get("_agent_kwargs", {}) or {})
         ar = self._run_agent(request.prompt, **kwargs)
         return _result_from_agentic(ar)

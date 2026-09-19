@@ -1,0 +1,42 @@
+name: fork_branch
+question: >-
+  One isolated fork of the approved parent checkpoint: the cell receives its OWN copy of the
+  parent session state (fork_checkpoint), runs opencode with --session <parent> --fork, and
+  answers the ONE question carried as the goal from the shared context. Siblings share the
+  parent prefix (provider cache) but never a writable database: each cell stages its own copy,
+  and a missing/mismatched checkpoint REFUSES rather than starting fresh.
+version: "0.1"
+artifact_kind: workflow
+intent: measure
+side_effects:
+  repository: false
+  external_services: false
+repeatable: true
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+comparison: null
+writeup: {format: lab_book, sections: [question, evidence]}
+stop: {budget_usd: 1.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_uncertainty}
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: false
+    rag:
+      emit_self: false
+    phases:
+      - name: branch
+        kind: agent
+        scope: research_readonly
+        # This phase FORKS: the concrete checkpoint (pinned receipt id) arrives as the
+        # submission's typed --fork-checkpoint input, resolved once at submit time; a fork
+        # phase without a pinned checkpoint refuses rather than starting a fresh session.
+        fork: true
+        timeout: 900
+        prompt: |
+          {goal}

@@ -1,0 +1,41 @@
+name: fork_seed
+question: >-
+  Seed conversation for the isolated fork experiment. Context source (explicit): this is a
+  DELIBERATELY CURATED new conversation carrying a short measured-state dossier - it is NOT a
+  native fork of the coordinator's own conversation, and no claim of inherited coordinator
+  history is made. The seed runs once in an ordinary isolated cell; its session is published
+  as an immutable checkpoint receipt (SQLite-backup snapshot + sha256 + explicit session id)
+  that later branch cells fork from. No shared OpenCode database is involved: the seed's state
+  lives in its own per-attempt namespace, and each fork stages its own snapshot copy (see the
+  fork_checkpoint transport in prepared-step/v1).
+version: "0.1"
+artifact_kind: workflow
+intent: measure
+side_effects:
+  repository: false
+  external_services: false
+repeatable: true
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+comparison: null
+writeup: {format: lab_book, sections: [question, evidence]}
+stop: {budget_usd: 1.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_uncertainty}
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: false
+    rag:
+      emit_self: false
+    phases:
+      - name: seed
+        kind: agent
+        scope: research_readonly
+        timeout: 900
+        prompt: |
+          {goal}
