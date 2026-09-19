@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Control Room — run-evidence slice: acceptance record (2026-09-19)
