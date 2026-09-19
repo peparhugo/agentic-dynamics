@@ -243,12 +243,12 @@ def test_prepared_fork_block_must_be_complete_on_load():
 
 def test_fork_experiment_specs_validate_with_the_real_validator():
     """The checked-in fork specs pass load_spec + validate_spec (Astra review item 1)."""
-    from pathlib import Path as _P
+    import pathlib
 
     from agentic_dynamics.experiment.compile_experiment import validate_spec
     from agentic_dynamics.experiment.experiment_spec import load_spec
 
-    root = _P(__file__).resolve().parent.parent
+    root = pathlib.Path(__file__).resolve().parent.parent
     for rel in ("workflows/repository/fork_seed.yaml", "workflows/repository/fork_branch.yaml"):
         spec = load_spec(root / rel)
         errors = validate_spec(spec)
