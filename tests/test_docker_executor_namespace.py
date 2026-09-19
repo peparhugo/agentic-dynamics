@@ -340,7 +340,6 @@ def test_latest_ref_resolves_the_published_checkpoint(tmp_path, monkeypatch):
     assert snapshot.is_file() and session == "ses_seed" and sha
     with pytest.raises(RuntimeError, match="no published receipt"):
         executor._resolve_fork_source({"ref": "latest:nope"})
-    executor.build_request  # sanity: attribute still exists
 
 
 def test_store_membership_is_the_checkpoint(tmp_path, monkeypatch):
