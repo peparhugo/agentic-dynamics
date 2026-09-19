@@ -172,6 +172,9 @@ class DockerAgentExecutor(StepExecutor):
             # repo stays readable at /repo (ro) via absolute paths — and create the host dir
             # now so the child's `--dir` exists at spawn time.
             request.workdir = f"{spawn_wrapper.STATE_TARGET}/workdir"
+            # The prepared step stamps the CHILD-visible workdir from ``sibling_workdir``, so
+            # the ro case must move that too — otherwise the child still runs in the ro clone.
+            sibling_workdir = request.workdir
             if self._run_clone:
                 run_key = Path(self._run_clone).parent.name
                 host_scratch = (

@@ -568,5 +568,8 @@ def test_implementation_scope_keeps_the_clone_workdir(tmp_path, monkeypatch):
     request = _request()
     request.phase_def = {"scope": "implementation"}
     executor.build_request(request)
-    assert request.workdir == "/repo"
     assert request.transcript_path == ""
+    prepared = json.loads(
+        (clone / ".fleet" / "prepared_steps" / "p1.a1.json").read_text(encoding="utf-8")
+    )
+    assert prepared["workdir"] == "/repo"
