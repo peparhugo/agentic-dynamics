@@ -10,7 +10,7 @@
 **Themes exercised:** dark, light
 **Coverage executed:** navigation: seven destinations, exactly one visible board, aria-current, no horizontal overflow, every board captured (desktop dark+light, narrow dark) · loading: first visit and reload for Operations/Surfaces/Routing; each endpoint requested exactly once; rendered fixture values asserted; delayed and failed routing responses settle (loading state refused by the readiness predicate) · degraded: an unreadable control db reads 'unavailable', never 0; a failed read model names its reason and URL while its siblings render · scrolling: real wheel input reaches the last below-fold run row; an overflow-y:hidden page fails the same check · keyboard: Enter opens the run drawer with focus on its close control; Escape closes it and returns focus to the originating row; the loaded drawer renders the run-inspection blocks (measured-zero and unknown cost provenance, independent verification separate from the agent's claim, delivered-knowledge ids, the prepared-step reference, an unknown-state timing), and a 200 error envelope renders by name
 **Coverage omitted:** mobile viewport (390x844), forced-colors theme, WCAG-AA contrast, first-paint timing, charts, visuals, style, a11y, parity, live, interactions (legacy parked classes)
-**Candidate:** 8d550763c (verified against the checkout HEAD)
+**Candidate:** ca1ef46dc (verified against the checkout HEAD)
 
 **Screenshots:** 21 (boards-degraded 1, boards-keyboard 2, boards-loading 1, boards-navigation 17)
 

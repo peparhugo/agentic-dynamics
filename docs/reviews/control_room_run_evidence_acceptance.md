@@ -15,8 +15,9 @@ pure derivations at the service boundary.
   model `deepseek/deepseek-v4-flash`, cost $0.164194, phases `evidence` + `verify` both ok,
   `test_executed_success: true`, `evaluator_independent: true`).
 - Workflow candidate (as produced): `2e53b165b` (agent commits `73a05839f` + `2e53b165b`).
-- Delivery head (this branch): `8d550763c` — candidate + AIO remediation commits (drop the
-  leaked prepared-step transport file; fix the drawer-content gate's row targeting).
+- Delivery head (this branch): `ca1ef46dc` — candidate + AIO remediation commits (drop the
+  leaked prepared-step transport file; fix the drawer-content gate's row targeting, re-applied
+  without an editor's whole-file reformatting), with the gate evidence rebound to the head.
 - Spec: `workflows/repository/control_room_run_journey.yaml` (sha256
   `e6bf1d415b7a…` as submitted; spec bytes carried into the run clone).
 
