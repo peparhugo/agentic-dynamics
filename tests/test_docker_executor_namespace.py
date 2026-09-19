@@ -210,3 +210,46 @@ def test_fork_checkpoint_carries_sqlite_companions_when_present(tmp_path):
 
     dest_dir = clone / ".fleet" / "fork_checkpoints"
     assert (dest_dir / "p1.a1.db-wal").read_bytes() == b"wal-bytes"
+
+
+def test_completed_session_is_persisted_as_its_own_file(tmp_path, monkeypatch):
+    """The finished cell db lands as a SEPARATE file in the workflow store + a manifest entry."""
+    import json as _json
+    import sqlite3
+
+    import agentic_dynamics.core.paths as core_paths
+    import scripts.fleet.docker_executor as de
+
+    # state namespace the executor derived: <spec>/<run>/<phase>/a<attempt>
+    run_dir = tmp_path / "runs" / "run-abc"
+    clone = run_dir / "repo"
+    clone.mkdir(parents=True)
+    state_root = tmp_path / "state"
+    # docker_executor holds its own top-level ``spawn_wrapper`` module reference: patch THAT.
+    monkeypatch.setattr(de.spawn_wrapper, "STATE_ROOT", str(state_root), raising=True)
+    monkeypatch.setattr(core_paths, "PROJECT_ROOT", tmp_path, raising=True)
+
+    ns = state_root / "t" / "run-abc" / "p1" / "a1" / "data" / "opencode"
+    ns.mkdir(parents=True)
+    db = ns / "opencode.db"
+    con = sqlite3.connect(db)
+    con.execute("create table session (id text primary key, time_created integer)")
+    con.execute("insert into session values ('ses_child_1', 9)")
+    con.commit()
+    con.close()
+
+    executor = _executor(run_clone=str(clone))
+    store_dir = executor._persist_session_state(_request(), session_id="ses_child_1")
+
+    assert store_dir
+    persisted = tmp_path / "experiments" / "results" / "opencode" / "t" / "run-abc-p1.a1" / "opencode" / "opencode.db"
+    assert persisted.is_file()
+    manifest = _json.loads((persisted.parent.parent.parent / "manifest.json").read_text())
+    entry = manifest["sessions"][0]
+    assert entry["session_id"] == "ses_child_1"
+    assert entry["file"] == "run-abc-p1.a1/opencode/opencode.db"
+    assert entry["sha256"]
+    # idempotent: re-persisting replaces the entry rather than duplicating the lineage row
+    executor._persist_session_state(_request(), session_id="ses_child_1")
+    manifest2 = _json.loads((persisted.parent.parent.parent / "manifest.json").read_text())
+    assert len(manifest2["sessions"]) == 1

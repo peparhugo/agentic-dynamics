@@ -16,6 +16,7 @@ pre-contract child that exits 0 with ``ok:false`` is failed, never success.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import sys
@@ -348,7 +349,82 @@ class DockerAgentExecutor(StepExecutor):
             sr.change_observation_partial = bool(phase.get("change_observation_partial", False))
             sr.confidence = phase.get("confidence")
             sr.final_response = str(phase.get("final_response", "") or "")
+        # Durable workflow session store (operator direction 2026-09-19): the cell's db was
+        # never shared while it ran, and it does not share one afterwards either — the finished
+        # session is PERSISTED as its OWN file under experiments/results/opencode/<workflow>/,
+        # with a lineage entry in the workflow manifest. Best-effort: no db records nothing and
+        # never fails the phase.
+        with contextlib.suppress(Exception):
+            self._persist_session_state(request, session_id=sr.session_id)
         return sr
+
+
+    def _persist_session_state(self, request: StepRequest, *, session_id: str = "") -> str:
+        """Persist the cell's finished session db as its OWN file in the workflow store.
+
+        Store layout (host-persisted, AIO-readable, gitignored data plane)::
+
+            experiments/results/opencode/<workflow>/<run-id>-<phase>.a<n>/opencode/opencode.db
+            experiments/results/opencode/<workflow>/manifest.json
+
+        Each completed cell keeps a SEPARATE db file — nothing is merged into one shared
+        database, so no writable db is ever shared, before or after the run. The manifest
+        carries the lineage (run, phase, attempt, sha256, ``forked_from``, prepared prompt
+        hash). Returns the store directory; ``""`` when the child left no db.
+        """
+        import hashlib
+        import shutil
+        from datetime import datetime, timezone
+
+        from agentic_dynamics.core.paths import PROJECT_ROOT
+
+        if not self._run_clone:
+            return ""
+        run_key = Path(self._run_clone).parent.name
+        attempt = max(int(request.attempt), 1)
+        namespace = f"{self._spec_name}/{run_key}/{request.phase_name}/a{attempt}"
+        src = Path(spawn_wrapper.STATE_ROOT) / namespace / "data" / "opencode" / "opencode.db"
+        if not src.is_file():
+            return ""
+        store = Path(PROJECT_ROOT) / "experiments" / "results" / "opencode" / self._spec_name
+        dest_dir = store / f"{run_key}-{request.phase_name}.a{attempt}" / "opencode"
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / "opencode.db"
+        shutil.copy2(src, dest)
+        for suffix in ("-wal", "-shm"):
+            side = Path(str(src) + suffix)
+            if side.is_file():
+                shutil.copy2(side, Path(str(dest) + suffix))
+        digest = hashlib.sha256(dest.read_bytes()).hexdigest()
+        manifest_path = store / "manifest.json"
+        manifest: dict[str, Any] = {"schema": "opencode-store/v1", "workflow": self._spec_name,
+                                    "sessions": []}
+        if manifest_path.is_file():
+            try:
+                loaded = json.loads(manifest_path.read_text(encoding="utf-8"))
+                if isinstance(loaded, dict):
+                    manifest = loaded
+            except Exception:
+                pass
+        entry = {
+            "run_id": run_key,
+            "phase": request.phase_name,
+            "attempt": attempt,
+            "file": str(dest.relative_to(store)),
+            "sha256": digest,
+            "session_id": session_id,
+            "forked_from": request.fork_session_id or "",
+            "prepared_prompt_sha256": request.prompt_sha256,
+            "persisted_at": datetime.now(timezone.utc).isoformat(),
+        }
+        sessions = [e for e in manifest.get("sessions", [])
+                    if not (e.get("run_id") == run_key and e.get("phase") == request.phase_name
+                            and e.get("attempt") == attempt)]
+        sessions.append(entry)
+        manifest["sessions"] = sessions
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        return str(dest_dir.parent)
 
 
 def _phase_from_envelope(envelope: dict[str, Any]) -> dict[str, Any] | None:
