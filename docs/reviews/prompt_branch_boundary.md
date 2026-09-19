@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Prompt-branch boundary — what the isolated execution path actually supports (Story B)
