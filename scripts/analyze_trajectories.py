@@ -332,7 +332,15 @@ def analyze_all(limit=0, model_filter=None):
 
 
 def enrich_with_embeddings(results, model_map):
-    """Query ChromaDB for step embeddings and add reasoning_distance per session."""
+    """Load step embeddings from the durable export and add reasoning_distance per session.
+
+    The Chroma service is retired (operator decision 2026-09-19). At decommission its
+    historical ``session_embeddings`` collection was already EMPTY (a casualty of the
+    container-layer persistence losses the retirement fixed), so there is no legacy corpus to
+    migrate: when a durable export exists at
+    ``experiments/results/embeddings/session_embeddings.jsonl`` it is read here; otherwise the
+    enrichment reports the missing export and skips — never a crash, never silent.
+    """
     try:
         try:
             import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
@@ -341,15 +349,20 @@ def enrich_with_embeddings(results, model_map):
 
         import numpy as np
 
-        from agentic_dynamics.knowledge.embeddings import ChromaStore
-
-        store = ChromaStore()
-        chroma = store.collection.get(include=["embeddings", "metadatas"])
-        chroma_embeddings = chroma.get("embeddings", [])
-        chroma_metadatas = chroma.get("metadatas", [])
+        export = ROOT / "experiments" / "results" / "embeddings" / "session_embeddings.jsonl"
+        if not export.exists():
+            print(f"  (session embedding export missing: {export} — skipping enrichment)")
+            return
+        chroma_embeddings = []
+        chroma_metadatas = []
+        with export.open(encoding="utf-8") as fh:
+            for line in fh:
+                record = json.loads(line)
+                chroma_embeddings.append(record.get("embedding") or [])
+                chroma_metadatas.append(record.get("metadata") or {})
 
         if len(chroma_embeddings) == 0:
-            print("  (ChromaDB empty — skipping embedding enrichment)")
+            print("  (session embedding export empty — skipping embedding enrichment)")
             return
 
         session_steps: dict[str, list] = {}
