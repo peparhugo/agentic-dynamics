@@ -789,14 +789,16 @@ def _git_commit_verbose(workdir: Path, phase: str, goal: str) -> tuple[str, str]
       timeout — the detail is carried so the next occurrence is self-diagnosing);
     * ``"git_error: <exception>"`` — a git call raised.
 
-    ``.instrument/`` (the runner's own session transcripts) is excluded from the snapshot
-    via a pathspec so ephemeral transcripts stop entering history (docs/routing_next_steps.md
-    item 5.1). The exclusion is explicit here rather than relying on ``.gitignore``, since a
-    fresh worktree may not yet carry the repo's ignore rules.
+    ``.instrument/`` (the runner's own session transcripts) and ``.fleet/`` (the runner's
+    prepared-step transport) are excluded from the snapshot via pathspecs so ephemeral
+    runner-owned files stop entering history (docs/routing_next_steps.md item 5.1; the
+    prepared-step leak was observed on main as committed ``.fleet/prepared_steps/*.json``).
+    The exclusions are explicit here rather than relying on ``.gitignore``, since a fresh
+    worktree may not yet carry the repo's ignore rules.
     """
     try:
         subprocess.run(
-            ["git", "add", "-A", "--", ":(exclude).instrument"],
+            ["git", "add", "-A", "--", ":(exclude).instrument", ":(exclude).fleet"],
             cwd=workdir, capture_output=True, timeout=60,
         )
         staged = subprocess.run(
@@ -4652,7 +4654,7 @@ def run_workflow(
                 try:
                     st = subprocess.run(
                         ["git", "status", "--porcelain", "--", ".",
-                         ":(exclude).instrument"],
+                         ":(exclude).instrument", ":(exclude).fleet"],
                         cwd=git_wd,
                         capture_output=True, text=True, timeout=30,
                     )
