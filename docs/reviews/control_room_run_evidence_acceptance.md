@@ -65,6 +65,15 @@ pure derivations at the service boundary.
   Delivery remains qualified per the Unit 4B forensic note (image-baked-code caveat); use here
   is evidenced by the artifact's structure + the worker's record, not claimed beyond that.
 
+**Real-data check (host-side, beyond fixtures).** The candidate's shared derivations were run
+against the live control database for two real runs: `run-75e8319533fb` resolves its ledger and
+renders `delivered_knowledge` = recorded, `use: not_established`, with the delivered
+`3c4d382e…` id and `fallback_mode: lexical_graph_only`; `run-f8ec919c1601` renders the
+independent-verification verdict (`independent tests passed`) separately from narration. For
+pre-candidate ledgers the per-phase prepared reference is a named `missing` with null fields —
+never an inferred path. This is the Unit 4 trace as the live drawer will show it after
+merge + portal restart.
+
 **Residual gaps (named, not papered over).**
 1. **Parent-side recording activates on the next run from merged code.** The prepared-step
    path/hash recording lives in the parent (orchestrator) — this run's parent executed
