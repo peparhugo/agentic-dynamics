@@ -1,0 +1,6 @@
+Implement a pure-Python, stdlib-only package `taskman` (exposing `TaskManager`) in this worktree that satisfies the behavioural contract in tests/flash_ladder/taskman_contract_test.py. Read the contract test; do NOT modify it or any other test file. Verify with: python3 -m pytest tests/flash_ladder/taskman_contract_test.py -q. Iterate until it passes.
+
+When you finish, commit your work with EXACTLY this subject line (required by the run's resume machinery; any other subject fails the phase):
+[workflow] generate — Implement a pure-Python, stdlib-only pac
+
+Keep the commit's message body brief: the design you chose and the final test result.
