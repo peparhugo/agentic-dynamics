@@ -1074,6 +1074,10 @@ def main(argv: list[str] | None = None) -> int:
         "submit", help="command the orchestrator to validate and launch a workflow job"
     )
     p_submit.add_argument("--spec", required=True, help="spec path, e.g. workflows/repository/<name>.yaml")
+    p_submit.add_argument("--fork-checkpoint", default=None, metavar="REF",
+                          help="checkpoint ref for fork phases: '<workflow>/<attempt_id>' or "
+                               "'latest:<workflow>' (resolved ONCE here and pinned into the "
+                               "run request so queued siblings share one exact seed)")
     p_submit.add_argument("--goal", required=True)
     p_submit.add_argument("--model", required=True)
     p_submit.add_argument("--workdir", default=None,
@@ -1223,7 +1227,7 @@ def main(argv: list[str] | None = None) -> int:
         if any(value is not None for value in (
             args.backend, args.thinking_effort, args.thinking_budget_tokens,
             args.output_token_limit, args.timeout_seconds,
-        )) or args.no_commit:
+        )) or args.no_commit or args.fork_checkpoint:
             execution = {}
             if args.backend is not None:
                 execution["backend"] = args.backend
@@ -1237,6 +1241,13 @@ def main(argv: list[str] | None = None) -> int:
                 execution["timeout_seconds"] = args.timeout_seconds
             if args.no_commit:
                 execution["no_commit"] = True
+            if args.fork_checkpoint:
+                # PIN ONCE: resolve a moving 'latest:<workflow>' alias at SUBMIT time so every
+                # queued sibling carries the same exact receipt; a missing receipt refuses
+                # before anything is dispatched (never a silent fresh session).
+                from scripts.fleet.docker_executor import resolve_checkpoint_ref
+
+                execution["fork_checkpoint"] = resolve_checkpoint_ref(args.fork_checkpoint)
         aio: dict | None = None
         if args.aio_session_id:
             aio = {

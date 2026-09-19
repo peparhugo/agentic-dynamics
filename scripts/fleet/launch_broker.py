@@ -440,6 +440,8 @@ def build_submit_argv(
             argv += ["--timeout", str(execution["timeout_seconds"])]
         if execution.get("no_commit"):
             argv += ["--no-commit"]
+        if execution.get("fork_checkpoint"):
+            argv += ["--fork-checkpoint", str(execution["fork_checkpoint"])]
     image = command.get("image")
     if image:
         argv += ["--cell-image", str(image)]

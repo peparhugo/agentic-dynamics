@@ -33,7 +33,10 @@ workflow:
       - name: branch
         kind: agent
         scope: research_readonly
-        fork_checkpoint: experiments/results/fork_checkpoint/seed
+        # This phase FORKS: the concrete checkpoint (pinned receipt id) arrives as the
+        # submission's typed --fork-checkpoint input, resolved once at submit time; a fork
+        # phase without a pinned checkpoint refuses rather than starting a fresh session.
+        fork: true
         timeout: 900
         prompt: |
           {goal}

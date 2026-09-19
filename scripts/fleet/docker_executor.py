@@ -67,6 +67,7 @@ class DockerAgentExecutor(StepExecutor):
         output_token_limit: int = 0,
         cell_image: str | None = None,
         run_clone: str | None = None,
+        fork_checkpoint: str | None = None,
     ):
         self._spec_path = spec_path
         self._spec_name = spec_name
@@ -84,6 +85,9 @@ class DockerAgentExecutor(StepExecutor):
         self._output_token_limit = output_token_limit
         self._cell_image = cell_image
         self._run_clone = run_clone or os.environ.get("FINOPS_RUN_CLONE")
+        #: The pinned checkpoint id (``<workflow>/<attempt_id>``) this run's fork phases use;
+        #: resolved ONCE at submit time so queued siblings cannot inherit different seeds.
+        self._fork_checkpoint = str(fork_checkpoint or "")
 
     def build_request(self, request: StepRequest) -> dict[str, Any]:
         """Build the sibling-cell spawn request for ``request`` (pure, no docker).
@@ -135,11 +139,20 @@ class DockerAgentExecutor(StepExecutor):
         # dir, same .fleet commit exclusion) and stamps its identity onto the prepared step;
         # every child then stages its OWN copy into its isolated state dir. A declared fork
         # whose checkpoint is missing REFUSES here — before any launch, never a fresh session.
-        fork_decl = (
-            request.phase_def.get("fork_checkpoint")
-            if isinstance(request.phase_def, dict)
-            else None
-        )
+        fork_decl = None
+        if isinstance(request.phase_def, dict):
+            fork_decl = request.phase_def.get("fork_checkpoint")
+            if fork_decl is None and request.phase_def.get("fork") is True:
+                fork_decl = True
+        if fork_decl is True:
+            # The phase declares ITSELF a fork; the concrete checkpoint comes from the pinned
+            # submission input — never a moving alias resolved per cell.
+            if not self._fork_checkpoint:
+                raise RuntimeError(
+                    f"phase {request.phase_name!r} declares fork: true but this submission "
+                    "pinned no --fork-checkpoint — refusing (a fork never falls back to fresh)"
+                )
+            fork_decl = {"ref": self._fork_checkpoint}
         if fork_decl:
             self._stage_fork_checkpoint(request, fork_decl)
         # Runner-owned transcripts default beneath the workdir; a read-only scope mount
@@ -263,24 +276,49 @@ class DockerAgentExecutor(StepExecutor):
             con.close()
 
     @staticmethod
-    def _source_digest(src_db: Path) -> str:
-        """Digest of the LIVE source set (db + WAL + shm) — the idempotency discriminator.
+    def _atomic_write(directory: Path, name: str, payload: str) -> None:
+        """Write ``payload`` to ``directory/name`` via a UNIQUE temp file + atomic replace.
 
-        Publication identity must not silently replace evidence; comparing the source SET
-        (not a re-snapshot, whose bytes need not be deterministic) tells an identical
-        re-publication from a changed attempt.
+        Unique temps (``tempfile.mkstemp``) remove the concurrent-writer collision on a shared
+        ``.tmp`` path; the replace makes the publication atomic, so an interrupted write can
+        never leave a malformed final file behind.
+        """
+        import os
+        import tempfile
+
+        directory.mkdir(parents=True, exist_ok=True)
+        fd, tmp_name = tempfile.mkstemp(dir=str(directory), prefix=f".{name}.", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(payload)
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(tmp_name, directory / name)
+        finally:
+            if os.path.exists(tmp_name):
+                os.unlink(tmp_name)
+
+    @staticmethod
+    def _session_identity(db: Path) -> str:
+        """Stable identity of a snapshot's CONVERSATION contents (not SQLite bookkeeping).
+
+        Sorted session ids with their message counts — unchanged by -shm churn, a WAL
+        checkpoint, or page-level repacking; changed when the conversation changed.
         """
         import hashlib
+        import sqlite3
 
-        digest = hashlib.sha256()
-        for suffix in ("", "-wal", "-shm"):
-            side = Path(str(src_db) + suffix)
-            digest.update(f"{side.name}:{side.stat().st_size if side.exists() else 0}:".encode())
-            if side.exists():
-                with side.open("rb") as fh:
-                    for chunk in iter(lambda: fh.read(1024 * 1024), b""):
-                        digest.update(chunk)
-        return digest.hexdigest()
+        con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        try:
+            rows = list(con.execute("select id from session order by id"))
+            try:
+                counts = dict(con.execute("select session_id, count(*) from message group by session_id"))
+            except sqlite3.Error:
+                counts = {}
+        finally:
+            con.close()
+        lines = [f"{r[0]}:{counts.get(r[0], 0)}" for r in rows]
+        return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
 
     def _store_root(self) -> Path:
         from agentic_dynamics.core.paths import PROJECT_ROOT
@@ -390,7 +428,6 @@ class DockerAgentExecutor(StepExecutor):
         without a receipt is not fork-ready.
         """
         import json
-        import os
         from datetime import datetime, timezone
 
         if not self._run_clone:
@@ -408,15 +445,15 @@ class DockerAgentExecutor(StepExecutor):
         snapshot_rel = f"snapshots/{attempt_id}.db"
         snapshot = store / snapshot_rel
         receipt_path = store / "receipts" / f"{attempt_id}.json"
-        source_digest = self._source_digest(src)
         if receipt_path.is_file():
             import json as _json
 
-            prior = _json.loads(receipt_path.read_text(encoding="utf-8"))
-            if str(prior.get("source_digest") or "") != source_digest:
+            try:
+                prior = _json.loads(receipt_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
                 raise RuntimeError(
-                    f"checkpoint identity {attempt_id} already published with different source "
-                    f"bytes — refusing to replace evidence (publish a new attempt instead)"
+                    f"receipt {receipt_path} is unreadable/malformed ({exc}) — refusing; "
+                    "remove it deliberately to re-publish"
                 )
             published = store / str(prior.get("snapshot") or snapshot_rel)
             import hashlib
@@ -425,8 +462,24 @@ class DockerAgentExecutor(StepExecutor):
                 raise RuntimeError(
                     f"published snapshot {published} is missing or does not match its receipt — refusing"
                 )
+            # Identity is based on STABLE snapshot contents (the session set + message counts),
+            # never transient SQLite bookkeeping: the backup itself can touch -shm, and a WAL
+            # checkpoint can empty -wal, without the conversation having changed.
+            probe = store / "snapshots" / f".{attempt_id}.probe.db"
+            try:
+                self._snapshot_sqlite(src, probe)
+                fresh_identity = self._session_identity(probe)
+            finally:
+                probe.unlink(missing_ok=True)
+            if fresh_identity != str(prior.get("session_identity") or ""):
+                raise RuntimeError(
+                    f"checkpoint identity {attempt_id} already published with different "
+                    "conversation contents — refusing to replace evidence (publish a new "
+                    "attempt instead)"
+                )
             return f"{self._spec_name}/{attempt_id}", ""
         digest = self._snapshot_sqlite(src, snapshot)
+        session_identity = self._session_identity(snapshot)
         receipt = {
             "schema": "opencode-checkpoint/v1",
             "workflow": self._spec_name,
@@ -436,7 +489,7 @@ class DockerAgentExecutor(StepExecutor):
             "attempt": attempt,
             "snapshot": snapshot_rel,
             "sha256": digest,
-            "source_digest": source_digest,
+            "session_identity": session_identity,
             "session_id": session_id,
             "forked_from": request.fork_session_id or "",
             "prepared_prompt_sha256": request.prompt_sha256,
@@ -444,15 +497,12 @@ class DockerAgentExecutor(StepExecutor):
             "persisted_at": datetime.now(timezone.utc).isoformat(),
         }
         payload = json.dumps(receipt, indent=2, sort_keys=True) + "\n"
-        if receipt_path.is_file() and receipt_path.read_text(encoding="utf-8") != payload:
-            raise RuntimeError(
-                f"receipt {receipt_path} already exists with different content — refusing"
-            )
-        receipt_path.write_text(payload, encoding="utf-8")
-        latest = store / "latest.json"
-        tmp_latest = store / ".latest.json.tmp"
-        tmp_latest.write_text(payload, encoding="utf-8")
-        os.replace(tmp_latest, latest)
+        self._atomic_write(store / "receipts", f"{attempt_id}.json", payload)
+        # ``latest.json`` is a POINTER, not evidence: publish it with a UNIQUE temp name so
+        # concurrent completions never collide on one shared temp path (the reproduced
+        # FileNotFoundError cleared a valid reference), then replace atomically. The receipt
+        # above is the immutable record; the pointer is last-writer-wins by design.
+        self._atomic_write(store, "latest.json", payload)
         return f"{self._spec_name}/{attempt_id}", ""
 
     def _prepared_relative_path(self, request: StepRequest) -> str:
@@ -576,6 +626,45 @@ class DockerAgentExecutor(StepExecutor):
         except Exception as exc:  # a seed without a checkpoint is not fork-ready; surface it
             sr.checkpoint_ref, sr.archive_error = "", str(exc)[:300]
         return sr
+
+
+def resolve_checkpoint_ref(ref: str, *, store_root: Path | None = None) -> str:
+    """Resolve a checkpoint reference ONCE to a pinned ``<workflow>/<attempt_id>``.
+
+    ``latest:<workflow>`` is a moving pointer; any consumer that must be stable across queued
+    siblings (the branch submissions) resolves it HERE, at submit time, and carries the pinned
+    id. A missing receipt refuses — a branch is never submitted against an unpublished seed.
+    """
+    import json
+
+    if not ref:
+        raise RuntimeError("empty checkpoint reference")
+    store = store_root or (
+        _store_root_path()
+    )
+    if ref.startswith("latest:"):
+        workflow = ref.split(":", 1)[1]
+        receipt_path = store / workflow / "latest.json"
+        if not receipt_path.is_file():
+            raise RuntimeError(f"checkpoint ref {ref!r}: no published receipt at {receipt_path}")
+        rec = json.loads(receipt_path.read_text(encoding="utf-8"))
+        attempt_id = str(rec.get("attempt_id") or "")
+        if not attempt_id:
+            raise RuntimeError(f"checkpoint ref {ref!r}: latest receipt lacks an attempt_id")
+        return f"{workflow}/{attempt_id}"
+    workflow, _, attempt_id = ref.partition("/")
+    if not workflow or not attempt_id:
+        raise RuntimeError(f"checkpoint ref {ref!r} must be '<workflow>/<attempt_id>'")
+    receipt_path = store / workflow / "receipts" / f"{attempt_id}.json"
+    if not receipt_path.is_file():
+        raise RuntimeError(f"checkpoint ref {ref!r}: no published receipt at {receipt_path}")
+    return f"{workflow}/{attempt_id}"
+
+
+def _store_root_path() -> Path:
+    from agentic_dynamics.core.paths import PROJECT_ROOT
+
+    return Path(PROJECT_ROOT) / "experiments" / "results" / "opencode"
 
 
 def _phase_from_envelope(envelope: dict[str, Any]) -> dict[str, Any] | None:

@@ -1464,6 +1464,14 @@ def validate_submit_request(
                 errors.append(
                     f"submit: execution.no_commit must be a boolean (got {no_commit!r})"
                 )
+            fork_checkpoint = execution.get("fork_checkpoint")
+            if fork_checkpoint is not None and (
+                not isinstance(fork_checkpoint, str) or not fork_checkpoint.strip()
+            ):
+                errors.append(
+                    "submit: execution.fork_checkpoint must be a non-blank '<workflow>/"
+                    f"<attempt_id>' string (got {fork_checkpoint!r})"
+                )
 
     # Step 12a — the AIO local-execution exception (Unit D repair): an AIO in-process run is
     # permitted only for a VERIFIED DETERMINISTIC workflow (no agent phases), so the local
