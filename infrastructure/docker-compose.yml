@@ -17,43 +17,11 @@ services:
     networks:
       - ai-infra
 
-  chromadb:
-    image: chromadb/chroma:1.0.13
-    container_name: chromadb
-    restart: unless-stopped
-    # Endpoint contract (2026-09-18 review): clients resolve localhost:8100 (CHROMA_PORT in
-    # the kb-chroma unit; resolve_chroma_endpoint's host default). The host publishes 8100;
-    # the container keeps answering on its internal 8000.
-    ports:
-      - "127.0.0.1:8100:8000"
-    environment:
-      - CHROMA_SERVER_HOST=0.0.0.0
-      - CHROMA_SERVER_HTTP_PORT=8000
-      # The image's entrypoint runs `chroma run /config.yaml`, and the baked config's
-      # persist_path is /data — PERSIST_DIRECTORY above is inert (kept for reference only).
-      # The volume therefore mounts the ACTUAL persist path: previously it mounted
-      # /chroma/chroma (empty) while 51M of live index sat in the container layer, so every
-      # container recreation silently lost the dense index (the recurring-stall aftermath).
-      - ANONYMIZED_TELEMETRY=False
-    volumes:
-      - chroma_data:/data
-    # No healthcheck existed: a wedged server looked identical to a busy one. The heartbeat
-    # endpoint is cheap and version-stable.
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v2/heartbeat', timeout=3)",
-        ]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
-    networks:
-      - ai-infra
-
+  # chromadb retired 2026-09-19 (operator decision): the dense retrieval leg now runs on
+  # the Neo4j vector index (src/agentic_dynamics/knowledge/neo4j_vectors.py). The service
+  # and its healthcheck were removed here; the `infrastructure_chroma_data` volume is
+  # preserved as frozen historical evidence, and its session embeddings were exported to
+  # experiments/results/embeddings/session_embeddings.jsonl before decommission.
   opencode:
     image: sprisa/opencode:latest
     container_name: opencode-server
