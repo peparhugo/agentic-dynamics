@@ -150,6 +150,12 @@ aio-control session with fixed-parent `fork_session` (workdir `/tmp/cont_run`); 
   (`emit_phase_finding`/`derive_phase_record`; advisory authority for unverified phases). The
   current specs disable this (`rag.emit_self: false`; all phases `research_readonly` with no
   commits, and the emit hook requires `pr.commit_hash`).
+- **Repair verified (2026-09-20):** `run-1ec7bb0052f0` (spec `contemplation_synthesis_rerun`,
+  $0.0315) delivered all 24 answers complete (355,473 chars) as a workspace-internal file bundle
+  + delivery manifest; the synthesis read 24/24 files (transcript-verified) and produced the
+  20,223-char reconciliation at `experiments/results/fork_contemplation/synthesis_rerun/answer.md`
+  (advisory KB record `fd4a3960…`). Two next-iteration gaps it flagged: prior syntheses cited
+  second-hand; no lineage labels in the manifest.
 
 ### 4.4 Claim classes (2026-09-20 correction)
 
@@ -214,7 +220,7 @@ capacity vs compliance as root cause (wave1/c11, c13 vs the directive); human re
 
 ## 6. Named gaps
 
-- The in-process runner captures phase `final_response` at runtime but does not persist it (`PhaseResult.to_dict` omits the field) — the run evidence cannot show what a synthesis received; wave 1's synthesis read 4,000-char excerpts and wave 2's read none. Repair: persist responses + a delivery manifest.
+- **Fork-answer delivery — repaired + verified (2026-09-20).** `final_response` is now persisted on the ledger; the `{prior_answers}` channel delivers complete by default and switches to a workspace-internal file bundle above 100k chars (a single Linux argv arg caps at ~128 KB — measured live: `exit_code=-2` E2BIG on the 355 KB prompt); the delivery manifest (`answers_delivered`) records name/path/chars/sha256/complete. Verification: `run-1ec7bb0052f0` delivered 24/24 complete answers and the synthesis read 24/24 files (transcript-verified). Next-iteration gaps it flagged: prior syntheses cited second-hand; no lineage labels in the manifest.
 - Contemplation outputs produce no KB emission today: both specs set `rag.emit_self: false` and all phases are `research_readonly` with no commits (the emit hook requires `pr.commit_hash`). Direction: relax the fork instruction (read-only exploration allowed; no edits) and emit each output as a scoped advisory finding via the existing producer path (§4.3).
 - Frozen real-session Docker forks (snapshot transport) remain unproven; the in-process path was used instead.
 - Part 2 (capsule reminder, host-worker tool refusals, owned-run cancellation) not implemented.

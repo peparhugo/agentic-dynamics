@@ -123,6 +123,15 @@ current "no files, no commands, no tool calls". Outputs: (a) a markdown report, 
 instead of dying in files. **Next:** repair answer delivery, rerun only the synthesis on the
 existing answers, then re-judge the Q-B harness — no further wave before that.
 
+**Repair verified (2026-09-20, `run-1ec7bb0052f0`, $0.0315).** The repaired channel delivered all
+24 answers **complete** (355,473 chars) as a workspace-internal file bundle with a recorded
+delivery manifest; the rerun synthesis made **24/24 read calls** on the delivered files
+(transcript-verified) and produced a 20,223-char reconciliation at
+`experiments/results/fork_contemplation/synthesis_rerun/answer.md` (advisory KB record
+`fd4a3960…`). It also flagged two next-iteration gaps: the excluded prior syntheses (c17/c09) are
+cited second-hand by wave-2 answers, and the manifest carries no lineage labels, so corpus
+agreement cannot be partitioned by lineage.
+
 ## Review pointers
 - Full texts: `experiments/results/fork_contemplation/wave1/c01..c17.md`, `wave2/c01..c09.md`
 - Prompt sets: `docs/experiments/contemplation/prompts-v1.md`, `prompts-v2.md`
