@@ -1,0 +1,326 @@
+name: contemplation_fanout_v2
+question: >-
+  Wave 2 of the contemplation fan-out: eight divergence-forced deep dives built from wave
+  1's own gaps (Q-A quality boundary, Q-B mechanization test, prose-to-mechanism compiler,
+  effect receipts, the voluntary oracle, independence, cadence, the adjacent-quantity
+  detector) plus a wave-2 synthesis; every phase forks the same approved aio-control session.
+version: "0.1"
+artifact_kind: workflow
+intent: measure
+side_effects:
+  repository: false
+  external_services: false
+repeatable: true
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+comparison: null
+writeup: {format: lab_book, sections: [question, evidence]}
+stop: {budget_usd: 1.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_uncertainty}
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: false
+    rag:
+      emit_self: false
+    context:
+      domain_context: >-
+        CONTEMPLATION - ANALYSIS ONLY. Do not modify files, run commands, or write code;
+        answer as text. You are a FORKED aio-control session; the working history above is
+        your evidence.
+
+        DIVERGENCE RULES (mandatory): (1) begin with ONE entry claim - a falsifiable sentence
+        that could be wrong; (2) do NOT restate the shared history; (3) name the TWO expert
+        lenses you route through; (4) cite a wave-1 sibling only to say precisely what you ADD
+        beyond it; (5) prefer an EXECUTABLE artifact (test, detector, spec with paths and
+        commands) over prose; (6) end with one falsifier for your entry claim. Keep conflicts
+        visible; do not blend early.
+
+        KNOWN FINDINGS (knowledge base): 7948b8ace287e881 - instruction arms did not improve
+        accepted outcomes; baseline cost-minimal; cache 95.5-97.9%. 6ef9bf9b6ef3b53a - goals
+        ride argv (newlines refused); untracked specs never reach clones. c50f37cfff42523b -
+        Docker forks: seed -> four isolated branches, 47% cold -> 90% warm, $0.004735.
+        b8c06bc189c15fee - in-session contemplation fan-out: 17/17 phases, 302,080 cache-read
+        tokens per phase, $0.14184; answers retained under fork_contemplation/wave1.
+
+        WAVE 1 CORPUS (seventeen answers, condensed):
+        [wave1 c01] # Forked AIO session — where effort compounded, and what would have stopped it
+
+        *Analysis only. Nothing below was executed; every claim is anchored to a named moment in this fork's history.*
+
+        ## 0. Evidence base
+
+        The work spans: the capacity-budget implementation (`b16bbe9a2`→`3df1d809f`), the CI lint repair (`bc87e60af`), the controller's five behavioral findings (P1–P5), the second implementation pass (`9ae173419`, `d2aef3be3`, `4c3c6cdf0`), activation (merge `c8acc4d8c`, broker `883363` @01:59:12, consumer `883849` @02:02:51), and the continuation submit (job `1fddc5861ac6` → run `run-0da5271bc0cb`). The predecessor is `control-room-instrument-cont-submit`; the original disputed reading i
+
+        [wave1 c02] # Net-Negative Retrospective — forked aio-control session, capacity-budget correction
+
+        ## Routing (MoE, divergence first)
+
+        I route this material through seven lenses that the history actually activates: control theory, distributed systems, measurement epistemology, safety engineering, organizational economics, evolutionary dynamics, game theory. Each take below is independent; I keep conflicts visible and name the discriminating test before attempting synthesis. Grounding moments are named, not paraphrased.
+
+        ---
+
+        ## Lens takes
+
+        **1) Control theory — the loop lacked feedback on its own control actions.**
+        The clearest net-negative is the service reload: I sent `fleet_manager.py restart --servi
+
+        [wave1 c03] # Contemplation — the feedback loops that governed this work
+
+        **Scope note (verbose mode).** Analysis only; no files touched, no commands run. Every claim below is anchored to a named moment in the working history or to a named KB finding. I route first across seven lenses (divergence preserved), then synthesize. The format deliberately keeps the *conflicts* visible, because the useful signal in this material is where the loops disagreed with each other.
+
+        ---
+
+        ## Lens 1 — Control theory
+
+        **Take.** The AIO session is a setpoint-tracking system. The operator's directive was the setpoint ("use the active model's real capacity"), the AIO's behavior was the plant, the budget check was the inner c
+
+        [wave1 c04] Analysis only — no files touched, no commands run. I state the leading claim up front so the closing falsifier has a referent.
+
+        **Leading claim (to be falsified):** the gate now agrees with OpenCode because it *consumes OpenCode's own resolution and mirrors its state semantics* — not because 1,000,000/968,000 is the right number. The numeric capacity change was necessary to stop a false trip; the correctness came from provenance and behavioral equivalence.
+
+        ---
+
+        ## Pivotal moment 1 — REJECTED: the second configuration system
+
+        **What happened.** During recon I extracted the exact runtime formula from the installed binary (`be.OUTPUT_TOKEN_MAX=32000`, `zd=20000`, `SessionCompaction.isOverflow`
+
+        [wave1 c05] # Contemplation memo — smallest changes with the largest trajectory effect
+
+        **Reasoning for the shape of this answer.** The request asks for trajectory-changing, failure-class-eliminating changes, ranked by evidence strength, grounded in this session's moments. I deliberately separate *divergence* (independent expert lenses, each allowed to disagree) from *synthesis* (the ranked set), because the strongest lesson of the evidence is that early convergence on one model of the world is exactly what failed. I do not modify anything; this is analysis.
+
+        ---
+
+        ## 1. Seven lenses, independently
+
+        ### Lens A — Control theory
+        **Take.** The budget gate was a controller with a wrong plant model: it regula
+
+        [wave1 c06] # Where the arc measured a proxy instead of the thing
+
+        ## Four axes, four named moments
+
+        **Acceptance without quality.** The durable submit path returned “Submission accepted by the durable path… **A queued submit is NOT a running run** — verify the run row exists before treating the build as started.” That sentence is the whole disease in one line: the system’s success signal is *acceptance* (CI green on `bc87e60af`, broker admission, `fleet:jobs[… ] <- launching`), and the arc repeatedly treated a gate transition as the product. PR #77 itself was “accepted” (all ten checks) while the instrument inside it was wrong in three independent ways the CI could not see — the controller’s five findi
+
+        [wave1 c07] # Contemplation: auditing the acceptance oracles of the capacity-budget delivery
+
+        ## 0. The record I'm auditing (evidence ledger)
+
+        Everything below is grounded in this session's actual moments, not in generalities:
+
+        - **The operator's verification list** (172,491 passes; >80 messages; model switch; compaction continuity; no fabricated OK; CLI/capsule/backend consistency) was the *contract*, not an oracle — it named behaviors but supplied no instrument.
+        - **My oracle construction**: a fixture catalog (`deepseek-v4-flash: context 1M / output 384k`), synthetic session DBs with `tokens.total`, a ported formula, and tests asserting `effective_limit == 968_000`.
+        - **CI lint failure** `bc87e60af`:
+
+        [wave1 c08] # Contemplation: where the operator's attention earned its keep, and the division of labor it implies
+
+        *Method note (per the spec context): analysis only — no files, no commands. I speak as the forked AIO; the history above and the KB findings are the evidence. I route across seven lenses first, keep their conflicts visible, then synthesize. Reasoning and design rationale are annotated inline per the verbose-mode constraint.*
+
+        ---
+
+        ## 1. Intervention ledger (ranked by outcome leverage)
+
+        | # | Human moment | What it changed | Was it load-bearing? |
+        |---|---|---|---|
+        | 1 | **The pre-merge review** — *"I'd hold the merge for behavioral fixes beyond lint"* + the five findings; *"sharing one Pyth
+
+        [wave1 c09] # Economic post-mortem — `feature/aio-capacity-budget` → PR #77 → run `run-0da5271bc0cb`
+
+        **Mode note.** CONTEMPLATION — analysis only. No files touched, no commands run. Everything below is grounded in the forked session record, cited by the names and IDs that appear in that record. Illustrative code is presented as text, not executed.
+
+        ---
+
+        ## 1. The ledger: where value was created vs where the budget went
+
+        | Spend | Evidence in this session | Value produced | Visible at decision time? |
+        |---|---|---|---|
+        | Runtime archaeology | `strings` on the 183 MB `/home/drseuss/.opencode/bin/opencode` → `/tmp/opencode_strings.txt` (432 K lines), repeated greps for `Is(`, `Dl(`, `zd`, `outputTokenMax`
+
+        [wave1 c10] # Contemplation: the next controlled experiment for the context-policy line
+
+        **Framing note (why analysis only, and what I am synthesizing).** I am a forked aio-control session. The history above is my evidence: the fixed-budget failure that refused `control-room-instrument-cont-submit` at 172,491 tokens; the capacity-derived correction; the controller's five behavioral findings; PR #77's merge (`c8acc4d8c`); the reloaded gate services; and the live continuation `run-0da5271bc0cb` (job `1fddc5861ac6`, parent `run-dfa259243059`), now in `p1b_gate_first_viewport` with `p1c_contract_gate` ahead as the first operator approval. Everything below is reasoning, not action.
+
+        ---
+
+        ## Part 1 — Seven le
+
+        [wave1 c11] ## Frame under attack
+
+        Three load-bearing claims, stated so they can be hit:
+
+        1. **Measurement-driven control** — if we record tokens, turns, cost, epochs, leases, and verdicts, and run a control packet every turn, the system will steer better than one that doesn't.
+        2. **Fork/contemplation** — a forked session with independent lenses, divergence-first, is the right unit of cognition for hard problems.
+        3. **Milestones** — 39 phases, two signed checkpoints, a permanence gate, and wave-based delivery is the right unit of progress.
+
+        I'll steelman each before judging. The outsider standard throughout: *one operator, real spend, an autonomous stochastic agent with Docker access, and a product (the
+
+        [wave1 c12] # Authority-map of the Agentic Dynamics AIO system (contemplation, analysis only)
+
+        Evidence base: the `aio-capacity-budget-activation` session above (the 200K-policy refusal at `control-room-instrument-cont-submit`, the PR #77 review rounds, the merge/activation, the native `run_workflow` receipt `1fddc5861ac6` / `run-0da5271bc0cb`), plus KB findings `7948b8ace287e881`, `6ef9bf9b6ef3b53a`, `c50f37cfff42523b`. I treat the working history as the plant and this fork as its observer — which means the largest epistemic risk in what follows is that the guard I cannot see is the one I use every turn.
+
+        ---
+
+        ## 1. Divergence first: seven lenses, each grounded
+
+        **Lens 1 — Control theory.** Authority i
+
+        [wave1 c13] ## Contemplation — belief inventory, evidence classes, and the one stale mover
+
+        *(Analysis only. No files touched, no commands run. Every claim below is anchored to a named moment from this fork's history or to a project-KB artifact.)*
+
+        ### 0. Frame (the design decision behind this answer)
+
+        Contemplation is not a status report; it is an audit of the *epistemic state* that produced the actions above. The organizing decision: classify each belief by **evidence class** — `MEASURED` (instrumented/reproduced, artifact exists), `HEDGED` (partially observed, small n, or proxy), `ASSUMED` (no direct evidence; inherited doctrine or intuition), `STALE` (was once grounded, has since been superseded or
+
+        [wave1 c14] # Contemplation: modelling the controller, and where this system misread them
+
+        Analysis only — no commands, no edits. The evidence is the history above, cited by name: PR #77 and its commits (`bc87e60af`, `9ae173419`, `d2aef3be3`, `4c3c6cdf0`, merge `c8acc4d8c`), the five numbered review findings, the refused-then-accepted submission (`1fddc5861ac6` / `run-0da5271bc0cb`), and the known findings (`7948b8ace287e881`, `6ef9bf9b6ef3b53a`, `c50f37cfff42523b`).
+
+        I run the divergence-first method: seven lenses, each with its own take and its discriminating test, then reconcile.
+
+        ---
+
+        ## Lenses (independent takes, conflicts kept visible)
+
+        **1. Control theory — the observer must be the plant's own ou
+
+        [wave1 c15] # Contemplation: what the next session needs that the records do not carry
+
+        *Analysis only. No files touched, no commands run. The evidence is the working history above.*
+
+        ## 0. The spine as it actually behaved (grounding)
+
+        | Leg | Carrier | What it actually carried | What it dropped |
+        |---|---|---|---|
+        | `session close` | `session_close.py` → close `43af2a0c…` (slug `aio-capacity-budget-activation`) | free-text lists: `waves`, `merged`, `parked`, `open_threads`, `self_notes`; reflection appended | no typed gate, no work-unit, no monitor pointer, no provenance |
+        | `session open` | `session_open.py` default read | **the latest close** | a fresh session has no binding, so it gets "whatever clo
+
+        [wave1 c16] ## Method note (why this shape)
+
+        I am honoring the CONTEMPLATION constraint literally: no tool calls, no edits, no commands. This is a forked `aio-control` read of the arc above. My evidence base is the working history: the capacity-budget correction, PR #77's CI miss (`bc87e60af`), the controller's five reproduced findings, the activation reload (broker PID 883363, consumer PID 883849), the native submit (job `1fddc5861ac6`, run `run-0da5271bc0cb`), the binding (`fbca5106…`, rev 2), the decision (`77eb2260…`) and close (`43af2a0c…`) records, plus the three supplied KB findings. I route deliberately across seven lenses first, keep their conflicts visible, then synthesize. The mode is verbose
+
+        [wave1 c17] # Cross-Fan-Out Synthesis — the AIO capacity-budget arc, read as one corpus
+
+        *Analysis only. No files, commands, or code. I am the last sibling; my evidence is the sixteen contemplations plus the working history they all cite.*
+
+        **Leading claim, stated up front so the closing falsifier has a referent.**
+        Every failure in this arc — and most of the remedies the fan-out proposes — is the substitution of a cheap *adjacent quantity* for the authority's own output. The repairs that held were the ones that replaced the local quantity with a diff against the authority; therefore the only durable output a deliberation like this can have is whatever can be written as such a diff (an executable oracle)
+
+        [wave1 c17 proposals] for the next wave
+
+        ### Q-A — Is the capacity boundary a *quality* boundary?
+        **The question.** Pre-register a dose–response experiment: replay or drive sessions at controlled context fractions (20 / 50 / 80 / 95 % of the native usable limit) and measure *accepted-outcome rate*, loop/recurrence (same-spec family depth from the control db, DLQ incidence), and realized cost — with the native boundary only as the reference line.
+        **Why the current set cannot yield this.** Every sibling reasons about the predicate *fits within capacity*; none instruments the construct that actually failed on 2026-09-13 (a session that kept accepting work and looping, not one that overflowed). B2 (c13) states the gap; c11 demands the counterfactual harm and the false-positive cost for every rule. The data already exist — the same-spec chain, 63 failed story / 106 failed analysis / 34 `fleet_jobs` — but no experiment has been posed against them. If quality is flat below the native boundary, the 80 % advisory is safe; if it degrades well before, the capacity policy has traded a measured false positive (172,491 at `ses_f5add1095ffe1ZDEm4YJZJLbwy`) for an unmeasured false negative and the gate needs a quality term again.
+
+        ### Q-B — Can the machine reproduce the controller's oracle?
+        **The question.** Build the standing differential interrogator and test whether it can find, without a human, what the controller found by hand: on every check, diff `resolve_capacity()` against `opencode models <provider> --verbose`; generate adversarial inputs (config files exercising `OPENCODE_CONFIG` order, partial-`output` overrides, JSONC trailing commas; usage shapes testing the missing-`total` sum; message sequences containing completed/pending compaction summaries) and compare our classification to the runtime's own `Dl`/`Is` and to a native export/import snapshot (`c50f37cfff42523b`). Score detector recall against the reviewer's five findings.
+        **Why the current set cannot yield this.** The set's consensus — "consume the authority" — is a design principle, never tested as a *detector*; the existing tests still run against fixtures authored from the same model (c13: "a no-change verdict from a small task inside my own test design"). `7948b8ace287e881` says prose arms don't move accepted outcomes; the only untested path is executable, boundary-level detection. If a differential oracle recovers the five findings automatically, the human review is a redundant (if currently necessary) cost; if it cannot, we have bounded what only human attention can do — which is itself a high-value result.
+
+        *(Runner
+    phases:
+      - name: w2c01
+        kind: agent
+        scope: research_readonly
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
+        timeout: 900
+        prompt: |
+          Entry claim: the controller's five findings are reproducible by a differential harness, and
+          the harness is cheaper than the review it replaces. Design it concretely: the inputs (config
+          variants, usage shapes, message sequences incl. completed/pending compactions), the expected
+          detections (map each of the five findings to a case), the scoring (recall against the
+          reviewer, false-positive cost), the integration point (which test file, which CI job, which
+          command), and the two ways it could pass while being worthless. If you conclude it cannot
+          recover the five, say what only human attention can do and bound it.
+      - name: w2c02
+        kind: agent
+        scope: research_readonly
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
+        timeout: 900
+        prompt: |
+          Entry claim: a rule that cannot be expressed as a boundary check should not be written as a
+          rule. Define the compiler: given a finding (yours or wave 1's), produce either (a) an
+          executable check with an owner, a location, and a refusal path, or (b) an explicit "prose
+          only — not enforced" label. Apply it to the FIVE strongest wave-1 remedies you can name;
+          for each, state the artifact it becomes or why it degrades to prose. Then apply it to your
+          own entry claim.
+      - name: w2c03
+        kind: agent
+        scope: research_readonly
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
+        timeout: 900
+        prompt: |
+          Entry claim: context fraction does not predict accepted-outcome rate below the native limit;
+          the 80% advisory is safe. Design the dose-response test against data that already exist
+          (same-spec family depth, DLQ incidence, acceptance, realized cost) plus the smallest new run
+          that would falsify you; state the decision rule that keeps or removes the advisory, and the
+          confounder that makes the existing data unusable (if any).
+      - name: w2c04
+        kind: agent
+        scope: research_readonly
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
+        timeout: 900
+        prompt: |
+          Entry claim: every effectful control act must leave a durable terminal record, and today's
+          submits are the only act that does. Enumerate the effectful acts (submit, restart, scale,
+          drain, cancel, promote, publish), specify the receipt (fields, storage, who writes it), the
+          verification that a claimed act produced its effect, and the smallest migration that closes
+          the swallowed-restart class without a second control store.
+      - name: w2c05
+        kind: agent
+        scope: research_readonly
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
+        timeout: 900
+        prompt: |
+          Entry claim: the human review was the highest-yield oracle in this arc and remains
+          unpinned — that is the largest unhedged risk in the system. Quantify its marginal yield
+          (findings per review, cost per finding, what it caught that machinery did not) and design
+          either the rail that replaces part of it or the explicit acceptance of the residual risk,
+          including who reviews the reviewer.
+      - name: w2c06
+        kind: agent
+        scope: research_readonly
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
+        timeout: 900
+        prompt: |
+          Entry claim: this fan-out's agreement is not evidence because the samples are correlated.
+          Design the cheapest protocol that makes convergence informative: cross-model arms (which
+          models, which questions), blind entry points, pre-registered divergence predictions, and the
+          scoring that distinguishes independent confirmation from shared-prior repetition.
+      - name: w2c07
+        kind: agent
+        scope: research_readonly
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
+        timeout: 900
+        prompt: |
+          Entry claim: contemplation without a required artifact is a net cost. Given wave 1's own
+          score (1/5 accepted-outcome, 3/5 question-generator), write the policy: required artifacts
+          per wave, maxima per N accepted outcomes or per budget, the trigger that promotes a question
+          into an experiment, and the trigger that replaces a wave with a single harness. Make the
+          policy falsifiable and cheap to enforce.
+      - name: w2c08
+        kind: agent
+        scope: research_readonly
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
+        timeout: 900
+        prompt: |
+          Entry claim: the synthesis's law can be operationalized as a lint that flags adjacent-quantity
+          substitutions in any proposal. Build it: the pattern (what a substitution looks like in a
+          proposal), the checklist or check, the examples it must catch from this arc (at least five),
+          the false positives it will produce, and then APPLY IT TO THIS WAVE (this prompt set and the
+          wave-1 synthesis) and report what it flags, including yourself.
+      - name: w2c09
+        kind: agent
+        scope: research_readonly
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
+        timeout: 900
+        prompt: |
+          Reconcile wave 1 and wave 2. Resolve the prose-vs-mechanism contradiction with a decision
+          (which side wins, under what boundary). List every surviving EXECUTABLE artifact or
+          falsifiable question, each with its owner and next command. Score wave 2 on the same axes
+          wave 1 used and compare honestly. Propose either wave 3's single sharpest question or the
+          one harness that replaces further waves, and state what would prove that choice wrong.
