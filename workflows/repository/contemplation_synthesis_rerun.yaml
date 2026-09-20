@@ -59,10 +59,10 @@ workflow:
     context:
       domain_context: >-
         READ-ONLY RESEARCH — REPAIR VERIFICATION PASS. You may use read-only tools (read,
-        grep, glob; read-only inspection of files and the session store) to EXPLORE and
-        DISSECT the supplied material and to verify claims against the working tree. Do NOT
-        edit files, do NOT run mutating commands, do NOT fix anything: your output is a report,
-        not a change.
+        grep, glob) to read and dissect the evidence files listed below — they are inside this
+        session's workspace. Work ONLY from the supplied evidence: do NOT attempt to read
+        files outside the workspace, do NOT edit files, do NOT run mutating commands, do NOT
+        fix anything: your output is a report, not a change.
 
         This pass REPLACES two prior synthesis passes produced with defective inputs (wave 1's
         synthesis read only 4,000-char excerpts of its siblings; wave 2's received no sibling
@@ -87,8 +87,8 @@ workflow:
           2. SEPARATES claims: measured observations vs hypotheses vs proposals (each with its
              support class) vs open questions.
           3. HISTORICAL vs CURRENT: which claims concern historical code/tooling states, and
-             which are checkable against today's implementation — check what you can with
-             read-only tools and mark what you could not check.
+             which would need a current-code check before being relied on (the working tree is
+             not part of this pass — mark them, do not attempt to fetch code).
           4. CHALLENGES the prompts' assumptions: identify which wave-2 "entry claims" were
              supplied by the prompts (e.g. "contemplation without a required artifact is a net
              cost") and then argued by the branches — agreement with a supplied thesis is not

@@ -782,7 +782,7 @@ def _answer_block(name: str, text: str, *, char_limit: int | None) -> tuple[str,
         "sha256": digest,
         "complete": complete,
     }
-    return block, manifest, text
+    return block, manifest
 
 
 #: Above this many delivered chars the ``{prior_answers}`` payload switches from inline text
@@ -795,19 +795,23 @@ DELIVERY_INLINE_LIMIT = 100_000
 
 
 def _write_delivery_file(wd: Path, name: str, text: str) -> str:
-    """Write one delivered answer into the workdir's runner-owned delivery dir (return path).
+    """Write one delivered answer into ``<workdir>/.instrument/delivery-answers/`` (return path).
 
-    ``.instrument/`` is the runner's own scratch space — ``_git_commit_verbose`` excludes it
-    from phase commits by pathspec, so a delivery file can never dirty a worktree.
+    INSIDE the run workdir on purpose: the forked agent's workspace is the SESSION's directory
+    (== the run workdir in the in-session setup), and a delivery file OUTSIDE that workspace
+    triggers the runtime's ``external_directory`` permission prompt — observed live on
+    2026-09-20: the fork asked for approval, no TTY existed, and the phase sat silent until the
+    watchdog killed it. ``.instrument`` is excluded from phase commits by the commit pathspecs.
     """
     safe = re.sub(r"[^A-Za-z0-9._-]+", "_", name) or "answer"
-    path = Path(wd) / ".instrument" / "delivery-answers" / f"{safe}.md"
-    path.parent.mkdir(parents=True, exist_ok=True)
+    base = Path(wd) / ".instrument" / "delivery-answers"
+    base.mkdir(parents=True, exist_ok=True)
+    path = base / f"{safe}.md"
     path.write_text(text, encoding="utf-8")
     return str(path)
 
 
-def _render_answers(blocks: list[str], manifest: list[dict[str, Any]]) -> str:
+def _render_answers(blocks: list[str], manifest: list[dict[str, Any]], wd: Path) -> str:
     """Render the ``{prior_answers}`` payload: inline text while it fits, else a file index.
 
     Inline below :data:`DELIVERY_INLINE_LIMIT` chars; above it, each output's file (written at
@@ -823,6 +827,11 @@ def _render_answers(blocks: list[str], manifest: list[dict[str, Any]]) -> str:
             "each block carries its own length + sha256, and a block marked 'complete' is the "
             "full text (no excerpts).\n\n" + "\n\n".join(blocks)
         )
+    # Bundle mode: write each delivered text to the transport dir and record it on the
+    # manifest, then list the files. The block's own text is everything after its header line.
+    for block, entry in zip(blocks, manifest):
+        text = block.split("\n", 1)[1] if "\n" in block else ""
+        entry["file"] = _write_delivery_file(wd, str(entry.get("name", "answer")), text)
     lines = [
         f"ANSWER EVIDENCE — {len(blocks)} outputs delivered as FILES, {total} chars total.",
         "Read EVERY file below with your read tool before synthesizing — each file is the "
@@ -4345,11 +4354,10 @@ def run_workflow(
                     "to nothing)"
                 )
             text = src.read_text(encoding="utf-8", errors="replace")
-            block, manifest, delivered = _answer_block(
+            block, manifest = _answer_block(
                 str(entry.get("name") or src.stem), text, char_limit=answer_char_limit
             )
             manifest["path"] = rel
-            manifest["file"] = _write_delivery_file(wd, str(manifest["name"]), delivered)
             prior_answers.append(block)
             answers_delivered.append(manifest)
     result.answers_delivered = answers_delivered
@@ -4650,7 +4658,7 @@ def run_workflow(
                         goal,
                         prior,
                         domain_context=domain_context,
-                        answers_summary=_render_answers(prior_answers, answers_delivered),
+                        answers_summary=_render_answers(prior_answers, answers_delivered, wd),
                     )
                 # Point the agent's built-in publisher at this workflow's cell so the
                 # fine-grained session events stream into the Control Room.
@@ -5207,11 +5215,8 @@ def run_workflow(
         # no record; an explicit ``rag.prior_answer_char_limit`` re-enables a declared
         # bound, and the manifest records exactly what was delivered either way.
         if pr.final_response:
-            block, manifest, delivered = _answer_block(
-                name, pr.final_response, char_limit=answer_char_limit
-            )
+            block, manifest = _answer_block(name, pr.final_response, char_limit=answer_char_limit)
             manifest["session_id"] = pr.session_id
-            manifest["file"] = _write_delivery_file(wd, str(name), delivered)
             prior_answers.append(block)
             # The manifest lists DELIVERED outputs only: an answer no later phase consumes
             # (the synthesis's own) enters the accumulator but is never marked delivered.
