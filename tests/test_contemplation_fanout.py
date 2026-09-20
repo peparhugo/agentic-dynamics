@@ -268,6 +268,6 @@ def test_fork_answers_bundle_above_the_inline_budget(tmp_path):
     manifest = result.answers_delivered
     assert len(manifest) == 2 and all(e["file"] and e["path"] for e in manifest)
     # each delivered file contains the COMPLETE text — nothing truncated
-    for entry, big in zip(manifest, (big_a, big_b)):
+    for entry, big in zip(manifest, (big_a, big_b), strict=True):
         assert Path(entry["file"]).read_text(encoding="utf-8") == big
         assert entry["complete"] is True

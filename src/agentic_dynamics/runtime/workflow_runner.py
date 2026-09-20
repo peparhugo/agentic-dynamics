@@ -829,7 +829,7 @@ def _render_answers(blocks: list[str], manifest: list[dict[str, Any]], wd: Path)
         )
     # Bundle mode: write each delivered text to the transport dir and record it on the
     # manifest, then list the files. The block's own text is everything after its header line.
-    for block, entry in zip(blocks, manifest):
+    for block, entry in zip(blocks, manifest, strict=True):
         text = block.split("\n", 1)[1] if "\n" in block else ""
         entry["file"] = _write_delivery_file(wd, str(entry.get("name", "answer")), text)
     lines = [
@@ -4328,7 +4328,7 @@ def run_workflow(
         except (TypeError, ValueError):
             raise ValueError(
                 f"rag.prior_answer_char_limit must be an integer — got {answer_char_limit!r}"
-            )
+            ) from None
     preseed = spec.workflow.params.get("prior_answers") or []
     if preseed:
         if not isinstance(preseed, list):
