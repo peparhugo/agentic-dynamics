@@ -1745,6 +1745,45 @@ def _emit_self_finding(pr: PhaseResult, *, goal: str, scope: str) -> None:
         pass  # progressive path — never block or fail the phase on emission
 
 
+def _emit_research_report(
+    pr: PhaseResult, *, goal: str, spec_name: str, wd: Path, rag_params: dict[str, Any]
+) -> None:
+    """Persist a research phase's FULL report + emit a retrievable finding (Astra acceptance).
+
+    The read-only fork RETURNS the report; the owning runner persists it (the fork needs no
+    repository-edit permission) and emits a record whose text IS the report's retrieval
+    surface, linked to the durable file (``source_uri``). Best-effort like every self-build
+    emit — never a gate on the phase.
+    """
+    try:
+        from agentic_dynamics.knowledge.knowledge_ingestion import emit_phase_finding
+
+        stamp = re.sub(r"[^0-9]", "", _now())[:14] or "report"
+        safe_phase = re.sub(r"[^A-Za-z0-9._-]+", "_", str(pr.phase)) or "phase"
+        path = (
+            PROJECT_ROOT
+            / "experiments"
+            / "results"
+            / "workflows"
+            / spec_name
+            / "reports"
+            / f"{stamp}_{safe_phase}.md"
+        )
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(pr.final_response, encoding="utf-8")
+        scope = str(rag_params.get("emit_scope") or "").strip() or cell_scope(wd)
+        emit_phase_finding(
+            pr,
+            goal=goal,
+            repository_id=scope,
+            revision=str(pr.session_id or stamp),
+            report_path=str(path),
+            report_text=pr.final_response,
+        )
+    except Exception:
+        pass  # best-effort — the verification run makes a persistence failure visible
+
+
 def _emit_phase_evidence(
     recorder: PhaseEvidenceRecorder,
     pr: PhaseResult,
@@ -5183,9 +5222,21 @@ def run_workflow(
             # phase commits, its finding is emitted into the cell's OWN scope so the cell's
             # retrieval filter can later read its own progress. Opt-outs are explicit only
             # (the run via rag_params.emit_self=False / FINOPS_EMIT_SELF=0, the phase via the
-            # no_emit marker) — a phase never silently skips its finding.
+            # no_emit marker) — a phase never silently skips its finding. A research phase (no
+            # commit, a free-text report) takes the REPORT variant: the runner persists the
+            # full report and emits a record that IS the report's retrieval surface (Astra
+            # emission acceptance, 2026-09-20).
             if _finding_emit_enabled(rag_params, phase_def) and pr.commit_hash:
                 _emit_self_finding(pr, goal=goal, scope=cell_scope(wd))
+            elif (
+                _finding_emit_enabled(rag_params, phase_def)
+                and pr.status == "ok"
+                and pr.final_response
+                and kind != "test"
+            ):
+                _emit_research_report(
+                    pr, goal=goal, spec_name=spec.name, wd=wd, rag_params=rag_params
+                )
 
         # Relabel tree-identity gate (cap_runner_hardening2 §Gap 2) — post-phase, agent phases
         # only, run AFTER the commit so the phase's committed tree is final. The phase's

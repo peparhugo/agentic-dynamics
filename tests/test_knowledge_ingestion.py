@@ -58,7 +58,6 @@ def _load_kb_produce():
     return mod
 
 
-
 def _entry(**overrides) -> dict:
     """A minimal valid results entry, overridable per field for focused tests."""
     entry = {
@@ -158,7 +157,9 @@ def test_knowledge_id_folds_revision_hash_and_extractor():
 def test_extractor_version_bump_changes_knowledge_id(monkeypatch):
     entry = _entry()
     record_v1 = build_record(entry)
-    monkeypatch.setattr("agentic_dynamics.knowledge.knowledge_ingestion.EXTRACTOR_VERSION", "measured-finding/v2")
+    monkeypatch.setattr(
+        "agentic_dynamics.knowledge.knowledge_ingestion.EXTRACTOR_VERSION", "measured-finding/v2"
+    )
     record_v2 = build_record(entry)
     # A new extractor generation yields a new knowledge_id ...
     assert record_v2.knowledge_id != record_v1.knowledge_id
@@ -176,9 +177,10 @@ def test_source_revision_uses_commit_when_stamped():
     record = build_record(_entry(git_sha="abc1234"))
     assert record.commit_sha == "abc1234"
     # The knowledge_id must fold the commit, not the fallback version.
-    assert compute_knowledge_id(
-        record.entity_id, "abc1234", record.content_hash, EXTRACTOR_VERSION
-    ) == record.knowledge_id
+    assert (
+        compute_knowledge_id(record.entity_id, "abc1234", record.content_hash, EXTRACTOR_VERSION)
+        == record.knowledge_id
+    )
 
 
 # ── Ledger signals carried through ──────────────────────────────
@@ -483,20 +485,27 @@ def test_kb_produce_dry_run_smoke(tmp_path):
     and still works with the stream down.
     """
     results = tmp_path / "_results_summary.json"
-    results.write_text(json.dumps({
-        "entries": [
-            _entry(worktree_name="exp_good_a", run_id="exp_good_a"),
-            # Skipped upstream (narration failure) — must not count toward the emit total.
-            _entry(worktree_name="exp_narr", run_id="exp_narr", narration_failure=True),
-            _entry(worktree_name="exp_good_b", run_id="exp_good_b"),
-        ]
-    }))
+    results.write_text(
+        json.dumps(
+            {
+                "entries": [
+                    _entry(worktree_name="exp_good_a", run_id="exp_good_a"),
+                    # Skipped upstream (narration failure) — must not count toward the emit total.
+                    _entry(worktree_name="exp_narr", run_id="exp_narr", narration_failure=True),
+                    _entry(worktree_name="exp_good_b", run_id="exp_good_b"),
+                ]
+            }
+        )
+    )
     proc = subprocess.run(
         [
-            sys.executable, str(KB_PRODUCE),
+            sys.executable,
+            str(KB_PRODUCE),
             "--dry-run",
-            "--results", str(results),
-            "--repository-id", "test-repo",
+            "--results",
+            str(results),
+            "--repository-id",
+            "test-repo",
         ],
         capture_output=True,
         text=True,
@@ -529,7 +538,7 @@ def test_producer_emitted_event_verifies_and_lands_measured(tmp_path, monkeypatc
     # 1. Producer path — derive, serialize, and durably write the per-record artifact.
     record = build_record(_entry(worktree_name="exp_int", run_id="exp_int"))
     artifact = record_to_artifact(record)
-    rel_path = artifact_uri(record.knowledge_id)[len("file://"):]
+    rel_path = artifact_uri(record.knowledge_id)[len("file://") :]
     artifact_path = tmp_path / rel_path
     artifact_path.parent.mkdir(parents=True, exist_ok=True)
     artifact_path.write_bytes(artifact)
@@ -557,7 +566,11 @@ def test_producer_emitted_event_verifies_and_lands_measured(tmp_path, monkeypatc
 
     store = Store()
     outcome = ks.process_entry(
-        _FakeRedis(), "kb-int", "0-1", event, store.upsert,
+        _FakeRedis(),
+        "kb-int",
+        "0-1",
+        event,
+        store.upsert,
         extractor=extract_record,
     )
     assert outcome == "ok"
@@ -612,7 +625,9 @@ def test_derive_phase_record_authority_flips_on_test_executed_success():
 def test_derive_phase_record_text_and_scoping():
     goal = "build a task manager api with many details"
     rec = derive_phase_record(
-        _phase_result(phase="scope", cost_usd=0.01, tokens={"total": 42}, test_executed_success=True),
+        _phase_result(
+            phase="scope", cost_usd=0.01, tokens={"total": 42}, test_executed_success=True
+        ),
         goal=goal,
         repository_id="self-cell-1",
         revision="abc1234",
@@ -640,10 +655,30 @@ def test_derive_phase_record_idempotent():
     assert a.content_hash == b.content_hash
     # The idempotence key is f(goal, phase, commit, scope, extractor): each input change
     # yields a new knowledge_id.
-    assert derive_phase_record(_phase_result(), goal="other", repository_id="self-1", revision="abc").knowledge_id != a.knowledge_id
-    assert derive_phase_record(_phase_result(phase="scope"), goal="g", repository_id="self-1", revision="abc").knowledge_id != a.knowledge_id
-    assert derive_phase_record(_phase_result(), goal="g", repository_id="self-1", revision="xyz").knowledge_id != a.knowledge_id
-    assert derive_phase_record(_phase_result(), goal="g", repository_id="self-2", revision="abc").knowledge_id != a.knowledge_id
+    assert (
+        derive_phase_record(
+            _phase_result(), goal="other", repository_id="self-1", revision="abc"
+        ).knowledge_id
+        != a.knowledge_id
+    )
+    assert (
+        derive_phase_record(
+            _phase_result(phase="scope"), goal="g", repository_id="self-1", revision="abc"
+        ).knowledge_id
+        != a.knowledge_id
+    )
+    assert (
+        derive_phase_record(
+            _phase_result(), goal="g", repository_id="self-1", revision="xyz"
+        ).knowledge_id
+        != a.knowledge_id
+    )
+    assert (
+        derive_phase_record(
+            _phase_result(), goal="g", repository_id="self-2", revision="abc"
+        ).knowledge_id
+        != a.knowledge_id
+    )
 
 
 def test_derive_phase_record_text_carries_enriched_fields():
@@ -818,3 +853,59 @@ def test_emit_phase_finding_idempotent(tmp_path, monkeypatch):
     assert len(events) == 2  # both emits published ...
     assert events[0].knowledge_id == events[1].knowledge_id  # ... the same idempotence key.
 
+
+# ── research-report variant (Astra emission acceptance, 2026-09-20) ───────────────────────────
+
+
+def test_phase_report_record_carries_the_report_body(tmp_path, monkeypatch):
+    """A report-embedding record differs per report and holds its MIDDLE, not just the tail.
+
+    The counterexample that motivated the variant: two different report bodies sharing the
+    same closing sentence used to extract to identical text (last non-empty line, clipped to
+    200 chars) — "emitted" while the substance stayed unretrievable.
+    """
+    import agentic_dynamics.knowledge.knowledge_ingestion as ki
+    import agentic_dynamics.knowledge.knowledge_stream as ks
+
+    monkeypatch.setattr(ki, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(ks, "connect", lambda: object())
+    events = []
+    monkeypatch.setattr(ks, "publish_event", lambda r, e, **kw: events.append(e) or "0-1")
+
+    closing = "In conclusion, one shared closing sentence."
+    report_a = "HEADLINE A\n" + ("alpha " * 40) + "MIDDLE-MARKER-A\n" + closing
+    report_b = "HEADLINE B\n" + ("beta " * 40) + "MIDDLE-MARKER-B\n" + closing
+    phase = _phase_result(
+        status="ok", test_executed_success=None, commit_hash="", final_response=""
+    )
+
+    record_a = ki.emit_phase_finding(
+        phase,
+        goal="g",
+        repository_id="agentic-dynamics",
+        revision="ses_a",
+        report_path=str(tmp_path / "a.md"),
+        report_text=report_a,
+    )
+    record_b = ki.emit_phase_finding(
+        phase,
+        goal="g",
+        repository_id="agentic-dynamics",
+        revision="ses_b",
+        report_path=str(tmp_path / "b.md"),
+        report_text=report_b,
+    )
+
+    # The shared closing line no longer collapses distinct reports.
+    assert record_a.text != record_b.text
+    assert "MIDDLE-MARKER-A" in record_a.text and "MIDDLE-MARKER-B" not in record_a.text
+    assert "MIDDLE-MARKER-B" in record_b.text
+    # Advisory authority + the report as the evidence link + the variant's extractor version.
+    assert record_a.authority is Authority.ADVISORY
+    assert record_a.evidence_class == "[H]"
+    assert record_a.source_uri == f"file://{tmp_path / 'a.md'}"
+    assert record_a.extractor_version == ki.PHASE_REPORT_EXTRACTOR_VERSION
+    assert record_a.knowledge_id != record_b.knowledge_id
+    # The durable artifact is written and the pointer event published.
+    assert (tmp_path / "experiments" / "results" / "kb" / f"{record_a.knowledge_id}.json").exists()
+    assert len(events) == 2

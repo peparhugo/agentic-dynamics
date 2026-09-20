@@ -30,7 +30,8 @@ workflow:
     fork: false
     rag_augment: false
     rag:
-      emit_self: false
+      emit_self: true
+      emit_scope: agentic-dynamics
     prior_answers:
       - {name: wave1/c01, path: experiments/results/fork_contemplation/wave1/c01.md}
       - {name: wave1/c02, path: experiments/results/fork_contemplation/wave1/c02.md}

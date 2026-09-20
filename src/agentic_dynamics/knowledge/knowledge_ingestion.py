@@ -85,6 +85,7 @@ def artifact_uri(knowledge_id: str) -> str:
     """
     return f"file://{ARTIFACT_DIR}/{knowledge_id}.json"
 
+
 #: Canonical repository identity (the rebranded ``agentic-dynamics`` id, per
 #: ``docs/agentic_dynamics_rebrand_plan.md``). It is a stable component of ``entity_id`` so the
 #: same logical cell converges on one identity across call sites. Overridable per derivation
@@ -117,6 +118,19 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 #: collide on identity even for identical text (each folds its own extractor into
 #: ``knowledge_id``).
 PHASE_EXTRACTOR_VERSION = "phase-finding/v1"
+
+#: Extractor generation for the research-REPORT variant of a phase finding (Astra emission
+#: acceptance, 2026-09-20): a research phase (no commit, a free-text report) must be
+#: retrievable by its OWN content, not by a metadata line. The report variant folds the
+#: COMPLETE report into the record text and points ``source_uri`` at the durable report file
+#: (the evidence link). Distinct from :data:`PHASE_EXTRACTOR_VERSION` so the report record and
+#: the metadata-only record of the same phase never collide on identity.
+PHASE_REPORT_EXTRACTOR_VERSION = "phase-report/v1"
+
+#: Bounded inclusion of a report in its finding text. The durable report file always holds the
+#: full text; above this bound the record text carries the head + an explicit truncation
+#: marker (never a silent cut).
+_REPORT_TEXT_LIMIT = 120_000
 
 #: Logical ``source_uri`` for phase findings. A workflow phase has no aggregate source file —
 #: the durable per-record artifact *is* the source — so this is a stable namespace constant
@@ -490,8 +504,10 @@ def _phase_finding_tail(phase_result: Any, *, revision: str, success: bool | Non
                 (line.strip() for line in reversed(final.splitlines()) if line.strip()), ""
             )
     if conclusion:
-        clipped = conclusion if len(conclusion) <= _CONCLUSION_CLIP else (
-            f"{conclusion[:_CONCLUSION_CLIP]}…"
+        clipped = (
+            conclusion
+            if len(conclusion) <= _CONCLUSION_CLIP
+            else (f"{conclusion[:_CONCLUSION_CLIP]}…")
         )
         parts.append(f"conclusion {clipped}")
     return ", ".join(parts)
@@ -509,6 +525,8 @@ def derive_phase_record(
     repository_id: str,
     revision: str,
     now: datetime | None = None,
+    report_path: str = "",
+    report_text: str = "",
 ) -> KnowledgeRecord:
     """Derive ONE phase-finding record for a completed workflow phase.
 
@@ -550,11 +568,33 @@ def derive_phase_record(
     if tail:
         text = f"{text}; {tail}"
 
+    # Research-report variant (Astra emission acceptance, 2026-09-20): the record IS the
+    # report's retrieval surface. The metadata head stays; the COMPLETE report follows, so a
+    # query matching ANY part of it — including the middle — resolves this record. The durable
+    # report file is the evidence link (``source_uri``); the extractor version marks the
+    # variant so its ``knowledge_id`` cannot collide with the metadata-only record.
+    source_uri = PHASE_SOURCE_URI
+    extractor = PHASE_EXTRACTOR_VERSION
+    if report_text:
+        import hashlib as _hashlib
+
+        digest = _hashlib.sha256(report_text.encode("utf-8", "replace")).hexdigest()
+        body = report_text
+        if len(body) > _REPORT_TEXT_LIMIT:
+            body = body[:_REPORT_TEXT_LIMIT] + "\n[truncated — full report at the source link]"
+        text = (
+            f"{text}; report {len(report_text)} chars, sha256:{digest[:12]}"
+            + (f", file {report_path}" if report_path else "")
+            + f"\n\nREPORT:\n{body}"
+        )
+        source_uri = f"file://{report_path}" if report_path else PHASE_SOURCE_URI
+        extractor = PHASE_REPORT_EXTRACTOR_VERSION
+
     # Delegate identity + the content-hash back-fill to the shared factory. Every scoping field
     # is the cell scope (== repository_id on the self-build path), never global.
     return build_record_from_parts(
         source_type=SOURCE_TYPE,  # "finding"
-        source_uri=PHASE_SOURCE_URI,
+        source_uri=source_uri,
         logical_locator=repository_id,
         repository_id=repository_id,
         revision=revision,
@@ -563,7 +603,7 @@ def derive_phase_record(
         text=text,
         extra_fields={
             "worktree_id": repository_id,
-            "extractor_version": PHASE_EXTRACTOR_VERSION,
+            "extractor_version": extractor,
             "acl_scope": repository_id,  # scoped to the cell, never global
             "outcome_id": phase,  # the phase name is the outcome unit
             "test_executed_success": success,
@@ -579,6 +619,8 @@ def emit_phase_finding(
     repository_id: str,
     revision: str,
     now: datetime | None = None,
+    report_path: str = "",
+    report_text: str = "",
 ) -> KnowledgeRecord:
     """Derive, durably write, and publish a phase finding into the cell's OWN scope.
 
@@ -595,7 +637,13 @@ def emit_phase_finding(
     from . import knowledge_stream as _ks
 
     record = derive_phase_record(
-        phase_result, goal=goal, repository_id=repository_id, revision=revision, now=now
+        phase_result,
+        goal=goal,
+        repository_id=repository_id,
+        revision=revision,
+        now=now,
+        report_path=report_path,
+        report_text=report_text,
     )
     # Durable artifact first — the consumer must be able to read + verify the bytes the
     # event's content_hash covers the moment the pointer lands (mirrors kb_produce ordering).
