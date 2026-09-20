@@ -751,6 +751,7 @@ def _build_phase_prompt(
     goal: str,
     prior: list[str],
     domain_context: str | None = None,
+    prior_answers: list[str] | None = None,
 ) -> str:
     """Assemble an agent phase's prompt from its template + the run-level domain context.
 
@@ -767,10 +768,14 @@ def _build_phase_prompt(
     """
     prompt = str(phase.get("prompt", ""))
     prior_summary = "\n".join(f"- {p}" for p in prior) if prior else "(none)"
+    answers_summary = (
+        "\n\n".join(prior_answers) if prior_answers else "(no prior phase answers)"
+    )
     template_refs_context = "{domain_context}" in prompt
     prompt = (
         prompt.replace("{goal}", goal)
         .replace("{prior_phases}", prior_summary)
+        .replace("{prior_answers}", answers_summary)
         .replace("{domain_context}", str(domain_context or ""))
     )
     context = (domain_context or "").strip()
@@ -4029,6 +4034,7 @@ def run_workflow(
         })
 
     prior: list[str] = []
+    prior_answers: list[str] = []
     completed: set[str] = set()
     #: Reached-but-awaiting checkpoint phases from the selected parent snapshot — carried
     #: separately from ``completed`` so a checkpoint is treated as skippable only AFTER its
@@ -4296,7 +4302,10 @@ def run_workflow(
                     # rewrite it. The hash the parent carried covers exactly these bytes.
                     prompt = str(phase_def.get("prompt", ""))
                 else:
-                    prompt = _build_phase_prompt(phase_def, goal, prior, domain_context=domain_context)
+                    prompt = _build_phase_prompt(
+                        phase_def, goal, prior, domain_context=domain_context,
+                        prior_answers=prior_answers,
+                    )
                 # Point the agent's built-in publisher at this workflow's cell so the
                 # fine-grained session events stream into the Control Room.
                 prev_cell = os.environ.get("FINOPS_CELL_ID")
@@ -4467,7 +4476,16 @@ def run_workflow(
                         # cache read ~120x cheaper than input). A model switch breaks the
                         # cache prefix, so only fork when the model is unchanged. Both
                         # backends support it (opencode --session/--fork; claude --resume/--fork-session).
-                        if (
+                        # Fixed-parent fork (contemplation fan-out; the LOCAL/in-process
+                        # path): a phase may declare ``fork_session: <id>`` to fork that EXACT
+                        # parent session — every sibling branches from one checkpoint instead
+                        # of chaining from the previous phase. The Docker path ignores these
+                        # kwargs (its cells stage a checkpoint through the prepared step).
+                        fixed_parent = str(phase_def.get("fork_session") or "")
+                        if fixed_parent:
+                            agent_kwargs["session_id"] = fixed_parent
+                            agent_kwargs["fork"] = True
+                        elif (
                             fork_enabled
                             and prev_session_id
                             and prev_model == attempt_model
@@ -4824,6 +4842,11 @@ def run_workflow(
             )
 
         prior.append(f"{name} ({pr.status})")
+        # The synthesis channel: prior phases' ANSWERS (bounded) for a later phase whose
+        # template references ``{prior_answers}`` — the contemplation fan-out's #17 receives
+        # the whole set this way, in-process.
+        if pr.final_response:
+            prior_answers.append(f"### {name}\n{pr.final_response[:4000]}")
         result.phases.append(pr)
 
         if publisher is not None and publisher.enabled:
