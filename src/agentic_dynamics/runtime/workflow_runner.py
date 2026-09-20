@@ -1986,6 +1986,21 @@ def _stage_fork_checkpoint(request: StepRequest) -> None:
         side = Path(str(src) + suffix)
         if side.is_file():
             shutil.copy2(side, Path(str(dest) + suffix))
+    # Environment adaptation of the COPY (the published checkpoint stays immutable): a frozen
+    # conversation carries the SOURCE session's directory, which may not exist in this cell —
+    # OpenCode refuses to fork a session whose directory is foreign (observed: empty log, zero
+    # tokens). Present the cell's own workdir so the forked session is valid HERE.
+    import sqlite3 as _sqlite3
+
+    workdir = request.workdir or "/repo"
+    con = _sqlite3.connect(dest)
+    try:
+        con.execute("update session set directory = ?", (workdir,))
+        con.commit()
+    except _sqlite3.Error:
+        pass
+    finally:
+        con.close()
 
 
 def run_concrete_step(

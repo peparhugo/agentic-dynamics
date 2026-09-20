@@ -254,3 +254,46 @@ def test_fork_experiment_specs_validate_with_the_real_validator():
         errors = validate_spec(spec)
         assert not errors, f"{rel}: {errors}"
         assert spec.intent == "measure"
+
+
+def test_fork_staging_adapts_the_copys_session_directory(tmp_path, monkeypatch):
+    """The staged copy presents the CELL's workdir; the source checkpoint stays untouched."""
+    import hashlib
+    import sqlite3
+
+    # a frozen snapshot whose session lives at a foreign (host) directory
+    src = tmp_path / "transport" / "p1.a1.db"
+    src.parent.mkdir(parents=True)
+    con = sqlite3.connect(src)
+    con.execute("create table session (id text primary key, directory text)")
+    con.execute("insert into session values ('ses_parent', '/home/someone/foreign')")
+    con.commit()
+    con.close()
+    before = hashlib.sha256(src.read_bytes()).hexdigest()
+
+    state = tmp_path / "state" / "data" / "opencode"
+    state.mkdir(parents=True)
+    monkeypatch.setenv("FINOPS_OPENCODE_STATE_DIR", str(tmp_path / "state" / "data"))
+    captured = {}
+
+    def fake_agent(prompt, **kwargs):
+        captured.update(kwargs)
+        class R:
+            ok = True
+            tokens = {"in": 1, "out": 1, "total": 2}
+            error = ""
+            session_id = "ses_child"
+        return R()
+
+    request = StepRequest(
+        phase_name="p1", phase_kind="agent", prompt="q", model="m", goal="g",
+        spec_name="t", workdir="/state/workdir",
+        fork_session_id="ses_parent",
+        fork_checkpoint_sha256=hashlib.sha256(src.read_bytes()).hexdigest(),
+        fork_db_path=str(src),
+    )
+    run_concrete_step(request, run_agent=fake_agent)
+    con = sqlite3.connect(f"file:{state / 'opencode.db'}?mode=ro", uri=True)
+    assert con.execute("select directory from session where id='ses_parent'").fetchone()[0] == "/state/workdir"
+    con.close()
+    assert hashlib.sha256(src.read_bytes()).hexdigest() == before  # checkpoint untouched
