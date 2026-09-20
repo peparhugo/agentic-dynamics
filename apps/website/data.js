@@ -1,8 +1,8 @@
-/* Generated 2026-09-12 20:46:55 UTC by build_data.py */
+/* Generated 2026-09-20 18:57:50 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-09-12T20:46:50.637748+00:00",
+    "generated_at": "2026-09-20T18:57:46.700061+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -72,13 +72,13 @@ window.DYNAMICS_DATA = {
     "story_sessions": 1027,
     "stories_total": 207,
     "story_total_cost": 309.1685,
-    "db_sessions_total": 6848,
+    "db_sessions_total": 6333,
     "game_reports": 348,
     "model_variants": 7,
     "providers": 3,
     "experiment_configs": 0,
     "experiment_specs": 11,
-    "workflow_specs": 208,
+    "workflow_specs": 224,
     "perturbation_operators": 10,
     "lab_books": 21,
     "lab_books_canonical": 8,
@@ -3993,7 +3993,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 20
     },
-    "generated_at": "2026-09-12T20:46:50.809659+00:00"
+    "generated_at": "2026-09-20T18:57:46.859609+00:00"
   },
   "reviews": {
     "models": [
@@ -4654,7 +4654,7 @@ window.DYNAMICS_DATA = {
   "labs": {
     "cache_economics": {
       "experiment_id": "lab_cache_economics",
-      "generated_at": "2026-09-12T20:42:01.595109",
+      "generated_at": "2026-09-20T20:57:25.919038",
       "summary": {
         "models": 7,
         "stories": 207
@@ -4923,12 +4923,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v7",
-        "generated_at": "2026-09-12T20:42:01.595894+00:00"
+        "generated_at": "2026-09-20T18:57:25.919599+00:00"
       }
     },
     "condition_effects": {
       "experiment_id": "lab_condition_effects",
-      "generated_at": "2026-09-12T20:42:02.385450",
+      "generated_at": "2026-09-20T20:57:33.787722",
       "summary": {
         "conditions": 2,
         "stories": 207,
@@ -4992,12 +4992,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v7",
-        "generated_at": "2026-09-12T20:42:02.386251+00:00"
+        "generated_at": "2026-09-20T18:57:33.788483+00:00"
       }
     },
     "grit": {
       "experiment_id": "lab_grit",
-      "generated_at": "2026-09-12T20:42:03.310095",
+      "generated_at": "2026-09-20T20:57:34.682310",
       "metric_definition": "G(s) = P(test_executed_success | perturbation_strength = s)",
       "summary": {
         "cells": 136,
@@ -5271,12 +5271,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v7",
-        "generated_at": "2026-09-12T20:42:03.310712+00:00"
+        "generated_at": "2026-09-20T18:57:34.682974+00:00"
       }
     },
     "quality_frontier": {
       "experiment_id": "lab_quality_frontier",
-      "generated_at": "2026-09-12T20:42:04.216512",
+      "generated_at": "2026-09-20T20:57:35.456308",
       "summary": {
         "models": 7,
         "stories": 207,
@@ -5540,12 +5540,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v7",
-        "generated_at": "2026-09-12T20:42:04.217275+00:00"
+        "generated_at": "2026-09-20T18:57:35.457019+00:00"
       }
     },
     "story_arc": {
       "experiment_id": "lab_story_arc",
-      "generated_at": "2026-09-12T20:42:04.997224",
+      "generated_at": "2026-09-20T20:57:36.199183",
       "summary": {
         "snowball_factor": 2.32,
         "session1_cost": 0.173207,
@@ -5706,12 +5706,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v7",
-        "generated_at": "2026-09-12T20:42:04.997915+00:00"
+        "generated_at": "2026-09-20T18:57:36.200301+00:00"
       }
     },
     "verification_frontier": {
       "experiment_id": "lab_verification_frontier",
-      "generated_at": "2026-09-12T20:42:06.709371",
+      "generated_at": "2026-09-20T20:57:36.886451",
       "summary": {
         "models": 7,
         "stories": 207,
@@ -5846,12 +5846,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v7",
-        "generated_at": "2026-09-12T20:42:06.710069+00:00"
+        "generated_at": "2026-09-20T18:57:36.887048+00:00"
       }
     },
     "verification_value": {
       "experiment_id": "lab_verification_value",
-      "generated_at": "2026-09-12T20:42:07.480909",
+      "generated_at": "2026-09-20T20:57:37.619619",
       "summary": {
         "correlation_tests_vs_worse_rate": null,
         "cells": 105,
@@ -6621,7 +6621,7 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v7",
-        "generated_at": "2026-09-12T20:42:07.481732+00:00"
+        "generated_at": "2026-09-20T18:57:37.620396+00:00"
       }
     }
   },
