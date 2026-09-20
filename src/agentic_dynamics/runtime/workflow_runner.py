@@ -1745,6 +1745,62 @@ def _emit_self_finding(pr: PhaseResult, *, goal: str, scope: str) -> None:
         pass  # progressive path — never block or fail the phase on emission
 
 
+def _capture_session_report(session_id: str) -> str:
+    """The fork's COMPLETE turn text, read from its session store (the authoritative reader view).
+
+    The adapter's ``final_response`` is a heuristic (the last few text parts) — measured live
+    2026-09-20: a multi-part turn recorded 624 chars for a 713-char turn. The store holds every
+    assistant text part of the fork's turn; capturing from it makes "retain the full report"
+    structural, not run-lucky. Returns "" when the store or session is unavailable (the caller
+    falls back to ``final_response`` — never worse than before).
+    """
+    if not session_id:
+        return ""
+    data_home = os.environ.get("FINOPS_OPENCODE_STATE_DIR") or os.environ.get("XDG_DATA_HOME") or ""
+    if not data_home:
+        return ""
+    db = Path(data_home) / "opencode" / "opencode.db"
+    if not db.is_file():
+        return ""
+    import json as _json
+    import sqlite3 as _sqlite3
+
+    try:
+        con = _sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    except _sqlite3.Error:
+        return ""
+    try:
+        messages = con.execute(
+            "select id, data from message where session_id=? order by time_created",
+            (session_id,),
+        ).fetchall()
+        last_user = -1
+        for i, (_mid, mdata) in enumerate(messages):
+            try:
+                d = _json.loads(mdata) if mdata else {}
+            except Exception:
+                d = {}
+            role = str(d.get("role") or (d.get("info") or {}).get("role") or "")
+            if role == "user":
+                last_user = i
+        parts: list[str] = []
+        for mid, _ in messages[last_user + 1 :]:
+            for (pdata,) in con.execute(
+                "select data from part where message_id=? order by time_created", (mid,)
+            ):
+                try:
+                    p = _json.loads(pdata)
+                except Exception:
+                    continue
+                if p.get("type") == "text" and str(p.get("text") or "").strip():
+                    parts.append(str(p["text"]))
+        return "\n\n".join(parts).strip()
+    except _sqlite3.Error:
+        return ""
+    finally:
+        con.close()
+
+
 def _emit_research_report(
     pr: PhaseResult, *, goal: str, spec_name: str, wd: Path, rag_params: dict[str, Any]
 ) -> None:
@@ -1770,7 +1826,10 @@ def _emit_research_report(
             / f"{stamp}_{safe_phase}.md"
         )
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(pr.final_response, encoding="utf-8")
+        # The store capture is authoritative (the reader's view); the adapter's final_response
+        # is the fallback when the store is unavailable.
+        report_text = _capture_session_report(str(pr.session_id or "")) or pr.final_response
+        path.write_text(report_text, encoding="utf-8")
         scope = str(rag_params.get("emit_scope") or "").strip() or cell_scope(wd)
         emit_phase_finding(
             pr,
@@ -1778,7 +1837,7 @@ def _emit_research_report(
             repository_id=scope,
             revision=str(pr.session_id or stamp),
             report_path=str(path),
-            report_text=pr.final_response,
+            report_text=report_text,
         )
     except Exception:
         pass  # best-effort — the verification run makes a persistence failure visible

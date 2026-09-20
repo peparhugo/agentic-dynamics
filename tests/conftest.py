@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -6,6 +7,12 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
+
+# Disarm the self-build emit for the whole suite (kb_finding_layer k1's documented flag).
+# The research-report variant (2026-09-20) emits without requiring a commit, so synthetic
+# specs would otherwise write reports + records into the live tree/KB on every test run.
+# Tests that exercise emission opt in explicitly (rag_params emit_self=True / monkeypatch).
+os.environ["FINOPS_EMIT_SELF"] = "0"
 
 
 def _try_connect(host: str, port: int) -> bool:
@@ -154,8 +161,9 @@ def _hermetic_kb_write_default(monkeypatch):
     monkeypatch.delenv("FINOPS_KB_WRITE", raising=False)
 
 
-def _start_broker_seam(tmp_path, monkeypatch, *, docker: str, compose: str,
-                       compose_file: str | None = None):
+def _start_broker_seam(
+    tmp_path, monkeypatch, *, docker: str, compose: str, compose_file: str | None = None
+):
     """Start a live launch-broker seam server (launch_broker.serve) on a tmp unix socket.
 
     Returns a namespace carrying ``socket_path`` (and the stop handle) and points
@@ -222,16 +230,13 @@ def broker_seam_stub(tmp_path, monkeypatch):
     log = tmp_path / "stub-calls.log"
     for name in ("docker", "docker-compose"):
         stub = tmp_path / name
-        stub.write_text(
-            "#!/bin/sh\n"
-            f'echo "$@" >> "{log}"\n'
-            'exit "${BROKER_STUB_EXIT:-0}"\n'
-        )
+        stub.write_text(f'#!/bin/sh\necho "$@" >> "{log}"\nexit "${{BROKER_STUB_EXIT:-0}}"\n')
         stub.chmod(0o755)
     monkeypatch.setenv("BROKER_STUB_LOG", str(log))
     monkeypatch.setenv("BROKER_STUB_EXIT", "0")
     seam = _start_broker_seam(
-        tmp_path, monkeypatch,
+        tmp_path,
+        monkeypatch,
         docker=str(tmp_path / "docker"),
         compose=str(tmp_path / "docker-compose"),
     )
@@ -241,6 +246,7 @@ def broker_seam_stub(tmp_path, monkeypatch):
     yield seam
     seam.stop_event.set()
     seam.thread.join(timeout=10)
+
 
 def _disarm_finding_emit(monkeypatch):
     """Keep workflow-run finding emission out of the unit suite (kb_finding_layer k1).
