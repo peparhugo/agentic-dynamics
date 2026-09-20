@@ -142,6 +142,19 @@ response line, clipped to 200 chars) discards the substance — demonstrated wit
 bodies sharing a closing sentence that produce identical extracted text. Next delivery:
 **branch answer → durable report → informed synthesis → retrievable finding.**
 
+**Emission verified (2026-09-20, `run-d2860dbc5157` + `run-4fe9017ce476`).** The runner captures
+the fork's COMPLETE turn from its session store (30,308 chars — the adapter's `final_texts[-3:]`
+heuristic had dropped early parts of a prior turn), persists it as a durable report
+(`experiments/results/workflows/contemplation_synthesis_rerun/reports/20260920191337_synthesis_rerun.md`),
+and emits an advisory finding (`315a0c71…`, `phase-report/v1`) whose text carries the full report
+with the report file as its evidence link. Verified end to end: the registry line exists; a
+mid-report phrase retrieves a report's finding through the real retrieval pipeline (record
+`5f85aa72…`); both emitted records surface as retrieval candidates; the evidence link resolves to
+the full text. Two live bumps were measured en route and fixed: the emit sat inside the commit
+branch (a `--no-commit` research run silently skipped it — relocated outside), and the suite-wide
+emit disarm was missing (synthetic test specs were writing scoped records to the live KB —
+`FINOPS_EMIT_SELF=0` added to conftest).
+
 ## Review pointers
 - Full texts: `experiments/results/fork_contemplation/wave1/c01..c17.md`, `wave2/c01..c09.md`
 - Prompt sets: `docs/experiments/contemplation/prompts-v1.md`, `prompts-v2.md`

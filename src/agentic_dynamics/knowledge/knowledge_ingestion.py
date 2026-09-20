@@ -607,6 +607,11 @@ def derive_phase_record(
             "acl_scope": repository_id,  # scoped to the cell, never global
             "outcome_id": phase,  # the phase name is the outcome unit
             "test_executed_success": success,
+            # A research report has no commit of its own — the revision (session id) is folded
+            # through ``revision``/``knowledge_id``, and ``commit_sha`` stays EMPTY rather than
+            # masquerading a session id as a commit (the factory's documented convention for
+            # no-commit producers).
+            **({"commit_sha": ""} if report_text else {}),
         },
         now=now,
     )

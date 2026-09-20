@@ -156,6 +156,10 @@ aio-control session with fixed-parent `fork_session` (workdir `/tmp/cont_run`); 
   20,223-char reconciliation at `experiments/results/fork_contemplation/synthesis_rerun/answer.md`
   (advisory KB record `fd4a3960…`). Two next-iteration gaps it flagged: prior syntheses cited
   second-hand; no lineage labels in the manifest.
+- **Emission verified (2026-09-20, Astra acceptance):** the runner captures a research fork's
+  COMPLETE turn from its session store, persists it as a durable report, and emits an advisory
+  finding (`phase-report/v1`) whose text IS the report (evidence link = the report file).
+  Verified: registry line + mid-report retrieval through the real pipeline + link resolution.
 
 ### 4.4 Claim classes (2026-09-20 correction)
 

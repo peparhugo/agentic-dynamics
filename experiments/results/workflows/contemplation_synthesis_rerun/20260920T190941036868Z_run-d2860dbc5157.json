@@ -1,0 +1,321 @@
+{
+  "spec_name": "contemplation_synthesis_rerun",
+  "spec_id": "contemplation_synthesis_rerun@0.1",
+  "workflow_revision_id": "3bc6b0961130884b2da043df7c467dfff47835e00ee805301d0dabbe02df4694",
+  "model": "deepseek/deepseek-v4-flash",
+  "workdir": "/tmp/cont_run",
+  "goal": "Emission-proof rerun of the contemplation synthesis over the 24 existing answers: the same reconciled report, now persisted as a durable file and emitted as a retrievable advisory finding",
+  "git_sha": "2e6ace3",
+  "started_at": "2026-09-20T19:07:44.557444+00:00",
+  "ended_at": "2026-09-20T19:09:41.027936+00:00",
+  "awaiting": false,
+  "awaiting_phase": "",
+  "awaiting_reason": "",
+  "already_complete": false,
+  "checkpoints": [],
+  "state": "succeeded",
+  "attempts": [
+    {
+      "attempt_id": "wf_contemplation_synthesis_rerun_deepseek_deepseek_v4_flash_synthesis_rerun_a1",
+      "job_id": "wf_contemplation_synthesis_rerun_deepseek_deepseek_v4_flash",
+      "phase": "synthesis_rerun",
+      "attempt_number": 1,
+      "parent_attempt_id": null,
+      "retry_reason": "",
+      "first_pass": true,
+      "accepted": true,
+      "escalation_from": null,
+      "escalation_to": null,
+      "model": "deepseek/deepseek-v4-flash",
+      "status": "ok",
+      "cost_usd": 0.035081598,
+      "cost_inference": 0.035081598,
+      "cost_orchestration": null,
+      "leased_at": null,
+      "first_token_at": "2026-09-20T19:07:54.314549+00:00",
+      "tokens": {
+        "in": 0,
+        "out": 0,
+        "reasoning": 0,
+        "answer": 0,
+        "explanation": 0,
+        "total": 115384
+      },
+      "test_executed_success": null,
+      "evaluator_independent": null,
+      "confidence": 0.2
+    }
+  ],
+  "attempt_count": 1,
+  "total_cost_usd": 0.035082,
+  "ok": true,
+  "phases": [
+    {
+      "phase": "synthesis_rerun",
+      "kind": "agent",
+      "status": "ok",
+      "spec_id": "contemplation_synthesis_rerun@0.1",
+      "model": "deepseek/deepseek-v4-flash",
+      "duration_s": 116.45,
+      "timed_out": false,
+      "commit_hash": "",
+      "commit_status": "",
+      "error": "",
+      "tokens": {
+        "in": 0,
+        "out": 0,
+        "reasoning": 0,
+        "answer": 0,
+        "explanation": 0,
+        "total": 115384
+      },
+      "cost_usd": 0.035081598,
+      "cost_inference": 0.035081598,
+      "cost_orchestration": null,
+      "leased_at": null,
+      "first_token_at": "2026-09-20T19:07:54.314549+00:00",
+      "cost_source": "metered",
+      "estimation_method": null,
+      "reported_cost_usd": 0.035081598,
+      "cache_read_tokens": 2758016,
+      "cache_write_tokens": 0,
+      "cache_hit_rate": 0.9598,
+      "session_id": "ses_f3fc85fb5ffepri07FMiTKjfu1",
+      "files_created": [],
+      "files_modified": [
+        ".instrument/session.jsonl"
+      ],
+      "change_detection": "hashed",
+      "change_observation_partial": false,
+      "confidence": 0.2,
+      "attempts": [],
+      "raw_prompt_hash": "",
+      "pre_phase_commit": "",
+      "retrieval_attempt_id": "",
+      "constructor_attempt_id": "",
+      "selected_evidence_ids": [],
+      "augmentation_evidence": [],
+      "retrieval_leg_errors": {},
+      "augmentation_versions": {},
+      "augmentation_tokens": {},
+      "augmentation_cost_usd": 0.0,
+      "augmentation_latency_ms": 0.0,
+      "fallback_mode": "",
+      "prepared_step_path": "",
+      "prepared_step_prompt_sha256": "",
+      "checkpoint_ref": "",
+      "archive_error": "",
+      "test_executed_success": null,
+      "evaluator_independent": null,
+      "tests_passed": 0,
+      "tests_total": 0,
+      "change_analysis": null,
+      "stall_evidence": null,
+      "deploy_gate": null,
+      "commit_gate": null,
+      "relabel_gate": null,
+      "final_response": "I'll read all 24 delivered files with the read tool, then synthesize. Starting with wave 1:\nI've read all 24 files. Before synthesizing, let me verify the delivery manifest (lengths + sha256) since the prior passes failed on defective inputs:\nI read all 24 files in full and verified the delivery manifest (24/24 lengths + sha256 prefixes match). Here is the report.\n\n---\n\n# Synthesis \u2014 the capacity-budget contemplation corpus (wave 1 \u00d716, wave 2 \u00d78)\n\n## 0. Corpus integrity and what it can support\n\n**Verified.** Each of the 24 files was read in full with the read tool; all 24 char-counts and sha256 prefixes match the delivery header. One arithmetic defect: the header's stated aggregate **356,889 chars is wrong** \u2014 the 24 per-file lengths sum to **355,473** (\u0394 1,416). No file is short; the manifest total is.\n\n**Incompletely repaired delivery.** Wave2 c01\u2013c08 repeatedly cite **\"wave-1 c17\" (Q\u2011A/Q\u2011B)** and \"the wave\u20111 synthesis,\" neither of which is in this delivery (wave1 ends at c16; wave2 c02 calls them \"the seventeen wave\u20111 answers\"). Any wave2 argument whose weight rests on c17/synthesis cannot be independently checked here.\n\n**Correlated samples.** All 24 answers read the same session history, and all 16 wave\u20111 answers use the *identical* seven-lens template (control theory, distributed systems, measurement epistemology, safety engineering, organizational economics, evolutionary dynamics, game theory). That is one model lineage producing a templated divergence \u2014 agreement across the corpus is **not independent confirmation**. Wave2 c06 supplies the formal discount (ICS = (A_cross \u2212 A_within)/(1 \u2212 A_within), effective witnesses N/(1+(m\u22121)\u03c1)); *no answer applies it*, and wave2 c08 notes its own detector's first flags land on \"the synthesis and on this answer.\"\n\n**No live compaction was ever observed.** `SELECT \u2026 WHERE time_compacting IS NOT NULL` returned empty on this host (c13, c09, c14, c07). Every post-compaction \"measurement\" is a **source-derived fixture**, not a real session. This matters for claim classes below.\n\n---\n\n## 1. Reconciliation: what the corpus establishes, and where it fights itself\n\n### 1.1 Collectively established (with support caveats)\n\n1. **The retired 200K/80 policy produced a measured false refusal** \u2014 172,491 tokens refused against a model whose usable boundary resolves to **968,000**. (Journal line + host CLI re-run; n=1 host.)\n2. **The dominant *reproduced* defect generator was re-deriving the runtime's semantics instead of consuming its own output**: config precedence/merge/JSONC; `reasoning` added to the missing-`total` sum (955K native vs 975K local); the completed compaction summary read as the new context. Nearly unanimous (w1 c01, c03\u2013c07, c09, c10, c13, c14, c16; w2 c01, c05, c08).\n3. **Control actions had no durable terminal record** \u2014 the `fleet_manager restart` was claimed, the queue emptied, no compose call, unchanged PID; only the seam re-issue + compose log proved the effect. Nearly unanimous; **live-proven**.\n4. **The P0/operator boundary worked** \u2014 the AIO prepared, the controller merged (c04, c05, c07, c08, c12, c13, c14, c16).\n\n### 1.2 Contradictions \u2014 named and kept apart\n\n- **Human review = irreplaceable oracle vs mechanizable/lower marginal yield.** w1 c07, c08, c09 argue the controller's review was the highest-yield detector (5 behavioral findings CI missed); w2 c01 shows 3/5 are differential and 2/5 (policy invariant, corrupt DB) are *structurally outside any runtime diff*; w2 c05 claims \u22654/6 at <$0.05 with \u226595% specificity; w1 c11 and w2 c07 treat prose-review as likely net cost. **Not averaged:** absolute recall (5/5) is undisputed; *marginal yield and mechanizability* are genuinely contested.\n- **Capacity change = safety fix vs values change vs unproven.** w1 c04: the gate \"agrees with OpenCode,\" the numeric change \"necessary to stop a false trip.\" w1 c11: \"an operator values change dressed as a measurement fix.\" w1 c13: \"a correct capability interlock but an untested behavioral control \u2026 without evidence the 25-hour failure was capacity-bounded.\" c04 itself weakens the policy story: the predecessor close already planned a fresh-session submit.\n- **CLI-first authority vs fallback necessity.** w1 c01, c03, c09, c14, c16 favor consuming the runtime and treating the fallback as liability (c02's falsifier: \"delete the fallback\"); w1 c02/c05 and c13 (B3) note the CLI can be absent/slow and the container has no host DB, so a *named degraded* fallback is mandatory. Shipped compromise noted; not a proof.\n- **Mirror the run-loop guard vs consume the native session representation.** w1 c04/c05/c07/c10/c16 are satisfied by transcribing `he.summary !== true`. w1 c01's **own falsifier** says if a real session's runtime decision depended on in-memory state never written to the DB, neither parity nor replay catches it, and the only fix is to *delegate* (native export/import, c50f37cf). Nobody resolved this.\n- **WARN-advisory is safe vs the 0.8 ratio is inherited.** w2 c03 hypothesizes \"below the native boundary, *f* does not predict acceptance; therefore an 80% advisory that only warns is safe\"; w1 c10 offers a keep/harden decision rule. w1 c13 (B6) classifies the ratio itself as **ASSUMED** \u2014 inherited from the retired constant.\n- **Native compaction settles the boundary vs its actuator was never observed.** w1 c01/c04/c16 proceed as if the native path is verified; c13 (B5), c14, and c16's own falsifier mark the native actuator unobserved (`time_compacting` null).\n- **Recurrence is the missing instrument (w1 c06) vs authority agreement (c01/c04/c16) vs an experiment (c03/c10).** c06 argues recurrence is measured nowhere and the resubmit chain proves it; c01/c04/c09 locate the generator in authority divergence; c03/c10 locate it in an unmeasured dose\u2013response. These are three different \"single next artifact\" answers.\n- **Apparatus overbuilt/misallocated (w1 c11) vs right-sized insurance (c05, c07, c15, c16).** c11 also steelmans the opposite and leaves it standing.\n- **12 failures \"environmental\" vs unverified next to self-commits.** c09/c15 treat the set as a stable, repeatable tax; c13 (B15) marks it HEDGED \u2014 seven cluster in `test_workflow_runner.py` git-commit machinery, adjacent to the submitted run's self-commit phases.\n- **Receipts fix the swallowed action (w2 c04) vs a reader/reconciler already suffices (its own falsifier).** `fleet:commands:processing` + `_recover_processing` may already make the ghost identifiable; if so the migration is a reader, not a writer.\n- **Fan-out is the cheapest informative design (w2 c06) vs cheap-and-unproven (w1 c11; 7948b8ac).** c06's two-lineage blind protocol vs c11/c13(B10): the prompt-layer pilot found no accepted-outcome effect, and forks are unproven as cognition.\n\n### 1.3 Weak-evidence agreement\n\nOne lineage, one host, one incident generalized into the 200K constant, constructed fixtures standing in for unobservable compaction, and a shared supplied lens template. The corpus's own strongest tool (ICS) would likely return **ICS \u2264 0** across these answers; its own substitution-lint (w2 c08) flags the synthesis and every answer.\n\n---\n\n## 2. Claims by class\n\n**MEASURED (artifact or live; support noted)**\n- M1 172,491 WARN refusal under the retired policy (journal `session_budget.jsonl` 12:59:52) \u2014 direct artifact.\n- M2 active model `deepseek-v4-flash`, effective **968,000**, `limits_source=opencode-cli` (host re-run) \u2014 n=1 host.\n- M3 corrupt-DB CLI crash vs gate `UNJUDGED` (controller reproduction + test) \u2014 constructed.\n- M4 F401 caught by CI `ruff check .` (commit `bc87e60af`) \u2014 CI artifact.\n- M5 suite 4,521 passed; 12 failures (8 reproduce on `main`, 3 in a pristine worktree, 1 live-Neo4j) \u2014 n=1 host differential.\n- M6 swallowed restart: PID 733477 unchanged at 90 s, queues empty, compose line only after seam re-issue, PID 883849 \u2014 live.\n- M7 submit \u2192 `run-0da5271bc0cb` running; `p1b_gate_first_viewport` with leases `bud_afacee0f\u2026`/`con_36ca651b\u2026` \u2014 live.\n- M8 no compacted sessions on host (`time_compacting` null) \u2014 live.\n- M9 post-compaction `975K/COMPACT` and `955K vs 975K` \u2014 **source-derived fixtures, not a live session** (treat as measured-synthetic).\n- M10 runtime constants + guard (`OUTPUT_TOKEN_MAX=32000`, reserved `20000`, `he.summary !== true`, `Dl` expression) extracted from opencode 1.18.15 \u2014 source-extracted.\n\n**HYPOTHESES (unrun)**\nH1 CAP\u2011BOUNDARY\u20111 improves continuation at equal cost (c10); H2 conditional independence of *f* below the boundary, so advisory is safe (w2 c03); H3 recurrence is the most consequential missing instrument (c06); H4 the capacity gate is a capability bound but an untested behavioral control (c13); H5 authority divergence is the dominant compounding cycle (c01); H6 the gate now agrees with OpenCode (c04); H7 the gate is never stricter for capacity reasons (c16); H8 3/5 (w2 c01) or \u22654/6 at <$0.05/\u22650.95 (w2 c05) of findings are mechanizable; H9 cross-lineage agreement clears the within-lineage floor (w2 c06); H10 artifact-less contemplation is net cost (w2 c07); H11 the apparatus has negative marginal product (c11).\n\n**PROPOSALS**\nP1 authority-differential/conformance rail (c01, c05, c07, c09; w2 c01, c05); P2 control-act receipts with authority fingerprint (c02, c05, c07; w2 c02 R3, w2 c04); P3 typed `handoff` binding object (c15); P4 Attempt-Recurrence Interlock (c06); P5 CAP\u2011BOUNDARY\u20111 / dose\u2013response (c10; w2 c03); P6 reviewer-calibration corpus with held-out scoring (w2 c05); P7 CDC/ICS fan-out protocol (w2 c06); P8 contemplation-policy governance (w2 c07); P9 substitution absence-lint (w2 c08); P10 run-row join fields (`native_session_id`, `f_at_start`) (w2 c03); P11 host-effect interlock / local-main immutability / in-process refusal (c12); P12 content-addressed input manifest (c05).\n\n**ASSUMED / INHERITED**\nA1 the 0.8 ratio (c13 B6); A2 native compaction will engage (c13 B5, c14, c16); A3 instruction/rule edits move behavior (contradicted by 7948b8ac per c03/c05/c13/c14); A4 the fallback is safe where the CLI is absent (c13 B3); A5 \"merged \u21d2 live\" (c13 B7, partly repaired by M6); A6 all 12 failures are environmental (c13 B15 vs c09/c15).\n\n**OPEN QUESTIONS**\nQ1 was the 25-hour failure capacity-bounded or compliance-bounded? Q2 does native compaction actually engage here? Q3 does the fallback's merge match the runtime for an input-limit model with config `reserved` (c16)? Q4 the outcome of `run-0da5271bc0cb` and the `p1c` stop? Q5 is the review mechanizable at claimed recall/specificity/cost? Q6 do the 12 failures clear on a clean CI runner? Q7 does the operator accept the irreducible judgment residual (w2 c02 R4/R5)? Q8 would a native export/import fork change any verdict (c50f37cf)?\n\n---\n\n## 3. Historical vs current\n\n**Historical (do not rely on as current):** `DEFAULT_CTX_BUDGET=200_000`/`DEFAULT_TURN_BUDGET=80` and `session-budget/v1`; the pre-fix `_measure`, `usage_context_tokens` (reasoning), `_config_candidates`/`load_runtime_config`, and the exit-3 fail-open; commits `b16bbe9a2`/`bc87e60af`; opencode **1.18.15** constants; the 172,491 journal line; PIDs 883363/883849/733477; lease ids; the 12-failure differential; PR #77 as *unmerged* (it is merged `c8acc4d8c`).\n\n**Current-code checks required before reliance (marked, not fetched):**\n- \"the shipped resolver is CLI-first and the fallback merges in the runtime's order, field-by-field, JSONC-tolerant\" (c01, c16) \u2192 `src/agentic_dynamics/core/session_capacity.py`.\n- \"post-compaction is OK; corrupt DB is UNJUDGED; a policy cap CLOSEs; WARN is advisory\" \u2192 `scripts/session_budget.py`, `scripts/session_open.py`, `scripts/fleet/spawn_wrapper.py`.\n- \"the running services read the local `main` checkout; local-main activation is unguarded\" (c12) \u2192 unit `WorkingDirectory` + container mounts.\n- \"control actions write no durable terminal record\" (w2 c02/c04) \u2192 current broker `run_fleet_command` / consumer `_dispatch_command`.\n- the 12 failures are environmental \u2192 run the node IDs on a clean CI runner (c13 B15).\n- KB `7948b8ac\u2026`, `6ef9bf9b\u2026`, `c50f37cf\u2026` \u2192 read the records.\n- `run-0da5271bc0cb` / `p1c` state \u2192 the control DB now.\n\n---\n\n## 4. Challenging the prompts' assumptions\n\n**Supplied theses (agreement with these is not independent evidence):**\n- *\"Contemplation without a required artifact is a net cost.\"* Wave2 c07 **explicitly adopts it** (\"I adopt the prompt's claim\"); c01/c05/c02/c06/c08 support variants. The corpus is largely prose, so the thesis, applied strictly, condemns most of wave 1 \u2014 a self-reflexive result c08 names.\n- *\"The durable output is a diff against the authority's own output\"* (attributed to wave1 c17/synthesis). Wave2 c01's own bound, c02's reflexive downgrade, and c08's lint partially **break** it: F4/F5 have no runtime oracle.\n- *\"The synthesis's law\"* (adjacent-quantity substitution) is supplied to c08.\n- The **seven-lens matrix** is supplied to wave1; all 16 answers instantiate it, so their \"divergence\" is templated and their convergence is partly prompt-shaped.\n- The task's own \"challenge the prompts\" frame is itself supplied.\n\n**Genuine, non-supplied challenges that survive:** w2 c02 shows the rule compiler downgrades its own strong form; w2 c01 proves 2/5 findings are structurally outside a differential; w2 c08 applies its detector to itself and the synthesis; c13/c11 challenge the arc's central self-congratulation; c14's \"controller optimizes oracle fidelity, tolerates incompleteness\" is a testable model of the operator, not a supplied claim.\n\n---\n\n## 5. Ranked surviving proposals and the single next artifact\n\nRanking by **(checkability, cost, expected value)**:\n\n1. **P1 \u2014 capacity conformance rail.** Checkability **high** (oracle = runtime CLI; transcribed guard; invariants; mutation-kill scoring). Cost **medium** (host \u22482 s; CI pinned capture; one test family). EV **high** \u2014 it retires the unanimous dominant generator and is the precondition for trusting the gate that routes every consequential action. *Dissent: c06 ranks ARI first; c11 says build neither; c03/c10 rank the dose\u2013response.*\n2. **P2 \u2014 control-act receipt + authority fingerprint.** High / low / high-but-narrow; closes the one **live-proven** break. *Risk: its own falsifier \u2014 `_recover_processing` may already make it a reader problem.*\n3. **P3 \u2014 typed `handoff` binding field.** Medium / low-medium / medium (c15's falsifier may show records suffice).\n4. **P4 \u2014 ARI.** High / medium / medium (recurrence dominance disputed by c03/c10).\n5. **P5 \u2014 CAP\u2011BOUNDARY\u20111 / dose\u2013response.** Medium / medium-high / high for advisory calibration only.\n(Then P6\u2013P12.)\n\n**The single next executable artifact:** the **capacity differential + invariant rail** \u2014 `scripts/capacity_differential.py` (`--capture`, `--oracle live --json`) plus `tests/test_capacity_differential.py` and pinned `tests/fixtures/capacity_oracle/` \u2014 implementing w2 c01's F1\u2013F5 matrix with w2 c05's calibration.\n\n**Acceptance test:** re-inject each of F1\u2013F5 into a scratch revision \u2192 **all five mutate RED** (recall 5/5); on the fixed tree plus a clean config corpus \u2192 **zero false positives**; five **held-out** benign mutants also die (holdout 5/5, FP 0); when the runtime binary is unavailable the live profile **fails loudly** (never skip-green); a pinned-capture version mismatch **fails loudly**. This is exactly w2 c01's scoring gate and w2 c05's falsifier thresholds.\n\n---\n\n## FINDING\n\nMost defensible: the retired 200K/80 policy caused a **measured** false refusal (172,491 vs 968,000 usable); the dominant **reproduced** defect class was re-deriving the runtime's semantics instead of consuming them (config order/merge/JSONC, the reasoning term 955K-vs-975K, the compaction summary read as context); control actions left no durable terminal record (the restart was swallowed); and native compaction was never observed on this host. One falsifier: a session where the installed runtime would continue (overflow false, summary skipped) while `measure_verdict` returns COMPACT/CLOSE/UNJUDGED for capacity reasons refutes \"the gate is never stricter than the runtime for capacity reasons.\""
+    }
+  ],
+  "run_id": "run-d2860dbc5157",
+  "parent_run_id": "",
+  "family_id": "run-d2860dbc5157",
+  "resumed_from_run_id": "",
+  "resumed_from_ledger": "",
+  "inherited_phases": [],
+  "unresolved_checkpoints": [],
+  "answers_delivered": [
+    {
+      "name": "wave1/c01",
+      "chars": 17855,
+      "sha256": "cc03a8cba577634e1a1a6d35b3adcf5eb06239ac61a3ffb0d3cfd60070c67ada",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave1/c01.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave1_c01.md"
+    },
+    {
+      "name": "wave1/c02",
+      "chars": 14144,
+      "sha256": "9fd5728b8e84972e68f98684ef02d4771a54d81e15737577fadf9b27cb6ab006",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave1/c02.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave1_c02.md"
+    },
+    {
+      "name": "wave1/c03",
+      "chars": 14033,
+      "sha256": "c08fa494937f01c476c0b1ebee48a01e112b655b4ed32e927f11a527d6817fe9",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave1/c03.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave1_c03.md"
+    },
+    {
+      "name": "wave1/c04",
+      "chars": 13983,
+      "sha256": "2195c6b5e37b5ae1c58d8a40826e4ab65cb19d480dbc8ddfabfdc8f8976fa147",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave1/c04.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave1_c04.md"
+    },
+    {
+      "name": "wave1/c05",
+      "chars": 13497,
+      "sha256": "c4d829276b9afdb40b928ebf05657b0a72c4b8beb3d9ea5657a6200790a99aff",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave1/c05.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave1_c05.md"
+    },
+    {
+      "name": "wave1/c06",
+      "chars": 14262,
+      "sha256": "137fceeb102fddeda2922685313a391e6ffa855f7e8a04f16903431017f810b3",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave1/c06.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave1_c06.md"
+    },
+    {
+      "name": "wave1/c07",
+      "chars": 15266,
+      "sha256": "86bf5e90971ea2c2e7c2ac3068f9e1fb8913ada74bfb0ed218e87ec294ee3394",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave1/c07.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave1_c07.md"
+    },
+    {
+      "name": "wave1/c08",
+      "chars": 10498,
+      "sha256": "eb236fb19a221700ee0ce6722a6f2a9608bffbf2d05fe0caa4ff0273030cc93c",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave1/c08.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave1_c08.md"
+    },
+    {
+      "name": "wave1/c09",
+      "chars": 13981,
+      "sha256": "57e77879cb9a8f58afb34037c9ae00affc74961e2bb99699532aa1ce51946308",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave1/c09.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave1_c09.md"
+    },
+    {
+      "name": "wave1/c10",
+      "chars": 16908,
+      "sha256": "5aede0ca6d14057099fcdd7dcce3551fa5ad1f96e49e00cd3c1b64d2c127d9b1",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave1/c10.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave1_c10.md"
+    },
+    {
+      "name": "wave1/c11",
+      "chars": 15505,
+      "sha256": "d653081fa4db967a364f1409a31a4305449934f81307ccd2d3660f399a18736d",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave1/c11.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave1_c11.md"
+    },
+    {
+      "name": "wave1/c12",
+      "chars": 11242,
+      "sha256": "6bdad591ef882b37aa3459215c7aab3e49dd42a71f646fd0bdbde4065ef91151",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave1/c12.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave1_c12.md"
+    },
+    {
+      "name": "wave1/c13",
+      "chars": 18819,
+      "sha256": "48d451bf1e7df73c506c7be1ad66618b761daf94d29ef9ccf307655d85abd012",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave1/c13.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave1_c13.md"
+    },
+    {
+      "name": "wave1/c14",
+      "chars": 10540,
+      "sha256": "7a53fb03f282e3e6bd749d538b41ec5e0d9ceff98a6c3e491d3deee1aa612b55",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave1/c14.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave1_c14.md"
+    },
+    {
+      "name": "wave1/c15",
+      "chars": 14862,
+      "sha256": "01956a968fc01ddc787440fc7ca97818baadecbbc13323dc9fa7d0757da54944",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave1/c15.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave1_c15.md"
+    },
+    {
+      "name": "wave1/c16",
+      "chars": 11855,
+      "sha256": "2af9f35d5946ba8be969d75756cb61209bc42b3379d2b4cd2859926df8abd5d8",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave1/c16.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave1_c16.md"
+    },
+    {
+      "name": "wave2/c01",
+      "chars": 10830,
+      "sha256": "b15ad2759644e46c6214f43ad078094ee2b75cd0b15355678e884376ca15d0b7",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave2/c01.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave2_c01.md"
+    },
+    {
+      "name": "wave2/c02",
+      "chars": 12091,
+      "sha256": "9e25fac0c8dec5d309fadcb021c41575e39158afd7392d6cc66e996be4757e59",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave2/c02.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave2_c02.md"
+    },
+    {
+      "name": "wave2/c03",
+      "chars": 15805,
+      "sha256": "1a4e54b19499f6b6674fc487e9570e8c23c49e5dfe509fffa40b6fbf9525b28d",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave2/c03.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave2_c03.md"
+    },
+    {
+      "name": "wave2/c04",
+      "chars": 16742,
+      "sha256": "c9716cec3b94ee43d7b1acd5640708bb4395c393f544785ba1092a5bee90edf7",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave2/c04.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave2_c04.md"
+    },
+    {
+      "name": "wave2/c05",
+      "chars": 21691,
+      "sha256": "5602b3f326ee8d71dccccc4f3d226f4cd049f1104076aa5a6eb55fc1915e92d9",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave2/c05.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave2_c05.md"
+    },
+    {
+      "name": "wave2/c06",
+      "chars": 17578,
+      "sha256": "1311b43a67af51f2005669626b33a0dc8f6f557facef09b812ef202b09a949ee",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave2/c06.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave2_c06.md"
+    },
+    {
+      "name": "wave2/c07",
+      "chars": 20464,
+      "sha256": "455208a8a0589aa534fc2bec666923117990626aba75d323f145bfbffef58b81",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave2/c07.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave2_c07.md"
+    },
+    {
+      "name": "wave2/c08",
+      "chars": 13022,
+      "sha256": "7c6dc6ba3aa5078ba5e1a1f6780ba23a17977fc503a4b8a79feb3aa87bcae571",
+      "complete": true,
+      "path": "experiments/results/fork_contemplation/wave2/c08.md",
+      "file": "/tmp/cont_run/.instrument/delivery-answers/wave2_c08.md"
+    }
+  ]
+}
