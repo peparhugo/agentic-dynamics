@@ -1,7 +1,7 @@
 name: contemplation_fanout
 question: >-
   Seventeen analysis-only contemplations fanned from ONE approved aio-control fork point
-  (ses_f5acb5440ffe...), run in-process as a single agent_task workflow: sixteen rich
+  (ses_f5acb5440ffegDqoQONAP4AaR0...), run in-process as a single agent_task workflow: sixteen rich
   prompts think about the thinking (loops, actions, cycles, counterfactuals, measurement,
   oracles, labor, cost, risk, beliefs, continuity, scale) and the seventeenth is the
   synthesis pass over ALL prior answers. Each phase forks the FIXED parent session so the
@@ -54,7 +54,7 @@ workflow:
       - name: c01
         kind: agent
         scope: research_readonly
-        fork_session: ses_f5acb5440ffe
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
         timeout: 900
         prompt: |
           Reconstruct every repair cycle in this work where effort compounded without net progress
@@ -65,7 +65,7 @@ workflow:
       - name: c02
         kind: agent
         scope: research_readonly
-        fork_session: ses_f5acb5440ffe
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
         timeout: 900
         prompt: |
           Identify the actions in this history that were net-negative: cost exceeded value, or they
@@ -76,7 +76,7 @@ workflow:
       - name: c03
         kind: agent
         scope: research_readonly
-        fork_session: ses_f5acb5440ffe
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
         timeout: 900
         prompt: |
           Map the feedback loops that governed this work — including the loops the agent was inside:
@@ -87,7 +87,7 @@ workflow:
       - name: c04
         kind: agent
         scope: research_readonly
-        fork_session: ses_f5acb5440ffe
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
         timeout: 900
         prompt: |
           Pick three pivotal moments in this history (a rejected approach, an accepted one, a failure
@@ -98,7 +98,7 @@ workflow:
       - name: c05
         kind: agent
         scope: research_readonly
-        fork_session: ses_f5acb5440ffe
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
         timeout: 900
         prompt: |
           Propose the smallest set of changes (system, process, prompt, measurement) that would most
@@ -109,7 +109,7 @@ workflow:
       - name: c06
         kind: agent
         scope: research_readonly
-        fork_session: ses_f5acb5440ffe
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
         timeout: 900
         prompt: |
           Across this arc, where did we measure the wrong quantity (or nothing at all) — acceptance
@@ -120,7 +120,7 @@ workflow:
       - name: c07
         kind: agent
         scope: research_readonly
-        fork_session: ses_f5acb5440ffe
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
         timeout: 900
         prompt: |
           Audit the acceptance oracles used here: binary test suites, host-side re-runs, arm-blind
@@ -131,7 +131,7 @@ workflow:
       - name: c08
         kind: agent
         scope: research_readonly
-        fork_session: ses_f5acb5440ffe
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
         timeout: 900
         prompt: |
           Study the human interventions in this history — corrections, refusals, re-directions,
@@ -142,7 +142,7 @@ workflow:
       - name: c09
         kind: agent
         scope: research_readonly
-        fork_session: ses_f5acb5440ffe
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
         timeout: 900
         prompt: |
           Analyze the economics of this work: where time, tokens, cache, retries, and human attention
@@ -153,7 +153,7 @@ workflow:
       - name: c10
         kind: agent
         scope: research_readonly
-        fork_session: ses_f5acb5440ffe
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
         timeout: 900
         prompt: |
           Synthesize your answers above into ONE controlled experiment this project should run next:
@@ -164,7 +164,7 @@ workflow:
       - name: c11
         kind: agent
         scope: research_readonly
-        fork_session: ses_f5acb5440ffe
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
         timeout: 900
         prompt: |
           Construct the strongest possible case that this project's frame is wrong or overbuilt:
@@ -175,7 +175,7 @@ workflow:
       - name: c12
         kind: agent
         scope: research_readonly
-        fork_session: ses_f5acb5440ffe
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
         timeout: 900
         prompt: |
           Map where this system can act beyond its granted authority: agent forks, host-side commands,
@@ -186,7 +186,7 @@ workflow:
       - name: c13
         kind: agent
         scope: research_readonly
-        fork_session: ses_f5acb5440ffe
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
         timeout: 900
         prompt: |
           Inventory the beliefs currently steering decisions here, each with its evidence class and
@@ -197,7 +197,7 @@ workflow:
       - name: c14
         kind: agent
         scope: research_readonly
-        fork_session: ses_f5acb5440ffe
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
         timeout: 900
         prompt: |
           Model the human controller: what they actually optimize, what they tolerate, what they refuse.
@@ -207,7 +207,7 @@ workflow:
       - name: c15
         kind: agent
         scope: research_readonly
-        fork_session: ses_f5acb5440ffe
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
         timeout: 900
         prompt: |
           Determine what the NEXT session of this agent needs that the current records do not carry.
@@ -218,7 +218,7 @@ workflow:
       - name: c16
         kind: agent
         scope: research_readonly
-        fork_session: ses_f5acb5440ffe
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
         timeout: 900
         prompt: |
           Examine what breaks at ten times this workload, with other models, and with multiple
@@ -229,7 +229,7 @@ workflow:
       - name: c17
         kind: agent
         scope: research_readonly
-        fork_session: ses_f5acb5440ffe
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
         timeout: 900
         prompt: |
           You are not one sibling among many: you run last and receive the ENTIRE fan-out — every
