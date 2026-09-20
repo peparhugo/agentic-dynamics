@@ -6,21 +6,49 @@ status: accepted
 
 **What this is.** Two in-session contemplation fan-outs from ONE approved aio-control session
 (`ses_f5acb5440ffegDqoQONAP4AaR0`, imported into an isolated store at the run workdir), run as
-single `agent_task` workflows with fixed-parent forks. Every answer is retained verbatim under
+single `agent_task` workflows with fixed-parent forks — **in-process, not Docker**. Every answer is retained verbatim under
 `experiments/results/fork_contemplation/`. Insights are **advisory [H]**; the runs, costs and
 cache counts are **measured [M]** (ledgers `run-4d5feb401fd3`, `run-a2dbea18505c`).
 
-**Economics.** Wave 1: 17/17 phases ok, $0.14184, 302,080 provider cache-read tokens PER PHASE.
-Wave 2: 9/9 ok, $0.09423, same 302,080 cache-read per phase (shared prefix stayed cache-warm).
-Two-wave total ≈ **$0.236** for 26 contemplations + 2 syntheses.
+**Correction (2026-09-20, after the controller's review).** The synthesis did not receive the
+material it was asked to synthesize; this package previously presented the syntheses'
+conclusions without that bound. Corrected here; the raw answers are unchanged:
+- **Wave 1:** the synthesis (`c17`) received the sixteen sibling answers **bounded to the first
+  4,000 characters each** (`src/agentic_dynamics/runtime/workflow_runner.py:4844-4849`). The
+  fork's stored prompt is 66,729 chars = 16 × 4,000 + template; the full answers are 10.5–21.6 KB
+  each. No missing-siblings defect; the defect is truncation.
+- **Wave 2:** the synthesis (`w2c09`) received **no sibling outputs and no live wave-1 texts** —
+  its prompt never references `{prior_answers}` (`contemplation_fanout_v2.yaml` L321-326), and the
+  only wave-1 material was the static "WAVE 1 CORPUS" block in the spec (L51-224: ≈710–750 chars
+  per answer for c01–c16, ≈3.4k for c17, each cut mid-sentence). `c09` states the bound itself:
+  *"Wave 2's sibling outputs are not in my evidence."* (`wave2/c09.md:53`; sibling-output cells
+  marked `UNOBSERVED`).
+- **Neither run's ledger persists phase responses.** `final_response` exists on `PhaseResult`
+  (`workflow_runner.py:283`) but `to_dict()` (L356-422) omits it, so the run evidence cannot show
+  what was delivered; the answers were captured to `experiments/results/fork_contemplation/` from
+  the session store (the fork store; `/tmp/cont_state` at review time).
+- **Consequence.** The syntheses are the least trustworthy documents in this package; the
+  individual answers are the primary material. Cross-sibling claims are bounded by the excerpt
+  window in wave 1 and absent in wave 2. The "retire further contemplation" inference is
+  rejected; kept findings, rejected proposals and open disagreements are separated in
+  `docs/reviews/aio_arc_findings_and_results.md` §4.4.
+
+**Economics.** Wave 1: 17/17 phases ok, $0.14184; wave 2: 9/9 ok, $0.09423; two-wave total ≈
+**$0.236** for 26 contemplations + 2 syntheses. Cache: **302,080 cache-read tokens per phase**,
+identical in every phase of both runs — a measured COUNT (the shared parent prefix re-read per
+fork), not a hit percentage; the ledger's derived `cache_hit_rate` field (0.91–0.98 here) is only
+as good as its denominator. The review cost that matters is attention: ~55k words of answers for
+the controller to read.
 
 **Divergence.** Wave 1 openings were formulaic (shared prelude + routing method); wave 2 enforced
 divergence (entry claim first, no restatement, named lens pairs). Pairwise 8-word-shingle
 similarity: wave 1 max 0.003 / median 0.000; wave 2 max 0.002 / median 0.000 — the answers are
 distinct documents, not restatements.
 
-**Known gap.** The in-process ledger records `final_response` EMPTY for these forks; the answers
-exist in the session DBs and are captured here. The run drawer cannot show them yet (backlog).
+**Evidence delivery (see Correction above).** The run ledger does not persist phase responses
+(`PhaseResult.to_dict` omits `final_response`), so the run drawer cannot show them; the answer
+files were captured from the session store post-hoc. Repair: persist responses + a delivery
+manifest (`docs/reviews/aio_arc_findings_and_results.md` §6).
 
 ## Wave 1 — sixteen contemplations + synthesis
 
@@ -50,7 +78,10 @@ an empty queue for a completed dispatch; ten green checks for correct behaviour)
 that held were diffs against the authority, so a deliberation's durable output is only what can
 be written as an executable oracle. Proposed **Q-A** (is the capacity boundary a quality
 boundary?) and **Q-B** (can a machine reproduce the controller's oracle?). Self-scored the
-practice: 1/5 on accepted outcomes, 3/5 as a question generator.
+practice: 1/5 on accepted outcomes, 3/5 as a question generator. **Bound:** `c17` read each
+sibling only through its 4,000-char window (the `c13` quotation it uses sits at offset 3,855 of
+an 18.9 KB answer — inside the window); its agreement counts and quotations are bounded by that
+window.
 
 ## Wave 2 — eight divergence-forced deep dives + synthesis
 
@@ -66,14 +97,38 @@ practice: 1/5 on accepted outcomes, 3/5 as a question generator.
 | `wave2/c08.md` | **Entry claim (one sentence, falsifiable):** The synthesis's law is operationalizable *only* as a precision-first **absence detector** — flagging clai |
 | `wave2/c09.md` | # Contemplation — reconciling the waves, deciding the prose/mechanism boundary, and the harness that retires further waves  *Analysis only. No files t |
 
-**Wave-2 synthesis (w2c09) decision** — the prose-vs-mechanism contradiction resolves to a
-*typed boundary*: prose is authoritative only for the setpoint and the authority to act;
-mechanism is authoritative for every checkable predicate. Consequence: **wave 3 should not be a
-wave** — the single Q-B differential harness (a mutation test re-injecting the controller's
-five findings) is sufficient to retire further contemplation.
+**Wave-2 synthesis (w2c09) — a proposal produced without its evidence.** The typed-boundary
+reconciliation (prose authoritative only for the setpoint/authority wall; mechanism for every
+checkable predicate) stands as a **proposal**. The accompanying conclusion — "wave 3 should not
+be a wave", further narrative waves "provably ≤ 0" (`wave2/c09.md:96-98`) — is **rejected** by
+the controller's review (2026-09-20): (1) the pilot (4 arms × 3 attempts, ONE task, all accepted
+— `aio_arc_findings_and_results.md` §4.1) is a ceiling null, not "measured disproof" that
+instruction cannot improve other outcomes; (2) the wave-2 prompts supplied the conclusions (e.g.
+"contemplation without a required artifact is a net cost", `prompts-v2.md:57-62`), so branch
+agreement is not independent confirmation; (3) new requirements, counterexamples and better
+questions have value before they are executable — "provably ≤ 0" is a consequence of the
+synthesis's own classification, not a result; (4) its "unpromoted questions are dropped, not
+stored" policy (`wave2/c07.md:88`) contradicts the requirement to retain unsuccessful ideas as
+searchable evidence. Kept from `c01`: the harness is **recurrence-insurance, not a review
+replacement** (`wave2/c01.md:109`); the upper-bound decision rule (`wave2/c03.md:216-224`) needs
+technical review before implementation (hardening on `UCB95(−τ_g) > δ` means substantial harm
+remains *possible*, not established — it could recreate the unwanted cutoff from inconclusive
+data).
+
+**Controller direction for the repair (2026-09-20).** Relax the fork instruction: forks may use
+**read-only tools to explore and dissect the session** (no edits, no fixing) instead of the
+current "no files, no commands, no tool calls". Outputs: (a) a markdown report, and (b) a
+**knowledge emission** through the existing producer path (`emit_phase_finding` /
+`derive_phase_record` — advisory authority for unverified phases), so discoveries reach the KB
+instead of dying in files. **Next:** repair answer delivery, rerun only the synthesis on the
+existing answers, then re-judge the Q-B harness — no further wave before that.
 
 ## Review pointers
 - Full texts: `experiments/results/fork_contemplation/wave1/c01..c17.md`, `wave2/c01..c09.md`
 - Prompt sets: `docs/experiments/contemplation/prompts-v1.md`, `prompts-v2.md`
 - Specs: `workflows/repository/contemplation_fanout{,_v2}.yaml`
 - Findings: `7948b8ace287e881`, `6ef9bf9b6ef3b53a`, `c50f37cfff42523b`, `b8c06bc189c15fee`
+- Delivery evidence for the 2026-09-20 correction: fork-store user message
+  `ses_f4054506cffeBQ8yDRBn29I03T` (66,729 chars); ledgers `run-4d5feb401fd3`,
+  `run-a2dbea18505c`; code `src/agentic_dynamics/runtime/workflow_runner.py:283,356-422,4844-4849`;
+  `wave2/c09.md:53`.
