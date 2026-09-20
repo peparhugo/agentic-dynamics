@@ -265,8 +265,12 @@ def test_fork_staging_adapts_the_copys_session_directory(tmp_path, monkeypatch):
     src = tmp_path / "transport" / "p1.a1.db"
     src.parent.mkdir(parents=True)
     con = sqlite3.connect(src)
-    con.execute("create table session (id text primary key, directory text)")
-    con.execute("insert into session values ('ses_parent', '/home/someone/foreign')")
+    con.execute("create table session (id text primary key, directory text, project_id text)")
+    con.execute("create table project (id text primary key, worktree text)")
+    con.execute("create table project_directory (project_id text, directory text)")
+    con.execute("insert into session values ('ses_parent', '/home/someone/foreign', 'foreign-proj')")
+    con.execute("insert into project values ('foreign-proj', '/home/someone/foreign')")
+    con.execute("insert into project_directory values ('foreign-proj', '/home/someone/foreign')")
     con.commit()
     con.close()
     before = hashlib.sha256(src.read_bytes()).hexdigest()
@@ -294,6 +298,7 @@ def test_fork_staging_adapts_the_copys_session_directory(tmp_path, monkeypatch):
     )
     run_concrete_step(request, run_agent=fake_agent)
     con = sqlite3.connect(f"file:{state / 'opencode.db'}?mode=ro", uri=True)
-    assert con.execute("select directory from session where id='ses_parent'").fetchone()[0] == "/state/workdir"
+    row = con.execute("select directory, project_id from session where id='ses_parent'").fetchone()
+    assert row[0] == "/state/workdir" and row[1] == "global"
     con.close()
     assert hashlib.sha256(src.read_bytes()).hexdigest() == before  # checkpoint untouched
