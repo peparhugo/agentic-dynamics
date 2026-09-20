@@ -159,6 +159,7 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     # acceptance measurement for the trailing-snapshot delivery (no prompt composition ↔
     # provider cache join existed before; this closes that gap).
     ("session", "cache-report"): "session_cache_report.py",
+    ("session", "checkpoint"): "session_checkpoint.py",
     # decision (the self-knowledge layer — loop 2). `decision record` (s2a) records a decision
     # at the moment of decision — what was decided, why, the alternatives weighed — through the
     # s2a decision record type (a decision IS an observation with intent). Rerun-safe and
