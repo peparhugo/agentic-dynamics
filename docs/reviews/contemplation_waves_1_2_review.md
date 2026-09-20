@@ -34,7 +34,7 @@ conclusions without that bound. Corrected here; the raw answers are unchanged:
   `docs/reviews/aio_arc_findings_and_results.md` §4.4.
 
 **Economics.** Wave 1: 17/17 phases ok, $0.14184; wave 2: 9/9 ok, $0.09423; two-wave total ≈
-**$0.236** for 26 contemplations + 2 syntheses. Cache: **302,080 cache-read tokens per phase**,
+**$0.236** for 26 outputs — 24 contemplations + 2 syntheses. Cache: **302,080 cache-read tokens per phase**,
 identical in every phase of both runs — a measured COUNT (the shared parent prefix re-read per
 fork), not a hit percentage; the ledger's derived `cache_hit_rate` field (0.91–0.98 here) is only
 as good as its denominator. The review cost that matters is attention: ~55k words of answers for
@@ -42,8 +42,9 @@ the controller to read.
 
 **Divergence.** Wave 1 openings were formulaic (shared prelude + routing method); wave 2 enforced
 divergence (entry claim first, no restatement, named lens pairs). Pairwise 8-word-shingle
-similarity: wave 1 max 0.003 / median 0.000; wave 2 max 0.002 / median 0.000 — the answers are
-distinct documents, not restatements.
+similarity: wave 1 max 0.003 / median 0.000; wave 2 max 0.002 / median 0.000 — **low verbatim
+overlap**. (This measures textual duplication only; it is not evidence that the answers contain
+different ideas.)
 
 **Evidence delivery (see Correction above).** The run ledger does not persist phase responses
 (`PhaseResult.to_dict` omits `final_response`), so the run drawer cannot show them; the answer
@@ -131,6 +132,15 @@ delivery manifest; the rerun synthesis made **24/24 read calls** on the delivere
 `fd4a3960…`). It also flagged two next-iteration gaps: the excluded prior syntheses (c17/c09) are
 cited second-hand by wave-2 answers, and the manifest carries no lineage labels, so corpus
 agreement cannot be partitioned by lineage.
+
+**Emission acceptance (Astra review, 2026-09-20).** The emission path must retain a completed
+contemplation's **full report** and emit **meaningful, searchable findings linked to that
+report**, with source identity and advisory status; a subsequent authorized session must
+**retrieve a finding from the middle of the report and follow its evidence link**. An emission
+event alone is insufficient: the current `derive_phase_record` extraction (canonical line + last
+response line, clipped to 200 chars) discards the substance — demonstrated with two report
+bodies sharing a closing sentence that produce identical extracted text. Next delivery:
+**branch answer → durable report → informed synthesis → retrievable finding.**
 
 ## Review pointers
 - Full texts: `experiments/results/fork_contemplation/wave1/c01..c17.md`, `wave2/c01..c09.md`

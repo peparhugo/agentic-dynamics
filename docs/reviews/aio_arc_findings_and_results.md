@@ -116,7 +116,7 @@ variant showed an improvement — every arm sat at the acceptance ceiling** (cei
 - Four isolated branches (`run-134ec77d949e`, `run-33bbbaa6d82c`, `run-c8c35a2c61f3`, `run-9ca338196f07`): $0.0005–$0.0013 each; cache read 4,480 → 8,704 tokens (47% → 90% warm); answers + reuse evidence in `experiments/results/fork_experiment/`.
 - Frozen REAL-session snapshots refused to fork in Docker (3 attempts); root cause: row-level extraction lost auxiliary data; a native `opencode export/import` round-trip preserves the session (proved). In-process forks of a real aio-control session work via an isolated store.
 
-### 4.3 Contemplation waves 1+2 (26 answers + 2 syntheses)
+### 4.3 Contemplation waves 1+2 (24 contemplations + 2 syntheses = 26 outputs)
 
 Both waves ran **in-process** — single `agent_task` workflows whose phases fork ONE approved
 aio-control session with fixed-parent `fork_session` (workdir `/tmp/cont_run`); no Docker.
@@ -128,7 +128,7 @@ aio-control session with fixed-parent `fork_session` (workdir `/tmp/cont_run`); 
   wave-2 synthesis received **no sibling outputs** — its prompt never inserted
   `{prior_answers}` — and only the static ≈700-char wave-1 excerpts; it says so itself
   (`wave2/c09.md:53`). Neither run's ledger persists phase responses.
-- **Therefore:** the 26 answers are the material; the syntheses are advisory and input-bounded.
+- **Therefore:** the 24 contemplations are the material; the two syntheses are advisory and input-bounded.
   The *adjacent-quantity law* and Q-A/Q-B stand as proposals read through a 4k-char window; the
   wave-2 typed-boundary reconciliation stands as a proposal; the "retire further contemplation"
   conclusion is **rejected** (§4.4). The controller keeps the contemplation experiment.
