@@ -114,3 +114,14 @@ operators: which choices here are scale-dependent (concurrency, budgets, isolati
 capacity, knowledge relevance)? Which knowledge from this arc transfers to those futures and
 which is local to this moment (model quirks, host specifics, one-task verdicts)?
 End with one falsifier for your leading claim.
+
+## 17 — The questions themselves (meta)
+Audit the question set you are part of. Sibling forks from this same parent are asking:
+repair loops; net-negative actions; feedback structure; pivotal moments; smallest changes;
+missing measurement; oracle audit; division of labor; cost structure; next experiment;
+steelman the opposite; risk/authority red-team; belief audit; controller model; continuity
+audit; scale/transfer. Which of these are well-posed, which are redundant, which are missing
+entirely? What single different question would change the most? Write the TWO strongest NEW
+questions for the next wave, each with the reason it yields insight the current set cannot,
+and state how you would score whether this contemplation practice was worth its cost.
+End with one falsifier for your leading claim.
