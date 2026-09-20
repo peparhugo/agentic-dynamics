@@ -1996,6 +1996,13 @@ def _stage_fork_checkpoint(request: StepRequest) -> None:
     con = _sqlite3.connect(dest)
     try:
         con.execute("update session set directory = ?", (workdir,))
+        # OpenCode scopes sessions by PROJECT; a foreign project id refuses the fork. Cells
+        # bind to the constant 'global' project for their own workdir, so the copy is rebound
+        # the same way (the checkpoint itself stays immutable).
+        con.execute("update session set project_id = 'global'")
+        with contextlib.suppress(_sqlite3.Error):
+            con.execute("update project set id = 'global', worktree = ?", (workdir,))
+            con.execute("update project_directory set project_id = 'global'")
         con.commit()
     except _sqlite3.Error:
         pass
