@@ -45,6 +45,35 @@ EVIDENCE = ("KNOWN FINDINGS (project knowledge base): 7948b8ace287e881 - prompt-
  "47% cold -> 90% warm, total $0.004735. Frozen real-session snapshots refuse to fork in Docker "
  "(three attempts; directory/project adaptations insufficient) - hence this in-process path.")
 
+SIBLING_ANSWER_CAP = 1500
+
+
+def sibling_digest(receipts: list[dict]) -> str:
+    """The synthesis payload: every PRIOR fork's identity, economics and answer.
+
+    Expanded into any prompt containing ``{{SIBLINGS}}`` — the meta/synthesis pass runs LAST and
+    receives the whole fan-out, not just the shared parent context.
+    """
+    if not receipts:
+        return "(no sibling contemplations ran before this pass)"
+    lines = ["SIBLING CONTEMPLATIONS (this fan-out, in run order):"]
+    for r in receipts:
+        answer = str(r.get("answer") or "")
+        if len(answer) > SIBLING_ANSWER_CAP:
+            answer = answer[:SIBLING_ANSWER_CAP] + " [...truncated]"
+        lines.append(
+            f"\n### {r['index']:02d} {r['title']}\n"
+            f"(fork {r.get('fork_session_id','') or '?'} | {r.get('tokens',0)} tok | "
+            f"cache_read {r.get('cache_read_tokens',0)} | ${r.get('cost_usd',0):.5f} | "
+            f"{r.get('latency_s',0)}s)\n{answer}"
+        )
+    return "\n".join(lines)
+
+
+def expand_placeholders(body: str, receipts: list[dict]) -> str:
+    """Replace ``{{SIBLINGS}}`` / ``{{FINDINGS}}`` with the batch's evidence."""
+    return body.replace("{{SIBLINGS}}", sibling_digest(receipts)).replace("{{FINDINGS}}", EVIDENCE)
+
 
 def parse_prompts(text: str) -> list[dict[str, str]]:
     """Split a prompts file on '## <title>' blocks."""
@@ -82,7 +111,8 @@ def run_fork_batch(*, session_id: str, prompts: list[dict[str, str]], out: Path,
     out.mkdir(parents=True, exist_ok=True)
     receipts: list[dict] = []
     for i, p in enumerate(prompts[: limit or len(prompts)], start=1):
-        text = compose(p["body"])
+        body = expand_placeholders(p["body"], receipts)
+        text = compose(body)
         t0 = time.time()
         r = run_agent(text, model=model, session_id=session_id, fork=True, timeout=timeout)
         rec = {

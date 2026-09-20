@@ -53,3 +53,32 @@ def test_unknown_parent_session_refuses(tmp_path):
     con.close()
     assert session_exists(db, "ses_known") is True
     assert session_exists(db, "ses_missing") is False
+
+
+def test_synthesis_block_receives_the_prior_answers(tmp_path):
+    seen = {}
+
+    class R:
+        ok = True
+        session_id = "ses_fork"
+        error = ""
+        total_tokens = 1
+        cache_read_tokens = 1
+        cache_write_tokens = 0
+        cache_hit_rate = 0.5
+        estimated_cost_usd = 0.0
+        final_response = ""
+
+    def fake(prompt, **kwargs):
+        seen["last"] = prompt
+        return R()
+
+    prompts = [
+        {"title": "One", "body": "first body"},
+        {"title": "Synthesis", "body": "synthesize: {{SIBLINGS}} and {{FINDINGS}}"},
+    ]
+    run_fork_batch(session_id="ses_parent", prompts=prompts, out=tmp_path, model="m",
+                   timeout=10, run_agent=fake)
+    assert "first body" not in seen["last"]  # only answers travel, not raw prompts
+    assert "### 01 One" in seen["last"]
+    assert "KNOWN FINDINGS" in seen["last"]

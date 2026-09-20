@@ -115,13 +115,13 @@ capacity, knowledge relevance)? Which knowledge from this arc transfers to those
 which is local to this moment (model quirks, host specifics, one-task verdicts)?
 End with one falsifier for your leading claim.
 
-## 17 — The questions themselves (meta)
-Audit the question set you are part of. Sibling forks from this same parent are asking:
-repair loops; net-negative actions; feedback structure; pivotal moments; smallest changes;
-missing measurement; oracle audit; division of labor; cost structure; next experiment;
-steelman the opposite; risk/authority red-team; belief audit; controller model; continuity
-audit; scale/transfer. Which of these are well-posed, which are redundant, which are missing
-entirely? What single different question would change the most? Write the TWO strongest NEW
-questions for the next wave, each with the reason it yields insight the current set cannot,
-and state how you would score whether this contemplation practice was worth its cost.
-End with one falsifier for your leading claim.
+## 17 — The synthesis pass (meta; runs LAST with the whole fan-out)
+You are not one sibling among many: you run last and receive the ENTIRE fan-out — every
+sibling contemplation's output ({{SIBLINGS}}) — plus the known findings ({{FINDINGS}}). Think
+about the thinking ACROSS all of it: what patterns, agreements, contradictions and blind spots
+appear when the sixteen are read together? Which questions were well-posed, redundant, or
+missing; what did the fan-out as a whole fail to see? Then: (a) the TWO strongest new
+questions for the next wave, each with the reason it yields insight the current set cannot;
+(b) the single synthesis insight that no individual sibling could have produced;
+(c) score whether this contemplation practice was worth its cost (given tokens, cache, time)
+and state what would make the answer different. End with one falsifier for your leading claim.
