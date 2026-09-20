@@ -109,9 +109,21 @@ def run_fork_batch(*, session_id: str, prompts: list[dict[str, str]], out: Path,
 
         run_agent = run_opencode_agentic
     out.mkdir(parents=True, exist_ok=True)
+    # Prior receipts from EARLIER invocations accumulate: a chunked fan-out resumes across
+    # calls, and the synthesis pass (which carries {{SIBLINGS}}) receives the whole set even
+    # when the run is split. Loaded from the per-fork files (they carry the answers).
+    existing: list[dict] = []
+    for f in sorted(out.glob("fork-*.json")):
+        try:
+            existing.append(json.loads(f.read_text(encoding="utf-8")))
+        except (OSError, ValueError):
+            continue
+    total_offset = len(existing)
     receipts: list[dict] = []
     for i, p in enumerate(prompts[: limit or len(prompts)], start=1):
-        body = expand_placeholders(p["body"], receipts)
+        i = i + total_offset
+        p = {**p}
+        body = expand_placeholders(p["body"], existing + receipts)
         text = compose(body)
         t0 = time.time()
         r = run_agent(text, model=model, session_id=session_id, fork=True, timeout=timeout)
