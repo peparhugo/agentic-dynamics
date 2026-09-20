@@ -782,7 +782,61 @@ def _answer_block(name: str, text: str, *, char_limit: int | None) -> tuple[str,
         "sha256": digest,
         "complete": complete,
     }
-    return block, manifest
+    return block, manifest, text
+
+
+#: Above this many delivered chars the ``{prior_answers}`` payload switches from inline text
+#: to the FILE BUNDLE + INDEX transport (fork-answer delivery repair v2, 2026-09-20): a single
+#: argv argument caps at ~128 KB on Linux (MAX_ARG_STRLEN), and the prompt rides argv — the
+#: first complete-delivery rerun attempt died at launch with ``exit_code=-2`` (E2BIG) at
+#: ~355 KB. The bundle keeps argv small, loses nothing, and the agent reads the complete
+#: outputs with its own read tool.
+DELIVERY_INLINE_LIMIT = 100_000
+
+
+def _write_delivery_file(wd: Path, name: str, text: str) -> str:
+    """Write one delivered answer into the workdir's runner-owned delivery dir (return path).
+
+    ``.instrument/`` is the runner's own scratch space — ``_git_commit_verbose`` excludes it
+    from phase commits by pathspec, so a delivery file can never dirty a worktree.
+    """
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", name) or "answer"
+    path = Path(wd) / ".instrument" / "delivery-answers" / f"{safe}.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return str(path)
+
+
+def _render_answers(blocks: list[str], manifest: list[dict[str, Any]]) -> str:
+    """Render the ``{prior_answers}`` payload: inline text while it fits, else a file index.
+
+    Inline below :data:`DELIVERY_INLINE_LIMIT` chars; above it, each output's file (written at
+    collection) is listed with its length + sha256 + completeness, and the phase is told to
+    READ the files — the complete outputs, never excerpts.
+    """
+    if not blocks:
+        return "(no prior phase answers)"
+    total = sum(len(b) for b in blocks)
+    if total <= DELIVERY_INLINE_LIMIT:
+        return (
+            f"ANSWER EVIDENCE — {len(blocks)} outputs delivered inline, {total} chars total; "
+            "each block carries its own length + sha256, and a block marked 'complete' is the "
+            "full text (no excerpts).\n\n" + "\n\n".join(blocks)
+        )
+    lines = [
+        f"ANSWER EVIDENCE — {len(blocks)} outputs delivered as FILES, {total} chars total.",
+        "Read EVERY file below with your read tool before synthesizing — each file is the "
+        "COMPLETE text of that output (no excerpts); each line carries its length + sha256 "
+        "for verification:",
+    ]
+    for entry in manifest:
+        lines.append(
+            f"- {entry.get('name')} — {entry.get('chars')} chars, "
+            f"sha256:{str(entry.get('sha256', ''))[:12]}, "
+            f"{'complete' if entry.get('complete') else 'truncated'}, "
+            f"file: {entry.get('file', '?')}"
+        )
+    return "\n".join(lines)
 
 
 def _build_phase_prompt(
@@ -791,6 +845,7 @@ def _build_phase_prompt(
     prior: list[str],
     domain_context: str | None = None,
     prior_answers: list[str] | None = None,
+    answers_summary: str | None = None,
 ) -> str:
     """Assemble an agent phase's prompt from its template + the run-level domain context.
 
@@ -807,16 +862,17 @@ def _build_phase_prompt(
     """
     prompt = str(phase.get("prompt", ""))
     prior_summary = "\n".join(f"- {p}" for p in prior) if prior else "(none)"
-    if prior_answers:
-        delivered_chars = sum(len(a) for a in prior_answers)
-        answers_summary = (
-            f"ANSWER EVIDENCE — {len(prior_answers)} outputs delivered, "
-            f"{delivered_chars} chars total; each block carries its own length + sha256, "
-            "and a block marked 'complete' is the full text (no excerpts).\n\n"
-            + "\n\n".join(prior_answers)
-        )
-    else:
-        answers_summary = "(no prior phase answers)"
+    if answers_summary is None:
+        # Legacy path (direct callers/tests): render the blocks inline; the engine path
+        # precomputes the summary through ``_render_answers`` (inline-vs-bundle aware).
+        if prior_answers:
+            total = sum(len(a) for a in prior_answers)
+            answers_summary = (
+                f"ANSWER EVIDENCE — {len(prior_answers)} outputs delivered inline, "
+                f"{total} chars total.\n\n" + "\n\n".join(prior_answers)
+            )
+        else:
+            answers_summary = "(no prior phase answers)"
     template_refs_context = "{domain_context}" in prompt
     prompt = (
         prompt.replace("{goal}", goal)
@@ -4289,10 +4345,11 @@ def run_workflow(
                     "to nothing)"
                 )
             text = src.read_text(encoding="utf-8", errors="replace")
-            block, manifest = _answer_block(
+            block, manifest, delivered = _answer_block(
                 str(entry.get("name") or src.stem), text, char_limit=answer_char_limit
             )
             manifest["path"] = rel
+            manifest["file"] = _write_delivery_file(wd, str(manifest["name"]), delivered)
             prior_answers.append(block)
             answers_delivered.append(manifest)
     result.answers_delivered = answers_delivered
@@ -4593,7 +4650,7 @@ def run_workflow(
                         goal,
                         prior,
                         domain_context=domain_context,
-                        prior_answers=prior_answers,
+                        answers_summary=_render_answers(prior_answers, answers_delivered),
                     )
                 # Point the agent's built-in publisher at this workflow's cell so the
                 # fine-grained session events stream into the Control Room.
@@ -5150,8 +5207,11 @@ def run_workflow(
         # no record; an explicit ``rag.prior_answer_char_limit`` re-enables a declared
         # bound, and the manifest records exactly what was delivered either way.
         if pr.final_response:
-            block, manifest = _answer_block(name, pr.final_response, char_limit=answer_char_limit)
+            block, manifest, delivered = _answer_block(
+                name, pr.final_response, char_limit=answer_char_limit
+            )
             manifest["session_id"] = pr.session_id
+            manifest["file"] = _write_delivery_file(wd, str(name), delivered)
             prior_answers.append(block)
             # The manifest lists DELIVERED outputs only: an answer no later phase consumes
             # (the synthesis's own) enters the accumulator but is never marked delivered.

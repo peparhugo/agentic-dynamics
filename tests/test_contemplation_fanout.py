@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from agentic_dynamics.experiment.experiment_spec import load_spec
 from agentic_dynamics.runtime.workflow_runner import run_workflow
 
@@ -227,3 +229,45 @@ def test_preseed_refuses_missing_evidence(tmp_path):
 
     with pytest.raises(ValueError, match="prior_answers evidence missing"):
         run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=fake)
+
+
+def test_fork_answers_bundle_above_the_inline_budget(tmp_path):
+    _init_repo(tmp_path)
+
+    ev_a = tmp_path / "a.md"
+    ev_b = tmp_path / "b.md"
+    big_a = "A-" + ("a" * 60_000) + "-A-END"
+    big_b = "B-" + ("b" * 60_000) + "-B-END"
+    ev_a.write_text(big_a, encoding="utf-8")
+    ev_b.write_text(big_b, encoding="utf-8")
+    spec_path = tmp_path / "spec.yaml"
+    spec_path.write_text(
+        PRESEED_SPEC.replace("__EVIDENCE_A__", str(ev_a)).replace("__EVIDENCE_B__", str(ev_b)),
+        encoding="utf-8",
+    )
+    spec = load_spec(spec_path)
+    prompts = []
+
+    class R:
+        ok = True
+        error = ""
+        session_id = "ses_child"
+        total_tokens = 10
+        estimated_cost_usd = 0.0
+        final_response = "ok"
+
+    def fake(prompt, **kwargs):
+        prompts.append(prompt)
+        return R()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=fake)
+    # above the budget the payload is a FILE INDEX, not the inline text (argv safety)
+    assert "delivered as FILES" in prompts[0]
+    assert "A-END" not in prompts[0] and "B-END" not in prompts[0]
+    assert len(prompts[0]) < 130_000
+    manifest = result.answers_delivered
+    assert len(manifest) == 2 and all(e["file"] and e["path"] for e in manifest)
+    # each delivered file contains the COMPLETE text — nothing truncated
+    for entry, big in zip(manifest, (big_a, big_b)):
+        assert Path(entry["file"]).read_text(encoding="utf-8") == big
+        assert entry["complete"] is True
