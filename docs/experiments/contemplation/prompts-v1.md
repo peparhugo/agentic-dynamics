@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # Contemplation prompts v1 — fan-out from one aio-control fork point
 
 Ten analysis-only contemplations, fanned from ONE parent session. All run in-process,
