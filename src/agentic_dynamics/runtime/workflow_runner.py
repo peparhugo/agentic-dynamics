@@ -5218,22 +5218,20 @@ def run_workflow(
                 # phase produced an analysis. No analyzer → prior unchanged → prompt identical.
                 if pr.change_analysis is not None:
                     prior.append(_evidence_context(pr))
-            # Self-build ("progressive") producer — DEFAULT ON (kb_finding_layer k1). After a
-            # phase commits, its finding is emitted into the cell's OWN scope so the cell's
-            # retrieval filter can later read its own progress. Opt-outs are explicit only
-            # (the run via rag_params.emit_self=False / FINOPS_EMIT_SELF=0, the phase via the
-            # no_emit marker) — a phase never silently skips its finding. A research phase (no
-            # commit, a free-text report) takes the REPORT variant: the runner persists the
-            # full report and emits a record that IS the report's retrieval surface (Astra
-            # emission acceptance, 2026-09-20).
-            if _finding_emit_enabled(rag_params, phase_def) and pr.commit_hash:
+        # Self-build ("progressive") producer — DEFAULT ON (kb_finding_layer k1). A committed
+        # phase's finding is emitted into the cell's OWN scope so the cell's retrieval filter
+        # can later read its own progress; a research phase (no commit, a free-text report)
+        # takes the REPORT variant: the runner persists the full report and emits a record
+        # that IS the report's retrieval surface (Astra emission acceptance, 2026-09-20).
+        # Opt-outs are explicit only (rag_params.emit_self=False / FINOPS_EMIT_SELF=0 / the
+        # phase's no_emit marker). This block lives OUTSIDE the commit branch on purpose: a
+        # ``--no-commit`` run (the research shape) must still emit — observed live 2026-09-20:
+        # the first emission-proof run silently skipped the emit because it sat inside
+        # ``if commit ...``.
+        if _finding_emit_enabled(rag_params, phase_def) and kind != "test" and pr.status == "ok":
+            if pr.commit_hash:
                 _emit_self_finding(pr, goal=goal, scope=cell_scope(wd))
-            elif (
-                _finding_emit_enabled(rag_params, phase_def)
-                and pr.status == "ok"
-                and pr.final_response
-                and kind != "test"
-            ):
+            elif pr.final_response:
                 _emit_research_report(
                     pr, goal=goal, spec_name=spec.name, wd=wd, rag_params=rag_params
                 )
