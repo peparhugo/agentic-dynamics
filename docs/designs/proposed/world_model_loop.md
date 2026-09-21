@@ -64,3 +64,13 @@ what we didn't know."
 - **Runtime-skill candidate path**: define where a runtime-minted skill lands before promotion
   (a `skill-candidate` record in the KB + an explicit promotion step) — never a hand-edit of
   generated surfaces.
+
+## Open extension: execute as a workflow (controller, 2026-09-21)
+
+A massive plan must not run as ONE execute phase — the execute step should itself be a
+workflow, and the plan should decompose. The seed exists (`ExperimentSpec`'s cells + the DAG
+compiler: spec → cells → phases), so the natural shape: the PRIOR phase emits a plan that
+COMPILES into the execute DAG (units with dependencies, budgets, and acceptance each), and the
+POSTERIOR diffs the whole shape — including which units the plan mis-sized. Open questions:
+the plan→spec bridge (what the prior writes that the compiler consumes), per-unit budgets, and
+aggregating the posterior across units. v0 keeps one execute phase; decomposition is v1.
