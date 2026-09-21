@@ -603,7 +603,7 @@ agentic-dynamics
 ├─ registry    query|show|lineage
 ├─ review      all|stories|trigger|enqueue|finalize
 ├─ spec        status|pipeline
-├─ validate    session|tests|prereq|preexisting|render
+├─ validate    session|tests|prereq|preexisting|render|preflight   # preflight = the five CI-parity gates, one local command
 ├─ supervise   [claude-agents|orphans|leases]
 ├─ control     status|drain-outbox|sweep-zombies|recording-sweep   # status = the ONE control packet (--json = control-status/v1)
 ├─ session     open|close|budget|cache-report   # the AIO spine: session records, capacity budget, provider cache accounting

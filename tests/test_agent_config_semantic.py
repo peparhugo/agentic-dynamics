@@ -107,8 +107,12 @@ _COUNT = re.compile(
 #: ``scripts/<name>.<ext>`` references.
 _SCRIPT = re.compile(r"\bscripts/([A-Za-z0-9_]+)\.(py|sh|md)\b")
 
-#: ``agentic-dynamics <verb> <noun>`` (two subcommand words).
-_CLI = re.compile(r"agentic-dynamics\s+([a-z][a-z-]*)\s+([a-z][a-z-]*)")
+#: ``agentic-dynamics <verb> <noun>`` (two subcommand words). The separator is ``[^\S\n]+``
+#: (horizontal whitespace only) rather than ``\s+``: ``\s`` matches newlines, so a skill line
+#: ending in a command followed by a line that itself begins with ``agentic-dynamics``
+#: synthesised a fake two-word command spanning the newline (world-model-loop G4). A real
+#: command's verb and noun are always on the same line.
+_CLI = re.compile(r"agentic-dynamics[^\S\n]+([a-z][a-z-]*)[^\S\n]+([a-z][a-z-]*)")
 
 
 def _files() -> list[Path]:
@@ -177,11 +181,7 @@ def _check_paths(text: str, rel: str) -> list[str]:
     bad: list[str] = []
     for m in _BACKTICK.finditer(text):
         tok = m.group(1).strip()
-        if (
-            _is_path_candidate(tok)
-            and not _is_runtime_data_path(tok)
-            and not _path_exists(tok)
-        ):
+        if _is_path_candidate(tok) and not _is_runtime_data_path(tok) and not _path_exists(tok):
             bad.append(f"{rel}: referenced path does not exist: `{tok}`")
     return bad
 
