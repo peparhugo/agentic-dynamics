@@ -267,9 +267,9 @@ that historical evidence from the current mount-guard state (which now passes).
 guard suite in `docs/fleet/04_slice1_live_cutover_log.md:12-18`,
 `docs/fleet/05_slice2_orchestrator_log.md:12-17`,
 `docs/fleet/06_slice3_neo4j_rrf_log.md:12-17`, and
-`docs/fleet/07_slice4_guards_log.md:12-18`. [M] The `green_main_closure` ledger records a
-successful workflow run in `/tmp/wt_green_main`; the ledger does not establish its container runtime
-(`experiments/results/workflows/green_main_closure/20260831T201627Z.json:2-14`).
+`docs/fleet/07_slice4_guards_log.md:12-18`. [M] The `green_main_closure` ledger (a run artifact
+under the ignored `experiments/results/workflows/` tree, not committed) records a successful
+workflow run in `/tmp/wt_green_main`; the ledger does not establish its container runtime.
 
 ## 6. Isolation inventory
 
