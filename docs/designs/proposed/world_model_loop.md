@@ -40,7 +40,7 @@ what we didn't know."
 | reflection records | `reflection_ingestion` (session self-notes) | exists |
 | context assembly for a step | `control.context_compiler` | exists |
 | procedural skills as knowledge | `kb_produce_skill` (pattern/v1 projection) | exists (KB-side) |
-| local CI parity | `pipeline` plans (`ci`), the workflow's gates | partial — no one-command preflight |
+| local CI parity | `agentic-dynamics validate preflight` (built 2026-09-21 on `feature/ci-preflight`, pending merge) | built |
 
 ## What is missing (the three artifacts)
 
@@ -64,6 +64,61 @@ what we didn't know."
 - **Runtime-skill candidate path**: define where a runtime-minted skill lands before promotion
   (a `skill-candidate` record in the KB + an explicit promotion step) — never a hand-edit of
   generated surfaces.
+
+## v1 built (2026-09-21, `feature/world-model-v1`)
+
+- **The artifact gate** — a phase declares `requires_files: [...]`; the runner REFUSES before
+  any prompt build, admission, or spend when a declared artifact is absent from the worktree.
+  This is the plan gate: `execute` cannot run without the prior phase's `notes/plan.md`, and
+  `posterior` cannot run without the model and the plan. Tests:
+  `tests/test_world_model_gates.py`.
+- **The report variant for committed phases** — `rag.emit_report: true` ALSO emits the full
+  captured turn as a retrievable record, so a loop's notes (world model, plan, posterior) are
+  knowledge, not only git files. The world-model loop spec opts in.
+- **Runtime-skill candidates (convention)** — a runtime discovery that wants to become a skill
+  lands as a KB record scoped to the proposing cell (the existing `kb_produce_skill` /
+  pattern-projection seam, or the posterior's UPDATES list), and is promoted into
+  `agent_config/skills/` only through an explicit promotion step (a reviewed commit) — never a
+  hand-edit of generated surfaces.
+- **Durable emission (v1.1, 2026-09-21)** — the emissions (KB artifacts, run reports) and the
+  reader now honor the fleet contract's `FINOPS_RESULTS_DIR` (default: this checkout). A run
+  executing from an EPHEMERAL worktree must set it to the durable checkout
+  (`FINOPS_RESULTS_DIR=<durable>/experiments/results`), so records and their links stay
+  resolvable after the worktree goes away. Measured cause: the second loop run emitted its
+  reports/records into `/tmp/wml_v1/` — durable only while that worktree lived, and invisible
+  to a reader in another worktree (the posterior's own V5 false-negative).
+
+## v1.3 built (2026-09-21, `feature/wml-v1.3`) — the three named gaps + the fleet scopes
+
+- **Fleet-runnable (scopes).** v1.2 could only run in-process: its agent phases declared no
+  `scope:`, so the durable path's spawn validation refused the spec, and the AIO
+  local-execution exception forbids in-process agent runs. v1.3 declares them —
+  `prior`/`posterior: proposal_write`, `execute`/`p2_mint`/`g_test_gate: implementation`,
+  `g_adversarial: adversarial_readonly` — and the loop rides the fleet
+  (first submission: `run-037d7d760bd6`).
+- **`g_test_gate` (the missing independent verification).** A `kind: test` phase after execute
+  whose targets come from the plan: `tests_from_plan: notes/plan.md` parses `## Tests`, keeps
+  only `tests/` paths that EXIST in the worktree, and hands them to the independent runner. A
+  plan that names no targets SKIPS explicitly (`test_gate_note` on the ledger;
+  `test_executed_success` stays None — never a fabricated verdict), so the gate is harmless
+  for analysis-only runs and exact for code-producing ones. Declared `tests:` lists are
+  unchanged.
+- **`p2_mint` (the runtime-skill path as a step, not a convention).** After the posterior, the
+  mint phase turns each SKILL/PATTERN candidate in §UPDATES into a `notes/skills/<slug>.json`
+  and mints it through the existing producer (`scripts/kb_produce_skill.py`, pattern/v1).
+  Candidates that cannot be minted are recorded, never dropped; promotion remains a reviewed
+  commit — generated surfaces are never hand-edited.
+- **Forced research (mechanized as far as the vocabulary allows).** The prior must write
+  `notes/sources.jsonl` — one provenance line per source actually used (KB id / file / URL +
+  sha256; an explicit `{"none": true, "reason": ...}` when no external fact was needed) — the
+  execute gate requires the file, and `g_adversarial` checks it against the world model: an
+  external gap with no fetched source is a finding. The semantic check stays adversarial by
+  design; the DECISION is no longer optional.
+- **The notes-collision finding (from the merge).** Two loop runs committed different artifacts
+  at the same fixed `notes/*.md` paths, so merging their branches conflicted on all four files.
+  The merge preserved both (main's canonical at `notes/*`, the second run's under
+  `notes/ci-preflight/`), and the next convention candidate is: namespace run notes by
+  run/task, or route them to the durable results dir.
 
 ## Open extension: execute as a workflow (controller, 2026-09-21)
 

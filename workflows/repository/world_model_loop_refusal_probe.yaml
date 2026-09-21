@@ -1,0 +1,66 @@
+name: world_model_loop_refusal_probe
+question: >-
+  DELIBERATE NEGATIVE FIXTURE: does the world-model loop's v1.2 shape gate refuse a
+  section-less prior BEFORE the execute phase spends? The prior writes its two artifacts
+  without the required sections; the execute gate (requires_content) must refuse with
+  ARTIFACT_SHAPE and stop the run. This spec exists to make that refusal observable in a
+  live run (the unit suite covers it hermetically in tests/test_world_model_gates.py).
+version: "0.1"
+artifact_kind: workflow
+intent: measure
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+comparison: null
+writeup: {format: lab_book, sections: [question, evidence]}
+stop: {budget_usd: 1.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_uncertainty}
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: false
+    rag:
+      emit_self: false
+      emit_report: false
+    context:
+      domain_context: >-
+        A DELIBERATE NEGATIVE FIXTURE for the world-model loop's shape gate. The prior phase
+        must write its two artifacts WITHOUT the required section headings, on purpose —
+        nothing about this run should look like normal work. The execute phase is then
+        expected to refuse (ARTIFACT_SHAPE) before its agent runs; that refusal is the
+        artifact this spec produces.
+    phases:
+      - name: prior
+        kind: agent
+        scope: proposal_write
+        timeout: 900
+        prompt: |
+          PROBE FIXTURE — deliberately malformed prior. Do NOT write section headings.
+          Write `notes/world_model.md` as exactly ONE sentence and `notes/plan.md` as exactly
+          ONE sentence (no `##` headings, no bullets). This is intentional: the run is
+          expected to be refused at the execute gate, and the refusal is the point.
+          Commit both files.
+      - name: execute
+        kind: agent
+        scope: implementation
+        timeout: 600
+        requires_files: [notes/plan.md]
+        requires_content:
+          notes/plan.md: ["## Files", "## Tests", "## Acceptance"]
+        prompt: |
+          This phase must never run — the shape gate refuses before the agent starts.
+      - name: posterior
+        kind: agent
+        scope: proposal_write
+        timeout: 600
+        requires_files: [notes/world_model.md, notes/plan.md]
+        prompt: |
+          If the run reaches here, the shape gate did NOT refuse — record that as the finding.

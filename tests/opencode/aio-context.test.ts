@@ -1760,3 +1760,52 @@ describe("aio-context plugin — handoff selection by session (reviewer repair)"
   })
 
 })
+
+// ── Per-message freshness (2026-09-21): the attach composes FRESH at every user message --------
+//    (`attachSnapshot` deletes the capsule cache first), so an OUT-OF-PROCESS binding write —
+//    the runner recording a submit — is delivered at the NEXT message. The TTL cache serves
+//    only WITHIN a message (the transform/refresh paths): per-turn consistency by design, not
+//    a cross-message staleness window. This is the regression the stale-state review asked for.
+
+describe("aio-context plugin — per-message freshness after an out-of-process write", () => {
+  test("a capsule change between messages is delivered at the next message", async () => {
+    let capsuleText = "CAPSULE v1"
+    const { calls, runner } = fakeRunner((mode, args) => {
+      if (mode === "bind") {
+        return {
+          schema: "session-binding/v1",
+          status: "created",
+          native_session_id: sessionOf(args),
+        }
+      }
+      if (mode === "capsule") {
+        return {
+          schema: "session-capsule/v1",
+          capsule_status: "composed",
+          capsule: { text: capsuleText },
+        }
+      }
+      return undefined
+    })
+    // A 60 s TTL: if the attach served the cache, the change below would NOT be delivered.
+    const hooks = await makePlugin(runner, { capsuleTtlMs: 60_000 })
+    const capsuleCalls = () => calls.filter((call) => modeOf(call.args) === "capsule").length
+    const snapshotOf = async (id: string, text: string) => {
+      const ctx = message("ses_fresh", "aio-control", text, id)
+      await hooks["chat.message"](...Object.values(ctx))
+      return attachedSnapshot(ctx.output.parts as any[])
+    }
+
+    const first = await snapshotOf("u1", "first request")
+    expect(first).toContain("CAPSULE v1")
+    const afterFirst = capsuleCalls()
+    expect(afterFirst).toBeGreaterThan(0)
+
+    // an OUT-OF-PROCESS change: the durable binding moved (e.g. a submit was recorded)
+    capsuleText = "CAPSULE v2 (submit recorded)"
+
+    const second = await snapshotOf("u2", "second request")
+    expect(second).toContain("CAPSULE v2") // the NEXT message is fresh, not TTL-cached
+    expect(capsuleCalls()).toBeGreaterThan(afterFirst) // the attach recomposed
+  })
+})
