@@ -903,9 +903,24 @@ def test_phase_report_record_carries_the_report_body(tmp_path, monkeypatch):
     # Advisory authority + the report as the evidence link + the variant's extractor version.
     assert record_a.authority is Authority.ADVISORY
     assert record_a.evidence_class == "[H]"
-    assert record_a.source_uri == f"file://{tmp_path / 'a.md'}"
+    # L18: the pointer is the repo-relative form — PROJECT_ROOT is monkeypatched to tmp_path,
+    # so the report under it normalizes to file://a.md (the documented shape), not the host
+    # absolute path the old emit recorded.
+    assert record_a.source_uri == "file://a.md"
     assert record_a.extractor_version == ki.PHASE_REPORT_EXTRACTOR_VERSION
     assert record_a.knowledge_id != record_b.knowledge_id
     # The durable artifact is written and the pointer event published.
     assert (tmp_path / "experiments" / "results" / "kb" / f"{record_a.knowledge_id}.json").exists()
     assert len(events) == 2
+
+
+def test_pointer_uri_normalizes_repo_paths_and_keeps_foreign_ones(tmp_path):
+    """L18 (the 2026-09-21 runs): pointers must be the documented repo-relative form
+    (``file://experiments/results/...``), never the container's ``file:///repo/...`` or an
+    absolute host path; a path outside the repo keeps its absolute form (best effort)."""
+    import agentic_dynamics.knowledge.knowledge_ingestion as ki
+
+    inside = ki.PROJECT_ROOT / "experiments" / "results" / "workflows" / "x" / "reports" / "r.md"
+    assert ki._pointer_uri(inside) == "file://experiments/results/workflows/x/reports/r.md"
+    foreign = tmp_path / "elsewhere" / "r.md"
+    assert ki._pointer_uri(foreign) == f"file://{foreign}"

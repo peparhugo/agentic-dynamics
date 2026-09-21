@@ -113,6 +113,30 @@ RESULT_VERSION = "results/v1"
 #: regardless of the process cwd (``artifact_uri`` is repo-root-*relative*).
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
+
+def _pointer_uri(path: Path | str) -> str:
+    """A ``file://`` pointer normalized to the repo-relative form the contract documents.
+
+    Fleet cells compute paths against their container root (``/repo``) and in-process runs
+    against the host checkout, so an absolute pointer records ``file:///repo/...`` or
+    ``file:///home/...`` — durable bytes, non-canonical or unresolvable pointers (live finding
+    L18, the 2026-09-21 runs: 11 registry rows with the container prefix, 144 with an absolute
+    host prefix). A path inside the repo collapses to ``file://<repo-relative>`` (the
+    documented ``file://experiments/results/...`` shape); a path outside the repo (e.g. a
+    foreign ``FINOPS_RESULTS_DIR``) keeps its absolute form — best effort, never a broken
+    scheme.
+    """
+    p = Path(str(path))
+    if not p.is_absolute():
+        # A relative input is already in the documented shape — pass it through untouched.
+        return f"file://{p}"
+    try:
+        rel = p.resolve().relative_to(PROJECT_ROOT.resolve())
+    except (ValueError, OSError):
+        return f"file://{p}"
+    return f"file://{rel.as_posix()}"
+
+
 #: Extractor generation for the self-build ("progressive") phase-finding path. Distinct from
 #: :data:`EXTRACTOR_VERSION` so a workflow-phase finding and a summary-derived finding never
 #: collide on identity even for identical text (each folds its own extractor into
@@ -592,7 +616,7 @@ def derive_phase_record(
             + (f", file {report_path}" if report_path else "")
             + f"\n\nREPORT:\n{body}"
         )
-        source_uri = f"file://{report_path}" if report_path else PHASE_SOURCE_URI
+        source_uri = _pointer_uri(report_path) if report_path else PHASE_SOURCE_URI
         extractor = PHASE_REPORT_EXTRACTOR_VERSION
 
     # Delegate identity + the content-hash back-fill to the shared factory. Every scoping field
