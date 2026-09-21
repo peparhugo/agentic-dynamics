@@ -33,8 +33,13 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
-KB_DIR = REPO / "experiments" / "results" / "kb"
-REGISTRY = REPO / "experiments" / "results" / "registry_index.jsonl"
+# The durable results tree (the fleet path contract's FINOPS_RESULTS_DIR, default: this
+# checkout). A reader must look where the runners actually emit: a run executing from an
+# ephemeral worktree emits into the durable tree, and the worktree-local tree is empty
+# (world-model loop v1.1, 2026-09-21).
+_RESULTS = Path(os.environ.get("FINOPS_RESULTS_DIR") or (REPO / "experiments" / "results"))
+KB_DIR = _RESULTS / "kb"
+REGISTRY = _RESULTS / "registry_index.jsonl"
 
 
 def _default_scope() -> str:

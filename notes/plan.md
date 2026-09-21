@@ -1,154 +1,140 @@
-# Plan — local CI preflight (`scripts/ci_preflight.py`, `agentic-dynamics validate preflight`)
+# Plan — Item 4: land the missing regression check for the stale next-action state
 
-This is the EXECUTE phase's contract. It follows the world model (`notes/world_model.md`);
-deviations from it must be recorded in `notes/deviations.md`.
+*Execute phase follows this file. Deviations go in `notes/deviations.md`; the posterior diffs
+against `notes/world_model.md` and this plan.*
 
-## Deliverable in one line
+## 0. Decision (from the world model)
 
-`scripts/ci_preflight.py` — a zero-model, stdlib-only runner that executes the five CI-parity
-gates in cheap→expensive order, prints one PASS/FAIL line per gate, and exits non-zero if any
-gate fails. Reachable as `agentic-dynamics validate preflight`.
+The c15 stale-next-action gap is **already closed** for the one confirmed AIO action that has a
+durable recording path — a workflow submit (`scripts/fleet/fleet_manager.py:853`,
+`_record_submission_in_task`, commit `246490028`, an ancestor of HEAD). The recording REPLACES
+`next_action` with a version-guarded `[auto] submitted job …` string, and the capsule renders
+the binding's `next_action` with precedence over predecessor threads
+(`scripts/session_open.py:393-400`).
 
-## Gate registry (exact argv — parity is the whole point)
+Therefore this task lands the **missing regression check**, not a source change. The check must
+pin the carrier-level property the c15 finding names: *a completed instruction can never remain
+the actionable next action after its confirmed action happened.* No new memory format, no
+`handoff` object, no generalized prose compiler.
 
-Ordered cheap→expensive; each entry is `(id, human name, argv, cwd)`.
+Fallback (only if a test fails): apply the smallest existing-machinery fix that makes it pass,
+and record the deviation. Do not invent a new record family.
 
-| id | name | argv (cwd = repo root) | CI anchor |
-|---|---|---|---|
-| `lint` | Lint (ruff, whole active surface) | `ruff check .` | `pytest.yml:38-44` |
-| `surfaces` | Generated instruction surfaces | `python3 scripts/_gen_instructions.py --check` | `pytest.yml:66-69` |
-| `docs-drift` | Docs drift (spec lifecycle) | `python3 scripts/scan_docs_drift.py --check spec_lifecycle --fail-on-drift` | `pytest.yml:71-81` |
-| `fast-path` | Fast path | `bash scripts/test_fast.sh` | `pytest.yml:106-118` |
-| `full-suite` | Deterministic suite (external excluded) | `python3 -m pytest tests/ -m "not external" [-n auto --dist loadfile] --timeout=600` | `pytest.yml:173-181` |
+## 1. Files to touch
 
-Rationale for each choice:
-- **lint** uses the bare `ruff` on `PATH` (not `python -m ruff`): that is what CI runs; report
-  `ruff --version` in the preamble so a version mismatch is visible. Missing `ruff` is a **gate
-  FAIL** with the install hint `pip install ruff==0.16.2`, never a crash — parity requires the gate.
-- **surfaces**/**docs-drift** are stdlib-only (verified: both run with no install), so they are
-  cheap and belong above the pytest gates.
-- **fast-path** calls `bash scripts/test_fast.sh` (the CI command) rather than re-spelling
-  `pytest -m fast`, so the budget-audited wrapper stays the single source of truth.
-- **full-suite** derives from CI's shard command with exactly two deliberate omissions:
-  `--splits/--group` (local runs are not sharded) and `-v` (summary readability). `-n auto
-  --dist loadfile` is kept **only if** `pytest-xdist` imports; `--timeout` only if
-  `pytest-timeout` imports. Both are present locally (probed), but the runner degrades instead of
-  failing on a thinner box.
+| file | change |
+|---|---|
+| `tests/test_session_binding.py` | ADD two tests: (a) replace-not-append for a non-empty prior `next_action`; (b) capsule-level regression that a completed `next_action` is superseded by a progress write and cannot appear as the capsule's next action. |
+| `tests/test_fleet_manager.py` | ADD one end-to-end regression: seed the exact c15 stale instruction, run the REAL `fleet_manager submit` (confirmed action), then compose the capsule and assert the stale instruction is gone and the `[auto]` job record is the next action. |
+| `notes/deviations.md` | CREATE only if a deviation occurs (the execute prompt requires it when reality differs). |
 
-## Script interface
+Explicitly NOT touched: `scripts/session_open.py`, `src/agentic_dynamics/knowledge/session_ingestion.py`,
+`scripts/fleet/fleet_manager.py`, `.opencode/plugins/aio-context.ts`, `docs/reviews/*` — unless the
+fallback is triggered.
 
-```
-scripts/ci_preflight.py [--list] [--only <id> ...] [--skip <id> ...]
-                        [--json <path|->] [--quiet] [--no-clean-env]
-```
+## 2. Tests to create
 
-- `--list` prints the gate registry and exits 0.
-- `--only`/`--skip` select a subset (repeatable); an id that matches nothing exits **2**.
-- `--json -` writes a `ci-preflight/v1` report (keys: `schema`, `generated_at`, `repo_head_sha`,
-  `ruff_version`, `gates[{id,name,argv,exit_code,status,elapsed_s}]`, `passed`, `failed`, `status`).
-- Default prints a short header (repo HEAD, ruff version) plus one `PASS`/`FAIL` line per gate
-  (with elapsed seconds) and a final `N passed, M failed` line. `--quiet` prints only the summary.
-- Gate output is inherited (streamed) by default so a long suite is observable; `--quiet` still
-  streams (it only suppresses the preflight's own chatter).
-- Exit codes: **0** all gates PASS; **1** one or more gates FAIL; **2** usage error.
+### 2.1 `tests/test_session_binding.py` (pure unit; no Redis, no subprocess)
 
-**Testability seam (required):** pure functions with injected process execution —
-`run_gate(gate, *, runner=subprocess.run, env=...) -> GateResult` and
-`run_preflight(gates=GATES, *, runner=..., which=shutil.which, env=...) -> int`. Production
-`main()` passes the real callables; the test passes fakes. This keeps the unit test hermetic
-(no real subprocesses, no Redis, no git).
+1. `test_a_progress_write_replaces_a_completed_next_action` — in `TestVersionedContext`:
+   - write a binding with `next_action="activate PR #77 then call run_workflow"`;
+   - `si.update_binding_context("ses_test_1", context={"next_action": "observe job abc123"},
+     expected_version=1, artifact_dir=tmp_path, connect_fn=_FakeRedis)`;
+   - assert the read-back `next_action == "observe job abc123"` (replaced, not concatenated);
+   - assert the superseded text is retained in `context_history[0]["next_action"]`
+     (nothing lost — the audit trail is the history, not the live carrier);
+   - assert `context_version == 2` and the authorization id/epoch are unchanged (progress-only,
+     per round-9).
+   - Rationale: today's tests only exercise a non-empty `next_action` on an EMPTY prior value
+     (`tests/test_session_binding.py:491-520`), so replace semantics against a stale non-empty
+     value are unproven.
 
-**Environment hygiene (G2):** the two pytest gates run with `FINOPS_CELL_ID` removed from the
-child env by default, because CI runs in a shell that never sets it and the variable rewrites the
-cell scope inside 2 tests (measured). `--no-clean-env` restores the inherited env for reproducing
-harness-specific behavior. This default is documented in the script docstring and asserted by a
-test. (Only `FINOPS_CELL_ID` is scrubbed; other `FINOPS_*` config is left intact.)
+2. `test_the_capsule_cannot_show_a_completed_next_action` — in `TestConstraintPreservation`
+   (it already has the `_capsule` helper and `compose_capsule`):
+   - write the binding with the c15 stale `next_action`;
+   - perform the progress write that records the confirmed action;
+   - compose the capsule from the read-back binding (packet/budget stubbed as in
+     `tests/test_session_binding.py:590-598`);
+   - assert `"activate PR #77" not in capsule["next_action"]["text"]` AND not in `capsule["text"]`;
+   - assert `capsule["next_action"]["source"] == "binding"` and the new record is present.
+   - Rationale: this is c15 §4.6 rendered against the machinery that actually exists.
 
-## Files to touch
+### 2.2 `tests/test_fleet_manager.py` (the real submit path)
 
-| File | Change | Why |
-|---|---|---|
-| `scripts/ci_preflight.py` | **new** — the runner (docstrings + inline reasoning per the verbose-mode constraint) | deliverable |
-| `src/agentic_dynamics/cli.py` | add `("validate","preflight"): "ci_preflight.py"`; add `preflight` to the `_HELP` validate line | CLI mapping (G8) |
-| `tests/test_cli_resolution.py` | add the `("validate","preflight")` row **and** the missing `("knowledge","read")` row | required by the guard; fixes G3 (see "scope" note) |
-| `tests/test_agent_config_semantic.py` | change `_CLI` separator `\s+` → `[^\S\n]+` so the regex cannot span lines | fixes G4 (regex fragility, 1-char semantic) |
-| `agent_config/mental-model.md` | add `validate …|preflight` to the CLI tree (line ~601) | source of the generated CLI surface |
-| `.opencode/instructions/mental-model.md`, `.claude/rules/mental-model.md`, `CLAUDE.md`, `AGENTS.md` | regenerated by `python3 scripts/_gen_instructions.py` — never hand-edited | surfaces gate stays green |
-| `scripts/CONTEXT.md` | append `maintained: ci_preflight.py` on its own line after `:32` | classification manifest (`test_script_classification`) |
-| `tests/test_ci_preflight.py` | **new** — hermetic unit tests (below) | "a test for the runner" |
+3. `test_a_submission_supersedes_a_completed_next_action_in_the_capsule` — reuse the existing
+   harness (`_binding_store`, `_fleet_manager`, `_FakeRedis`, and either the light `fm.main`
+   argv at `tests/test_fleet_manager.py:1034-1041` or the full `_submit_fixture`/`_aio_argv`
+   pair at `:1110-1148`):
+   - after `_binding_store`, issue an `si.update_binding_context` that sets the c15 stale
+     `next_action` (the binding was created empty by `_binding_store`, so version 1→2);
+   - run the real submit with `--binding-context-version 2` and `--retry-safe --json`;
+   - assert `payload["task_note"] == ""` (recorded cleanly) and the `[auto]`/`job_id` in the
+     read-back `next_action`;
+   - compose the capsule (load `scripts/session_open.py` exactly as
+     `tests/test_session_binding.py:45-49` does, or import `compose_capsule` via the same
+     `importlib` seam) with the read-back binding and stubbed packet/budget;
+   - assert the capsule text contains the new `job_id` and does NOT contain `"activate PR #77"`.
+   - Rationale: proves the *path* that the AIO actually uses records, not just that the writer
+     can; closes the loop from action → binding → carrier.
 
-**Scope note (G1/G3/G4 — the decision the execute phase must make explicit).**
-The task's deliverable is the preflight. But the preflight's `full-suite` gate can only reach
-green if the two branch-introduced failures are repaired. Because the CLI change already forces
-an edit to `tests/test_cli_resolution.py`, adding the missing `knowledge read` row there is a
-near-free in-context fix; the `_CLI` regex fix in `test_agent_config_semantic.py` is a one-token
-change. **Recommended:** make both repairs in the same unit and record them in
-`notes/deviations.md` as small in-context fixes (not scope creep). If the execute phase judges
-them out of scope, it must instead record them as the preflight's first findings and leave the
-full-suite gate red — but then "exit non-zero if any gate fails" is demonstrably true and the
-acceptance below must be read as "the runner is correct", not "the branch is green".
-
-## Tests to create — `tests/test_ci_preflight.py` (hermetic; NOT `fast`-marked)
-
-Not `fast`-marked because it imports `subprocess` (`test_fast_path_gate.FORBIDDEN_IN_FAST`); it is
-still ~ms because every gate run is faked.
-
-1. `test_registry_is_exactly_the_five_parity_gates` — ids `== {lint, surfaces, docs-drift,
-   fast-path, full-suite}` and ordered cheap→expensive.
-2. `test_gate_argv_matches_the_workflow` — assert the exact token lists, including the
-   `--check spec_lifecycle --fail-on-drift` flags and `test_fast.sh`. (Pins parity to `pytest.yml`.)
-3. `test_all_pass_exits_zero` — fake runner returns 0 for every gate → exit 0, every row `PASS`.
-4. `test_any_failure_exits_nonzero` — one gate returns 1 → exit 1; the summary names it.
-5. `test_summary_prints_one_pass_fail_line_per_gate`.
-6. `test_missing_ruff_is_a_gate_failure_with_an_install_hint` — fake `which` returns `None`.
-7. `test_cell_id_is_scrubbed_for_pytest_gates_and_restorable` — child env lacks `FINOPS_CELL_ID`;
-   `--no-clean-env` keeps it; the stdlib gates keep it either way.
-8. `test_json_report_is_ci_preflight_v1` — schema/keys/shape.
-9. `test_only_skip_select_a_subset_and_unknown_id_exits_2`.
-10. `test_full_suite_argv_omits_xdist_when_unavailable` — inject an import probe that fails.
-
-## Local verification commands (execute phase)
+## 3. Local verification commands
 
 ```bash
-ruff check .                                                   # gate 1 manually
-python3 scripts/ci_preflight.py --list
-python3 scripts/ci_preflight.py --only lint --only surfaces --only docs-drift   # fast smoke
-python3 -m pytest tests/test_ci_preflight.py -v                # the new unit suite
-python3 scripts/_gen_instructions.py --check                   # after editing agent_config
-python3 scripts/_gen_instructions.py                           # regenerate surfaces
-python3 -m pytest tests/test_cli_resolution.py tests/test_agent_config_semantic.py -q
-python3 scripts/ci_preflight.py                                # end-to-end, expect all 5 PASS
+# the two touched test modules (and the neighbouring binding/exec suites)
+python3 -m pytest tests/test_session_binding.py tests/test_fleet_manager.py \
+                 tests/test_spawn_wrapper.py -q -p no:cacheprovider
+
+# lint the touched files (whole-surface ruff is the repo rule)
+ruff check tests/test_session_binding.py tests/test_fleet_manager.py
+
+# the fast smoke, to confirm no fast-marked guard broke
+python3 -m pytest tests/ -m fast -q -p no:cacheprovider
 ```
 
-## Acceptance criteria
+If a fast-eligible module already carries the `fast` marker selectively, follow the existing
+marking convention in the module; do not mark a test `fast` if it spins up the real spec fixture
+(the parallel-safety audit in `tests/test_fast_path_gate.py` will reject it).
 
-1. `agentic-dynamics validate preflight` (and `python3 scripts/ci_preflight.py`) runs the five
-   gates and prints exactly one PASS/FAIL line per gate.
-2. Exit 0 iff all gates pass; exit 1 if any fails; exit 2 on a usage error.
-3. The gate argv equals the CI commands (asserted by test #2).
-4. `python3 -m pytest tests/test_ci_preflight.py -v` is green **without** spawning a real gate,
-   touching Redis, or creating a worktree.
-5. `tests/test_cli_resolution.py` and `tests/test_script_classification.py` are green (CLI row +
-   manifest entry present).
-6. `python3 scripts/_gen_instructions.py --check` is green after regeneration.
-7. `ruff check .` is green.
-8. An end-to-end `python3 scripts/ci_preflight.py` reports `5 passed` — which requires the G3/G4
-   repairs (see scope note); otherwise record the residual failures explicitly.
+## 4. Acceptance criteria
 
-## Risks and mitigations
+1. The three named tests exist, are deterministic, and pass.
+2. The capsule-level tests assert the completed instruction is absent from BOTH
+   `capsule["next_action"]["text"]` and the rendered `capsule["text"]` — the carrier, not just
+   the JSON.
+3. `tests/test_session_binding.py` and `tests/test_fleet_manager.py` and
+   `tests/test_spawn_wrapper.py` are green; `ruff check` on the touched files is clean.
+4. No source file is modified unless the fallback fires; if it fires, the change is additive and
+   uses `update_binding_context` only, and `notes/deviations.md` names the failing test, the
+   observed behavior, and the minimal change.
+5. `notes/deviations.md` exists and records any delta between this plan and what was done.
 
-| Risk | Mitigation |
-|---|---|
-| **R1 — env pollution (G2):** preflight inside a fleet cell reports false failures CI would not. | Scrub `FINOPS_CELL_ID` by default for the pytest gates; `--no-clean-env` to reproduce. Documented + tested. |
-| **R2 — pre-existing red suite (G1/G3/G4):** the full-suite gate stays red and makes the preflight look broken. | Recommended minimal in-context repairs (same files already touched); otherwise record as first findings. |
-| **R3 — ruff version drift (G5):** local ruff ≠ 0.16.2. | Print `ruff --version`; warn on mismatch in the header; never hard-fail solely on version. |
-| **R4 — missing pytest plugins:** `-n auto`/`--timeout` unsupported. | Probe `importlib.util.find_spec`; drop unsupported flags; degrade, don't crash (test #10). |
-| **R5 — data-root divergence (G6):** local has real runtime data, CI restores fixtures. | Do not touch the data root; document that corpus-dependent coverage may differ. |
-| **R6 — generated-surface drift (G8):** forgetting to regenerate after the mental-model edit. | The `surfaces` gate itself catches it; run `_gen_instructions.py` then `--check` before commit. |
-| **R7 — preflight total time (~3 min).** | Expected; cheap gates first so failures surface in seconds; `--only` for iteration. |
-| **R8 — accidental duplication of `pipeline ci`.** | Keep the runner subprocess-only and CLI-only; no queue phases, no mypy/build_data gates. |
+## 5. Risks and deviations to watch
 
-## Out of scope
+- **Fixture heaviness / non-determinism.** The full `_submit_fixture` builds a real git repo and
+  copies `workflows/repository/fleet_job_submission.yaml`; prefer the lighter `fm.main` argv
+  (`tests/test_fleet_manager.py:1034-1041`) if it suffices, to keep the test fast and hermetic.
+  If the light path cannot satisfy the submit validator, fall back to `_submit_fixture`.
+- **Import seam for `compose_capsule`.** `tests/test_session_binding.py` loads `session_open.py`
+  by path via `importlib` (`:45-49`) because the module lives under `scripts/`, not the package.
+  Reuse that helper; do not add a new import mechanism.
+- **Over-claiming scope.** The tests must cover the submit path only. Non-submit confirmed
+  actions (e.g. approvals) have no binding address today (see world model §4.2). Do NOT add a
+  test that implies coverage there, and do NOT extend `approve_workflow.py` — that is out of the
+  bounded ask.
+- **The covered path may reveal a real gap.** If the end-to-end capsule test fails because the
+  capsule is served from a 30 s TTL cache (`.opencode/plugins/aio-context.ts:86`) or because the
+  recording did not run, STOP and record the deviation rather than widening the change.
+- **KB read degradation in the worktree.** `experiments/results/registry_index.jsonl` is absent
+  in this worktree, so `scripts/kb_read.py --contains` raises `FileNotFoundError`; use the
+  canonical checkout for KB probes, and note the degradation rather than mistaking it for an
+  empty corpus.
 
-CI jobs beyond the five gates (`verify`, `workflow-parity`, `repro`, `packaging`); any change to
-`.github/workflows/pytest.yml`; fleet/admission wiring; publishing; the posterior phase.
+## 6. Out of scope (explicitly)
+
+- The c15 `handoff` object / any new binding field or record family.
+- A generalized prose compiler or a new governance framework (controller direction,
+  `aio_arc_findings_and_results.md:204-205`).
+- `work_unit` backfill, monitor pointers, corrections arrays, lineage beyond one hop — the other
+  c15 categories; this item is the next-action state only.
+- The in-process (`orchestrator=false`) run mode, which by the project rules is not the fleet
+  path and does not record.

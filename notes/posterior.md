@@ -1,245 +1,250 @@
-# Posterior — local CI preflight (`agentic-dynamics validate preflight`)
+# Posterior — Item 4: the stale next-action state
 
-**Loop:** POSTERIOR phase of `workflows/repository/world_model_loop.yaml` (prior → execute →
-posterior). **Task:** ONE local command running the five gates `.github/workflows/pytest.yml`
-runs on every push (ruff · generated surfaces · docs drift · fast path · deterministic suite),
-one PASS/FAIL line per gate, non-zero exit if any gate fails.
-**Branch:** `feature/ci-preflight` @ `79bbba749` (prior `f2f6bcaa1`; `main` @ `11bae5110`).
-**Inputs read:** `notes/world_model.md`, `notes/plan.md`, `notes/deviations.md`, the run's two
-commits, and the code they touch. **Date:** 2026-09-21.
-**Evidence discipline:** every claim below cites a file/line, a commit, a KB record, or a command
-output; nothing is from memory.
+*Final phase of the world-model loop. Read-only with respect to production code. Every claim is
+grounded in a file, a commit, a KB record, or a command output. The diff is against
+`notes/world_model.md` (the prior) and `notes/plan.md`; the deviations record is
+`notes/deviations.md`.*
 
----
+## Verdict
 
-## 0. What the posterior actually re-measured (method)
-
-The posterior does not trust the deviations note — it re-ran the claims. Commands and results:
-
-| Claim under test | Command | Result |
-|---|---|---|
-| The inherited shell is a fleet cell | `env \| grep FINOPS` | `FINOPS_CELL_ID=wf_world_model_loop_deepseek_deepseek_v4_flash` |
-| All five gates green | `python3 scripts/ci_preflight.py --only lint/surfaces/docs-drift` then `--only fast-path` then `--only full-suite` | 3 PASS, then `PASS fast-path (34.2s)`, then `4581 passed, 32 skipped in 110.35s` → `PASS full-suite (111.0s)`; exit 0 each |
-| G2 is real, not cosmetic | `pytest tests/test_control_room_build_contract.py` (raw) vs `env -u FINOPS_CELL_ID …` | raw: **2 failed, 21 passed**; scrubbed: **23 passed** |
-| G3/G4 repaired | `pytest tests/test_ci_preflight.py test_cli_resolution.py test_agent_config_semantic.py test_script_classification.py -q` | **117 passed** |
-| CLI resolution in-tree | `PYTHONPATH=src python3 -c "cli._resolve(['validate','preflight'])"` | `('ci_preflight.py', [])` |
-| The bare console script is NOT this checkout | `/home/drseuss/.local/bin/agentic-dynamics validate preflight --list` | `unknown command validate preflight --list` |
-| The two guard tests are fast-excluded | `pytest test_cli_resolution.py test_agent_config_semantic.py test_ci_preflight.py -m fast --collect-only` | `no tests collected (115 deselected)` |
-| KB recall for this task | `python3 scripts/kb_read.py --query "CI preflight local gates parity one command" --scope agentic-dynamics` | 1 hit: `e6222c1ca0de8ead \| finding \| design:world-model-loop` |
-
-**Verdict on the world model's hypotheses.** H1 (the five gates are the blocking subset) holds.
-H2 (hermetic testability) holds, but only after a seam the plan did not name (§V4). H3 holds, and
-is *sharpened*: the failures this task repaired were invisible to the fast path
-(`-m fast` collects **zero** of the three guard modules) — only the full-suite gate caught them.
+The plan's central prediction held: **the c15 gap is closed at the capsule-composer layer for the
+one confirmed action that records — a durable submit — and the execute phase landed the missing
+carrier-level regression check, not a source change.** The three named tests exist and pass
+(`242 passed` across the three suites, `ruff check` clean). Two things the model did not carry are
+now visible: the *delivery* layer still has a bounded staleness window the regression does not
+cover, and the execute phase performed a large, unrecorded whole-file reformat that contradicts
+the plan's "smallest fix" scope.
 
 ---
 
 ## 1. VIOLATIONS — where reality differed from the world model
 
-### V1 — The world model labelled G2 "not real"; it is the load-bearing condition of the deliverable.
-- **Model said:** `notes/world_model.md:153-155` — the two `test_control_room_build_contract`
-  failures are "**Harness-environment (not real, 2)**", and `:108` frames G2 as an open question
-  ("Decide whether the preflight scrubs…").
-- **Reality:** the variable is set in *every* fleet/AIO shell (measured: this session's `env`),
-  and without the scrub the branch's own `full-suite` gate is **red** — the acceptance criterion
-  the model itself set (`notes/plan.md:135`, "Reports `5 passed`"). The failures are real in the
-  environment the preflight is actually run from; "not real" reads as "can be ignored", which is
-  wrong.
-- **Evidence:** raw vs scrubbed pytest above; `scripts/ci_preflight.py:274-287` (`_child_env`
-  scrub) and `tests/test_ci_preflight.py:211-232` (the scrub is asserted); `notes/deviations.md:72-73`.
-- **Consequence:** the scrub is not environment hygiene bolted on — it is a correctness
-  requirement of the runner. The next model must state the condition, not the anecdote.
+### V1. The world model claims the *carrier* is fixed; the regression actually pins the *composer*
 
-### V2 — "Reachable as `agentic-dynamics validate preflight`" was false for the bare binary.
-- **Model said:** `notes/world_model.md:1`, `:47-55`, and `notes/plan.md:125` treat the installed
-  console script as the in-tree CLI; §2.2 inspects `src/agentic_dynamics/cli.py` and assumes it is
-  what `agentic-dynamics` runs.
-- **Reality:** `/home/drseuss/.local/bin/agentic-dynamics` imports `agentic_dynamics` from a
-  **different checkout** (`/home/drseuss/ai-finops-framework/src/…`) and prints `unknown command
-  validate preflight`. In-tree resolution works (`cli._resolve` → `("ci_preflight.py", [])`).
-- **Evidence:** command outputs above; `notes/deviations.md:49-61` (D4).
-- **Consequence:** the world model omitted a one-command check (`which agentic-dynamics`) that
-  would have caught a host-level assumption at prior time. Every CLI-touching task must check it.
+`notes/world_model.md:73-75` states the property unconditionally: "once the submit records, the
+capsule's next action is the `[auto]` job observation and the completed instruction is gone." The
+tests prove that for `compose_capsule`, but the per-request carrier is the TypeScript plugin, which
+**caches the composed capsule for 30 s and reuses it**.
 
-### V3 — The plan's named test seam could not satisfy the plan's own acceptance #4.
-- **Model/plan said:** `notes/plan.md:55-59` — the seam is `run_gate(...)` and `run_preflight(...)`,
-  and acceptance #4 requires the unit suite green "**without** spawning a real gate … or creating
-  a worktree".
-- **Reality:** `run_preflight` renders the repo HEAD and the ruff version, so calling it would
-  shell out to real `git`/`ruff`, violating acceptance #4. A new pure function
-  `evaluate_preflight(...) -> PreflightReport` (plus `build_report`/`render_summary`) was required.
-- **Evidence:** `scripts/ci_preflight.py:321-352` (`evaluate_preflight`), `:456-485`
-  (`run_preflight` = evaluate + render), `:355-387` (the real metadata probes);
-  `notes/deviations.md:13-25` (D1).
-- **Consequence:** the world model's H2 ("injectable process execution") was right in spirit but
-  the *plan* conflated process injection with metadata-probe injection. The next plan should state
-  the seam at the granularity the acceptance tests actually need.
+- `.opencode/plugins/aio-context.ts:86` — `const CAPSULE_TTL_MS = 30_000`.
+- `.opencode/plugins/aio-context.ts:839-842` — `deliverSnapshot` returns
+  `cached?.text` whenever `Date.now() - cached.at < ttlMs`.
+- The cache is invalidated **only** by the plugin's own update path
+  (`.opencode/plugins/aio-context.ts:796` — `capsules.delete(sessionID)`). A durable write made by
+  another process — `fleet_manager.py submit`, the ordinary AIO path — does **not** invalidate it.
 
-### V4 — The execute commit altered more than the deviation record admits.
-- **Plan/model said:** `notes/plan.md:74` — `tests/test_agent_config_semantic.py` change is
-  "`_CLI` separator `\s+` → `[^\S\n]+`" (explicitly "1-char semantic"); `notes/deviations.md:70-71`
-  records only that separator change for G4.
-- **Reality:** the execute commit `79bbba749` also **reformatted `_check_paths`** — a multi-line
-  `if (...)` collapsed to one line, with **no behavioural change** — at
-  `tests/test_agent_config_semantic.py:183-185`. This second hunk is not recorded anywhere.
-- **Evidence:** `git diff f2f6bcaa1..79bbba749 -- tests/test_agent_config_semantic.py` (two hunks);
-  the file today at `:183-185`; `notes/deviations.md` has no entry for it.
-- **Consequence:** the deviations artifact — the very thing this loop exists to make honest —
-  under-reports its own diff. A reviewer diffing the plan against the commit tree finds a change
-  the record denies. Minor in blast radius, material to the loop's contract.
+So for up to 30 s after an out-of-process submit, the live carrier can still render the completed
+`next_action`. The regression (`tests/test_fleet_manager.py:1599`,
+`tests/test_session_binding.py:782`) composes fresh from the read-back binding and therefore never
+exercises this window. The world model named the mechanism correctly but over-claimed the closure
+class. The plan itself flagged the risk (`notes/plan.md:124-126`) and instructed "STOP and record
+the deviation"; the tests avoided the plugin, so the risk never fired and the residual was never
+recorded.
 
-### V5 — A line anchor in the world model was already stale on the branch it described.
-- **Model said:** `notes/world_model.md:52` — "the `validate` group currently reads
-  `session|tests|prereq|preexisting|render` (`cli.py:232` region)".
-- **Reality:** the pre-edit `_HELP` validate line sat at `cli.py:236` (the edit hunk header is
-  `@@ -233,7 +240,7 @@`, i.e. the old line was in that window, the new at 240). The model's anchor
-  was off; note that `notes/` is outside the `anchor_integrity` axis' scan scope
-  (`scripts/scan_docs_drift.py:52`), so this class of drift is unchecked by construction.
-- **Evidence:** `git diff f2f6bcaa1..79bbba749 -- src/agentic_dynamics/cli.py`; `notes/deviations.md`
-  does not mention it.
-- **Consequence:** low severity, but it is the loop's own artifacts drifting from the code — a
-  world model that cannot be anchor-checked will accumulate this. Worth a prior-phase habit
-  (grep the line before citing it), not a new rail.
+### V2. Unrecorded scope expansion: a whole-file reformat in the execute commit
+
+The execute commit is `3689fb233`. Its diff is **851 insertions / 241 deletions** across two test
+files — overwhelmingly `ruff format` reflowing pre-existing code, not the three tests the plan
+authorized (`notes/plan.md:27-28`).
+
+```
+$ git show --stat 3689fb233
+ notes/deviations.md           |   30 ++
+ tests/test_fleet_manager.py   |  775 ++++++++++++++++++++++++++++++++++------
+ tests/test_session_binding.py |  287 ++++++++++++----
+```
+
+The files were unformatted **before** the commit:
+
+```
+$ git show f2d939783:tests/test_fleet_manager.py > /tmp/tfm_before.py
+$ git show f2d939783:tests/test_session_binding.py > /tmp/tsb_before.py
+$ ruff format --check /tmp/tfm_before.py /tmp/tsb_before.py
+2 files would be reformatted          # but:
+$ ruff check /tmp/tfm_before.py /tmp/tsb_before.py
+All checks passed!
+```
+
+CI runs `ruff check .` and **not** `ruff format --check`
+(`.github/workflows/pytest.yml:44`), so the reformat was neither required nor caught. The plan's
+§1 file table says "ADD tests"; it names no formatting work, and `notes/deviations.md` records no
+delta for it — a violation of the plan's own acceptance criterion §4.5 ("records any delta") and of
+the loop's "smallest fix" instruction. It is semantically inert, but it inflates the permanence-gate
+diff and broke the prior's navigation (V3).
+
+### V3. The reformat invalidated the prior's line references
+
+The world model navigated by line number. The reformat moved every referenced test:
+
+| prior reference | reality at prior time (`f2d939783`) | after execute (`3689fb233`) |
+|---|---|---|
+| `tests/test_fleet_manager.py:1023` | `test_a_submission_records_its_job_into_the_task_state` | `:1247` |
+| `tests/test_fleet_manager.py:1059` | `test_a_stale_revision_never_overwrites_the_task_state` | `:1303` |
+| `tests/test_session_binding.py:300` | `test_next_action_precedence` | moved |
+| `tests/test_session_binding.py:570` | `test_capsule_reflects_the_updated_context` | moved |
+
+The world model's references were accurate when written; the drift is a *consequence* of V2, not a
+prior error. It is recorded here because the next model reads `world_model.md` and will navigtate
+by those stale numbers.
+
+### V4. The deviations record's KB claim contradicts the world model's own probe
+
+`notes/deviations.md:15` records: "`python3 scripts/kb_read.py --query ... --scope
+agentic-dynamics` returned `hits=0` (ranked)". But the world model's own §3 (lines 114-116) reports
+the same ranked mode returning the design finding `e6222c1ca0de8ead`. Re-run today:
+
+```
+$ python3 scripts/kb_read.py --query "stale next action binding capsule regression" --scope agentic-dynamics
+[kb-read] ... mode=ranked hits=2
+  51e507a9cc25a296 | finding | audit:retrieval
+  e6222c1ca0de8ead | finding | design:world-model-loop
+```
+
+Ranked retrieval never depended on `experiments/results/registry_index.jsonl`; only `--contains`
+does (`scripts/kb_read.py:94` raises `FileNotFoundError` — reproduced in this worktree). The
+deviations record conflated the two modes. The world model's §5 risk correctly named the
+`--contains` failure; `deviations.md` restated it as a ranked failure. Minor, but it is a
+reconstruction that a later reader could trust as the KB being empty.
+
+### V5. The loop's own outputs are git-only — no KB finding was emitted
+
+The spec declares the emit intent (`workflows/repository/world_model_loop.yaml:26-31`:
+`rag_augment: false`, `rag.emit_self: true`, `rag.emit_report: true`,
+`emit_scope: agentic-dynamics`) and the design's stated purpose is "the loop's world-model/plan/
+posterior notes must be knowledge, not only git files"
+(`src/agentic_dynamics/runtime/workflow_runner.py:5331-5334`). Reality at posterior time:
+
+```
+$ ls experiments/results/kb                -> No such file or directory
+$ ls experiments/results/workflows         -> contemplation_synthesis_rerun (only)
+$ python3 scripts/kb_read.py --query "world model loop item 4 ..." --scope agentic-dynamics
+  -> hits=2 (the design + the retrieval audit; no record from this run)
+```
+
+Neither the prior nor the execute produced a retrievable finding or a report artifact. Either emit
+was disarmed (`FINOPS_EMIT_SELF=0`, the unit-suite flag) or it failed silently — `_emit_self_finding`
+swallows every exception by construction (`workflow_runner.py:1768-1770`). A silent emit failure is
+indistinguishable from success, so the run cannot demonstrate the property it exists to test.
 
 ---
 
-## 2. UNKNOWNS DISCOVERED — what we did not know at prior time
+## 2. UNKNOWNS DISCOVERED — what the next model must carry
 
-### N1 — "Run the full suite locally" is under-defined in a fleet shell; the clean-shell semantics are the missing half.
-The prior model knew `FINOPS_CELL_ID` existed (`notes/world_model.md:108`) and that `cell_scope()`
-honours it (`src/agentic_dynamics/runtime/workflow_runner.py`'s `cell_scope`, cited there), but it
-did not know the variable is present in **every** AIO/fleet cell, nor that the raw suite is
-therefore red by default in exactly the environment the preflight is meant to serve. The
-non-obvious fact the next model must carry: *a local preflight is a claim about a CLEAN shell, so
-it must construct that shell, not inherit one.* The runner does (`scripts/ci_preflight.py:39-45,
-274-287`), but nothing at prior time said the scrub was mandatory.
-
-### N2 — The docs-drift scanner has seven axes; `scripts/CONTEXT.md` documents six.
-`scripts/scan_docs_drift.py:43` ("THE SEVEN AXES") and `:104-114` (the `AXES` tuple, ending
-`"fast_path"`) enumerate **seven** axes; `scripts/CONTEXT.md:224` says the scanner works "across
-six axes" and omits `fast_path`. This is a pre-existing prose drift on `main` too
-(`git show main:scripts/scan_docs_drift.py` already has seven; `git show main:scripts/CONTEXT.md`
-already says six). It is invisible to the CI gate because CI only runs
-`--check spec_lifecycle` (`.github/workflows/pytest.yml:81`). **The scanner does not check its own
-documentation's axis count** — a self-referential blind spot the next model should know exists.
-
-### N3 — The guards that catch CLI/generator drift are NOT in the fast path.
-`pytest -m fast` collects **zero** of `tests/test_cli_resolution.py`,
-`tests/test_agent_config_semantic.py`, `tests/test_ci_preflight.py` (measured: 115 deselected), and
-`tests/test_ci_preflight.py` explicitly cannot be fast-marked because importing `ci_preflight`
-pulls in `subprocess` (`tests/test_ci_preflight.py:9-11`;
-`tests/test_fast_path_gate.py:32` `FORBIDDEN_IN_FAST`). Consequence for the next model: a
-"run `test_fast.sh` before pushing" habit does **not** reproduce CI's CLI/parity checks — the
-full-suite gate is the one that matters, and it is ~110s. This is precisely why the preflight
-exists, and it should be stated in its docstring/onboarding.
-
-### N4 — `--json -` is not a clean machine stream.
-The plan's two requirements collide: gates stream to inherited stdout by default
-(`notes/plan.md:51`) while `--json -` also writes to stdout. The deviations record this (D3,
-`notes/deviations.md:39-47`) and the script documents it, but at **prior time it was unknown** —
-the model's file/interface table (`notes/plan.md:47-48`) lists `--json <path|->` with no caveat.
-The next model should assume "observable stream + structured stdout" need an explicit split (a
-file path, or `--json` implies `--quiet`).
-
-### N5 — The KB has no record of the task itself; recall is design-only.
-`kb_read.py --query "CI preflight local gates parity one command" --scope agentic-dynamics` returns
-exactly one hit, `e6222c1ca0de8ead | finding | design:world-model-loop` — the loop's own design
-note. There is **no** prior finding/decision/session about CI parity, the five gates, or the
-`pipeline ci` disjointness. So the prior phase's model was necessarily derived from code, and the
-next model must not expect KB recall to reduce the search for repository-infrastructure tasks.
-(The read verb itself works — this is a coverage gap, not a retrieval failure.)
-
-### N6 — A maintained script reaches the CLI without a `Primary Entry Points` row.
-`scripts/CONTEXT.md` gained only `maintained: ci_preflight.py` (inside the machine-parsed
-`<!-- scripts-classification -->` block, `scripts/CONTEXT.md:33` region) to satisfy
-`tests/test_script_classification.py`. The file's human-facing "Primary Entry Points" table has no
-`ci_preflight.py` row, so a reader browsing the manifest learns the script exists but not what it
-does or when to run it. The classification guard does not require the table row. The next model
-must know that "classified" ≠ "documented".
+1. **The delivery cache is a real, bounded staleness channel not covered by the regression.**
+   Composer-level correctness (proven) ≠ carrier-level absence of staleness (unproven). Any future
+   claim of the form "a completed instruction can never remain the actionable next action" must
+   state the layer and the window. Reduce: either a plugin-level test (hard — TS/opencode runtime)
+   or a documented, named residual with the 30 s bound. Do not widen a bounded item to close it.
+2. **Silent emit means "no finding" is not evidence of "no emission."** `_emit_self_finding` and
+   `_emit_research_report` both `except Exception: pass`. The runner has no observable ack that a
+   KB record landed. Reduce: a `notes/` run with emit armed should assert its own artifact exists
+   (`experiments/results/kb/<id>.json` or `experiments/results/workflows/<spec>/reports/`), and the
+   posterior should check it — which this posterior did.
+3. **`emit_scope` is honored only by the report variant.** `_emit_self_finding` is called with
+   `scope=cell_scope(wd)` (`workflow_runner.py:5326`), producing `self-<worktree>` (for this tree,
+   `self-wml_run2`); only `_emit_research_report` reads `rag_params["emit_scope"]`
+   (`workflow_runner.py:1854`). The spec's `emit_scope: agentic-dynamics` therefore does **not**
+   place the metadata findings in the shared scope. Not known at prior time; it matters for the
+   loop's stated goal of writing its notes into `agentic-dynamics`.
+4. **Confirmed actions other than submit still do not record** (world model §4.2; `deviations.md`
+   §"Out of scope"). `approve_workflow.py` carries no session identity and never calls
+   `update_binding_context`; if the AIO sets `next_action = "approve gate X"`, approval leaves the
+   field stale. Bounded, named, unfixed — carry it, do not silently treat the c15 class as closed.
+5. **The plan's stated acceptance criterion is unenforced by the tooling.** §4.5 requires
+   `deviations.md` to record "any delta", but nothing checks that a delta (here: formatting) was
+   recorded. The execute phase passed every command in `notes/plan.md` §3 while still violating §1
+   scope. Reduce: a prior-phase convention, not a new gate (see UPDATES C1).
 
 ---
 
 ## 3. UPDATES — the concrete update set
 
-### 3.1 KB findings to emit
+### A. KB findings to emit (scope `agentic-dynamics`, existing producer path)
 
-1. **`phase-finding/v1` for this run (automatic, scope `agentic-dynamics`).**
-   The workflow runs with `rag.emit_self: true` (`workflows/repository/world_model_loop.yaml:19-24`),
-   so this report is emitted by the runtime after the phase commits. Content it should carry,
-   [M]-tagged: the five-gate preflight exists at `scripts/ci_preflight.py`, is reachable as
-   `validate preflight` in-tree, and was end-to-end green (`5 passed`, exit 0) on `79bbba749`.
-2. **A cross-suite hazard finding — "`FINOPS_CELL_ID` rewrites the KB cell scope inside the
-   deterministic suite."** [M] Evidence: the raw/scrubbed pytest pair above; `cell_scope()`'s env
-   override; `scripts/ci_preflight.py:274-287`. Consumer: any suite runner, worker, or agent that
-   runs `pytest tests/` from a fleet shell. This is the single highest-value record the loop
-   produced.
-3. **A docs-drift self-coverage finding — "the scanner's own doc says six axes; the code has
-   seven."** [M] Evidence: `scripts/scan_docs_drift.py:43,104-114` vs `scripts/CONTEXT.md:224`;
-   the CI gate only checks `spec_lifecycle`. Consumer: the docs-drift rail's next iteration
-   (either fix the prose or add an axis that checks the scanner's documented surface).
+**A1 — the verification outcome (authority MEASURED; the loop's own result).** Text: *"c15
+stale-next-action: the gap is CLOSED at the composer layer for the durable-submit path.
+`_record_submission_in_task` (`scripts/fleet/fleet_manager.py:853`) REPLACES the binding's
+`next_action` under a context-version guard (recorded at `:1326`, note `:1348`); the capsule
+renders the binding value with precedence (`scripts/session_open.py:393-400`). Pinned by three new
+regressions: `tests/test_session_binding.py:610, 782` and `tests/test_fleet_manager.py:1599`
+(242 passed)."* Cite the commit `3689fb233` and the c15 source
+(`experiments/results/fork_contemplation/wave1/c15.md:20`).
 
-Suggested retrieval keys so a future prior finds them: `ci preflight`, `local CI parity`,
-`FINOPS_CELL_ID cell scope`, `docs-drift axes`.
+**A2 — the named residual (authority ADVISORY [H]).** Text: *"Two residual staleness channels the
+submit-path fix does not close: (i) the per-request carrier's 30 s capsule cache
+(`.opencode/plugins/aio-context.ts:86,839-842`) is not invalidated by out-of-process durable
+writes, so a completed `next_action` may render for ≤30 s; (ii) confirmed actions without a
+binding address (e.g. `approve_workflow.py`) do not record at all."* This is the honest boundary of
+the bounded improvement; it must be retrievable so the next loop does not re-litigate closure.
 
-### 3.2 Skills / knowledge / conventions to record
+**A3 — the process correction (authority ADVISORY [H]).** Text: *"A bounded regression change must
+not carry a whole-file `ruff format` sweep: CI gates on `ruff check .`, not `ruff format --check`
+(`.github/workflows/pytest.yml:44`); an unformatted file passes. Reformatting inflates the
+permanence diff and invalidates prior line references."* Evidence: `git show --stat 3689fb233`.
 
-- **Convention (CLI additions are a three-file edit):** a new `agentic-dynamics` verb requires
-  (a) `src/agentic_dynamics/cli.py` `_COMMANDS` **and** `_HELP`, (b) the hand-authored
-  `DOCUMENTED_RESOLUTIONS` table in `tests/test_cli_resolution.py`, and (c) the CLI tree in
-  `agent_config/mental-model.md` followed by `python3 scripts/_gen_instructions.py`. G3 is the
-  proof: `knowledge read` was added to (a) and (b)'s source but not to the table, and the guard
-  went red (`notes/world_model.md:109`; repaired at `tests/test_cli_resolution.py:87-89`).
-  Candidate home: the `run-workflow`/`instrument` skill, or a short section in
-  `scripts/CONTEXT.md`.
-- **Convention (fast-path membership):** a test module that imports `subprocess` (or any
-  `FORBIDDEN_IN_FAST` token) **must not** carry `@pytest.mark.fast` unless it declares
-  `# fast-safe`; `tests/test_fast_path_gate.py:32,104` enforces it. Corollary discovered: the
-  preflight's own unit test therefore adds coverage to the full suite only (N3).
-- **Convention (clean-shell measurement):** any command whose job is to predict CI must construct
-  the CI shell (scrub harness-only variables) rather than inherit the caller's; `--no-clean-env`
-  is the documented escape hatch. `scripts/ci_preflight.py:39-45`.
-- **Skill/knowledge candidate:** a one-page "local CI parity" entry (either a `knowledge-reader`
-  sibling skill or a `scripts/CONTEXT.md` Primary Entry Points row) that says: run
-  `agentic-dynamics validate preflight` before a push; `--only`/`--skip` for iteration; the bare
-  global binary is not this checkout. Per the design's own rule
-  (`docs/designs/proposed/world_model_loop.md:51-54`), a *skill* must ride the normal promotion
-  gate — so this phase proposes the content and location but does not mint a generated surface.
+Emit these through `emit_phase_finding`/`derive_phase_record` (the existing producer path), not a
+new family. Note the run did **not** auto-emit V5; this is a manual update step until the emit is
+verified.
 
-### 3.3 What should change in the next loop's prior phase
+### B. Conventions to record
 
-1. **Separate raw from scrubbed measurement.** When the task touches the test suite, run the raw
-   command *and* the clean-shell command and diff the failure sets; classify each failure as
-   real vs harness-env *before* writing the model (this loop had to discover that in execute).
-2. **Check host-level resolution for any CLI claim.** `which <binary>` + `PYTHONPATH=src …` before
-   asserting a command is reachable (V2). Prefer in-tree `cli._resolve` as the evidence form.
-3. **Do not cite a line anchor without re-grepping it** (V5); `notes/` is not anchor-checked.
-4. **Test the plan's named interfaces against the acceptance criteria on paper** (V3): if an
-   acceptance test needs injection the plan's signature cannot provide, name the extra seam in the
-   plan, not in execute.
-5. **Prose-vs-code counts are a drift class of their own** (N2): reconcile a doc's stated
-   "N of X" against the code's enumeration during the prior read.
-6. **Expect thin KB recall for repository-infrastructure work** (N5) and budget the prior phase
-   for code-derived modelling accordingly.
+- **C1 (recording completeness):** *A mechanical change is still a delta.* A whole-file formatter
+  run, a line-ending normalization, or any edit outside `notes/plan.md`'s file table belongs in
+  `notes/deviations.md` even when it passes lint. "The tests pass" is not "no deviation."
+- **C2 (layer discipline):** *Name the layer a property is proven at.* A regression against a pure
+  function (`compose_capsule`) proves the function, not the delivery path (the plugin). When a
+  finding says "the carrier", the test must say which carrier. Prefer a named residual over silently
+  narrowing the claim.
+- **C3 (emit observability):** *A silent emit is unverified emit.* When a spec opts into
+  `rag.emit_self`/`emit_report`, the phase's exit check should confirm its artifact exists; the
+  posterior should verify it (as §V5 does).
 
-### 3.4 Derived / design artifacts to update (proposals, not actions here)
+### C. Skills / knowledge to create or amend
 
-- `docs/designs/proposed/world_model_loop.md:43` still lists *"local CI parity … partial — no
-  one-command preflight"*; the "Smallest next steps" bullet at `:61-63` is now **done**. The row
-  should read *built (`scripts/ci_preflight.py`, `validate preflight`)* and the design should carry
-  this loop's result (the pilot's first posterior). Owner: a normal permanence-gated change, not
-  this phase.
-- `scripts/CONTEXT.md` — two small gaps: its "Primary Entry Points" table has no `ci_preflight.py`
-  row (N6), and its `scan_docs_drift.py` row says "six axes" where the code has seven (N2). Both
-  are documentation edits on `main` and belong to a docs-drift remediation, not the posterior.
+- **`run-workflow` skill:** add the scope gotcha — `rag.emit_self` metadata findings land in
+  `cell_scope(wd)` = `self-<worktree>`, while `rag.emit_report` honors `rag.emit_scope`
+  (`workflow_runner.py:5326` vs `:1854`). A spec that asks for shared-scope knowledge needs
+  `emit_report: true`; `emit_self` alone will not put findings in `agentic-dynamics`.
+- **`run-workflow` skill / workflow-runner docs:** note the best-effort `except Exception: pass`
+  in both emit paths, with the observable artifacts to check
+  (`experiments/results/kb/`, `experiments/results/workflows/<spec>/reports/`).
+- **`notes/` loop template (the design doc `docs/designs/proposed/world_model_loop.md`):** state
+  that the posterior's deliverable includes an emitted finding, and that the loop is not complete
+  until A1/A2 land in the registry.
+
+### D. What should change in the next loop's prior phase
+
+1. **Baseline the formatter.** Run `ruff format --check` on the files the plan intends to touch and
+   record the result. If a file is unformatted, decide once — leave it (CI does not require it) or
+   do the reformat as a separate, explicitly-scoped change — and write that decision into
+   `notes/plan.md` §1. This is the direct fix for V2/V3.
+2. **Prove the layer, don't assume it.** For any finding whose subject is a "carrier" / "delivery",
+   trace the actual delivery path in the prior (here: `.opencode/plugins/aio-context.ts`) and list
+   its caches/windows as explicit unknowns. The prior read the composer and the binding but treated
+   the plugin's TTL as a risk footnote, not a fact to carry.
+3. **Check whether the loop can emit at all.** Before writing, verify the workflow's emit is armed
+   and that prior runs' artifacts exist; otherwise the loop's stated purpose is unmet and the
+   posterior must say so (V5).
+4. **Enumerate the residual set in the acceptance criteria**, not only in `deviations.md`'s
+   "out of scope" tail — so the posterior can measure against a declared boundary rather than a
+   post-hoc one.
 
 ---
 
-## 4. One-line close
+## 4. Probe log (what was read, and why)
 
-The deliverable met its contract (all five gates independently re-verified green; exit 0/1/2 as
-specified), but the model that produced it mis-scored its own biggest hazard (V1), assumed an
-entry point that does not resolve on this host (V2), under-specified the seam its acceptance
-required (V3), and its deviation record under-reports its own diff (V4); the durable lessons are
-the clean-shell requirement for every CI-predicting command, the three-file edit rule for a new
-CLI verb, and the fact that the guards protecting CLI/generator parity live only in the slow
-suite.
+| probe | why | result |
+|---|---|---|
+| `notes/world_model.md`, `notes/plan.md`, `notes/deviations.md` | the model and plan under test | mechanism claims accurate; carrier claim over-broad; format delta unrecorded |
+| `git show 3689fb233` / `--stat` | what execute actually did | 851+/241-, overwhelmingly `ruff format`; 3 tests + 1 helper added |
+| `ruff format --check` on `f2d939783:` test files | was the reformat necessary? | "2 files would be reformatted"; `ruff check` passed before |
+| `.github/workflows/pytest.yml:44` | is format gated in CI? | no — `ruff check .` only |
+| `.opencode/plugins/aio-context.ts:86,796,839-842` | the real per-request carrier | 30 s TTL cache; invalidated only by the plugin's own update |
+| `scripts/fleet/fleet_manager.py:853,1326,1348` | the confirmed action's recording | `_record_submission_in_task` replaces `next_action` |
+| `scripts/session_open.py:393-400,521` | capsule precedence/rendering | binding value wins; rendered in the protected tail |
+| `tests/test_session_binding.py`, `tests/test_fleet_manager.py` (run) | do the regressions pass? | 242 passed; `ruff check` clean |
+| `workflow_runner.py:5326,1854,1768-1770` | where do emitted findings land? | `emit_self` → `cell_scope`; `emit_report` → `emit_scope`; both swallow errors |
+| `experiments/results/kb`, `.../workflows` (ls) | did the loop emit? | absent/empty — the loop's notes are git-only (V5) |
+| `kb_read.py --query ... --scope agentic-dynamics` (ranked and `--contains`) | prior records / closure claims | ranked hits=2; `--contains` raises (`registry_index.jsonl` absent) |
+| `experiments/results/fork_contemplation/wave1/c15.md:20` | the finding under test | stale-intent item; §4.6 proposed regression |
+| `docs/reviews/aio_arc_findings_and_results.md:140-141,179-180,190-191` | Item 4's directive + claim class | bounded improvement; verify first; no new memory format |

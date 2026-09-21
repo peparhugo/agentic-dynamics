@@ -423,9 +423,14 @@ def _artifact_path(knowledge_id: str) -> Path:
 
     ``artifact_uri`` / ``record_to_event`` point at the repo-root-relative
     ``file://experiments/results/kb/<knowledge_id>.json``; writing needs the absolute path
-    regardless of the process cwd, so it is anchored to :data:`PROJECT_ROOT`.
+    regardless of the process cwd. Anchored to the DURABLE results tree: the fleet path
+    contract's ``FINOPS_RESULTS_DIR`` when set (a runner executing from an EPHEMERAL worktree
+    must emit artifacts into the durable checkout — world-model loop v1.1, 2026-09-21), else
+    this checkout's :data:`PROJECT_ROOT`.
     """
-    return PROJECT_ROOT / ARTIFACT_DIR / f"{knowledge_id}.json"
+    results_env = os.environ.get("FINOPS_RESULTS_DIR")
+    base = Path(results_env) / "kb" if results_env else PROJECT_ROOT / ARTIFACT_DIR
+    return base / f"{knowledge_id}.json"
 
 
 def _phase_tokens(phase_result: Any) -> int:

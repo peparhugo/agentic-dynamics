@@ -107,11 +107,11 @@ _COUNT = re.compile(
 #: ``scripts/<name>.<ext>`` references.
 _SCRIPT = re.compile(r"\bscripts/([A-Za-z0-9_]+)\.(py|sh|md)\b")
 
-#: ``agentic-dynamics <verb> <noun>`` (two subcommand words). The separator is ``[^\S\n]+``
-#: (horizontal whitespace only) rather than ``\s+``: ``\s`` matches newlines, so a skill line
-#: ending in a command followed by a line that itself begins with ``agentic-dynamics``
-#: synthesised a fake two-word command spanning the newline (world-model-loop G4). A real
-#: command's verb and noun are always on the same line.
+#: ``agentic-dynamics <verb> <noun>`` (two subcommand words). Horizontal whitespace only: a CLI
+#: invocation is single-line, and a bare ``\s+`` forges a command across the newline between two
+#: adjacent lines (2026-09-21 false positive: ``--scope agentic-dynamics`` at the end of one
+#: example line plus ``agentic-dynamics knowledge read`` on the next read as the command
+#: ``agentic-dynamics agentic-dynamics knowledge``).
 _CLI = re.compile(r"agentic-dynamics[^\S\n]+([a-z][a-z-]*)[^\S\n]+([a-z][a-z-]*)")
 
 
@@ -272,6 +272,22 @@ def test_cli_commands_exist():
     assert not violations, "agent_config names unknown CLI commands:\n" + "\n".join(
         sorted(violations)
     )
+
+
+def test_cli_guard_is_line_scoped():
+    """A CLI invocation is single-line; the guard must not match across a newline.
+
+    Regression (2026-09-21): in the knowledge-reader skill, one example line ends
+    ``--scope agentic-dynamics`` and the next opens ``agentic-dynamics knowledge read``; a bare
+    ``\\s+`` forged the command ``agentic-dynamics agentic-dynamics knowledge`` from the pair.
+    """
+    adjacent_lines = (
+        'agentic-dynamics knowledge read --query "cache hit rate" --scope agentic-dynamics\n'
+        'agentic-dynamics knowledge read --query "delivery repair" --scope self-cell\n'
+    )
+    assert _check_cli(adjacent_lines, "fixture") == []
+    # The guard still catches a genuinely unknown single-line command.
+    assert _check_cli("agentic-dynamics bogus verb\n", "fixture")
 
 
 def test_named_scripts_exist():

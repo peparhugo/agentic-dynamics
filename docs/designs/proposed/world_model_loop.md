@@ -40,7 +40,7 @@ what we didn't know."
 | reflection records | `reflection_ingestion` (session self-notes) | exists |
 | context assembly for a step | `control.context_compiler` | exists |
 | procedural skills as knowledge | `kb_produce_skill` (pattern/v1 projection) | exists (KB-side) |
-| local CI parity | `pipeline` plans (`ci`), the workflow's gates | partial — no one-command preflight |
+| local CI parity | `agentic-dynamics validate preflight` (built 2026-09-21 on `feature/ci-preflight`, pending merge) | built |
 
 ## What is missing (the three artifacts)
 
@@ -64,6 +64,29 @@ what we didn't know."
 - **Runtime-skill candidate path**: define where a runtime-minted skill lands before promotion
   (a `skill-candidate` record in the KB + an explicit promotion step) — never a hand-edit of
   generated surfaces.
+
+## v1 built (2026-09-21, `feature/world-model-v1`)
+
+- **The artifact gate** — a phase declares `requires_files: [...]`; the runner REFUSES before
+  any prompt build, admission, or spend when a declared artifact is absent from the worktree.
+  This is the plan gate: `execute` cannot run without the prior phase's `notes/plan.md`, and
+  `posterior` cannot run without the model and the plan. Tests:
+  `tests/test_world_model_gates.py`.
+- **The report variant for committed phases** — `rag.emit_report: true` ALSO emits the full
+  captured turn as a retrievable record, so a loop's notes (world model, plan, posterior) are
+  knowledge, not only git files. The world-model loop spec opts in.
+- **Runtime-skill candidates (convention)** — a runtime discovery that wants to become a skill
+  lands as a KB record scoped to the proposing cell (the existing `kb_produce_skill` /
+  pattern-projection seam, or the posterior's UPDATES list), and is promoted into
+  `agent_config/skills/` only through an explicit promotion step (a reviewed commit) — never a
+  hand-edit of generated surfaces.
+- **Durable emission (v1.1, 2026-09-21)** — the emissions (KB artifacts, run reports) and the
+  reader now honor the fleet contract's `FINOPS_RESULTS_DIR` (default: this checkout). A run
+  executing from an EPHEMERAL worktree must set it to the durable checkout
+  (`FINOPS_RESULTS_DIR=<durable>/experiments/results`), so records and their links stay
+  resolvable after the worktree goes away. Measured cause: the second loop run emitted its
+  reports/records into `/tmp/wml_v1/` — durable only while that worktree lived, and invisible
+  to a reader in another worktree (the posterior's own V5 false-negative).
 
 ## Open extension: execute as a workflow (controller, 2026-09-21)
 
