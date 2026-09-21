@@ -848,6 +848,51 @@ def _render_answers(blocks: list[str], manifest: list[dict[str, Any]], wd: Path)
     return "\n".join(lines)
 
 
+def _missing_required_files(phase_def: dict[str, Any], wd: Path) -> list[str]:
+    """Worktree paths a phase declared it cannot run without (the artifact/plan gate).
+
+    World-model loop v1 (2026-09-21): the loop's plan gate depends on this — the execute
+    phase declares ``requires_files: [notes/plan.md]`` and the runner REFUSES before any
+    prompt build, admission, or spend when the prior phase's plan is absent. Paths are
+    worktree-relative unless absolute.
+    """
+    required = phase_def.get("requires_files") or []
+    if isinstance(required, str):
+        required = [required]
+    missing: list[str] = []
+    for rel in required:
+        candidate = Path(str(rel))
+        if not candidate.is_absolute():
+            candidate = Path(wd) / str(rel)
+        if not candidate.is_file():
+            missing.append(str(rel))
+    return missing
+
+
+def _missing_required_markers(phase_def: dict[str, Any], wd: Path) -> list[str]:
+    """Required section markers a phase's artifacts must carry (the SHAPE gate).
+
+    ``requires_content: {path: [marker, ...]}`` — each marker must appear in the file's text.
+    The world-model loop's prior artifacts are shape-enforced: a plan without ``## Files`` /
+    ``## Tests`` / ``## Acceptance`` refuses the execute phase — not merely a missing file
+    (world-model loop v1.2, 2026-09-21, per the controller's "what does a prior run look like").
+    """
+    required = phase_def.get("requires_content") or {}
+    problems: list[str] = []
+    for rel, markers in required.items():
+        path = Path(str(rel))
+        if not path.is_absolute():
+            path = Path(wd) / str(rel)
+        if not path.is_file():
+            problems.append(f"{rel} (missing)")
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for marker in markers or []:
+            if str(marker) not in text:
+                problems.append(f"{rel} lacks {str(marker)!r}")
+    return problems
+
+
 def _build_phase_prompt(
     phase: dict[str, Any],
     goal: str,
@@ -1816,15 +1861,15 @@ def _emit_research_report(
 
         stamp = re.sub(r"[^0-9]", "", _now())[:14] or "report"
         safe_phase = re.sub(r"[^A-Za-z0-9._-]+", "_", str(pr.phase)) or "phase"
-        path = (
-            PROJECT_ROOT
-            / "experiments"
-            / "results"
-            / "workflows"
-            / spec_name
-            / "reports"
-            / f"{stamp}_{safe_phase}.md"
+        # The DURABLE results tree (the fleet path contract's FINOPS_RESULTS_DIR, default:
+        # this checkout) — a run executing from an ephemeral worktree must emit its reports
+        # where the records' links stay resolvable after the worktree goes away (world-model
+        # loop v1.1, 2026-09-21).
+        _results_env = os.environ.get("FINOPS_RESULTS_DIR")
+        results_dir = (
+            Path(_results_env) if _results_env else PROJECT_ROOT / "experiments" / "results"
         )
+        path = results_dir / "workflows" / spec_name / "reports" / f"{stamp}_{safe_phase}.md"
         path.parent.mkdir(parents=True, exist_ok=True)
         # The store capture is authoritative (the reader's view); the adapter's final_response
         # is the fallback when the store is unavailable.
@@ -4745,6 +4790,26 @@ def run_workflow(
                     empty_refuses=bool(phase_def.get("tests")),
                 )
             else:
+                # Artifact gate (world-model loop v1, 2026-09-21): a phase may declare
+                # ``requires_files: [...]`` — the runner REFUSES (raised before any prompt
+                # build, admission, or spend; recorded as a failed phase by the handler
+                # below) when a declared artifact is absent from the worktree. The
+                # world-model loop's plan gate depends on this: execute cannot run without
+                # the prior phase's plan.
+                _missing_required = _missing_required_files(phase_def, wd)
+                if _missing_required:
+                    raise RuntimeError(
+                        f"ARTIFACT_MISSING — phase '{name}' requires "
+                        f"{', '.join(_missing_required)}; the declared artifact(s) are "
+                        "absent from the worktree (the plan gate refuses before spend)"
+                    )
+                _missing_markers = _missing_required_markers(phase_def, wd)
+                if _missing_markers:
+                    raise RuntimeError(
+                        f"ARTIFACT_SHAPE — phase '{name}' requires: "
+                        f"{'; '.join(_missing_markers)}; the declared artifact exists but its "
+                        "required sections are absent (the shape gate refuses before spend)"
+                    )
                 if phase_def.get("_prepared_step"):
                     # Wave A2: a prepared step's prompt is the parent's FINAL instruction — the
                     # child neither re-renders placeholders nor lets any later transform
@@ -5290,6 +5355,15 @@ def run_workflow(
         if _finding_emit_enabled(rag_params, phase_def) and kind != "test" and pr.status == "ok":
             if pr.commit_hash:
                 _emit_self_finding(pr, goal=goal, scope=cell_scope(wd))
+                # Report variant for a COMMITTED phase (world-model loop v1, 2026-09-21):
+                # code phases keep the metadata finding above; a run that opts in
+                # (``rag.emit_report: true``) also gets the FULL captured turn as a
+                # retrievable record — the loop's world-model/plan/posterior notes must be
+                # knowledge, not only git files.
+                if rag_params.get("emit_report") and pr.final_response:
+                    _emit_research_report(
+                        pr, goal=goal, spec_name=spec.name, wd=wd, rag_params=rag_params
+                    )
             elif pr.final_response:
                 _emit_research_report(
                     pr, goal=goal, spec_name=spec.name, wd=wd, rag_params=rag_params

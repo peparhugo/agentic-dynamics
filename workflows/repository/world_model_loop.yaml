@@ -27,6 +27,7 @@ workflow:
     rag_augment: false
     rag:
       emit_self: true
+      emit_report: true
       emit_scope: agentic-dynamics
     context:
       domain_context: >-
@@ -46,17 +47,21 @@ workflow:
           Before any implementation:
           1. READ what is known. Use `python3 scripts/kb_read.py --query "..." --scope
              agentic-dynamics` for prior findings/decisions/sessions; `git log` and the code
-             tree for the current state; and `python3 scripts/research_fetch.py <url>` only if an
-             external fact is genuinely needed (record what you fetched and why).
-          2. WRITE `notes/world_model.md`: what the problem is believed to be; what exists;
-             what is unknown (gaps); what would reduce each gap.
-          3. WRITE `notes/plan.md`: the files to touch, the tests to create, the local
-             verification commands, the acceptance criteria, the risks.
+             tree for the current state; and `python3 scripts/research_fetch.py <url> --out-dir
+             notes/sources` only if an external fact is genuinely needed.
+          2. WRITE `notes/world_model.md` with these SECTIONS (the execute gate checks them):
+             `## Problem`, `## What Exists`, `## Gaps`, `## Sources` — SOURCES lists every KB
+             record id, file, and fetched URL (+sha256) you actually used.
+          3. WRITE `notes/plan.md` with these SECTIONS (the execute gate checks them):
+             `## Files`, `## Tests`, `## Acceptance`, `## Risks`.
 
           Do NOT implement — the plan gates the execute phase. Commit both files.
       - name: execute
         kind: agent
         timeout: 3600
+        requires_files: [notes/plan.md]
+        requires_content:
+          notes/plan.md: ["## Files", "## Tests", "## Acceptance"]
         prompt: |
           You are the EXECUTE phase. Implement the task ({goal}) FOLLOWING `notes/plan.md`.
 
@@ -67,6 +72,7 @@ workflow:
       - name: posterior
         kind: agent
         timeout: 1800
+        requires_files: [notes/world_model.md, notes/plan.md]
         prompt: |
           You are the POSTERIOR phase of the world-model loop. The task was: {goal}
 
@@ -79,3 +85,18 @@ workflow:
              conventions to record — and what should change in the next loop's prior phase.
 
           Commit the file.
+      - name: g_adversarial
+        kind: agent
+        scope: adversarial_readonly
+        timeout: 1800
+        requires_files: [notes/world_model.md, notes/plan.md, notes/posterior.md]
+        run_model: openai/gpt-5.6-terra
+        prompt: |
+          ADVERSARIAL REVIEW — you are a DIFFERENT model by design (independence, the canonical
+          adversarial phase every cap_* workflow carries). Read `notes/world_model.md`,
+          `notes/plan.md`, `notes/deviations.md`, `notes/posterior.md`, and the run's commits.
+
+          Attack the analysis: which claims are unsupported by a file? which recommendations are
+          misleading? where does the posterior overclaim? Name at least one falsifier per major
+          claim; recompute any number you cite. Write `notes/adversarial_review.md` with a final
+          `## FINDING` paragraph and commit it.
