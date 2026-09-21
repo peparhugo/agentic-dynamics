@@ -222,3 +222,82 @@ def test_report_path_honors_the_results_dir_contract(tmp_path, monkeypatch):
     path = str(captured.get("report_path", ""))
     assert str(results) in path and path.endswith("_prior.md")
     assert Path(path).is_file()
+
+
+# ── v1.3: the plan-driven test gate (tests_from_plan + the explicit skip) ─────────────────────
+
+PLAN_GATE_SPEC = """name: t_wml_plan_gate
+question: q
+version: "0.1"
+artifact_kind: workflow
+intent: measure
+side_effects: {repository: true, external_services: false}
+repeatable: true
+factors: [{name: model, levels: [m]}]
+design: factorial
+rules: []
+metrics: []
+comparison: null
+writeup: {format: lab_book, sections: [question]}
+stop: {budget_usd: 1.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_uncertainty}
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: false
+    rag: {emit_self: false, emit_report: false}
+    context:
+      domain_context: TEST
+    phases:
+      - name: prior
+        kind: agent
+        timeout: 60
+        prompt: |
+          prior {goal}
+      - name: g_test_gate
+        kind: test
+        scope: implementation
+        timeout: 60
+        tests_from_plan: notes/plan.md
+        prompt: |
+          The declared target verifies the worktree.
+"""
+
+
+def test_plan_test_targets_resolve_existing_files_in_the_tests_section_only(tmp_path):
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_in_section.py").write_text("x")
+    (tmp_path / "tests" / "test_outside_section.py").write_text("x")
+    notes = tmp_path / "notes"
+    notes.mkdir()
+    (notes / "plan.md").write_text(
+        "# Plan\n\n"
+        "## Files\n- `tests/test_outside_section.py`\n- `src/not_a_test.py`\n\n"
+        "## Tests\n- `tests/test_in_section.py`\n- `tests/test_missing.py`\n"
+        "- `tests/test_in_section.py`\n\n"
+        "## Acceptance\n- done\n"
+    )
+    # Only the ## Tests section; only files that exist; deduplicated.
+    assert wr._test_targets_from_plan(notes / "plan.md", tmp_path) == ["tests/test_in_section.py"]
+
+
+def test_plan_driven_test_gate_skips_explicitly_when_the_plan_names_no_targets(tmp_path):
+    _init_repo(tmp_path)
+    spec_path = tmp_path / "spec.yaml"
+    spec_path.write_text(PLAN_GATE_SPEC, encoding="utf-8")
+    spec = load_spec(spec_path)
+
+    def fake(prompt, **kwargs):
+        (tmp_path / "notes").mkdir(exist_ok=True)
+        (tmp_path / "notes" / "plan.md").write_text(
+            "## Tests\nNo suites are named for this analysis-only run.\n"
+        )
+        return _R()
+
+    result = wr.run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=fake)
+    gate = {p.phase: p for p in result.phases}["g_test_gate"]
+    assert gate.status == "ok"
+    assert "SKIPPED" in gate.test_gate_note  # explicit, visible — never a silent pass
+    assert gate.test_executed_success is None  # never ran — never a fabricated verdict

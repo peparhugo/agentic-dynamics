@@ -55,13 +55,18 @@ workflow:
              record id, file, and fetched URL (+sha256) you actually used.
           3. WRITE `notes/plan.md` with these SECTIONS (the execute gate checks them):
              `## Files`, `## Tests`, `## Acceptance`, `## Risks`.
+          4. WRITE `notes/sources.jsonl` — one JSON line per source you ACTUALLY used
+             (`{"kind": "kb"|"file"|"url", "ref": "<id|path|url>", "sha256": "<hex>"}`; a
+             fetched URL carries the sha256 `research_fetch` returned). When no external fact
+             was needed, write exactly one line `{"none": true, "reason": "..."}`. The
+             `## Sources` section above and this file must agree.
 
-          Do NOT implement — the plan gates the execute phase. Commit both files.
+          Do NOT implement — the plan gates the execute phase. Commit all three files.
       - name: execute
         kind: agent
         scope: implementation
         timeout: 3600
-        requires_files: [notes/plan.md]
+        requires_files: [notes/plan.md, notes/sources.jsonl]
         requires_content:
           notes/plan.md: ["## Files", "## Tests", "## Acceptance"]
         prompt: |
@@ -71,6 +76,18 @@ workflow:
           it in `notes/deviations.md` (what the plan said, what was true, what you did instead).
           Create the tests the plan names; run the local verification commands it lists.
           Commit your work.
+      - name: g_test_gate
+        kind: test
+        scope: implementation
+        timeout: 1800
+        requires_files: [notes/plan.md]
+        tests_from_plan: notes/plan.md
+        prompt: |
+          The independent test runner verifies the execute phase's worktree against the
+          targets `notes/plan.md` names in its `## Tests` section. Analysis-only runs that
+          name no targets SKIP explicitly (recorded on the ledger as `test_gate_note`, with
+          no fabricated verdict); code-producing runs are verified by their own declared
+          suites — never by the agent's self-report.
       - name: posterior
         kind: agent
         scope: proposal_write
@@ -88,6 +105,28 @@ workflow:
              conventions to record — and what should change in the next loop's prior phase.
 
           Commit the file.
+      - name: p2_mint
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        requires_files: [notes/posterior.md]
+        prompt: |
+          You are the MINT phase: turn the loop's own update set into knowledge, through the
+          EXISTING producer path — never a hand-written record.
+
+          1. Read `notes/posterior.md` §UPDATES. For every SKILL/PATTERN candidate it names,
+             write `notes/skills/<slug>.json` in the producer's shape: `claim`, `population`,
+             `conditions`, `support`, `uncertainty`, `evidence` (record ids you cite),
+             `source_experiment`, `subject`.
+          2. Mint each candidate: `python3 scripts/kb_produce_skill.py --skill-json
+             notes/skills/<slug>.json` (the pattern/v1 projection).
+          3. WRITE `notes/minted.md`: one line per candidate — `minted | skipped (reason)`.
+             A candidate that is not mintable MUST be recorded, never silently dropped.
+          4. Generated surfaces are NEVER hand-edited: a candidate lands in the KB; promotion
+             to an agent-facing skill is a reviewed commit, not a phase side effect.
+
+          If the posterior names no candidates, write `notes/minted.md` with a single
+          `none: <reason>` line — an explicit empty, never a silent skip. Commit your files.
       - name: g_adversarial
         kind: agent
         scope: adversarial_readonly
@@ -97,9 +136,12 @@ workflow:
         prompt: |
           ADVERSARIAL REVIEW — you are a DIFFERENT model by design (independence, the canonical
           adversarial phase every cap_* workflow carries). Read `notes/world_model.md`,
-          `notes/plan.md`, `notes/deviations.md`, `notes/posterior.md`, and the run's commits.
+          `notes/plan.md`, `notes/sources.jsonl`, `notes/deviations.md`, `notes/posterior.md`,
+          `notes/minted.md`, and the run's commits.
 
           Attack the analysis: which claims are unsupported by a file? which recommendations are
-          misleading? where does the posterior overclaim? Name at least one falsifier per major
-          claim; recompute any number you cite. Write `notes/adversarial_review.md` with a final
+          misleading? where does the posterior overclaim? Check the sources file against the
+          world model: every gap marked external must carry a fetched source with a sha256 — an
+          external gap with no fetch is a finding. Name at least one falsifier per major claim;
+          recompute any number you cite. Write `notes/adversarial_review.md` with a final
           `## FINDING` paragraph and commit it.

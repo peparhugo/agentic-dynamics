@@ -46,11 +46,21 @@ Evidence: `cap_runner_hardening`, `control_db_publication`, `self_knowledge_laye
 **`g_adversarial`** (different model, readonly, falsifiers required) — plus `requires_files`
 on posterior and the durable-emission contract (`FINOPS_RESULTS_DIR`).
 
-## Gaps (ranked, honest)
+**v1.3 (`feature/wml-v1.3`) adds the missing pieces below**: fleet scopes, `g_test_gate`
+(plan-driven), `p2_mint`, and source forcing.
 
-1. The loop has no `g_test_gate`: harmless for analysis-only runs; when `execute` produces
-   CODE, a `kind: test` phase is the canonical independent verification and must be added.
-2. Skill creation is a convention, not a step: candidates land in the KB; promotion is a
-   reviewed commit. A `p2_mint`-style step (the pattern-minting precedent) is the next build.
-3. Research is prompt-encouraged, not forced: `## Sources` shape-gating ensures the section
-   exists, not that a search happened when a gap demanded one.
+## Gaps (ranked, honest) — addressed in the loop's v1.3
+
+1. ~~The loop has no `g_test_gate`~~ → **added**: a plan-driven `kind: test` phase
+   (`tests_from_plan: notes/plan.md`; an explicit skip when the plan names no targets —
+   `test_gate_note`, no fabricated verdict).
+2. ~~Skill creation is a convention, not a step~~ → **step added**: `p2_mint` mints the
+   posterior's candidates through the existing producer; promotion stays a reviewed commit.
+3. ~~Research is prompt-encouraged, not forced~~ → the prior must write
+   `notes/sources.jsonl` (provenance + sha256; explicit `none`), the execute gate requires it,
+   and `g_adversarial` checks external gaps against it.
+
+**New finding (2026-09-21, from the merge):** the loop's fixed `notes/*.md` paths collide
+across runs — two runs' branches conflicted on all four files at merge time (resolved by
+namespacing the second run's notes). Next convention: namespace run notes by run/task, or
+route them to the durable results dir.
