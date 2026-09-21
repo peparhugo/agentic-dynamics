@@ -1,0 +1,15 @@
+{"kind": "kb", "ref": "598c8a8fb9397063f06d74a07c47d46fd424bab115cf686098439fc64f7aa361", "sha256": "3f0248bce385a1584f571c08eceda4de26ce215dc158c7f94226b6e2e061019f"}
+{"kind": "kb", "ref": "34e86fa2d2402e6b8d2628d61cb00b60043f46292cced4298a991354bb629136", "sha256": "f66a04f396e3f86cd87b7af8bda931be5a27c2da9ab5cf1005a6c4df5a76d8d7"}
+{"kind": "kb", "ref": "2bacadba099bfe2aa175b788e3704363ea478892157ffd327d994c7ed4ebad49", "sha256": "ab00befa21a86a52e274323c0ba7b8b255bfb277e7544d67e5e7b54c8fca7046"}
+{"kind": "kb", "ref": "016b5d9431f0be944e9231e9abdfaf2be07bce6a6fcddf396546caaae7144135", "sha256": "df3aebd7f894f54dc4cc46fb21945f14544fc14cec48ae619d4c5a0d2beaca4c"}
+{"kind": "kb", "ref": "dddefbfe7f5b9d322ff72c743c9812751101778e300a42ff74c9917ebe2ad1bf", "sha256": "614417248922c063904f62f50df8fec6e51cba99c33e66ea3f7070d02e621dfa"}
+{"kind": "file", "ref": "tests/test_world_model_gates.py", "sha256": "fb2eee5f9a7e0b61c89955d85ddc97a54c5942897f3e466f0ad2bb72f2489377"}
+{"kind": "file", "ref": "src/agentic_dynamics/runtime/workflow_runner.py", "sha256": "19563a67d0e546a5ad9730df9d25159a6efb89635381378eb48c0f7fa2ec922d"}
+{"kind": "file", "ref": "src/agentic_dynamics/knowledge/knowledge_ingestion.py", "sha256": "d7f776d481d2bf50731520f625044c430cb9431769155f676d0cf75f0c1f1668"}
+{"kind": "file", "ref": "tests/conftest.py", "sha256": "0282bbe2b1c3ce3f5dea7604ea8fdbce83e0f49523625a90319ad08cb690e41e"}
+{"kind": "file", "ref": "workflows/repository/world_model_loop.yaml", "sha256": "c49a4dd5119ea47cec665715d94a7aa15b99832c8e480c76715e7d3cce0b3f4a"}
+{"kind": "file", "ref": "/app/experiments/results/workflows/world_model_loop/reports/20260921181437_prior.md", "sha256": "300604d15614c149838f475614ab991cc97654f93136a418cabae71cbd6f8da9"}
+{"kind": "file", "ref": "/app/experiments/results/workflows/world_model_loop/reports/20260921181703_execute.md", "sha256": "b56ac2bd0b48bbcd22590d31aa75c05b164f4b55d1a531e1efdc6bb261b3c385"}
+{"kind": "file", "ref": "/app/experiments/results/workflows/world_model_loop/reports/20260921182021_posterior.md", "sha256": "3c33572582db51a03ff094dd36ba56d6b82ef0c22554f22e75638d49bdfd9e89"}
+{"kind": "file", "ref": "/app/experiments/results/workflows/world_model_loop/reports/20260921182307_p2_mint.md", "sha256": "d056e5c61c9f10b8ba918ba01849ad3e22ef4b18031e0ab8e5f2532e3e8f7b16"}
+{"kind": "file", "ref": "/app/experiments/results/workflows/world_model_loop/reports/20260921182924_g_adversarial.md", "sha256": "c1a8ea4eec600851f26eda1c5ec8fe458425991769a086c69818b45127980162"}

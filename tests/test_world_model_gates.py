@@ -10,12 +10,48 @@ Covers the two runner additions of 2026-09-21:
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
+
+import pytest
 
 from agentic_dynamics.experiment.experiment_spec import load_spec
 from agentic_dynamics.runtime import workflow_runner as wr
 from agentic_dynamics.runtime.executor import StepResult
+
+#: The checkout root — the LIVE durable tree lives at ``<root>/experiments/results``. Resolved
+#: from this file, never from the process cwd, so the regression's before/after snapshot always
+#: names the same tree the runner would otherwise write into.
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture(autouse=True)
+def _stub_emit_write_path(tmp_path_factory, monkeypatch):
+    """No test in this module may reach the real GB/emit write path.
+
+    The module's fixture spec opts in with ``rag.emit_self`` / ``rag.emit_report: true``, which
+    ``_finding_emit_enabled`` returns BEFORE the suite-wide ``FINFOPS_EMIT_SELF=0`` disarm
+    (``tests/conftest.py``). Without this guard four tests write real findings + report files
+    into the live durable tree on every run. Two layers are required:
+
+    (1) stub ``knowledge_ingestion.emit_phase_finding`` — the one durable write+publish entry
+        both emit paths import IN-FUNCTION (so the call-time module attribute is intercepted);
+    (2) point ``FINOPS_RESULTS_DIR`` at a tmp tree — ``_emit_research_report`` writes its report
+        file DIRECTLY (``path.write_text``) before calling ``emit_phase_finding``, so the stub
+        alone would still leak the report file.
+
+    The returned recording list lets the regression prove the gate actually opened (non-vacuous)
+    and was intercepted. Tests that exercise the real ``_emit_research_report`` override this
+    fixture afterwards (their ``monkeypatch`` calls apply later), so their coverage is intact.
+    """
+    from agentic_dynamics.knowledge import knowledge_ingestion as ki
+
+    emitted = []
+    monkeypatch.setattr(ki, "emit_phase_finding", lambda pr, **kw: emitted.append((pr.phase, kw)))
+    monkeypatch.setenv("FINOPS_RESULTS_DIR", str(tmp_path_factory.mktemp("results")))
+    return emitted
+
 
 SPEC = """name: t_wml
 question: q
@@ -478,3 +514,68 @@ def test_report_stamp_is_unique_within_a_second(tmp_path, monkeypatch):
         )
     reports = sorted((results / "workflows" / "t_wml" / "reports").glob("*_prior.md"))
     assert len(reports) == 2  # same wall-clock second, two files — no overwrite
+
+
+# ── the live-KB test-emission leak: the module-local guard + its regression ───────────────────
+
+
+def _snapshot_paths(root: Path) -> set[str]:
+    """The SET of file paths under ``root`` (never a count).
+
+    Report stamps carry microseconds but the REPORT filenames of a single phase can still land
+    in nondeterministic order/counts across runs; a path SET is the stable invariant — it either
+    gained a file or it did not.
+    """
+    if not root.exists():
+        return set()
+    return {str(p) for p in root.rglob("*") if p.is_file()}
+
+
+def test_no_emission_escapes_the_module_under_the_suite_disarm(
+    tmp_path, monkeypatch, _stub_emit_write_path
+):
+    """Regression: while the suite disarm is active, this module must not write to the live KB.
+
+    The fixture spec declares ``rag.emit_self: true`` / ``emit_report: true``, and the runner
+    intentionally lets an explicit opt-in outrank ``FINFOPS_EMIT_SELF=0``
+    (``_finding_emit_enabled``). So the module-local autouse guard, not the suite env, is what
+    keeps the live durable tree clean. This test proves BOTH halves:
+
+    * the emit gate actually opened and was intercepted (``_stub_emit_write_path`` is
+      non-empty) — otherwise the guard would be vacuous and the test would pass even if the
+      real write path were reachable;
+    * the live path sets under ``experiments/results/kb`` and
+      ``experiments/results/workflows/t_wml`` are unchanged — the report file's direct write
+      is also contained.
+    """
+    _init_repo(tmp_path)
+    spec = load_spec(_write_spec(tmp_path))
+
+    # Positive control: the suite disarm is set, yet the spec's explicit opt-in opens the gate.
+    # (If this stops holding, the leak's premise changed — fail loudly rather than silently
+    # passing with nothing to guard.)
+    assert os.environ.get("FINOPS_EMIT_SELF") == "0"
+    resolved = wr._resolve_rag_params(spec, None, wd=tmp_path, rag_augment=False)
+    assert wr._finding_emit_enabled(resolved, {}) is True
+
+    # Snapshot the LIVE durable tree BEFORE the run (path SETS, not counts).
+    live_kb = _REPO_ROOT / "experiments" / "results" / "kb"
+    live_reports = _REPO_ROOT / "experiments" / "results" / "workflows" / "t_wml"
+    before = _snapshot_paths(live_kb) | _snapshot_paths(live_reports)
+
+    def fake(prompt, **kwargs):
+        (tmp_path / "notes").mkdir(exist_ok=True)
+        (tmp_path / "notes" / "plan.md").write_text("the plan")
+        (tmp_path / "work.txt").write_text("work")
+        return _R()
+
+    wr.run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=fake)
+
+    # Interception proof — the runner reached the emit seam and the guard caught it. Removing
+    # the stub makes this empty and this assertion fail.
+    assert _stub_emit_write_path, "the emit seam was ever reached — the regression is vacuous"
+    # Containment proof — nothing escaped to the live durable tree. Removing the results-dir
+    # redirect lets `_emit_research_report` write its report file directly, so this assertion
+    # fails.
+    after = _snapshot_paths(live_kb) | _snapshot_paths(live_reports)
+    assert after == before

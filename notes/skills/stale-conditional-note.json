@@ -1,0 +1,23 @@
+{
+  "subject": "pattern/world-model-loop/stale-conditional-note",
+  "claim": "A world-model loop's fixed-path conditional note is never reset between runs: `notes/deviations.md` is ordered by the execute prompt (workflows/repository/world_model_loop.yaml:75-76) and read by the posterior prompt (:99), but a run with no deviations omits the file, leaving the previous task's document in the slot the posterior is instructed to trust. Measured on the 2026-09-21 run: the execute report says 'No deviations occurred' (commit 6985163dd, one file) yet the deviations file present is the Item-4 document from commit 3689fb233, and notes/posterior.md was likewise the Item-4 posterior (commit 077ad4837) until this run overwrote it — two stale fixed-path notes inherited by one posterior.",
+  "population": "agentic-dynamics world-model loop (deepseek/deepseek-v4-flash)",
+  "conditions": [
+    "world_model_loop",
+    "notes/deviations.md",
+    "no-deviation execute",
+    "fixed-path conditional note"
+  ],
+  "support": 2,
+  "uncertainty": null,
+  "source_experiment": "world_model_loop",
+  "evidence": [
+    "kb:dc1d8eb1649b70db3f769adaf38e32e141622c2fa9ee07c5a82211be21f62c1f",
+    "kb:09c552b95ab6ae51237848d841cc1ccda4549e36967777e30cdfbaebbd35f05d",
+    "kb:2c5995a7b041711740c910d4ce88a0fa841ae9a9c525b965a448c79cc46f90b3",
+    "commit:3689fb233",
+    "commit:077ad4837",
+    "file:notes/deviations.md",
+    "file:notes/posterior.md"
+  ]
+}

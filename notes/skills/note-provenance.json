@@ -1,0 +1,23 @@
+{
+  "subject": "skill/world-model-loop/note-provenance",
+  "claim": "Before trusting a world-model loop note, check its last commit: a note not changed in the current run is stale and about another task. Measured on the 2026-09-21 run — `notes/deviations.md` was last changed by `3689fb233` (the Item-4 execute) and `notes/posterior.md` by `077ad4837` (the Item-4 posterior), while the current run's prior/execute commits were `b00947b12`/`6985163dd`; so the posterior's ordered inputs were two documents about a different task until the posterior established provenance. `git log -1 -- notes/<file>` per inherited note is the cheap check; a note not minted/touched this run must be named as an unknown, not trusted.",
+  "population": "agentic-dynamics world-model loop (deepseek/deepseek-v4-flash)",
+  "conditions": [
+    "world_model_loop",
+    "notes provenance",
+    "fixed-path notes",
+    "stale note"
+  ],
+  "support": 2,
+  "uncertainty": null,
+  "source_experiment": "world_model_loop",
+  "evidence": [
+    "kb:dc1d8eb1649b70db3f769adaf38e32e141622c2fa9ee07c5a82211be21f62c1f",
+    "commit:3689fb233",
+    "commit:077ad4837",
+    "commit:b00947b12",
+    "commit:6985163dd",
+    "file:notes/deviations.md",
+    "file:notes/posterior.md"
+  ]
+}

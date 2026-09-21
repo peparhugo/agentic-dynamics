@@ -1,0 +1,19 @@
+{
+  "subject": "pattern/kb-read/degradation-crash",
+  "claim": "`scripts/kb_read.py` turns an unavailable ranked-retrieval path into a hard crash rather than an empty result: with no services `_ranked` returns None, the fallback `_contains` reads `experiments/results/registry_index.jsonl` at kb_read.py:99 and raises FileNotFoundError when the registry is absent. Reproduced in this checkout: ranked unavailable (`ModuleNotFoundError: agentic_dynamics.knowledge.neo4j_vectors`), `--contains` traceback `FileNotFoundError: /repo/experiments/results/registry_index.jsonl`, exit 1 — a reader sees a traceback and cannot distinguish 'registry absent' from 'no matches'. KB-read availability is environment-dependent, so each run must probe it and record which mode answered (ranked, `--contains`, or both failed).",
+  "population": "agentic-dynamics checkout without services",
+  "conditions": [
+    "kb_read",
+    "ranked unavailable",
+    "no registry_index.jsonl",
+    "degraded fallback"
+  ],
+  "support": 1,
+  "uncertainty": null,
+  "source_experiment": "world_model_loop",
+  "evidence": [
+    "kb:dc1d8eb1649b70db3f769adaf38e32e141622c2fa9ee07c5a82211be21f62c1f",
+    "script:scripts/kb_read.py:99",
+    "traceback:FileNotFoundError:/repo/experiments/results/registry_index.jsonl"
+  ]
+}

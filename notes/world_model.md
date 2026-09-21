@@ -1,162 +1,123 @@
-# World model — Item 4: the stale next-action state
+# World model — Close the live-KB test-emission leak
 
-*Prior phase of the world-model loop. Read-only: no production code touched. Every claim below
-is grounded in a file, a KB record, or a command output.*
+*Prior phase of the world-model loop. Read-only: no production or test code touched. Every claim
+below is grounded in a file, a KB record, or a command output — never in memory.*
 
-## 0. The task, verbatim from its source
+## Problem
 
-From `docs/reviews/aio_arc_findings_and_results.md:140-141` (controller-directed 2026-09-20):
+`tests/test_world_model_gates.py` writes real knowledge-base records to the durable results tree
+on every run, even though the suite is disarmed.
 
-> (4) turn one useful finding into a bounded improvement using existing machinery — stale
-> next-action state **or** a missing regression check, after verifying the gap exists today
+- Its fixture spec opts into emission: `rag.emit_self: true` and `rag.emit_report: true`
+  (`tests/test_world_model_gates.py:42-44`).
+- `_finding_emit_enabled` returns the **explicit** per-run value *before* it consults the
+  process disarm (`src/agentic_dynamics/runtime/workflow_runner.py:1819-1839`; the decisive
+  lines are `explicit = rag_params.get("emit_self")` → `return bool(explicit)`).
+- The suite's disarm is only the env default `FINOPS_EMIT_SELF=0`
+  (`tests/conftest.py:15`), so it is bypassed for every test that runs a workflow against the
+  fixture spec without stubbing the emit seam.
+- Four tests do exactly that (the two artifact-gate and the two shape-gate tests); the other
+  nine are either already stubbed, use a spec with `emit_self: false`, or do not commit.
 
-and `docs/reviews/aio_arc_findings_and_results.md:179-180` (Claim classes → Observed):
+Measured first-hand (`python3 -m pytest tests/test_world_model_gates.py -q`, 13 passed):
 
-> Historical observation to re-check before building: a binding still instructing "activate,
-> then submit" after both had happened (wave1/c15:20).
+- with no results redirect: **10 artifacts under `experiments/results/kb/` + 6 report files
+  under `experiments/results/workflows/t_wml/reports/`** were created in the checkout;
+- with `FINFOPS_RESULTS_DIR` redirected to a tmp tree: the same 10 + 6 landed in the redirect
+  and the checkout stayed clean (0 new files).
 
-The finding itself, `experiments/results/fork_contemplation/wave1/c15.md:20`:
+The root cause is a **precedence rule, not a stray write**: the explicit opt-in is intentional
+and documented ("the flag still works when set (outranks the env disarm)"), so the defect is the
+**test seam** — this module's tests do not stub the write path their own spec authorizes.
 
-> **Intent as a current unit, not a completed instruction.** Binding `fbca5106` (v2) says *"After
-> the controller activates PR #77 … call run_workflow"*. Activation happened; the run went out;
-> **nothing rewrote the binding**. The per-request carrier now instructs a finished sequence.
+Task: stub the emit write path in this module's tests and add a regression proving no emission
+escapes this module while the suite disarm is active.
 
-The prior prompt's own framing of the decision: *"implement the smallest fix with existing
-machinery (keep the existing task state current after confirmed actions; not a new memory
-format) plus tests. If the stale-state gap no longer exists, land the missing regression check
-instead."*
+## What Exists
 
-## 1. What the problem is believed to be
+The emit chain, exactly as written today:
 
-A durable session binding carries a `next_action` field. The capsule composes it and delivers it
-to the model as the CURRENT "one next action" (`scripts/session_open.py:393-406`, rendered in the
-protected tail at `scripts/session_open.py:490-492, 521-522`). If nothing rewrites that field
-after the action it names has actually happened, the carrier keeps instructing a finished
-sequence — the successor re-derives true state from prose. The proposed-but-unbuilt c15 remedy
-was a new `handoff` object (`c15.md:51-97`); the review deliberately kept the *smaller* direction
-and rejected new structure: "keep the existing task state current after confirmed actions — the
-first fix, not another memory format" (`aio_arc_findings_and_results.md:190-191`).
+- `_finding_emit_enabled(rag_params, phase_def)` — `workflow_runner.py:1819-1839`. Marker
+  `no_emit` first, then explicit `rag_params["emit_self"]`, then env. The explicit value wins.
+- The emit block — `workflow_runner.py:5448-5463`. A committed phase calls
+  `_emit_self_finding`; a run with `rag.emit_report: true` additionally calls
+  `_emit_research_report`; a report-only phase (no commit) calls `_emit_research_report`.
+- `_emit_self_finding` — `workflow_runner.py:1842-1855`. Imports `emit_phase_finding`
+  **in-function** and swallows every exception.
+- `_emit_research_report` — `workflow_runner.py:1914-1957`. Writes the report file **directly**
+  (`path.write_text`, `:1946`) to `<results>/workflows/<spec>/reports/<stamp>_<phase>.md`,
+  *then* calls `emit_phase_finding`. A stub of only `emit_phase_finding` therefore does NOT stop
+  the report-file write.
+- `emit_phase_finding` — `src/agentic_dynamics/knowledge/knowledge_ingestion.py:625-668`.
+  Derives the record, writes `<results>/kb/<knowledge_id>.json` (`:661-663`), then publishes.
+- `_artifact_path` — `knowledge_ingestion.py:421-433`. Honors `FINOPS_RESULTS_DIR` when set,
+  else `PROJECT_ROOT/ARTIFACT_DIR`.
 
-So the question this phase must answer, mechanically: **does a confirmed action today rewrite the
-binding's `next_action`, or can a completed instruction survive as the actionable next action?**
+Existing test coverage of the seam (so the new guard must not break it):
 
-## 2. What exists today (the mechanism)
+- `test_emit_report_opts_in_for_committed_phases` (`tests/test_world_model_gates.py:116`)
+  monkeypatches both `wr._emit_self_finding` and `wr._emit_research_report`.
+- `test_report_path_honors_the_results_dir_contract` (`:200`) stubs `ki.emit_phase_finding`,
+  sets `FINOPS_RESULTS_DIR` to a tmp path, and calls the **real** `_emit_research_report`.
+- `test_report_stamp_is_unique_within_a_second` (`:451`) stubs `ki.emit_phase_finding` and sets
+  its own results dir.
+- `_disarm_finding_emit` (`tests/conftest.py:251`) exists but is **dead code** — it is never
+  referenced; the active disarm is the module-level assignment at `conftest.py:15`.
 
-A confirmed AIO action — a durable workflow submit — already records itself into the existing
-binding. `scripts/fleet/fleet_manager.py`:
+Prior art — a previous world-model loop ran this exact task (2026-09-21 18:14–18:29) and
+implemented a test-only fix in its run worktree (reported as commit `78866649e`). **It is not in
+this checkout:** `git log --all` contains no such commit, no ref contains it, and the fixture
+name `_stub_emit_write_path` is absent from `tests/`. The prior POSTERIOR and the adversarial
+review still hold as evidence of approach and pitfalls: the harness intermittently strips
+`FINFOPS_RESULTS_DIR` from shell prefixes (set it with `monkeypatch.setenv` instead), the report
+write needs its own redirect, and a regression must prove the gate **opened** (positive control)
+or it is vacuous.
 
-- `_record_submission_in_task(...)` (`scripts/fleet/fleet_manager.py:853`) builds a labeled,
-  deterministic `[auto] submitted job <job_id> …` (or `[auto] reconciled to job …`) string and
-  writes it as the binding's `next_action` through the EXISTING versioned machinery:
-  `si.update_binding_context(..., context={"next_action": action}, expected_version=..., ...)`
-  (`scripts/fleet/fleet_manager.py:898-903`).
-- It is called on every durable submit immediately after the command is queued
-  (`scripts/fleet/fleet_manager.py:1322-1328`), and its result is reported as `task_note` in the
-  `fleet-submit/v1` payload (`scripts/fleet/fleet_manager.py:1348`).
-- The AIO path reaches it: the `run_workflow` tool passes `--aio-session-id`,
-  `--aio-agent`, `--binding-id`, `--binding-context-version` (`.opencode/tools/run_workflow.ts:123-131`);
-  the submit branch consumes them and records. The rules require the durable fleet path for spec
-  workflows, so this is the ordinary path, not a corner.
-- Provenance: commit `246490028` "recording: submissions record their pending job into the
-  durable task state" (2026-09-16) is an ancestor of HEAD (verified:
-  `git merge-base --is-ancestor 246490028 HEAD`); its follow-up `ceaec532e` (2026-09-17)
-  separated the authorization epoch from operational progress so this recording does not
-  invalidate queued commands.
+The live spec `workflows/repository/world_model_loop.yaml:28-31` also opts in
+(`emit_self: true`, `emit_report: true`, `emit_scope: agentic-dynamics`) — intentional for real
+runs; the fix must not change production precedence.
 
-The write semantics are REPLACE, not append: `_apply_context_update` does
-`merged = dict(payload); merged.update({field: context[field] for field in
-BINDING_CONTEXT_FIELDS if field in context})` (`src/agentic_dynamics/knowledge/session_ingestion.py:1517-1520`),
-and `next_action` is in `BINDING_CONTEXT_FIELDS`
-(`src/agentic_dynamics/knowledge/session_ingestion.py:851-859`). The old value is retained only
-in the bounded `context_history` (`:1542-1548`), so replacement loses no auditable fact.
+## Gaps
 
-The capsule reads the binding's `next_action` FIRST, ahead of any predecessor open-thread
-(`scripts/session_open.py:393-400`). So once the submit records, the capsule's next action is the
-`[auto]` job observation and the completed instruction is gone.
+- **No module-local guard.** Nothing in `tests/test_world_model_gates.py` prevents a test from
+  reaching the real emit write path; the suite disarm is only a default the spec outranks.
+- **No regression.** No test asserts the module leaves the live results tree untouched.
+- **Stub seam subtlety.** Stubbing only `emit_phase_finding` misses `_emit_research_report`'s
+  direct report-file `write_text`; both the stub AND a results-dir redirect are required.
+- **Blind KB in this checkout.** `scripts/kb_read.py` fails here — `registry_index.jsonl` is
+  absent from `/repo/experiments/results/` and `agentic_dynamics.knowledge.neo4j_vectors` is
+  missing. Prior knowledge was recovered from the durable container tree
+  (`/app/experiments/results/kb/*.json`) and its report files instead.
+- **Harness quirk.** `FINFOPS_RESULTS_DIR=… python3 …` on the command line was honored once and
+  silently ignored on later invocations (identical command shape) — so acceptance verification
+  must not rely on the shell prefix; the test must set the env in-process.
+- **Dead disarm helper.** `_disarm_finding_emit` (`conftest.py:251`) is unused; a future editor
+  could "fix" it and believe the suite is guarded.
+- **No production change is warranted.** Explicit opt-in winning is intentional and pinned by
+  the function docstring; the leak is a test-seam defect, and production specs
+  (`world_model_loop.yaml`) legitimately emit.
 
-Existing tests pin the mechanism but not the carrier property:
+## Sources
 
-- `tests/test_fleet_manager.py:1023` `test_a_submission_records_its_job_into_the_task_state`:
-  a submit sets `next_action` to the `[auto]` record, `context_version` 1→2, authorization
-  stable.
-- `tests/test_fleet_manager.py:1059` `test_a_stale_revision_never_overwrites_the_task_state`:
-  the version guard.
-- `tests/test_fleet_manager.py:1151` `test_a_recorded_submission_still_passes_delayed_consumption`
-  and `test_spawn_wrapper.py:2043` `test_progress_recording_does_not_advance_the_authorization`.
-- `tests/test_session_binding.py:300` `test_next_action_precedence` and
-  `tests/test_session_binding.py:570` `test_capsule_reflects_the_updated_context` — the latter
-  checks acceptance only, never that a superseded `next_action` is gone.
+KB records (canonical tree `/app/experiments/results/kb/<id>.json`), the prior loop on this task:
 
-## 3. Verification: does the gap exist today?
+- `kb:598c8a8fb9397063f06d74a07c47d46fd424bab115cf686098439fc64f7aa361` (prior, `agentic-dynamics`)
+- `kb:34e86fa2d2402e6b8d2628d61cb00b60043f46292cced4298a991354bb629136` (execute, `agentic-dynamics`)
+- `kb:2bacadba099bfe2aa175b788e3704363ea478892157ffd327d994c7ed4ebad49` (posterior, `agentic-dynamics`)
+- `kb:016b5d9431f0be944e9231e9abdfaf2be07bce6a6fcddf396546caaae7144135` (p2_mint, `agentic-dynamics`)
+- `kb:dddefbfe7f5b9d322ff72c743c9812751101778e300a42ff74c9917ebe2ad1bf` (g_adversarial, `agentic-dynamics`)
 
-**Finding: the gap is CLOSED for the confirmed action wired today — a durable submit.** There is
-no code path by which a binding that says "activate PR #77 … call run_workflow" can remain
-unrewritten *after the submit it names has happened through the fleet path*, because that submit
-overwrites `next_action` with the `[auto]` job record and the capsule renders the new value with
-precedence. The c15 scenario's "run went out" step is exactly the trigger.
+Files (+sha256):
 
-**What is missing is the regression check, not the fix.** No test asserts the c15 property at the
-carrier level: that a stale, already-completed `next_action` cannot survive a confirmed action
-into the capsule. `grep` over `tests/` finds the `[auto]` assertion only at the binding layer
-(`tests/test_fleet_manager.py:1048-1051`), never composed into a capsule against a *previously
-stale* instruction. c15's own §4.6 test was exactly this ("after activation, an update sets
-`stage='submitted'`; assert the capsule's next action no longer contains 'activate PR #77' — a
-completed gate can never remain the actionable next action"), and it was never landed because the
-`handoff` object it assumed was not built.
+- `tests/test_world_model_gates.py` (fb2eee5f9a7e0b61c89955d85ddc97a54c5942897f3e466f0ad2bb72f2489377)
+- `src/agentic_dynamics/runtime/workflow_runner.py` (19563a67d0e546a5ad9730df9d25159a6efb89635381378eb48c0f7fa2ec922d)
+- `src/agentic_dynamics/knowledge/knowledge_ingestion.py` (d7f776d481d2bf50731520f625044c430cb9431769155f676d0cf75f0c1f1668)
+- `tests/conftest.py` (0282bbe2b1c3ce3f5dea7604ea8fdbce83e0f49523625a90319ad08cb690e41e)
+- `workflows/repository/world_model_loop.yaml` (c49a4dd5119ea47cec665715d94a7aa15b99832c8e480c76715e7d3cce0b3f4a)
+- `/app/experiments/results/workflows/world_model_loop/reports/20260921181437_prior.md` (300604d15614c149838f475614ab991cc97654f93136a418cabae71cbd6f8da9)
+- `/app/experiments/results/workflows/world_model_loop/reports/20260921181703_execute.md` (b56ac2bd0b48bbcd22590d31aa75c05b164f4b55d1a531e1efdc6bb261b3c385)
+- `/app/experiments/results/workflows/world_model_loop/reports/20260921182021_posterior.md` (3c33572582db51a03ff094dd36ba56d6b82ef0c22554f22e75638d49bdfd9e89)
+- `/app/experiments/results/workflows/world_model_loop/reports/20260921182307_p2_mint.md` (d056e5c61c9f10b8ba918ba01849ad3e22ef4b18031e0ab8e5f2532e3e8f7b16)
+- `/app/experiments/results/workflows/world_model_loop/reports/20260921182924_g_adversarial.md` (c1a8ea4eec600851f26eda1c5ec8fe458425991769a086c69818b45127980162)
 
-KB grounds (`kb_read.py`, canonical checkout — the run worktree lacks
-`experiments/results/registry_index.jsonl`, so `--contains` there raises `FileNotFoundError`):
-
-- The prior close carrying Item 4 is `70c84cd676ec58bb` (`meta_session`, slug
-  `aio-correction-delivery-repair`, 2026-09-20), open-thread text: "item 4: one bounded
-  improvement using existing machinery — stale next-action state OR a missing regression check —
-  after verifying the gap exists today".
-- A ranked read for `next action` on scope `agentic-dynamics` returns only the world-model-loop
-  design finding `e6222c1ca0de8ead`. No KB record claims the c15 gap was verified closed, so the
-  verification is this phase's own.
-
-## 4. Unknowns (gaps) and what would reduce each
-
-1. **Carrier-level staleness is unproven by test.** The replacement semantics are asserted only
-   at the binding layer. *Reduce:* add a capsule-level regression that seeds a completed
-   `next_action`, performs the confirmed write, and asserts the capsule's next action is the new
-   record and does not contain the completed text.
-2. **Residual class: confirmed actions other than submit do not record.** `approve_workflow.py`
-   emits a decision record but never touches a binding (`grep` for `update_binding_context` finds
-   no call in it), and it carries no native session id with which to address a binding. If the AIO
-   ever sets `next_action = "approve gate X"`, an approval leaves that field stale. *Reduce:* do
-   not build a new mechanism; document this precisely as a known residual with the reason
-   (no session identity at the approval boundary) and leave it for a future bounded item. A
-   regression test may pin the *covered* submit case; it must not claim coverage of approvals.
-3. **Whether the existing tests actually exercise the replace (not append) semantics for
-   `next_action` against a non-empty prior value.** `test_updates_are_versioned_and_preserve_the_request`
-   sets `next_action = "review the PR"` on an empty prior value. *Reduce:* add an explicit
-   assert that a non-empty prior `next_action` is replaced and that the prior value survives only
-   in `context_history`.
-4. **The in-process (`orchestrator=false`) path does not record.** Explicitly a separate,
-   explicitly-requested mode for trivial deterministic runs; out of scope by the project rules.
-   *Reduce:* state it as a non-goal in the plan, no code.
-
-## 5. Conclusion carried into the plan
-
-- No source fix is required for the c15 submit case; Unit 3 already keeps the task state current
-  after the confirmed action. The bounded improvement is the **missing regression check** that
-  pins the carrier property, plus an explicit replace-not-append assertion.
-- If, and only if, the tests reveal a real path where the stale instruction survives (e.g., a
-  capsule composed without the recording, or an append instead of a replace), the plan's fallback
-  is the minimal existing-machinery fix — never a new record family, never the `handoff` object.
-
-## 6. Probe log (what was read, and why)
-
-| probe | why | result |
-|---|---|---|
-| `experiments/results/fork_contemplation/wave1/c15.md` | the finding under test | §1 stale-intent item; §4.6 proposed regression |
-| `docs/reviews/aio_arc_findings_and_results.md:120-205` | Item 4's exact directive + claim class | bounded improvement, verify first |
-| `scripts/fleet/fleet_manager.py:800-910,1280-1360` | does a confirmed action record? | yes — `_record_submission_in_task` |
-| `src/agentic_dynamics/knowledge/session_ingestion.py:786-1580` | binding read/write/update semantics | replace + version guard + history |
-| `scripts/session_open.py:328-525` | capsule next-action precedence + rendering | binding wins; protected tail |
-| `.opencode/plugins/aio-context.ts` | the per-request carrier + updates | attachment cannot clear a field; freshness guard prevents stale replay |
-| `.opencode/tools/run_workflow.ts:108-140` | does the AIO path carry binding context? | yes |
-| `git log` / `merge-base` | is the fix in HEAD? | `246490028` is an ancestor |
-| `tests/test_fleet_manager.py`, `tests/test_session_binding.py`, `tests/test_spawn_wrapper.py` | what is already pinned | mechanism yes; carrier property no |
-| `kb_read.py --contains next-action` (canonical checkout) | prior records/decisions | close `70c84cd676ec58bb` carries Item 4; no closure claim |
+No external URL was fetched (no fact required it).

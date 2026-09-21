@@ -1,0 +1,23 @@
+{
+  "subject": "skill/workflow-tests/emit-seam-guard",
+  "claim": "Any test module whose fixture spec opts into `rag.emit_self`/`rag.emit_report` must carry a module-local autouse guard that (i) stubs `knowledge_ingestion.emit_phase_finding` and (ii) redirects `FINFOPS_RESULTS_DIR`; its regression must assert BOTH interception (non-vacuous — the stub saw the call) AND live-tree invariance (path sets before/after, never counts). The suite-level `FINOPS_EMIT_SELF=0` disarm does not protect such a test because the explicit per-run opt-in outranks the env default (`workflow_runner._finding_emit_enabled`, workflow_runner.py:1819-1839), and stubbing `emit_phase_finding` alone misses `_emit_research_report`'s direct report-file `write_text` (workflow_runner.py:1946). Verified live: tests/test_world_model_gates.py:29-53 (guard) + :534 (regression), commit 6985163dd, one file, 14 passed, `ruff` clean, the checkout results path set byte-identical before/after (52 files both times).",
+  "population": "agentic-dynamics workflow tests (pytest)",
+  "conditions": [
+    "rag.emit_self",
+    "rag.emit_report",
+    "suite disarm bypassed by explicit opt-in",
+    "autouse fixture",
+    "live-tree invariance assertion"
+  ],
+  "support": 1,
+  "uncertainty": null,
+  "source_experiment": "world_model_loop",
+  "evidence": [
+    "kb:09c552b95ab6ae51237848d841cc1ccda4549e36967777e30cdfbaebbd35f05d",
+    "kb:dc1d8eb1649b70db3f769adaf38e32e141622c2fa9ee07c5a82211be21f62c1f",
+    "commit:6985163dd",
+    "test:tests/test_world_model_gates.py:29-53",
+    "test:tests/test_world_model_gates.py:534",
+    "src:workflow_runner.py:1819-1839"
+  ]
+}

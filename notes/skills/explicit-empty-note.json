@@ -1,0 +1,21 @@
+{
+  "subject": "pattern/world-model-loop/explicit-empty-note",
+  "claim": "A phase that writes a conditional note file must write an explicit-empty record when the condition is false, or the plan's single-path rule must carve `notes/*.md` out — a stale conditional note is worse than no note. In the world-model loop the execute phase must always write `notes/deviations.md` (an empty 'no deviations' record when none occurred) instead of skipping it, because the current contract lets notes/plan.md:29 ('git diff --stat must show a single path') forbid the write the execute prompt orders (world_model_loop.yaml:75-76), so a no-deviation run leaves the prior run's file in place; alternatively the plan's single-path rule must explicitly exempt the loop's notes.",
+  "population": "agentic-dynamics world-model loop (deepseek/deepseek-v4-flash)",
+  "conditions": [
+    "world_model_loop",
+    "explicit-empty record",
+    "conditional note file",
+    "single-path plan rule"
+  ],
+  "support": 2,
+  "uncertainty": null,
+  "source_experiment": "world_model_loop",
+  "evidence": [
+    "kb:dc1d8eb1649b70db3f769adaf38e32e141622c2fa9ee07c5a82211be21f62c1f",
+    "kb:2c5995a7b041711740c910d4ce88a0fa841ae9a9c525b965a448c79cc46f90b3",
+    "kb:09c552b95ab6ae51237848d841cc1ccda4549e36967777e30cdfbaebbd35f05d",
+    "file:notes/plan.md",
+    "commit:3689fb233"
+  ]
+}
