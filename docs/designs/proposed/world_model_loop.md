@@ -140,6 +140,22 @@ adversarial phase attack the run itself; three findings were engine/spec defects
 Next: re-run the loop on this revision; a candidate whose adversarial phase commits is
 promotable.
 
+## Run-note hygiene (2026-09-21, `feature/loop-hygiene`) — L11 + L12
+
+`notes/` is **ignored, not tracked**: the loop's run notes (world-model, plan, deviations,
+posterior, sources, skills) are PROCESS records. Each run's notes live in its own worktree and
+travel durably through the phase reports (`experiments/results/workflows/<spec>/reports/`) and
+the KB findings; a run's branch carries its CODE/TESTS. Why: two runs committing identical fixed
+paths collided on every note file at merge time (#109), and literal per-run namespacing would
+need run-identity plumbing the engine does not have. The gates are unaffected —
+`requires_files` / `requires_content` / `tests_from_plan` read the worktree paths, which the
+phases still write.
+
+The emit seam is now observable (L12): a swallowed emission failure lands on the phase result's
+`emit_note` (+ stderr), so "no finding" cannot masquerade as "no emission"; and
+`_phase_emit_scope` makes `rag.emit_scope` ONE precedence for BOTH the metadata finding and the
+report variant (previously only the report variant honored it).
+
 ## Open extension: execute as a workflow (controller, 2026-09-21)
 
 A massive plan must not run as ONE execute phase — the execute step should itself be a

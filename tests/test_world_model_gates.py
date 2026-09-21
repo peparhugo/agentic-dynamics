@@ -579,3 +579,38 @@ def test_no_emission_escapes_the_module_under_the_suite_disarm(
     # fails.
     after = _snapshot_paths(live_kb) | _snapshot_paths(live_reports)
     assert after == before
+
+
+# ── L11/L12 (2026-09-21): run-note tracking + emit observability ──────────────────────────────
+
+
+def test_emit_failure_is_recorded_on_the_phase_result():
+    """L12: a swallowed emission failure must be VISIBLE — 'no finding' is not 'no emission'."""
+    import agentic_dynamics.knowledge.knowledge_ingestion as ki
+
+    def boom(*_a, **_k):
+        raise RuntimeError("redis down")
+
+    original = ki.emit_phase_finding
+    ki.emit_phase_finding = boom
+    try:
+        pr = wr.PhaseResult(phase="prior", kind="agent", status="ok", commit_hash="abc123")
+        wr._emit_self_finding(pr, goal="g", scope="s")
+    finally:
+        ki.emit_phase_finding = original
+    assert pr.emit_note.startswith("emit failed: RuntimeError")
+
+
+def test_emit_scope_is_one_precedence_for_both_emitters(tmp_path):
+    """L12: a declared ``rag.emit_scope`` is honored by the metadata finding exactly as by the
+    report variant; the fallback is the cell scope."""
+    assert wr._phase_emit_scope({"emit_scope": "agentic-dynamics"}, tmp_path) == "agentic-dynamics"
+    assert wr._phase_emit_scope({}, tmp_path) == wr.cell_scope(tmp_path)
+
+
+def test_loop_run_notes_are_ignored_not_tracked():
+    """L11: the loop's run scratch (``notes/``) is ignored — notes are process records that
+    travel durably via the phase reports + KB, and committing them made two runs collide at
+    merge time (the #109 conflict)."""
+    gitignore = (Path(wr.__file__).resolve().parents[3] / ".gitignore").read_text(encoding="utf-8")
+    assert "\nnotes/" in gitignore
