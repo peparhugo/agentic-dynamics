@@ -325,6 +325,10 @@ class PhaseResult:
     #: an EXPLICIT skip, never a fabricated pass — ``test_executed_success`` stays None (never
     #: ran) and this note names the plan. Empty when the gate ran or the phase is not a gate.
     test_gate_note: str = ""
+    #: Why a phase's finding emission failed (L12): set only on a swallowed emit exception —
+    #: the phase still succeeds, but the failure is visible instead of silent, so "no finding"
+    #: is never mistaken for "no emission". Empty when the emit succeeded or did not run.
+    emit_note: str = ""
     # G-14 — True when the verdict above came from the independent test_runner (the harness),
     # None when no independent verdict ran (the gate was skipped/failed before executing).
     # Never ``False``: the field asks whether an independent evaluator produced the verdict,
@@ -418,6 +422,9 @@ class PhaseResult:
             # ADDED key (world-model loop v1.3 — never renames an existing key): the explicit
             # skip note of a plan-driven test gate; old ledgers lack the key.
             "test_gate_note": self.test_gate_note,
+            # ADDED key (L12, 2026-09-21): a swallowed emission failure, named; old ledgers
+            # lack the key.
+            "emit_note": self.emit_note,
             "evaluator_independent": self.evaluator_independent,
             "tests_passed": self.tests_passed,
             "tests_total": self.tests_total,
@@ -1840,19 +1847,31 @@ def _finding_emit_enabled(rag_params: dict[str, Any], phase_def: dict[str, Any])
 
 
 def _emit_self_finding(pr: PhaseResult, *, goal: str, scope: str) -> None:
-    """Emit a completed phase's finding into the cell's own scope (self-build producer).
+    """Emit a completed phase's finding into ``scope`` (self-build producer).
 
-    Best-effort: emission failure (Redis down, write guard off, artifact path issue) is
-    swallowed — a self-build finding is a progressive enhancement, never a gate on the phase.
-    ``scope`` is ``cell_scope(wd)`` (``self-<worktree>``), so the record lands in the cell's own
-    retrieval scope, never the global store.
+    Best-effort — an emission failure (Redis down, write guard off, artifact path issue) is
+    never a gate on the phase — but it is no longer SILENT (L12, the 2026-09-21 loop
+    candidates): the failure lands on the phase result's ``emit_note`` and on stderr, so
+    "no finding" cannot be mistaken for "no emission". ``scope`` is the spec's
+    ``rag.emit_scope`` when declared (the same precedence the report variant honors), else
+    ``cell_scope(wd)`` (``self-<worktree>``).
     """
     try:
         from agentic_dynamics.knowledge.knowledge_ingestion import emit_phase_finding
 
         emit_phase_finding(pr, goal=goal, repository_id=scope, revision=pr.commit_hash)
-    except Exception:
-        pass  # progressive path — never block or fail the phase on emission
+    except Exception as exc:  # noqa: BLE001 — progressive path, never blocks the phase
+        pr.emit_note = f"emit failed: {type(exc).__name__}: {str(exc)[:160]}"
+        print(f"[warn] finding emit failed for phase '{pr.phase}': {type(exc).__name__}")
+
+
+def _phase_emit_scope(rag_params: dict[str, Any], wd: Path) -> str:
+    """The repository scope a phase's emissions land in: ``rag.emit_scope`` when declared,
+    else the cell's own scope (``self-<worktree>``). ONE precedence for BOTH emitters — the
+    metadata finding (``_emit_self_finding``) and the report variant — so a declared scope is
+    honored identically (L12: the report variant honored ``emit_scope`` while the metadata
+    finding silently used the cell scope)."""
+    return str(rag_params.get("emit_scope") or "").strip() or cell_scope(wd)
 
 
 def _capture_session_report(session_id: str) -> str:
@@ -1944,7 +1963,7 @@ def _emit_research_report(
         # is the fallback when the store is unavailable.
         report_text = _capture_session_report(str(pr.session_id or "")) or pr.final_response
         path.write_text(report_text, encoding="utf-8")
-        scope = str(rag_params.get("emit_scope") or "").strip() or cell_scope(wd)
+        scope = _phase_emit_scope(rag_params, wd)
         emit_phase_finding(
             pr,
             goal=goal,
@@ -5447,7 +5466,7 @@ def run_workflow(
         # ``if commit ...``.
         if _finding_emit_enabled(rag_params, phase_def) and kind != "test" and pr.status == "ok":
             if pr.commit_hash:
-                _emit_self_finding(pr, goal=goal, scope=cell_scope(wd))
+                _emit_self_finding(pr, goal=goal, scope=_phase_emit_scope(rag_params, wd))
                 # Report variant for a COMMITTED phase (world-model loop v1, 2026-09-21):
                 # code phases keep the metadata finding above; a run that opts in
                 # (``rag.emit_report: true``) also gets the FULL captured turn as a
