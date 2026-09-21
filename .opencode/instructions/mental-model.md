@@ -503,7 +503,7 @@ run_workflow(spec, *, goal, model, workdir, ..., rag_augment=None, retrieve_fn=N
   #   --thinking-budget-tokens --output-token-limit --timeout --phase-watchdog-min --no-commit
   #   --resume --signals --cap-snapshot --cap-shadow --no-fact-emit --change-analysis
   #   --change-analysis-graph --orchestrator --only-phase --prepared-step --cell-image --no-admission
-  #   --campaign-budget-usd --campaign-concurrency] — see the run-workflow skill for semantics
+  #   --campaign-budget-usd --campaign-concurrency --fork-checkpoint --parent-run-id] — see the run-workflow skill for semantics
   # rag_params.emit_self (opt-in, default OFF): after a phase commits, emit its finding into
   #   the cell's OWN scope via emit_phase_finding (best-effort — never blocks the phase)
 
