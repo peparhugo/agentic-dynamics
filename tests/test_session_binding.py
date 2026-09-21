@@ -138,11 +138,13 @@ class TestBindingStore:
                 connect_fn=_FakeRedis,
             )
         ok = si.write_binding(
-            _binding(acceptance={
-                "text": "tests green",
-                "source": "interpretation",
-                "provenance": "extracted by model X from message msg_1",
-            }),
+            _binding(
+                acceptance={
+                    "text": "tests green",
+                    "source": "interpretation",
+                    "provenance": "extracted by model X from message msg_1",
+                }
+            ),
             artifact_dir=tmp_path,
             connect_fn=_FakeRedis,
         )
@@ -163,7 +165,9 @@ class TestReadControlPacket:
             "control_db": "",
         }
         module._run_json_command = lambda cmd, timeout: {
-            "status": "observed", "payload": envelope, "exit_code": 3,
+            "status": "observed",
+            "payload": envelope,
+            "exit_code": 3,
         }
         result = module.read_control_packet()
         assert result["status"] == "no_control_database"
@@ -173,7 +177,9 @@ class TestReadControlPacket:
         module = _load_session_open("session_open_packet_ok_test")
         packet = {"schema": "control-status/v1", "control_epoch": 771, "active_runs": []}
         module._run_json_command = lambda cmd, timeout: {
-            "status": "observed", "payload": packet, "exit_code": 0,
+            "status": "observed",
+            "payload": packet,
+            "exit_code": 0,
         }
         result = module.read_control_packet()
         assert result["status"] == "observed" and result["payload"] is packet
@@ -182,11 +188,22 @@ class TestReadControlPacket:
 class TestCapsuleComposition:
     def _capsule(self, tmp_path, binding, **kwargs):
         module = _load_session_open()
-        packet = kwargs.pop("packet", {"status": "observed", "payload": {
-            "schema": "control-status/v1", "control_epoch": 42, "repo_head_sha": "abc",
-            "active_runs": [], "awaiting_approvals": [], "safe_actions": [],
-            "degraded": [], "projection_lag": {"registry": 0},
-        }})
+        packet = kwargs.pop(
+            "packet",
+            {
+                "status": "observed",
+                "payload": {
+                    "schema": "control-status/v1",
+                    "control_epoch": 42,
+                    "repo_head_sha": "abc",
+                    "active_runs": [],
+                    "awaiting_approvals": [],
+                    "safe_actions": [],
+                    "degraded": [],
+                    "projection_lag": {"registry": 0},
+                },
+            },
+        )
         budget = kwargs.pop("budget", {"verdict": "OK", "turns": 2, "context_tokens": 100})
         return module.compose_capsule(
             binding, artifact_dir=tmp_path, packet=packet, budget=budget, **kwargs
@@ -207,10 +224,12 @@ class TestCapsuleComposition:
         close = _close("bound-predecessor", date="2026-09-10", artifact_dir=tmp_path)
         capsule = self._capsule(
             tmp_path,
-            _binding(predecessor={
-                "slug": "bound-predecessor",
-                "knowledge_ids": [close.record.knowledge_id, "0" * 12],
-            }),
+            _binding(
+                predecessor={
+                    "slug": "bound-predecessor",
+                    "knowledge_ids": [close.record.knowledge_id, "0" * 12],
+                }
+            ),
             max_records=1,
         )
         records = capsule["predecessor"]["records"]
@@ -248,12 +267,19 @@ class TestCapsuleComposition:
         observed = self._capsule(
             tmp_path,
             _binding(),
-            packet={"status": "observed", "payload": {
-                "schema": "control-status/v1", "control_epoch": 7, "repo_head_sha": "abc",
-                "active_runs": [], "awaiting_approvals": [], "safe_actions": [],
-                "degraded": ["failed_runs"],
-                "projection_lag": {"registry": 0, "chroma": None},
-            }},
+            packet={
+                "status": "observed",
+                "payload": {
+                    "schema": "control-status/v1",
+                    "control_epoch": 7,
+                    "repo_head_sha": "abc",
+                    "active_runs": [],
+                    "awaiting_approvals": [],
+                    "safe_actions": [],
+                    "degraded": ["failed_runs"],
+                    "projection_lag": {"registry": 0, "chroma": None},
+                },
+            },
         )
         assert observed["control_packet"]["unknowns"]["projection_lag_null"] == ["chroma"]
         assert observed["control_packet"]["degraded"] == ["failed_runs"]
@@ -263,15 +289,28 @@ class TestCapsuleComposition:
         limits, response headroom, remaining tokens, and the measurement provenance — and the
         rendered tail names the model and the effective limit, not only a verdict."""
         budget = {
-            "verdict": "OK", "turns": 38, "context_tokens": 189_594,
-            "usage_incomplete": True, "reason": "usage incomplete — last completed sample used",
-            "model": {"provider_id": "deepseek", "model_id": "deepseek-v4-flash",
-                      "variant": "max", "source": "session.model"},
-            "capacity": {"effective_limit": 968_000, "hard_limit": 1_000_000,
-                         "context_limit": 1_000_000, "input_limit": None,
-                         "output_limit": 384_000, "response_headroom_tokens": 32_000,
-                         "compaction_reserved_tokens": 15_000, "warn_fraction": 0.8,
-                         "compaction_enabled": True},
+            "verdict": "OK",
+            "turns": 38,
+            "context_tokens": 189_594,
+            "usage_incomplete": True,
+            "reason": "usage incomplete — last completed sample used",
+            "model": {
+                "provider_id": "deepseek",
+                "model_id": "deepseek-v4-flash",
+                "variant": "max",
+                "source": "session.model",
+            },
+            "capacity": {
+                "effective_limit": 968_000,
+                "hard_limit": 1_000_000,
+                "context_limit": 1_000_000,
+                "input_limit": None,
+                "output_limit": 384_000,
+                "response_headroom_tokens": 32_000,
+                "compaction_reserved_tokens": 15_000,
+                "warn_fraction": 0.8,
+                "compaction_enabled": True,
+            },
             "remaining_tokens": 778_406,
             "provenance": {"formula": "opencode@1.18.15:SessionCompaction.isOverflow"},
         }
@@ -314,30 +353,72 @@ class TestCapsuleComposition:
 class TestCliModes:
     def test_cli_bind_and_capsule_round_trip(self, tmp_path, monkeypatch, capsys):
         module = _load_session_open("session_open_cli_test")
-        monkeypatch.setattr(module, "read_control_packet",
-                            lambda timeout=20: {"status": "observed", "payload": {
-                                "schema": "control-status/v1", "control_epoch": 9,
-                                "repo_head_sha": "abc", "active_runs": [],
-                                "awaiting_approvals": [], "safe_actions": [], "degraded": [],
-                                "projection_lag": {},
-                            }})
-        monkeypatch.setattr(module, "measure_budget",
-                            lambda sid, timeout=20: {"verdict": "WARN", "turns": 80,
-                                                     "context_tokens": 200000, "reason": ""})
+        monkeypatch.setattr(
+            module,
+            "read_control_packet",
+            lambda timeout=20: {
+                "status": "observed",
+                "payload": {
+                    "schema": "control-status/v1",
+                    "control_epoch": 9,
+                    "repo_head_sha": "abc",
+                    "active_runs": [],
+                    "awaiting_approvals": [],
+                    "safe_actions": [],
+                    "degraded": [],
+                    "projection_lag": {},
+                },
+            },
+        )
+        monkeypatch.setattr(
+            module,
+            "measure_budget",
+            lambda sid, timeout=20: {
+                "verdict": "WARN",
+                "turns": 80,
+                "context_tokens": 200000,
+                "reason": "",
+            },
+        )
         monkeypatch.setattr("sys.stdin", io.StringIO("The original request text."))
 
-        assert module.main([
-            "--bind", "--native-session-id", "ses_cli", "--agent", "aio-control",
-            "--message-id", "m1", "--request-file", "-", "--task", "t-cli",
-            "--artifact-dir", str(tmp_path), "--json",
-        ]) == 0
+        assert (
+            module.main(
+                [
+                    "--bind",
+                    "--native-session-id",
+                    "ses_cli",
+                    "--agent",
+                    "aio-control",
+                    "--message-id",
+                    "m1",
+                    "--request-file",
+                    "-",
+                    "--task",
+                    "t-cli",
+                    "--artifact-dir",
+                    str(tmp_path),
+                    "--json",
+                ]
+            )
+            == 0
+        )
         bound = json.loads(capsys.readouterr().out)
         assert bound["status"] == "created"
 
-        assert module.main([
-            "--capsule", "--native-session-id", "ses_cli",
-            "--artifact-dir", str(tmp_path), "--json",
-        ]) == 0
+        assert (
+            module.main(
+                [
+                    "--capsule",
+                    "--native-session-id",
+                    "ses_cli",
+                    "--artifact-dir",
+                    str(tmp_path),
+                    "--json",
+                ]
+            )
+            == 0
+        )
         capsule = json.loads(capsys.readouterr().out)
         assert capsule["capsule_status"] == "composed"
         assert "session budget: WARN" in capsule["capsule"]["text"]
@@ -351,10 +432,19 @@ class TestCliModes:
     def test_cli_capsule_without_a_binding_composes_nothing(self, tmp_path, capsys):
         module = _load_session_open("session_open_cli_missing_test")
         (tmp_path / "empty").mkdir()
-        assert module.main([
-            "--capsule", "--native-session-id", "ses_none",
-            "--artifact-dir", str(tmp_path / "empty"), "--json",
-        ]) == 0
+        assert (
+            module.main(
+                [
+                    "--capsule",
+                    "--native-session-id",
+                    "ses_none",
+                    "--artifact-dir",
+                    str(tmp_path / "empty"),
+                    "--json",
+                ]
+            )
+            == 0
+        )
         report = json.loads(capsys.readouterr().out)
         assert report["capsule"] is None
         assert report["capsule_status"] == "missing"
@@ -441,9 +531,7 @@ class TestStoreHardening:
             except Exception as exc:  # pragma: no cover - failure detail for the assert
                 results.append(f"error: {exc}")
 
-        threads = [
-            threading.Thread(target=writer, args=(f"request-{i}",)) for i in range(2)
-        ]
+        threads = [threading.Thread(target=writer, args=(f"request-{i}",)) for i in range(2)]
         for thread in threads:
             thread.start()
         for thread in threads:
@@ -519,6 +607,43 @@ class TestVersionedContext:
         assert again.binding["context_version"] == 2
         assert again.binding["original_request"] == "ORIGINAL REQUEST"
 
+    def test_a_progress_write_replaces_a_completed_next_action(self, tmp_path):
+        """A confirmed action's progress write REPLACES the binding's `next_action`, never
+        appends to it.
+
+        The c15 scenario: the binding still instructs "activate PR #77 then call run_workflow"
+        after both happened. The recording that accompanies the confirmed action must leave the
+        new one next action in place of the completed sequence — the carrier names WHAT is
+        current, while the audit trail (``context_history``) keeps the superseded instruction.
+
+        Replaces-not-appends and progress-only are the two properties under test: the
+        authorization identity/epoch must not move (round-9), so a queued command's
+        authorization survives the recording.
+        """
+        stale = "After the controller activates PR #77 then call run_workflow"
+        si.write_binding(_binding(next_action=stale), artifact_dir=tmp_path, connect_fn=_FakeRedis)
+        before = si.read_binding("ses_test_1", artifact_dir=tmp_path).binding
+        founding_id = si.binding_authorization_id(before)
+        assert before["next_action"] == stale
+
+        updated = si.update_binding_context(
+            "ses_test_1",
+            context={"next_action": "observe job abc123"},
+            expected_version=1,
+            artifact_dir=tmp_path,
+            connect_fn=_FakeRedis,
+        )
+        assert updated.status == si.BINDING_STATUS_UPDATED
+        # REPLACED, not concatenated: the live carrier names only the new next action.
+        assert updated.binding["next_action"] == "observe job abc123"
+        assert stale not in updated.binding["next_action"]
+        # Nothing lost: the superseded instruction survives in the bounded audit history.
+        assert updated.binding["context_history"][0]["next_action"] == stale
+        assert updated.binding["context_version"] == 2
+        # PROGRESS-ONLY: the authorization identity and epoch are untouched.
+        assert si.binding_authorization_id(updated.binding) == founding_id
+        assert si.binding_authorization_version(updated.binding) == 1
+
     def test_unchanged_authorization_values_never_advance_the_epoch(self, tmp_path):
         """Round-10: re-sending IDENTICAL acceptance/predecessor values — reordered keys,
         omitted defaults — never advances the authorization epoch, so a queued command's
@@ -537,8 +662,11 @@ class TestVersionedContext:
 
         # 1. Progress recording: the epoch is untouched.
         progress = si.update_binding_context(
-            "ses_test_1", context={"next_action": "observe job X"},
-            expected_version=1, artifact_dir=tmp_path, connect_fn=_FakeRedis,
+            "ses_test_1",
+            context={"next_action": "observe job X"},
+            expected_version=1,
+            artifact_dir=tmp_path,
+            connect_fn=_FakeRedis,
         )
         assert si.binding_authorization_version(progress.binding) == 1
         assert si.binding_authorization_id(progress.binding) == founding_id
@@ -552,7 +680,9 @@ class TestVersionedContext:
                 "acceptance": {"source": "raw", "text": "tests green"},
                 "predecessor": {"knowledge_ids": ["kb-1", "kb-2"], "slug": "bound-predecessor"},
             },
-            expected_version=2, artifact_dir=tmp_path, connect_fn=_FakeRedis,
+            expected_version=2,
+            artifact_dir=tmp_path,
+            connect_fn=_FakeRedis,
         )
         assert si.binding_authorization_version(resent.binding) == 1
         assert si.binding_authorization_id(resent.binding) == founding_id
@@ -562,7 +692,9 @@ class TestVersionedContext:
         changed = si.update_binding_context(
             "ses_test_1",
             context={"acceptance": {"text": "different criteria", "source": "raw"}},
-            expected_version=3, artifact_dir=tmp_path, connect_fn=_FakeRedis,
+            expected_version=3,
+            artifact_dir=tmp_path,
+            connect_fn=_FakeRedis,
         )
         assert si.binding_authorization_version(changed.binding) == 2
         assert si.binding_authorization_id(changed.binding) != founding_id
@@ -600,9 +732,7 @@ class TestConstraintPreservation:
     def test_acceptance_tail_constraint_survives_with_a_marker(self, tmp_path):
         """The reviewer reproduction: a long criterion ending in NEVER DEPLOY must survive."""
         criterion = ("Requirement: keep the system stable. " * 80) + "NEVER DEPLOY on Fridays."
-        capsule = self._capsule(
-            tmp_path, _binding(acceptance={"text": criterion, "source": "raw"})
-        )
+        capsule = self._capsule(tmp_path, _binding(acceptance={"text": criterion, "source": "raw"}))
         assert "NEVER DEPLOY on Fridays." in capsule["text"]
         assert "chars omitted" in capsule["text"]
         assert capsule["acceptance"]["truncated"] is True
@@ -648,3 +778,32 @@ class TestConstraintPreservation:
         assert "next action: ship the repair" in capsule["text"]
         assert "blocker: waiting on review" in capsule["text"]
         assert "capsule head truncated" in capsule["text"]
+
+    def test_the_capsule_cannot_show_a_completed_next_action(self, tmp_path):
+        """The carrier-level property c15 §4.6 names: a completed instruction can never remain
+        the capsule's actionable next action after its confirmed action happened.
+
+        Seed the exact stale binding, perform the progress write a confirmed action performs,
+        then compose the capsule the way the per-request carrier does — and assert the finished
+        instruction is absent from BOTH the structured next-action slot and the rendered text.
+        """
+        stale = "After the controller activates PR #77 then call run_workflow"
+        si.write_binding(_binding(next_action=stale), artifact_dir=tmp_path, connect_fn=_FakeRedis)
+        # The confirmed action's recording — the same versioned progress write the submit path
+        # issues (see fleet_manager._record_submission_in_task).
+        si.update_binding_context(
+            "ses_test_1",
+            context={"next_action": "observe job abc123"},
+            expected_version=1,
+            artifact_dir=tmp_path,
+            connect_fn=_FakeRedis,
+        )
+        binding = si.read_binding("ses_test_1", artifact_dir=tmp_path).binding
+        capsule = self._capsule(tmp_path, binding)
+
+        # The carrier's one next action is the NEW record, sourced from the binding — and the
+        # completed sequence is gone from the rendered capsule, not only the JSON.
+        assert capsule["next_action"]["source"] == "binding"
+        assert capsule["next_action"]["text"] == "observe job abc123"
+        assert "activate PR #77" not in capsule["next_action"]["text"]
+        assert "activate PR #77" not in capsule["text"]
