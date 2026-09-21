@@ -149,6 +149,53 @@ def test_artifact_path_honors_the_results_dir_contract(tmp_path, monkeypatch):
     assert ki._artifact_path("abc") == results / "kb" / "abc.json"
 
 
+SHAPE_SPEC = SPEC.replace(
+    "        requires_files: [notes/plan.md]",
+    "        requires_files: [notes/plan.md]\n"
+    "        requires_content:\n"
+    '          notes/plan.md: ["## Files", "## Tests", "## Acceptance"]',
+)
+
+
+def test_shape_gate_refuses_an_unsectioned_plan(tmp_path):
+    _init_repo(tmp_path)
+    spec_path = tmp_path / "spec.yaml"
+    spec_path.write_text(SHAPE_SPEC, encoding="utf-8")
+    spec = load_spec(spec_path)
+    calls = []
+
+    def fake(prompt, **kwargs):
+        calls.append(prompt)
+        (tmp_path / "notes").mkdir(exist_ok=True)
+        (tmp_path / "notes" / "plan.md").write_text("a plan with no required sections")
+        return _R()
+
+    result = wr.run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=fake)
+    phases = {p.phase: p for p in result.phases}
+    assert phases["execute"].status == "failed"
+    assert "ARTIFACT_SHAPE" in phases["execute"].error
+    assert len(calls) == 1  # refused before the execute agent ran
+
+
+def test_shape_gate_passes_when_the_plan_carries_its_sections(tmp_path):
+    _init_repo(tmp_path)
+    spec_path = tmp_path / "spec.yaml"
+    spec_path.write_text(SHAPE_SPEC, encoding="utf-8")
+    spec = load_spec(spec_path)
+    calls = []
+
+    def fake(prompt, **kwargs):
+        calls.append(prompt)
+        (tmp_path / "notes").mkdir(exist_ok=True)
+        (tmp_path / "notes" / "plan.md").write_text("## Files\nx\n## Tests\ny\n## Acceptance\nz")
+        return _R()
+
+    result = wr.run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=fake)
+    phases = {p.phase: p for p in result.phases}
+    assert phases["execute"].status == "ok"
+    assert len(calls) == 2
+
+
 def test_report_path_honors_the_results_dir_contract(tmp_path, monkeypatch):
     from types import SimpleNamespace
 

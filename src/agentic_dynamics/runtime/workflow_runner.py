@@ -869,6 +869,30 @@ def _missing_required_files(phase_def: dict[str, Any], wd: Path) -> list[str]:
     return missing
 
 
+def _missing_required_markers(phase_def: dict[str, Any], wd: Path) -> list[str]:
+    """Required section markers a phase's artifacts must carry (the SHAPE gate).
+
+    ``requires_content: {path: [marker, ...]}`` — each marker must appear in the file's text.
+    The world-model loop's prior artifacts are shape-enforced: a plan without ``## Files`` /
+    ``## Tests`` / ``## Acceptance`` refuses the execute phase — not merely a missing file
+    (world-model loop v1.2, 2026-09-21, per the controller's "what does a prior run look like").
+    """
+    required = phase_def.get("requires_content") or {}
+    problems: list[str] = []
+    for rel, markers in required.items():
+        path = Path(str(rel))
+        if not path.is_absolute():
+            path = Path(wd) / str(rel)
+        if not path.is_file():
+            problems.append(f"{rel} (missing)")
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for marker in markers or []:
+            if str(marker) not in text:
+                problems.append(f"{rel} lacks {str(marker)!r}")
+    return problems
+
+
 def _build_phase_prompt(
     phase: dict[str, Any],
     goal: str,
@@ -4778,6 +4802,13 @@ def run_workflow(
                         f"ARTIFACT_MISSING — phase '{name}' requires "
                         f"{', '.join(_missing_required)}; the declared artifact(s) are "
                         "absent from the worktree (the plan gate refuses before spend)"
+                    )
+                _missing_markers = _missing_required_markers(phase_def, wd)
+                if _missing_markers:
+                    raise RuntimeError(
+                        f"ARTIFACT_SHAPE — phase '{name}' requires: "
+                        f"{'; '.join(_missing_markers)}; the declared artifact exists but its "
+                        "required sections are absent (the shape gate refuses before spend)"
                     )
                 if phase_def.get("_prepared_step"):
                     # Wave A2: a prepared step's prompt is the parent's FINAL instruction — the
