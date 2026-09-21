@@ -80,6 +80,13 @@ what we didn't know."
   pattern-projection seam, or the posterior's UPDATES list), and is promoted into
   `agent_config/skills/` only through an explicit promotion step (a reviewed commit) — never a
   hand-edit of generated surfaces.
+- **Durable emission (v1.1, 2026-09-21)** — the emissions (KB artifacts, run reports) and the
+  reader now honor the fleet contract's `FINOPS_RESULTS_DIR` (default: this checkout). A run
+  executing from an EPHEMERAL worktree must set it to the durable checkout
+  (`FINOPS_RESULTS_DIR=<durable>/experiments/results`), so records and their links stay
+  resolvable after the worktree goes away. Measured cause: the second loop run emitted its
+  reports/records into `/tmp/wml_v1/` — durable only while that worktree lived, and invisible
+  to a reader in another worktree (the posterior's own V5 false-negative).
 
 ## Open extension: execute as a workflow (controller, 2026-09-21)
 

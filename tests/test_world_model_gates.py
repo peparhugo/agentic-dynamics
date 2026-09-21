@@ -11,6 +11,7 @@ Covers the two runner additions of 2026-09-21:
 from __future__ import annotations
 
 import subprocess
+from pathlib import Path
 
 from agentic_dynamics.experiment.experiment_spec import load_spec
 from agentic_dynamics.runtime import workflow_runner as wr
@@ -138,3 +139,39 @@ def _write_spec(tmp_path):
     path = tmp_path / "spec.yaml"
     path.write_text(SPEC, encoding="utf-8")
     return path
+
+
+def test_artifact_path_honors_the_results_dir_contract(tmp_path, monkeypatch):
+    import agentic_dynamics.knowledge.knowledge_ingestion as ki
+
+    results = tmp_path / "durable" / "experiments" / "results"
+    monkeypatch.setenv("FINOPS_RESULTS_DIR", str(results))
+    assert ki._artifact_path("abc") == results / "kb" / "abc.json"
+
+
+def test_report_path_honors_the_results_dir_contract(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    import agentic_dynamics.knowledge.knowledge_ingestion as ki
+
+    results = tmp_path / "durable" / "experiments" / "results"
+    monkeypatch.setenv("FINOPS_RESULTS_DIR", str(results))
+    captured = {}
+    monkeypatch.setattr(ki, "emit_phase_finding", lambda pr, **kw: captured.update(kw))
+    monkeypatch.setattr(wr, "_capture_session_report", lambda sid: "the report body")
+    pr = SimpleNamespace(
+        phase="prior",
+        session_id="ses_x",
+        final_response="the report body",
+        status="ok",
+        cost_usd=0.0,
+        tokens={},
+        test_executed_success=None,
+        commit_hash="x",
+    )
+    wr._emit_research_report(
+        pr, goal="g", spec_name="t_wml", wd=tmp_path, rag_params={"emit_scope": "s"}
+    )
+    path = str(captured.get("report_path", ""))
+    assert str(results) in path and path.endswith("_prior.md")
+    assert Path(path).is_file()

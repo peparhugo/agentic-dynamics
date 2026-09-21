@@ -1837,15 +1837,15 @@ def _emit_research_report(
 
         stamp = re.sub(r"[^0-9]", "", _now())[:14] or "report"
         safe_phase = re.sub(r"[^A-Za-z0-9._-]+", "_", str(pr.phase)) or "phase"
-        path = (
-            PROJECT_ROOT
-            / "experiments"
-            / "results"
-            / "workflows"
-            / spec_name
-            / "reports"
-            / f"{stamp}_{safe_phase}.md"
+        # The DURABLE results tree (the fleet path contract's FINOPS_RESULTS_DIR, default:
+        # this checkout) — a run executing from an ephemeral worktree must emit its reports
+        # where the records' links stay resolvable after the worktree goes away (world-model
+        # loop v1.1, 2026-09-21).
+        _results_env = os.environ.get("FINOPS_RESULTS_DIR")
+        results_dir = (
+            Path(_results_env) if _results_env else PROJECT_ROOT / "experiments" / "results"
         )
+        path = results_dir / "workflows" / spec_name / "reports" / f"{stamp}_{safe_phase}.md"
         path.parent.mkdir(parents=True, exist_ok=True)
         # The store capture is authoritative (the reader's view); the adapter's final_response
         # is the fallback when the store is unavailable.
