@@ -22,7 +22,7 @@ workflow:
       repository_id: agentic-dynamics
       acl_scope: public
       pattern_projection: true
-      emit_self: false
+      emit_self: true
     phases:
       - name: generate
         kind: agent

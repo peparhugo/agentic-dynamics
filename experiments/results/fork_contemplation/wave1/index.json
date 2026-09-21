@@ -1,0 +1,104 @@
+[
+  {
+    "phase": "c01",
+    "session_id": "ses_f40654a24ffeha9G7OfDS26aaS",
+    "chars": 6000,
+    "head": "# Forked AIO session \u2014 where effort compounded, and what would have stopped it  *Analysis only. Noth"
+  },
+  {
+    "phase": "c02",
+    "session_id": "ses_f4063bfccffe7IRj1IUUFfoxhF",
+    "chars": 6000,
+    "head": "# Net-Negative Retrospective \u2014 forked aio-control session, capacity-budget correction  ## Routing (M"
+  },
+  {
+    "phase": "c03",
+    "session_id": "ses_f4062bb4dffeJBgCmTLWQirLnk",
+    "chars": 6000,
+    "head": "# Contemplation \u2014 the feedback loops that governed this work  **Scope note (verbose mode).** Analysi"
+  },
+  {
+    "phase": "c04",
+    "session_id": "ses_f4061ce29ffe5jiZEmXo2KTCJ6",
+    "chars": 6000,
+    "head": "Analysis only \u2014 no files touched, no commands run. I state the leading claim up front so the closing"
+  },
+  {
+    "phase": "c05",
+    "session_id": "ses_f4060d61affeycXo0Jk3bQ1ftK",
+    "chars": 6000,
+    "head": "# Contemplation memo \u2014 smallest changes with the largest trajectory effect  **Reasoning for the shap"
+  },
+  {
+    "phase": "c06",
+    "session_id": "ses_f405fcf8cffe6kpW2GFd1YinWv",
+    "chars": 6000,
+    "head": "# Where the arc measured a proxy instead of the thing  ## Four axes, four named moments  **Acceptanc"
+  },
+  {
+    "phase": "c07",
+    "session_id": "ses_f405ead5fffeOOWzuGEfefOB63",
+    "chars": 6000,
+    "head": "# Contemplation: auditing the acceptance oracles of the capacity-budget delivery  ## 0. The record I"
+  },
+  {
+    "phase": "c08",
+    "session_id": "ses_f405d82c8ffeol8hetBr4DIwWh",
+    "chars": 6000,
+    "head": "# Contemplation: where the operator's attention earned its keep, and the division of labor it implie"
+  },
+  {
+    "phase": "c09",
+    "session_id": "ses_f405cbaffffeqqZh666x5I8ZZs",
+    "chars": 6000,
+    "head": "# Economic post-mortem \u2014 `feature/aio-capacity-budget` \u2192 PR #77 \u2192 run `run-0da5271bc0cb`  **Mode not"
+  },
+  {
+    "phase": "c10",
+    "session_id": "ses_f405bb64effewruVL2jUe39Fxs",
+    "chars": 6000,
+    "head": "# Contemplation: the next controlled experiment for the context-policy line  **Framing note (why ana"
+  },
+  {
+    "phase": "c11",
+    "session_id": "ses_f405acd83ffe9YaVX4JnAEJNqX",
+    "chars": 6000,
+    "head": "## Frame under attack  Three load-bearing claims, stated so they can be hit:  1. **Measurement-drive"
+  },
+  {
+    "phase": "c12",
+    "session_id": "ses_f4059cd54fferxa7YIeWvF6YuN",
+    "chars": 6000,
+    "head": "# Authority-map of the Agentic Dynamics AIO system (contemplation, analysis only)  Evidence base: th"
+  },
+  {
+    "phase": "c13",
+    "session_id": "ses_f40586dc4ffeWQdqX70AdVRitr",
+    "chars": 6000,
+    "head": "## Contemplation \u2014 belief inventory, evidence classes, and the one stale mover  *(Analysis only. No "
+  },
+  {
+    "phase": "c14",
+    "session_id": "ses_f40575136ffeiHJD7ts7W1TDbK",
+    "chars": 6000,
+    "head": "# Contemplation: modelling the controller, and where this system misread them  Analysis only \u2014 no co"
+  },
+  {
+    "phase": "c15",
+    "session_id": "ses_f4056a639ffev3bl9Kv51N013G",
+    "chars": 6000,
+    "head": "# Contemplation: what the next session needs that the records do not carry  *Analysis only. No files"
+  },
+  {
+    "phase": "c16",
+    "session_id": "ses_f40554631ffeR2gpAn7IEc3WIS",
+    "chars": 6000,
+    "head": "## Method note (why this shape)  I am honoring the CONTEMPLATION constraint literally: no tool calls"
+  },
+  {
+    "phase": "c17",
+    "session_id": "ses_f4054506cffeBQ8yDRBn29I03T",
+    "chars": 6000,
+    "head": "# Cross-Fan-Out Synthesis \u2014 the AIO capacity-budget arc, read as one corpus  *Analysis only. No file"
+  }
+]

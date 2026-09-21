@@ -1,0 +1,27 @@
+{
+  "schema": "contemplation-synthesis-rerun/v1",
+  "spec": "contemplation_synthesis_rerun",
+  "run_id": "run-1ec7bb0052f0",
+  "ledger": "experiments/results/workflows/contemplation_synthesis_rerun/20260920T180239727424Z_run-1ec7bb0052f0.json",
+  "session_id": "ses_f40058f19ffe4CyzUjvnS57jRe",
+  "model": "deepseek/deepseek-v4-flash",
+  "goal": "Rerun the contemplation synthesis over the 24 existing answers with the repaired delivery channel: reconcile the corpus, preserve disagreements, challenge the prompt-supplied theses, separate historical-code claims from today's behavior",
+  "cost_usd": 0.031476,
+  "tokens_total": 116835,
+  "cache_read_tokens": 1608832,
+  "cache_hit_rate": 0.9323,
+  "answer": {
+    "file": "answer.md",
+    "chars": 20223,
+    "sha256": "c9f62f8f65a9b1d1406c17fd76c572dbd67aadfda0aa0d3ca2fe129bd3823e9f"
+  },
+  "delivery": {
+    "mode": "files",
+    "entries": 24,
+    "complete": 24,
+    "total_chars": 355473,
+    "read_calls_verified": 24,
+    "contents": "wave1 c01-c16 + wave2 c01-c08 (the 24 answers); prior syntheses wave1/c17 and wave2/c09 excluded, flagged in the report"
+  },
+  "note": "Repair verification: complete fork-answer delivery (no truncation), explicit file transport inside the session workspace, delivery manifest recorded on the run ledger, and 24/24 read calls confirmed in the fork session transcript."
+}

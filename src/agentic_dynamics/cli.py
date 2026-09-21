@@ -93,6 +93,11 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("knowledge", "project-findings"): "kb_project_findings.py",
     ("data", "site-census"): "site_census_check.py",
     ("knowledge", "worker"): "kb_worker.py",
+    # knowledge read — the reader verb (2026-09-21 retrieval audit): given a scope, read the
+    # KB through the ranked pipeline, with a deterministic artifact-scan fallback. The missing
+    # read path for steps: registry query filters metadata only, and retrieve() was in-process
+    # only — so nothing could read by content with a scope.
+    ("knowledge", "read"): "kb_read.py",
     ("knowledge", "context-report"): "context_snapshot_report.py",
     ("knowledge", "shadow-report"): "shadow_decision_report.py",
     ("knowledge", "arm-comparison"): "decision_arm_comparison.py",
@@ -224,7 +229,7 @@ Subcommands (each forwards to its backing script):
   queue       enqueue|worker|monitor|reinterleave|analysis-enqueue|analysis-worker
   analyze     worktrees|trajectories|stories|session-routing|workflow-metrics|lab <name>
   data        build|sync|manifest|inventory|bundle
-  knowledge   ingest|sources|facts|worker|context-report|shadow-report|arm-comparison
+  knowledge   ingest|sources|facts|worker|context-report|shadow-report|arm-comparison|read
   registry    query|show|lineage
   review      all|stories|trigger|enqueue|finalize
   spec        status|pipeline

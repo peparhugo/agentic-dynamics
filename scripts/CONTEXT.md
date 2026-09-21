@@ -18,6 +18,7 @@ maintained: promote.py approve_workflow.py scan_docs_drift.py docs_drift_watchdo
 maintained: control_status.py
 maintained: control_drain_outbox.py control_sweep_zombies.py
 maintained: check_preexisting.py
+maintained: kb_read.py
 maintained: publish_release.py
 maintained: session_close.py
 maintained: session_open.py session_budget.py

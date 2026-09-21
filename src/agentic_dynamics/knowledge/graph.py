@@ -99,10 +99,8 @@ _KNOWLEDGE_INDEXES = [
     # symbols). The :Knowledge index does NOT help: the multi-label nodes are matched
     # as :SymbolVersion, and Cypher only uses the :Knowledge index when the query
     # constrains that label.
-    "CREATE INDEX symbol_version_entity_id IF NOT EXISTS "
-    "FOR (s:SymbolVersion) ON (s.entity_id)",
-    "CREATE INDEX module_version_entity_id IF NOT EXISTS "
-    "FOR (m:ModuleVersion) ON (m.entity_id)",
+    "CREATE INDEX symbol_version_entity_id IF NOT EXISTS FOR (s:SymbolVersion) ON (s.entity_id)",
+    "CREATE INDEX module_version_entity_id IF NOT EXISTS FOR (m:ModuleVersion) ON (m.entity_id)",
 ]
 _KNOWLEDGE_FULLTEXT = [
     "CREATE FULLTEXT INDEX step_text_ft IF NOT EXISTS FOR (s:Step) ON EACH [s.text]",
@@ -178,9 +176,7 @@ def _acl_clause(alias: str, repository_id: str, acl_scope: str) -> str:
       unversioned legacy nodes are reachable.
     """
     if repository_id and acl_scope:
-        return (
-            f"{alias}.repository_id = $repository_id AND {alias}.acl_scope = $acl_scope"
-        )
+        return f"{alias}.repository_id = $repository_id AND {alias}.acl_scope = $acl_scope"
     versioned = " OR ".join(f"{alias}:{label}" for label in _VERSIONED_LABELS)
     return f"NOT ({versioned})"
 
@@ -216,16 +212,30 @@ class Neo4jClient:
         # production override — exactly the "override via ENV for prod" the comment always
         # promised but never wired. An explicit arg still wins (the run_workflow.py composition
         # root passes a resolved URI in directly).
-        resolved_uri = uri or os.environ.get("FINOPS_NEO4J_URI") or os.environ.get(
-            "FINOPS_NEO4J_URL"
-        ) or "bolt://localhost:7687"
+        resolved_uri = (
+            uri
+            or os.environ.get("FINOPS_NEO4J_URI")
+            or os.environ.get("FINOPS_NEO4J_URL")
+            or "bolt://localhost:7687"
+        )
         resolved_user = user or os.environ.get("FINOPS_NEO4J_USER") or "neo4j"
         resolved_password = password or os.environ.get("FINOPS_NEO4J_PASSWORD") or "password123"
         from neo4j import GraphDatabase
 
-        self._driver = GraphDatabase.driver(
-            resolved_uri, auth=(resolved_user, resolved_password)
-        )
+        # Quiet the driver's notification stream: the deployed database legitimately lacks some
+        # optional property keys our queries pattern-match (e.g. ``pattern_payload``), and a
+        # benign "property key does not exist" warning flooding a reader's stderr reads as an
+        # error. Notifications are not errors; errors still raise. Guarded for older drivers.
+        try:
+            self._driver = GraphDatabase.driver(
+                resolved_uri,
+                auth=(resolved_user, resolved_password),
+                notifications_min_severity="OFF",
+            )
+        except TypeError:  # older driver without the kwarg — accept the noise, never break
+            self._driver = GraphDatabase.driver(
+                resolved_uri, auth=(resolved_user, resolved_password)
+            )
 
     def close(self):
         self._driver.close()
@@ -840,9 +850,11 @@ class Neo4jClient:
             when the cited spec is not yet a current graph node (skipped); ``"not_family"``
             when the record is not of the wave-conclusion family.
         """
-        if record.source_type != "finding" or not (record.logical_locator or "").startswith("wave:"):
+        if record.source_type != "finding" or not (record.logical_locator or "").startswith(
+            "wave:"
+        ):
             return "not_family"
-        spec_name = (record.logical_locator or "")[len("wave:"):]
+        spec_name = (record.logical_locator or "")[len("wave:") :]
         if not spec_name:
             return "not_family"
         row = self._run_value(
@@ -918,13 +930,18 @@ class Neo4jClient:
         ``Diagnostic`` nodes and ``AFFECTS`` edges to the smallest containing ``SymbolVersion``.
         """
         counts = {
-            "revisions": 0, "module_versions": 0, "symbol_versions": 0,
-            "contains": 0, "defines": 0, "imports": 0, "calls": 0,
-            "tested_by": 0, "affects": 0, "supersedes": 0,
+            "revisions": 0,
+            "module_versions": 0,
+            "symbol_versions": 0,
+            "contains": 0,
+            "defines": 0,
+            "imports": 0,
+            "calls": 0,
+            "tested_by": 0,
+            "affects": 0,
+            "supersedes": 0,
         }
-        rev_version_id = hashlib.sha256(
-            f"revision|{repository_id}|{revision}".encode()
-        ).hexdigest()
+        rev_version_id = hashlib.sha256(f"revision|{repository_id}|{revision}".encode()).hexdigest()
         self._run(
             "MERGE (r:Revision {version_id: $vid}) "
             "SET r.repository_id = $repo, r.acl_scope = $acl, r.commit_sha = $revision",
@@ -948,9 +965,14 @@ class Neo4jClient:
                 "m.repository_id = $repo, m.acl_scope = $acl, m.commit_sha = $revision, "
                 "m.content_hash = $hash, m.language = $language",
                 {
-                    "vid": module_vid, "ent": module_ent, "module_name": module_name,
-                    "path": path, "repo": repository_id, "acl": acl_scope,
-                    "revision": revision, "hash": module_hash,
+                    "vid": module_vid,
+                    "ent": module_ent,
+                    "module_name": module_name,
+                    "path": path,
+                    "repo": repository_id,
+                    "acl": acl_scope,
+                    "revision": revision,
+                    "hash": module_hash,
                     "language": snapshot.language,
                 },
             )
@@ -964,9 +986,7 @@ class Neo4jClient:
             counts["contains"] += 1
 
             for sym in snapshot.files[path]:
-                sym_ent = symbol_entity_id(
-                    repository_id, path, sym.qualified_name, sym.kind
-                )
+                sym_ent = symbol_entity_id(repository_id, path, sym.qualified_name, sym.kind)
                 sym_vid = symbol_version_id(sym_ent, revision, sym.content_hash)
                 sym_vids[(path, sym.qualified_name, sym.kind)] = sym_vid
                 qname_to_vid[sym.qualified_name] = sym_vid
@@ -980,9 +1000,15 @@ class Neo4jClient:
                     "s.knowledge_id = $vid, s.authority = 'SOURCE', s.source_type = 'code', "
                     "s.logical_locator = $path, s.language = $language",
                     {
-                        "vid": sym_vid, "ent": sym_ent, "qname": sym.qualified_name,
-                        "kind": sym.kind, "path": path, "module_name": module_name,
-                        "repo": repository_id, "acl": acl_scope, "revision": revision,
+                        "vid": sym_vid,
+                        "ent": sym_ent,
+                        "qname": sym.qualified_name,
+                        "kind": sym.kind,
+                        "path": path,
+                        "module_name": module_name,
+                        "repo": repository_id,
+                        "acl": acl_scope,
+                        "revision": revision,
                         "hash": sym.content_hash,
                         "span": f"{sym.source_span.start_line}:{sym.source_span.end_line}",
                         "text": f"{sym.qualified_name} ({sym.kind}) in {path}",
@@ -1066,7 +1092,9 @@ class Neo4jClient:
         # The write path stays for the Sonar/LSP wiring that would feed it; re-allowlisting
         # AFFECTS requires a writer that is actually fed (the b1 frozen-allowlist rule).
         for issue in issues or []:
-            vid = self._version_id_for_location(snapshot, issue.file_path, issue.line, repository_id, revision)
+            vid = self._version_id_for_location(
+                snapshot, issue.file_path, issue.line, repository_id, revision
+            )
             if vid is None:
                 continue
             issue_key = f"{repository_id}:{revision}:{issue.key}"
@@ -1077,14 +1105,22 @@ class Neo4jClient:
                 f"WITH d MATCH (s:{SYMBOL_VERSION_LABEL} {{version_id: $vid}}) "
                 "MERGE (d)-[:AFFECTS]->(s)",
                 {
-                    "key": issue_key, "repo": repository_id, "acl": acl_scope,
-                    "revision": revision, "rule": issue.rule, "severity": issue.severity,
-                    "path": issue.file_path, "line": issue.line, "vid": vid,
+                    "key": issue_key,
+                    "repo": repository_id,
+                    "acl": acl_scope,
+                    "revision": revision,
+                    "rule": issue.rule,
+                    "severity": issue.severity,
+                    "path": issue.file_path,
+                    "line": issue.line,
+                    "vid": vid,
                 },
             )
             counts["affects"] += 1
         for diag in diagnostics or []:
-            vid = self._version_id_for_location(snapshot, diag.file, diag.line, repository_id, revision)
+            vid = self._version_id_for_location(
+                snapshot, diag.file, diag.line, repository_id, revision
+            )
             if vid is None:
                 continue
             diag_key = f"{repository_id}:{revision}:{diag.file}:{diag.line}:{diag.code}"
@@ -1095,9 +1131,15 @@ class Neo4jClient:
                 f"WITH d MATCH (s:{SYMBOL_VERSION_LABEL} {{version_id: $vid}}) "
                 "MERGE (d)-[:AFFECTS]->(s)",
                 {
-                    "key": diag_key, "repo": repository_id, "acl": acl_scope,
-                    "revision": revision, "rule": diag.code, "severity": diag.severity,
-                    "path": diag.file, "line": diag.line, "vid": vid,
+                    "key": diag_key,
+                    "repo": repository_id,
+                    "acl": acl_scope,
+                    "revision": revision,
+                    "rule": diag.code,
+                    "severity": diag.severity,
+                    "path": diag.file,
+                    "line": diag.line,
+                    "vid": vid,
                 },
             )
             counts["affects"] += 1
@@ -1274,9 +1316,7 @@ class Neo4jClient:
         for seed in seed_ids:
             if len(visited) >= max_nodes:
                 break
-            node = self._resolve_node(
-                seed, repository_id=repository_id, acl_scope=acl_scope
-            )
+            node = self._resolve_node(seed, repository_id=repository_id, acl_scope=acl_scope)
             if node is None:
                 continue  # unresolvable seed → skipped cleanly, never a zero-score hit
             elem = node["id"]
@@ -1394,7 +1434,9 @@ class Neo4jClient:
         # call, or a CLI flag matches literally instead of raising a parser error (see
         # ``_lucene_escape``'s docstring; measured live by the p4_activation_gate census).
         params: dict[str, Any] = {
-            "index": index_name, "query": _lucene_escape(query), "limit": limit,
+            "index": index_name,
+            "query": _lucene_escape(query),
+            "limit": limit,
         }
         query_str = "CALL db.index.fulltext.queryNodes($index, $query) YIELD node, score "
         if commit:

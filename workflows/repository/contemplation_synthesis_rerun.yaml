@@ -1,0 +1,102 @@
+name: contemplation_synthesis_rerun
+question: >-
+  Rerun ONLY the synthesis over the 24 existing contemplation answers (16 from wave 1, 8 from
+  wave 2), with the REPAIRED answer-delivery channel: the complete outputs are declared, read
+  in full, supplied explicitly as {prior_answers}, and recorded in the run's delivery manifest.
+  The two prior synthesis passes (wave1/c17, wave2/c09) are excluded — they were produced with
+  defective inputs (4,000-char excerpts; no sibling outputs at all) and this pass replaces them.
+  The synthesis must preserve disagreements, challenge the prompts' assumptions, and separate
+  historical-code claims from today's behavior.
+version: "0.1"
+artifact_kind: workflow
+intent: measure
+side_effects:
+  repository: false
+  external_services: false
+repeatable: true
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+comparison: null
+writeup: {format: lab_book, sections: [question, evidence]}
+stop: {budget_usd: 1.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_uncertainty}
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: false
+    rag:
+      emit_self: true
+      emit_scope: agentic-dynamics
+    prior_answers:
+      - {name: wave1/c01, path: experiments/results/fork_contemplation/wave1/c01.md}
+      - {name: wave1/c02, path: experiments/results/fork_contemplation/wave1/c02.md}
+      - {name: wave1/c03, path: experiments/results/fork_contemplation/wave1/c03.md}
+      - {name: wave1/c04, path: experiments/results/fork_contemplation/wave1/c04.md}
+      - {name: wave1/c05, path: experiments/results/fork_contemplation/wave1/c05.md}
+      - {name: wave1/c06, path: experiments/results/fork_contemplation/wave1/c06.md}
+      - {name: wave1/c07, path: experiments/results/fork_contemplation/wave1/c07.md}
+      - {name: wave1/c08, path: experiments/results/fork_contemplation/wave1/c08.md}
+      - {name: wave1/c09, path: experiments/results/fork_contemplation/wave1/c09.md}
+      - {name: wave1/c10, path: experiments/results/fork_contemplation/wave1/c10.md}
+      - {name: wave1/c11, path: experiments/results/fork_contemplation/wave1/c11.md}
+      - {name: wave1/c12, path: experiments/results/fork_contemplation/wave1/c12.md}
+      - {name: wave1/c13, path: experiments/results/fork_contemplation/wave1/c13.md}
+      - {name: wave1/c14, path: experiments/results/fork_contemplation/wave1/c14.md}
+      - {name: wave1/c15, path: experiments/results/fork_contemplation/wave1/c15.md}
+      - {name: wave1/c16, path: experiments/results/fork_contemplation/wave1/c16.md}
+      - {name: wave2/c01, path: experiments/results/fork_contemplation/wave2/c01.md}
+      - {name: wave2/c02, path: experiments/results/fork_contemplation/wave2/c02.md}
+      - {name: wave2/c03, path: experiments/results/fork_contemplation/wave2/c03.md}
+      - {name: wave2/c04, path: experiments/results/fork_contemplation/wave2/c04.md}
+      - {name: wave2/c05, path: experiments/results/fork_contemplation/wave2/c05.md}
+      - {name: wave2/c06, path: experiments/results/fork_contemplation/wave2/c06.md}
+      - {name: wave2/c07, path: experiments/results/fork_contemplation/wave2/c07.md}
+      - {name: wave2/c08, path: experiments/results/fork_contemplation/wave2/c08.md}
+    context:
+      domain_context: >-
+        READ-ONLY RESEARCH — REPAIR VERIFICATION PASS. You may use read-only tools (read,
+        grep, glob) to read and dissect the evidence files listed below — they are inside this
+        session's workspace. Work ONLY from the supplied evidence: do NOT attempt to read
+        files outside the workspace, do NOT edit files, do NOT run mutating commands, do NOT
+        fix anything: your output is a report, not a change.
+
+        This pass REPLACES two prior synthesis passes produced with defective inputs (wave 1's
+        synthesis read only 4,000-char excerpts of its siblings; wave 2's received no sibling
+        outputs at all). The complete texts of the 24 answers are supplied below through the
+        repaired delivery channel; the delivery manifest is recorded on this run's ledger.
+    phases:
+      - name: synthesis_rerun
+        kind: agent
+        scope: research_readonly
+        fork_session: ses_f5acb5440ffegDqoQONAP4AaR0
+        timeout: 1800
+        prompt: |
+          The 24 contemplation outputs are delivered as {prior_answers}.
+
+          Each block carries its length + sha256 + a completeness marker; this delivery is the
+          COMPLETE text of every answer (no excerpts).
+
+          Produce ONE markdown report that:
+          1. RECONCILES the corpus: what it collectively establishes; where answers CONTRADICT
+             each other (name the pairs and keep the disagreement visible — do not average it
+             away); where agreement is weak evidence (one model, correlated samples).
+          2. SEPARATES claims: measured observations vs hypotheses vs proposals (each with its
+             support class) vs open questions.
+          3. HISTORICAL vs CURRENT: which claims concern historical code/tooling states, and
+             which would need a current-code check before being relied on (the working tree is
+             not part of this pass — mark them, do not attempt to fetch code).
+          4. CHALLENGES the prompts' assumptions: identify which wave-2 "entry claims" were
+             supplied by the prompts (e.g. "contemplation without a required artifact is a net
+             cost") and then argued by the branches — agreement with a supplied thesis is not
+             independent evidence.
+          5. RANKS the surviving proposals by (checkability, cost, expected value) and names
+             the single next executable artifact worth building, with its acceptance test.
+          6. Ends with a "## FINDING" section (<=120 words): the most defensible claims plus
+             one falsifier, suitable for a knowledge-base record.
+
+          Keep conflicts visible; do not blend early. Answer as a text report.
