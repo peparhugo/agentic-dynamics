@@ -53,3 +53,9 @@ answers, the lab conclusions, the failure-pattern wisdom — because those were 
 
 **Standing question.** Re-run this audit when the emission switches change. The answer is only
 as good as the corpus, and the corpus is only as good as what we emit.
+
+**Update, 2026-09-21.** Gap 3's CLI side is closed: `agentic-dynamics knowledge read --query Q
+--scope S` (script `kb_read.py`) is the reader verb — ranked retrieval through the existing
+pipeline with a deterministic artifact-scan fallback (`--contains`, offline), documented by the
+`knowledge-reader` skill. The scope rules are unchanged (exact-match pre-filter; a non-empty
+explicit scope is the shared override).

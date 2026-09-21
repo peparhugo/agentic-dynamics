@@ -108,7 +108,7 @@ agentic-dynamics workflow run
 agentic-dynamics queue enqueue|worker|monitor|reinterleave|analysis-enqueue|analysis-worker
 agentic-dynamics analyze worktrees|trajectories|stories|lab <name>
 agentic-dynamics data build|sync|manifest|inventory
-agentic-dynamics knowledge ingest|sources|worker
+agentic-dynamics knowledge ingest|sources|worker|read
 agentic-dynamics registry query|show|lineage
 agentic-dynamics review all|stories|trigger|enqueue|finalize
 agentic-dynamics spec status|pipeline

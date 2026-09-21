@@ -107,8 +107,17 @@ ROOT_BANNER = (
     "`python3 scripts/_gen_instructions.py`. -->"
 )
 
-#: The seven skills (name/description frontmatter — the schema is SHARED by both platforms).
-SKILLS = ("analyze", "control-room", "instrument", "lab-books", "queue", "review", "run-workflow")
+#: The eight skills (name/description frontmatter — the schema is SHARED by both platforms).
+SKILLS = (
+    "analyze",
+    "control-room",
+    "instrument",
+    "knowledge-reader",
+    "lab-books",
+    "queue",
+    "review",
+    "run-workflow",
+)
 
 #: The agent definitions (schema DIVERGES between platforms — see the renderers).
 #: ``aio-control`` — the AIO Control Agent (Wave-3 a4) — is the controller's delegated

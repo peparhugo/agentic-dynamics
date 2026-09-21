@@ -598,7 +598,7 @@ agentic-dynamics
 ├─ queue       enqueue|worker|monitor|reinterleave|analysis-enqueue|analysis-worker
 ├─ analyze     worktrees|trajectories|stories|session-routing|workflow-metrics|lab <name>
 ├─ data        build|sync|manifest|inventory|bundle
-├─ knowledge   ingest|sources|facts|worker|context-report|shadow-report|arm-comparison
+├─ knowledge   ingest|sources|facts|worker|context-report|shadow-report|arm-comparison|read
 ├─ graph       build|wall|preverify
 ├─ registry    query|show|lineage
 ├─ review      all|stories|trigger|enqueue|finalize
