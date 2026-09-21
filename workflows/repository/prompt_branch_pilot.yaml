@@ -35,7 +35,7 @@ workflow:
     fork: false
     rag_augment: false
     rag:
-      emit_self: false
+      emit_self: true
     context:
       domain_context: >-
         FROZEN CHECKPOINT prompt_branch_pilot-2026-09-19. Source commit

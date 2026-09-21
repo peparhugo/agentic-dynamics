@@ -81,6 +81,9 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     (("knowledge", "sources"), "kb_produce_sources.py", ()),
     (("knowledge", "facts"), "kb_produce_facts.py", ()),
     (("knowledge", "worker"), "kb_worker.py", ()),
+    # read — the reader verb (2026-09-21 retrieval audit): given a scope, read the KB through
+    # the ranked pipeline with a deterministic artifact-scan fallback.
+    (("knowledge", "read"), "kb_read.py", ()),
     (("knowledge", "context-report"), "context_snapshot_report.py", ()),
     (("knowledge", "shadow-report"), "shadow_decision_report.py", ()),
     (("knowledge", "arm-comparison"), "decision_arm_comparison.py", ()),

@@ -20,7 +20,7 @@ workflow:
     language: python
     fork: true
     rag:
-      emit_self: false
+      emit_self: true
     context:
       pinned_sources:
         - https://herdr.dev/

@@ -18,7 +18,7 @@ workflow:
     fork: false
     rag_augment: false
     rag:
-      emit_self: false
+      emit_self: true
     phases:
       - name: g_score_review
         kind: agent
