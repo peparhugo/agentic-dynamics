@@ -4840,7 +4840,7 @@ def run_workflow(
                 # from the declared ``tests:`` list or, for a plan-driven gate
                 # (``tests_from_plan``, world-model loop v1.3), from the plan's ``## Tests``
                 # section; a plan naming no resolvable targets SKIPS explicitly below.
-                gate_targets, gate_skipped = _resolve_test_targets(phase_def, wd)
+                gate_targets, gate_skipped = _resolve_test_targets(phase_def, git_wd)
                 if gate_skipped:
                     pr.test_gate_note = (
                         f"SKIPPED: tests_from_plan={str(phase_def.get('tests_from_plan'))!r} "
@@ -4850,7 +4850,7 @@ def run_workflow(
                 else:
                     _run_test_gate(
                         pr,
-                        wd,
+                        git_wd,
                         language,
                         phase_timeout,
                         target=gate_targets,
@@ -4871,17 +4871,25 @@ def run_workflow(
                 # Artifact gate (world-model loop v1, 2026-09-21): a phase may declare
                 # ``requires_files: [...]`` — the runner REFUSES (raised before any prompt
                 # build, admission, or spend; recorded as a failed phase by the handler
-                # below) when a declared artifact is absent from the worktree. The
+                # below) when a declared artifact is absent from the CANDIDATE tree. The
                 # world-model loop's plan gate depends on this: execute cannot run without
                 # the prior phase's plan.
-                _missing_required = _missing_required_files(phase_def, wd)
+                #
+                # The candidate tree is ``git_wd`` (the b2 run-clone convention): in the
+                # containerized path the phases' world is the run's PRIVATE CLONE — cells
+                # commit INTO it — so a gate reading the host worktree checks the wrong tree
+                # and refuses artifacts that exist (observed live: run-037d7d760bd6, the first
+                # fleet submission of the loop, died ARTIFACT_MISSING on the prior's plan,
+                # which sat committed in the clone). In-process runs have no clone; git_wd IS
+                # wd and nothing changes.
+                _missing_required = _missing_required_files(phase_def, git_wd)
                 if _missing_required:
                     raise RuntimeError(
                         f"ARTIFACT_MISSING — phase '{name}' requires "
                         f"{', '.join(_missing_required)}; the declared artifact(s) are "
-                        "absent from the worktree (the plan gate refuses before spend)"
+                        "absent from the candidate worktree (the plan gate refuses before spend)"
                     )
-                _missing_markers = _missing_required_markers(phase_def, wd)
+                _missing_markers = _missing_required_markers(phase_def, git_wd)
                 if _missing_markers:
                     raise RuntimeError(
                         f"ARTIFACT_SHAPE — phase '{name}' requires: "
