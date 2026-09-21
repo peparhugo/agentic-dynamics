@@ -1924,7 +1924,11 @@ def _emit_research_report(
     try:
         from agentic_dynamics.knowledge.knowledge_ingestion import emit_phase_finding
 
-        stamp = re.sub(r"[^0-9]", "", _now())[:14] or "report"
+        # Whole-microsecond stamp (F2, live run-0fad6c313dcd): a seconds-only stamp collides
+        # when two reports for the SAME phase land inside one wall-clock second (e.g. two tests
+        # of one module), and the second write overwrites the first — nondeterministic counts
+        # and a lost report. 18 digits = YYYYMMDDHHMMSSffffff; consumers match by suffix.
+        stamp = re.sub(r"[^0-9]", "", _now())[:20] or "report"
         safe_phase = re.sub(r"[^A-Za-z0-9._-]+", "_", str(pr.phase)) or "phase"
         # The DURABLE results tree (the fleet path contract's FINOPS_RESULTS_DIR, default:
         # this checkout) — a run executing from an ephemeral worktree must emit its reports
@@ -4941,22 +4945,25 @@ def run_workflow(
                         prev_session_id=prev_session_id,
                         prev_cache_read_tokens=prev_cache_read_tokens,
                     )
-                    if router is not None:
+                    if phase_def.get("run_model"):
+                        # PER-PHASE EXECUTION OVERRIDE (cap_site_revamp4 p5 — the independence
+                        # lesson): a phase may declare ``run_model:`` (e.g. the independent
+                        # review phase runs a DIFFERENT model/session than the author).
+                        # ``run_model`` is DISTINCT from the routing selector key ``model``
+                        # (which is a pool member) and is exempt from pool validation by design.
+                        # It OUTRANKS the router (F1, live run-0fad6c313dcd): the production
+                        # composition root always injects ``route_step``, and that router never
+                        # reads ``phase_def`` — so a declared override was silently dead and the
+                        # world-model loop's ``run_model: openai/gpt-5.6-terra`` "DIFFERENT
+                        # model" adversarial phase ran on the run model. A declared override is
+                        # explicit intent; routing is a default.
+                        model_i = str(phase_def["run_model"])
+                    elif router is not None:
                         model_i = router(phase_def, state, preferences, signals=signals)
                     elif len(model_pool) <= 1:
                         # No router injected and a single-model workflow: use the run model
                         # directly (backward compatible — routing is a no-op here).
-                        # PER-PHASE EXECUTION OVERRIDE (cap_site_revamp4 p5 — the
-                        # independence lesson): a phase may declare ``run_model:`` (e.g. the
-                        # independent review phase runs a DIFFERENT model/session than the
-                        # author — the previous design promised it in prose and the runner
-                        # never implemented it). ``run_model`` is DISTINCT from the routing
-                        # selector key ``model`` (which is a pool member); the execution
-                        # override wins over the run model and is exempt from pool
-                        # validation by design.
-                        model_i = phase_def.get("run_model") or (
-                            model_pool[0] if model_pool else model
-                        )
+                        model_i = model_pool[0] if model_pool else model
                     else:
                         raise ValueError(
                             "spec declares a multi-model model_pool but no router was injected "
