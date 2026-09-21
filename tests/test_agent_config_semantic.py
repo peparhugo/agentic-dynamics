@@ -107,8 +107,12 @@ _COUNT = re.compile(
 #: ``scripts/<name>.<ext>`` references.
 _SCRIPT = re.compile(r"\bscripts/([A-Za-z0-9_]+)\.(py|sh|md)\b")
 
-#: ``agentic-dynamics <verb> <noun>`` (two subcommand words).
-_CLI = re.compile(r"agentic-dynamics\s+([a-z][a-z-]*)\s+([a-z][a-z-]*)")
+#: ``agentic-dynamics <verb> <noun>`` (two subcommand words). Horizontal whitespace only: a CLI
+#: invocation is single-line, and a bare ``\s+`` forges a command across the newline between two
+#: adjacent lines (2026-09-21 false positive: ``--scope agentic-dynamics`` at the end of one
+#: example line plus ``agentic-dynamics knowledge read`` on the next read as the command
+#: ``agentic-dynamics agentic-dynamics knowledge``).
+_CLI = re.compile(r"agentic-dynamics[^\S\n]+([a-z][a-z-]*)[^\S\n]+([a-z][a-z-]*)")
 
 
 def _files() -> list[Path]:
@@ -177,11 +181,7 @@ def _check_paths(text: str, rel: str) -> list[str]:
     bad: list[str] = []
     for m in _BACKTICK.finditer(text):
         tok = m.group(1).strip()
-        if (
-            _is_path_candidate(tok)
-            and not _is_runtime_data_path(tok)
-            and not _path_exists(tok)
-        ):
+        if _is_path_candidate(tok) and not _is_runtime_data_path(tok) and not _path_exists(tok):
             bad.append(f"{rel}: referenced path does not exist: `{tok}`")
     return bad
 
@@ -272,6 +272,22 @@ def test_cli_commands_exist():
     assert not violations, "agent_config names unknown CLI commands:\n" + "\n".join(
         sorted(violations)
     )
+
+
+def test_cli_guard_is_line_scoped():
+    """A CLI invocation is single-line; the guard must not match across a newline.
+
+    Regression (2026-09-21): in the knowledge-reader skill, one example line ends
+    ``--scope agentic-dynamics`` and the next opens ``agentic-dynamics knowledge read``; a bare
+    ``\\s+`` forged the command ``agentic-dynamics agentic-dynamics knowledge`` from the pair.
+    """
+    adjacent_lines = (
+        'agentic-dynamics knowledge read --query "cache hit rate" --scope agentic-dynamics\n'
+        'agentic-dynamics knowledge read --query "delivery repair" --scope self-cell\n'
+    )
+    assert _check_cli(adjacent_lines, "fixture") == []
+    # The guard still catches a genuinely unknown single-line command.
+    assert _check_cli("agentic-dynamics bogus verb\n", "fixture")
 
 
 def test_named_scripts_exist():
