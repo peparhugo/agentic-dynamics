@@ -848,6 +848,27 @@ def _render_answers(blocks: list[str], manifest: list[dict[str, Any]], wd: Path)
     return "\n".join(lines)
 
 
+def _missing_required_files(phase_def: dict[str, Any], wd: Path) -> list[str]:
+    """Worktree paths a phase declared it cannot run without (the artifact/plan gate).
+
+    World-model loop v1 (2026-09-21): the loop's plan gate depends on this — the execute
+    phase declares ``requires_files: [notes/plan.md]`` and the runner REFUSES before any
+    prompt build, admission, or spend when the prior phase's plan is absent. Paths are
+    worktree-relative unless absolute.
+    """
+    required = phase_def.get("requires_files") or []
+    if isinstance(required, str):
+        required = [required]
+    missing: list[str] = []
+    for rel in required:
+        candidate = Path(str(rel))
+        if not candidate.is_absolute():
+            candidate = Path(wd) / str(rel)
+        if not candidate.is_file():
+            missing.append(str(rel))
+    return missing
+
+
 def _build_phase_prompt(
     phase: dict[str, Any],
     goal: str,
@@ -4745,6 +4766,19 @@ def run_workflow(
                     empty_refuses=bool(phase_def.get("tests")),
                 )
             else:
+                # Artifact gate (world-model loop v1, 2026-09-21): a phase may declare
+                # ``requires_files: [...]`` — the runner REFUSES (raised before any prompt
+                # build, admission, or spend; recorded as a failed phase by the handler
+                # below) when a declared artifact is absent from the worktree. The
+                # world-model loop's plan gate depends on this: execute cannot run without
+                # the prior phase's plan.
+                _missing_required = _missing_required_files(phase_def, wd)
+                if _missing_required:
+                    raise RuntimeError(
+                        f"ARTIFACT_MISSING — phase '{name}' requires "
+                        f"{', '.join(_missing_required)}; the declared artifact(s) are "
+                        "absent from the worktree (the plan gate refuses before spend)"
+                    )
                 if phase_def.get("_prepared_step"):
                     # Wave A2: a prepared step's prompt is the parent's FINAL instruction — the
                     # child neither re-renders placeholders nor lets any later transform
@@ -5290,6 +5324,15 @@ def run_workflow(
         if _finding_emit_enabled(rag_params, phase_def) and kind != "test" and pr.status == "ok":
             if pr.commit_hash:
                 _emit_self_finding(pr, goal=goal, scope=cell_scope(wd))
+                # Report variant for a COMMITTED phase (world-model loop v1, 2026-09-21):
+                # code phases keep the metadata finding above; a run that opts in
+                # (``rag.emit_report: true``) also gets the FULL captured turn as a
+                # retrievable record — the loop's world-model/plan/posterior notes must be
+                # knowledge, not only git files.
+                if rag_params.get("emit_report") and pr.final_response:
+                    _emit_research_report(
+                        pr, goal=goal, spec_name=spec.name, wd=wd, rag_params=rag_params
+                    )
             elif pr.final_response:
                 _emit_research_report(
                     pr, goal=goal, spec_name=spec.name, wd=wd, rag_params=rag_params

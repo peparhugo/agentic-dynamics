@@ -27,6 +27,7 @@ workflow:
     rag_augment: false
     rag:
       emit_self: true
+      emit_report: true
       emit_scope: agentic-dynamics
     context:
       domain_context: >-
@@ -57,6 +58,7 @@ workflow:
       - name: execute
         kind: agent
         timeout: 3600
+        requires_files: [notes/plan.md]
         prompt: |
           You are the EXECUTE phase. Implement the task ({goal}) FOLLOWING `notes/plan.md`.
 
@@ -67,6 +69,7 @@ workflow:
       - name: posterior
         kind: agent
         timeout: 1800
+        requires_files: [notes/world_model.md, notes/plan.md]
         prompt: |
           You are the POSTERIOR phase of the world-model loop. The task was: {goal}
 
