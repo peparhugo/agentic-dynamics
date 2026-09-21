@@ -1,0 +1,18 @@
+{
+  "subject": "skill/world-model-loop/channel-corroboration",
+  "claim": "A single negative byte-match is not evidence of absence: on tests/conftest.py the local grep/byte-matching channel returned self-contradictory results in one Python process (lines[14] printed the FINFOPS_EMIT_SELF assignment while b'FINFOPS_EMIT_SELF' in lines[14] was False and b.count(...) was 0), so environment-variable and suite-disarm claims must be corroborated through at least two independent channels before being asserted.",
+  "population": "world_model_loop: 1 run (noisy probe channel against tests/conftest.py)",
+  "conditions": [
+    "a claim rests on a single query/probe channel",
+    "an environment variable or suite-disarm behavior is being asserted"
+  ],
+  "support": 1,
+  "uncertainty": null,
+  "evidence": [
+    "posterior:notes/posterior.md#U5",
+    "tests/conftest.py:15",
+    "tests/conftest.py:264"
+  ],
+  "source_experiment": "world_model_loop",
+  "notes": "Posterior C4. support=1; uncertainty=null (below MIN_SUPPORT_FOR_UNCERTAINTY=3). The conftest claims were ultimately verified through the Read tool, the second channel."
+}

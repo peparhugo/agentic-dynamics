@@ -1,0 +1,21 @@
+{
+  "subject": "skill/run-workflow/test-seam-guard",
+  "claim": "A test module whose shared ExperimentSpec sets rag.emit_self/emit_report: true MUST install a module-local autouse fixture that stubs knowledge_ingestion.emit_phase_finding and redirects FINFOPS_RESULTS_DIR to tmp, because an explicit opt-in outranks the suite-wide FINFOPS_EMIT_SELF=0 disarm (tests/conftest.py:15) and four committing tests would otherwise write real findings to the canonical KB on every run; the guard cannot live in tests/conftest.py because it would also intercept tests/test_workflow_runner.py::test_finding_emit_default_run_writes_enriched_records, which intentionally exercises the real write path against a tmp tree.",
+  "population": "host tests: tests/test_world_model_gates.py @ commit 78866649e (shared SPEC opting into rag.emit_self/emit_report)",
+  "conditions": [
+    "the test module's shared spec sets rag.emit_self=true or rag.emit_report=true",
+    "the suite-wide FINFOPS_EMIT_SELF=0 disarm is set",
+    "at least one test in the module commits an agent phase (reaching the durable write)"
+  ],
+  "support": 1,
+  "uncertainty": null,
+  "evidence": [
+    "commit:78866649e",
+    "tests/test_world_model_gates.py:25-54",
+    "tests/test_world_model_gates.py:265-303",
+    "tests/conftest.py:15",
+    "src/agentic_dynamics/runtime/workflow_runner.py:1836-1839"
+  ],
+  "source_experiment": "world_model_loop",
+  "notes": "Reusable transfer named by the posterior as A2 (the rule the fix encodes) and C2. support=1 (one observed fix instance); uncertainty=null because the slice is below the pattern reducer's MIN_SUPPORT_FOR_UNCERTAINTY=3, and a fabricated interval would violate the coverage invariant."
+}

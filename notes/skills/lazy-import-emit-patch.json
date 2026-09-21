@@ -1,0 +1,18 @@
+{
+  "subject": "skill/run-workflow/lazy-import-emit-patch",
+  "claim": "Patching knowledge_ingestion.emit_phase_finding intercepts BOTH self-build emit paths only because _emit_self_finding (workflow_runner.py:1851) and _emit_research_report (workflow_runner.py:1925) import the name inside the function; a refactor that hoists either import to module scope would silently disable the test-seam guard, so the function-local import is a load-bearing contract that deserves its own assertion.",
+  "population": "src/agentic_dynamics/runtime/workflow_runner.py @ commit 78866649e (self-build emit paths)",
+  "conditions": [
+    "a test patches knowledge_ingestion.emit_phase_finding",
+    "the emitter resolves emit_phase_finding at call time (function-local import)"
+  ],
+  "support": 1,
+  "uncertainty": null,
+  "evidence": [
+    "src/agentic_dynamics/runtime/workflow_runner.py:1851",
+    "src/agentic_dynamics/runtime/workflow_runner.py:1925",
+    "tests/test_world_model_gates.py:39-42"
+  ],
+  "source_experiment": "world_model_loop",
+  "notes": "Named in the posterior U3 and the run-workflow skill amendment. support=1; uncertainty=null (below MIN_SUPPORT_FOR_UNCERTAINTY=3). No repo-wide test currently guards the lazy-import contract - the module's own regression fails loudly if the guard breaks, but nothing guards the contract itself."
+}

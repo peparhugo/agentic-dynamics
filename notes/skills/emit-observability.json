@@ -1,0 +1,20 @@
+{
+  "subject": "skill/world-model-loop/emit-observability",
+  "claim": "A silent emit is unverified emit: both self-build emit paths swallow every exception (workflow_runner.py:1854-1855 and :1952-1953) and are best-effort by construction, so a successful and a failed emission are byte-for-byte indistinguishable from the outside; a phase or loop that opts into emission must assert its own artifact exists (experiments/results/kb/<knowledge_id>.json and experiments/results/workflows/<spec>/reports/) and its posterior must verify it, or the loop's declared output cannot be claimed.",
+  "population": "world_model_loop: 2 consecutive runs whose spec sets rag.emit_self/emit_report: true and after which no kb/ or workflow-report artifacts exist",
+  "conditions": [
+    "the workflow opts into rag.emit_self/emit_report",
+    "the posterior does not check for the run's own artifact"
+  ],
+  "support": 2,
+  "uncertainty": null,
+  "evidence": [
+    "posterior:notes/posterior.md#V3",
+    "prior_posterior:notes/posterior.md#V5",
+    "src/agentic_dynamics/runtime/workflow_runner.py:1854-1855",
+    "src/agentic_dynamics/runtime/workflow_runner.py:1952-1953",
+    "command:ls experiments/results/kb -> No such file or directory"
+  ],
+  "source_experiment": "world_model_loop",
+  "notes": "Posterior C3/A3 (carry-over from the previous run's V5) plus its doc amendment requiring the prior to verify the loop's own artifact. support=2 (observed across two consecutive loop runs); uncertainty=null (at MIN_SUPPORT_FOR_UNCERTAINTY=3 the estimate is still withheld, and the observed rate is not estimable as a stable interval)."
+}

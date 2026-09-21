@@ -1,0 +1,18 @@
+{
+  "subject": "skill/run-workflow/emit-scope-split",
+  "claim": "The self-build emit paths resolve scope differently: _emit_self_finding writes into the cell's own scope via cell_scope(wd) = self-<worktree> (workflow_runner.py:1842-1847), while _emit_research_report uses rag_params['emit_scope'] when non-empty, falling back to cell_scope (workflow_runner.py:1943); an emit_scope of agentic-dynamics therefore lands the research-report record in the shared org scope, never the cell scope.",
+  "population": "src/agentic_dynamics/runtime/workflow_runner.py @ commit 78866649e (self-build emit scope resolution)",
+  "conditions": [
+    "rag_params carries a non-empty emit_scope",
+    "the research-report emit path runs (_emit_research_report)"
+  ],
+  "support": 1,
+  "uncertainty": null,
+  "evidence": [
+    "src/agentic_dynamics/runtime/workflow_runner.py:1842-1847",
+    "src/agentic_dynamics/runtime/workflow_runner.py:1943",
+    "workflows/repository/world_model_loop.yaml:28-31"
+  ],
+  "source_experiment": "world_model_loop",
+  "notes": "Named in the run-workflow skill amendment and already flagged by the previous posterior's item C. support=1; uncertainty=null (below MIN_SUPPORT_FOR_UNCERTAINTY=3)."
+}

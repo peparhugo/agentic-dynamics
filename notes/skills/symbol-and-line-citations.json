@@ -1,0 +1,21 @@
+{
+  "subject": "skill/world-model-loop/symbol-and-line-citations",
+  "claim": "A plan that inserts code above referenced code necessarily invalidates the prior's line-precise citations: the execute edit added 3 imports plus a 30-line autouse fixture above SPEC, shifting every prior line reference by +37 above the insertion and +78 below it; cite symbols AND line numbers, have the prior predict the shift, and have the posterior record it, because the next model reads the prior and navigates by the stale numbers.",
+  "population": "world_model_loop: 2 consecutive runs (the prior run's line-refresh failure V3 and this run's V1)",
+  "conditions": [
+    "the plan adds code above existing referenced code",
+    "the prior cites file positions by line number only"
+  ],
+  "support": 2,
+  "uncertainty": null,
+  "evidence": [
+    "posterior:notes/posterior.md#V1",
+    "prior_posterior:notes/posterior.md#V3",
+    "commit:e41eedc0b",
+    "commit:78866649e",
+    "filesha:2ea5484dd5fd",
+    "filesha:339347f5bcfc"
+  ],
+  "source_experiment": "world_model_loop",
+  "notes": "Posterior C1 and its doc amendment. support=2 (two consecutive runs bit by the same line-drift class); uncertainty=null (below the reducer's estimation floor)."
+}

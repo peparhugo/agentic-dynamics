@@ -1,0 +1,18 @@
+{
+  "subject": "skill/run-workflow/kb-read-in-worktrees",
+  "claim": "In a run worktree the loop's stated first step (read the KB) is blind: scripts/kb_read.py ranked mode fails with ModuleNotFoundError: No module named 'agentic_dynamics.knowledge.neo4j_vectors', and --contains raises FileNotFoundError on the absent experiments/results/registry_index.jsonl; a prior that cannot read prior findings must record this as a first-class limitation, and the capability is environment-dependent and must never be assumed.",
+  "population": "run worktrees: the container running world_model_loop (FINOPS_ADMISSION_RUN_ID=world_model_loop:p2_mint:40ffec92)",
+  "conditions": [
+    "kb_read.py is invoked inside a run worktree",
+    "the canonical registry (registry_index.jsonl) or vector backend is absent from that worktree"
+  ],
+  "support": 1,
+  "uncertainty": null,
+  "evidence": [
+    "command:python3 scripts/kb_read.py --query ... --scope agentic-dynamics -> ModuleNotFoundError",
+    "command:python3 scripts/kb_read.py --contains ... -> FileNotFoundError registry_index.jsonl",
+    "posterior:notes/posterior.md#U1"
+  ],
+  "source_experiment": "world_model_loop",
+  "notes": "Posterior U1 and its doc amendment ('record that KB read is degraded in run worktrees and the loop must not treat that as a footnote'). support=1; uncertainty=null (below MIN_SUPPORT_FOR_UNCERTAINTY=3)."
+}
