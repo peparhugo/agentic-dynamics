@@ -87,8 +87,11 @@ def test_send_submit_command_lpushes_a_bounded_submit_command():
     fm = _fleet_manager()
     r = _FakeRedis()
     cmd = fm._send_submit_command(
-        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
-        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x",
+        r,
+        spec="workflows/repository/fleet_job_submission.yaml",
+        goal="g",
+        model="anthropic/claude-sonnet-5",
+        workdir="/tmp/wt_x",
     )
     assert cmd["action"] == "submit"
     assert cmd["spec"] == "workflows/repository/fleet_job_submission.yaml"
@@ -104,8 +107,11 @@ def test_send_submit_command_records_launching_on_the_board():
     fm = _fleet_manager()
     r = _FakeRedis()
     cmd = fm._send_submit_command(
-        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
-        model="deepseek/deepseek-v4-pro", workdir="/tmp/wt_y",
+        r,
+        spec="workflows/repository/fleet_job_submission.yaml",
+        goal="g",
+        model="deepseek/deepseek-v4-pro",
+        workdir="/tmp/wt_y",
     )
     board = fm.build_board(r)
     assert len(board["jobs"]) == 1
@@ -122,12 +128,18 @@ def test_multiple_concurrent_submits_are_all_recorded_no_lock():
     fm = _fleet_manager()
     r = _FakeRedis()
     cmd_a = fm._send_submit_command(
-        r, spec="workflows/repository/fleet_job_submission.yaml", goal="a",
-        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_a",
+        r,
+        spec="workflows/repository/fleet_job_submission.yaml",
+        goal="a",
+        model="anthropic/claude-sonnet-5",
+        workdir="/tmp/wt_a",
     )
     cmd_b = fm._send_submit_command(
-        r, spec="workflows/repository/fleet_job_submission.yaml", goal="b",
-        model="openai/gpt-5.6-luna", workdir="/tmp/wt_b",
+        r,
+        spec="workflows/repository/fleet_job_submission.yaml",
+        goal="b",
+        model="openai/gpt-5.6-luna",
+        workdir="/tmp/wt_b",
     )
     assert cmd_a["job_id"] != cmd_b["job_id"]
     board = fm.build_board(r)
@@ -143,13 +155,19 @@ def test_record_job_status_preserves_identifying_fields_across_transitions():
     fm = _fleet_manager()
     r = _FakeRedis()
     cmd = fm._send_submit_command(
-        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
-        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_z",
+        r,
+        spec="workflows/repository/fleet_job_submission.yaml",
+        goal="g",
+        model="anthropic/claude-sonnet-5",
+        workdir="/tmp/wt_z",
     )
     fm.record_job_status(r, cmd["job_id"], "running")
     fm.record_job_status(
-        r, cmd["job_id"], "completed",
-        returncode=0, ledger="experiments/results/workflows/fleet_job_submission/x.json",
+        r,
+        cmd["job_id"],
+        "completed",
+        returncode=0,
+        ledger="experiments/results/workflows/fleet_job_submission/x.json",
     )
     board = fm.build_board(r)
     job = board["jobs"][0]
@@ -165,8 +183,11 @@ def test_record_job_status_failed_carries_the_error_reason():
     fm = _fleet_manager()
     r = _FakeRedis()
     cmd = fm._send_submit_command(
-        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
-        model="deepseek/deepseek-v4-pro", workdir="/tmp/wt_fail",
+        r,
+        spec="workflows/repository/fleet_job_submission.yaml",
+        goal="g",
+        model="deepseek/deepseek-v4-pro",
+        workdir="/tmp/wt_fail",
     )
     fm.record_job_status(r, cmd["job_id"], "failed", returncode=1, error="compose run exited 1")
     board = fm.build_board(r)
@@ -192,8 +213,12 @@ def test_send_submit_command_carries_an_optional_image():
     fm = _fleet_manager()
     r = _FakeRedis()
     cmd = fm._send_submit_command(
-        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
-        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x", image="fleet/job-example",
+        r,
+        spec="workflows/repository/fleet_job_submission.yaml",
+        goal="g",
+        model="anthropic/claude-sonnet-5",
+        workdir="/tmp/wt_x",
+        image="fleet/job-example",
     )
     assert cmd["image"] == "fleet/job-example"
     queued = [json.loads(raw) for raw in r._lists[fm.COMMANDS_KEY]]
@@ -204,8 +229,11 @@ def test_send_submit_command_omits_image_field_when_not_given():
     fm = _fleet_manager()
     r = _FakeRedis()
     cmd = fm._send_submit_command(
-        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
-        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x",
+        r,
+        spec="workflows/repository/fleet_job_submission.yaml",
+        goal="g",
+        model="anthropic/claude-sonnet-5",
+        workdir="/tmp/wt_x",
     )
     assert "image" not in cmd
 
@@ -218,10 +246,19 @@ def test_submit_cli_dispatches_through_main(monkeypatch, capsys):
     r = _FakeRedis()
     monkeypatch.setattr(fm, "_connect", lambda: r)
 
-    rc = fm.main([
-        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
-        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
-    ])
+    rc = fm.main(
+        [
+            "submit",
+            "--spec",
+            "workflows/repository/fleet_job_submission.yaml",
+            "--goal",
+            "g",
+            "--model",
+            "anthropic/claude-sonnet-5",
+            "--workdir",
+            "/tmp/wt_cli",
+        ]
+    )
     assert rc == 0
 
     queued = [json.loads(raw) for raw in r._lists[fm.COMMANDS_KEY]]
@@ -242,11 +279,21 @@ def test_submit_cli_dispatches_the_optional_image_flag(monkeypatch):
     r = _FakeRedis()
     monkeypatch.setattr(fm, "_connect", lambda: r)
 
-    rc = fm.main([
-        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
-        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
-        "--image", "fleet/job-example",
-    ])
+    rc = fm.main(
+        [
+            "submit",
+            "--spec",
+            "workflows/repository/fleet_job_submission.yaml",
+            "--goal",
+            "g",
+            "--model",
+            "anthropic/claude-sonnet-5",
+            "--workdir",
+            "/tmp/wt_cli",
+            "--image",
+            "fleet/job-example",
+        ]
+    )
     assert rc == 0
     queued = [json.loads(raw) for raw in r._lists[fm.COMMANDS_KEY]]
     assert queued[0]["image"] == "fleet/job-example"
@@ -258,9 +305,14 @@ def test_send_submit_command_carries_the_extended_identity():
     fm = _fleet_manager()
     r = _FakeRedis()
     cmd = fm._send_submit_command(
-        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
-        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x",
-        spec_sha256="a" * 64, resume=True, parent_run_id="run-1",
+        r,
+        spec="workflows/repository/fleet_job_submission.yaml",
+        goal="g",
+        model="anthropic/claude-sonnet-5",
+        workdir="/tmp/wt_x",
+        spec_sha256="a" * 64,
+        resume=True,
+        parent_run_id="run-1",
         admission={"required": True, "campaign_budget_usd": 20.0},
     )
     assert cmd["spec_sha256"] == "a" * 64
@@ -276,12 +328,21 @@ def test_send_submit_command_carries_the_execution_settings():
     re-validate it; the manager's job is that it survives the hop)."""
     fm = _fleet_manager()
     r = _FakeRedis()
-    execution = {"backend": "opencode", "thinking_effort": "high",
-                 "thinking_budget_tokens": 12000, "output_token_limit": 64000,
-                 "timeout_seconds": 2400, "no_commit": False}
+    execution = {
+        "backend": "opencode",
+        "thinking_effort": "high",
+        "thinking_budget_tokens": 12000,
+        "output_token_limit": 64000,
+        "timeout_seconds": 2400,
+        "no_commit": False,
+    }
     cmd = fm._send_submit_command(
-        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
-        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x", execution=execution,
+        r,
+        spec="workflows/repository/fleet_job_submission.yaml",
+        goal="g",
+        model="anthropic/claude-sonnet-5",
+        workdir="/tmp/wt_x",
+        execution=execution,
     )
     assert cmd["execution"] == execution
 
@@ -292,8 +353,11 @@ def test_send_submit_command_carries_reserve_and_cap():
     fm = _fleet_manager()
     r = _FakeRedis()
     cmd = fm._send_submit_command(
-        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
-        model="deepseek/deepseek-v4-flash", workdir="/tmp/wt_x",
+        r,
+        spec="workflows/repository/fleet_job_submission.yaml",
+        goal="g",
+        model="deepseek/deepseek-v4-flash",
+        workdir="/tmp/wt_x",
         admission={"required": True, "reserve_usd": 0.6, "hard_cap_usd": 1.0},
     )
     assert cmd["admission"]["reserve_usd"] == 0.6
@@ -316,9 +380,7 @@ def test_send_submit_command_carries_the_aio_binding_identity():
         "binding_id": "a" * 64,
         "task_revision": 2,
     }
-    cmd = fm._send_submit_command(
-        r, spec="s", goal="g", model="m", workdir="/tmp/w", aio=aio
-    )
+    cmd = fm._send_submit_command(r, spec="s", goal="g", model="m", workdir="/tmp/w", aio=aio)
     assert cmd["actor"] == "aio"
     assert cmd["aio"] == aio
     queued = [json.loads(raw) for raw in r._lists[fm.COMMANDS_KEY]]
@@ -340,13 +402,27 @@ def test_submit_cli_dispatches_the_aio_identity_flags(monkeypatch):
     fm = _fleet_manager()
     r = _FakeRedis()
     monkeypatch.setattr(fm, "_connect", lambda: r)
-    rc = fm.main([
-        "submit",
-        "--spec", "workflows/repository/fleet_job_submission.yaml",
-        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli_aio",
-        "--aio-session-id", "ses_cli", "--aio-agent", "aio-control",
-        "--binding-id", "b" * 64, "--task-revision", "5",
-    ])
+    rc = fm.main(
+        [
+            "submit",
+            "--spec",
+            "workflows/repository/fleet_job_submission.yaml",
+            "--goal",
+            "g",
+            "--model",
+            "anthropic/claude-sonnet-5",
+            "--workdir",
+            "/tmp/wt_cli_aio",
+            "--aio-session-id",
+            "ses_cli",
+            "--aio-agent",
+            "aio-control",
+            "--binding-id",
+            "b" * 64,
+            "--task-revision",
+            "5",
+        ]
+    )
     assert rc == 0
     queued = [json.loads(raw) for raw in r._lists[fm.COMMANDS_KEY]]
     assert queued[0]["actor"] == "aio"
@@ -504,11 +580,23 @@ def test_submit_cli_carries_the_task_identity(tmp_path, monkeypatch, capsys):
     fm = _fleet_manager()
     r = _FakeRedis()
     monkeypatch.setattr(fm, "_connect", lambda: r)
-    rc = fm.main([
-        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
-        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
-        "--retry-safe", "--task-identity", "session:ses_x", "--json",
-    ])
+    rc = fm.main(
+        [
+            "submit",
+            "--spec",
+            "workflows/repository/fleet_job_submission.yaml",
+            "--goal",
+            "g",
+            "--model",
+            "anthropic/claude-sonnet-5",
+            "--workdir",
+            "/tmp/wt_cli",
+            "--retry-safe",
+            "--task-identity",
+            "session:ses_x",
+            "--json",
+        ]
+    )
     assert rc == 0
     payload = json.loads(capsys.readouterr().out.strip())
     assert payload["task_identity"] == "session:ses_x"
@@ -534,9 +622,17 @@ def test_submit_cli_reconciles_a_keyed_retry(monkeypatch, capsys):
     r = _FakeRedis()
     monkeypatch.setattr(fm, "_connect", lambda: r)
     argv = [
-        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
-        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
-        "--request-key", "req-cli",
+        "submit",
+        "--spec",
+        "workflows/repository/fleet_job_submission.yaml",
+        "--goal",
+        "g",
+        "--model",
+        "anthropic/claude-sonnet-5",
+        "--workdir",
+        "/tmp/wt_cli",
+        "--request-key",
+        "req-cli",
     ]
     assert fm.main(argv) == 0
     assert "launching" in capsys.readouterr().out
@@ -551,15 +647,31 @@ def test_submit_cli_refuses_a_conflicting_key_with_exit_2(monkeypatch, capsys):
     r = _FakeRedis()
     monkeypatch.setattr(fm, "_connect", lambda: r)
     base = [
-        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
-        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
-        "--request-key", "req-cli",
+        "submit",
+        "--spec",
+        "workflows/repository/fleet_job_submission.yaml",
+        "--goal",
+        "g",
+        "--model",
+        "anthropic/claude-sonnet-5",
+        "--workdir",
+        "/tmp/wt_cli",
+        "--request-key",
+        "req-cli",
     ]
     assert fm.main(base) == 0
     conflicting = [
-        "submit", "--spec", "workflows/repository/control_room_new_ui.yaml",
-        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
-        "--request-key", "req-cli",
+        "submit",
+        "--spec",
+        "workflows/repository/control_room_new_ui.yaml",
+        "--goal",
+        "g",
+        "--model",
+        "anthropic/claude-sonnet-5",
+        "--workdir",
+        "/tmp/wt_cli",
+        "--request-key",
+        "req-cli",
     ]
     assert fm.main(conflicting) == 2
     assert "request key" in capsys.readouterr().err
@@ -642,7 +754,8 @@ def _parent_clone(tmp_path, monkeypatch):
     clone.parent.mkdir(parents=True)
     proc = subprocess.run(
         ["git", "clone", "-q", "--no-hardlinks", "--", str(repo), str(clone)],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     assert proc.returncode == 0, proc.stderr
     _git("checkout", "-q", "--detach", base_sha, cwd=clone)
@@ -658,11 +771,13 @@ def _parent_clone(tmp_path, monkeypatch):
 
 def _write_parent_ledger(ledger_dir, *, candidate: str, completed: bool) -> None:
     (ledger_dir / "20260916T000000000000Z_run-parent.json").write_text(
-        json.dumps({
-            "run_id": "run-parent",
-            "git_sha": candidate,
-            "phases": [{"phase": "build", "status": "ok" if completed else "failed"}],
-        }),
+        json.dumps(
+            {
+                "run_id": "run-parent",
+                "git_sha": candidate,
+                "phases": [{"phase": "build", "status": "ok" if completed else "failed"}],
+            }
+        ),
         encoding="utf-8",
     )
 
@@ -681,9 +796,7 @@ def test_prepare_workspace_continuation_uses_the_parent_clone_at_the_candidate(
     assert "parent run run-parent" in note and candidate[:12] in note
 
 
-def test_prepare_workspace_continuation_refuses_without_clone_or_candidate(
-    tmp_path, monkeypatch
-):
+def test_prepare_workspace_continuation_refuses_without_clone_or_candidate(tmp_path, monkeypatch):
     """No silent fallback: a missing clone or a candidate the clone does not contain refuses
     — the continuation must never start from a tree without the completed work."""
     import shutil as _shutil
@@ -752,11 +865,20 @@ def test_submit_cli_json_result_is_structured(monkeypatch, capsys):
     fm = _fleet_manager()
     r = _FakeRedis()
     monkeypatch.setattr(fm, "_connect", lambda: r)
-    rc = fm.main([
-        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
-        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
-        "--json",
-    ])
+    rc = fm.main(
+        [
+            "submit",
+            "--spec",
+            "workflows/repository/fleet_job_submission.yaml",
+            "--goal",
+            "g",
+            "--model",
+            "anthropic/claude-sonnet-5",
+            "--workdir",
+            "/tmp/wt_cli",
+            "--json",
+        ]
+    )
     assert rc == 0
     payload = json.loads(capsys.readouterr().out.strip())
     assert payload["schema"] == "fleet-submit/v1"
@@ -772,10 +894,18 @@ def test_submit_cli_prepares_a_workspace_when_workdir_is_omitted(tmp_path, monke
     fm, repo, worktrees = _prep_repo(tmp_path, monkeypatch)
     r = _FakeRedis()
     monkeypatch.setattr(fm, "_connect", lambda: r)
-    rc = fm.main([
-        "submit", "--spec", "workflows/repository/demo.yaml",
-        "--goal", "g", "--model", "m", "--json",
-    ])
+    rc = fm.main(
+        [
+            "submit",
+            "--spec",
+            "workflows/repository/demo.yaml",
+            "--goal",
+            "g",
+            "--model",
+            "m",
+            "--json",
+        ]
+    )
     assert rc == 0
     payload = json.loads(capsys.readouterr().out.strip())
     assert payload["workdir"].startswith(str(worktrees))
@@ -790,8 +920,15 @@ def test_submit_cli_retry_skips_workspace_preparation(tmp_path, monkeypatch, cap
     r = _FakeRedis()
     monkeypatch.setattr(fm, "_connect", lambda: r)
     argv = [
-        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g",
-        "--model", "m", "--retry-safe", "--json",
+        "submit",
+        "--spec",
+        "workflows/repository/demo.yaml",
+        "--goal",
+        "g",
+        "--model",
+        "m",
+        "--retry-safe",
+        "--json",
     ]
     assert fm.main(argv) == 0
     first = json.loads(capsys.readouterr().out.strip())
@@ -821,8 +958,15 @@ def test_submit_cli_new_key_after_main_advances_gets_a_fresh_workspace(
     r = _FakeRedis()
     monkeypatch.setattr(fm, "_connect", lambda: r)
     argv = [
-        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g",
-        "--model", "m", "--retry-safe", "--json",
+        "submit",
+        "--spec",
+        "workflows/repository/demo.yaml",
+        "--goal",
+        "g",
+        "--model",
+        "m",
+        "--retry-safe",
+        "--json",
     ]
     assert fm.main(argv) == 0
     first = json.loads(capsys.readouterr().out.strip())
@@ -840,9 +984,7 @@ def test_submit_cli_new_key_after_main_advances_gets_a_fresh_workspace(
     assert Path(second["workdir"]).exists()
 
 
-def test_explicit_key_retry_reuses_the_recorded_suffixed_workspace(
-    tmp_path, monkeypatch, capsys
-):
+def test_explicit_key_retry_reuses_the_recorded_suffixed_workspace(tmp_path, monkeypatch, capsys):
     """Reviewer finding (round 4): a retry resolves the workspace FROM the retained record —
     the SHA-suffixed workspace assigned to the submission is reused (even after another main
     advance) instead of failing as a DIFFERENT request."""
@@ -850,10 +992,22 @@ def test_explicit_key_retry_reuses_the_recorded_suffixed_workspace(
     r = _FakeRedis()
     monkeypatch.setattr(fm, "_connect", lambda: r)
     # 1) a first workspace at main_1 (the base name).
-    assert fm.main([
-        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g",
-        "--model", "m", "--retry-safe", "--json",
-    ]) == 0
+    assert (
+        fm.main(
+            [
+                "submit",
+                "--spec",
+                "workflows/repository/demo.yaml",
+                "--goal",
+                "g",
+                "--model",
+                "m",
+                "--retry-safe",
+                "--json",
+            ]
+        )
+        == 0
+    )
     first = json.loads(capsys.readouterr().out.strip())
 
     # 2) main advances; a NEW explicit key gets the SHA-suffixed workspace.
@@ -861,10 +1015,23 @@ def test_explicit_key_retry_reuses_the_recorded_suffixed_workspace(
     _git("add", "-A", cwd=repo)
     _git("commit", "-m", "advance", cwd=repo)
     new_main = _git("rev-parse", "HEAD", cwd=repo).stdout.strip()
-    assert fm.main([
-        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g",
-        "--model", "m", "--request-key", "k1", "--json",
-    ]) == 0
+    assert (
+        fm.main(
+            [
+                "submit",
+                "--spec",
+                "workflows/repository/demo.yaml",
+                "--goal",
+                "g",
+                "--model",
+                "m",
+                "--request-key",
+                "k1",
+                "--json",
+            ]
+        )
+        == 0
+    )
     second = json.loads(capsys.readouterr().out.strip())
     assert second["reconciled"] is False
     assert second["workdir"] != first["workdir"]
@@ -875,10 +1042,23 @@ def test_explicit_key_retry_reuses_the_recorded_suffixed_workspace(
     (repo / "advance2.txt").write_text("x", encoding="utf-8")
     _git("add", "-A", cwd=repo)
     _git("commit", "-m", "advance2", cwd=repo)
-    assert fm.main([
-        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g",
-        "--model", "m", "--request-key", "k1", "--json",
-    ]) == 0
+    assert (
+        fm.main(
+            [
+                "submit",
+                "--spec",
+                "workflows/repository/demo.yaml",
+                "--goal",
+                "g",
+                "--model",
+                "m",
+                "--request-key",
+                "k1",
+                "--json",
+            ]
+        )
+        == 0
+    )
     retry = json.loads(capsys.readouterr().out.strip())
     assert retry["reconciled"] is True
     assert retry["job_id"] == second["job_id"]
@@ -896,20 +1076,48 @@ def test_auto_key_retry_reuses_the_recorded_suffixed_workspace(tmp_path, monkeyp
     r = _FakeRedis()
     monkeypatch.setattr(fm, "_connect", lambda: r)
     # task-a's first submission creates the base workspace at main_1.
-    assert fm.main([
-        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g", "--model", "m",
-        "--retry-safe", "--task-identity", "task-a", "--json",
-    ]) == 0
+    assert (
+        fm.main(
+            [
+                "submit",
+                "--spec",
+                "workflows/repository/demo.yaml",
+                "--goal",
+                "g",
+                "--model",
+                "m",
+                "--retry-safe",
+                "--task-identity",
+                "task-a",
+                "--json",
+            ]
+        )
+        == 0
+    )
     first = json.loads(capsys.readouterr().out.strip())
 
     # main advances; task-b's identical inputs get the SHA-suffixed workspace.
     (repo / "advance.txt").write_text("x", encoding="utf-8")
     _git("add", "-A", cwd=repo)
     _git("commit", "-m", "advance", cwd=repo)
-    assert fm.main([
-        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g", "--model", "m",
-        "--retry-safe", "--task-identity", "task-b", "--json",
-    ]) == 0
+    assert (
+        fm.main(
+            [
+                "submit",
+                "--spec",
+                "workflows/repository/demo.yaml",
+                "--goal",
+                "g",
+                "--model",
+                "m",
+                "--retry-safe",
+                "--task-identity",
+                "task-b",
+                "--json",
+            ]
+        )
+        == 0
+    )
     second = json.loads(capsys.readouterr().out.strip())
     assert second["reconciled"] is False
     assert second["workdir"] != first["workdir"]
@@ -918,10 +1126,24 @@ def test_auto_key_retry_reuses_the_recorded_suffixed_workspace(tmp_path, monkeyp
     (repo / "advance2.txt").write_text("x", encoding="utf-8")
     _git("add", "-A", cwd=repo)
     _git("commit", "-m", "advance2", cwd=repo)
-    assert fm.main([
-        "submit", "--spec", "workflows/repository/demo.yaml", "--goal", "g", "--model", "m",
-        "--retry-safe", "--task-identity", "task-b", "--json",
-    ]) == 0
+    assert (
+        fm.main(
+            [
+                "submit",
+                "--spec",
+                "workflows/repository/demo.yaml",
+                "--goal",
+                "g",
+                "--model",
+                "m",
+                "--retry-safe",
+                "--task-identity",
+                "task-b",
+                "--json",
+            ]
+        )
+        == 0
+    )
     retry = json.loads(capsys.readouterr().out.strip())
     assert retry["reconciled"] is True and retry["job_id"] == second["job_id"]
     assert retry["workdir"] == second["workdir"]
@@ -953,8 +1175,9 @@ def test_two_successive_continuations_keep_the_canonical_provenance(tmp_path, mo
         ["git", "-C", str(gen1.path), "rev-parse", "HEAD"], capture_output=True, text=True
     ).stdout.strip()
     (ledger_dir / "20260916T000000000000Z_run-gen1.json").write_text(
-        json.dumps({"run_id": "run-gen1", "git_sha": c1,
-                    "phases": [{"phase": "p1", "status": "ok"}]}),
+        json.dumps(
+            {"run_id": "run-gen1", "git_sha": c1, "phases": [{"phase": "p1", "status": "ok"}]}
+        ),
         encoding="utf-8",
     )
 
@@ -979,8 +1202,9 @@ def test_two_successive_continuations_keep_the_canonical_provenance(tmp_path, mo
         ["git", "-C", str(gen2.path), "rev-parse", "HEAD"], capture_output=True, text=True
     ).stdout.strip()
     (ledger_dir / "20260916T000000000001Z_run-gen2.json").write_text(
-        json.dumps({"run_id": "run-gen2", "git_sha": c2,
-                    "phases": [{"phase": "p2", "status": "ok"}]}),
+        json.dumps(
+            {"run_id": "run-gen2", "git_sha": c2, "phases": [{"phase": "p2", "status": "ok"}]}
+        ),
         encoding="utf-8",
     )
 
@@ -1031,14 +1255,31 @@ def test_a_submission_records_its_job_into_the_task_state(tmp_path, monkeypatch,
     store, binding_id = _binding_store(tmp_path)
     monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(store))
 
-    rc = fm.main([
-        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
-        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
-        "--aio-session-id", "ses_aio", "--aio-agent", "aio-control",
-        "--binding-id", binding_id, "--task-revision", "1",
-        "--binding-context-version", "1",
-        "--retry-safe", "--json",
-    ])
+    rc = fm.main(
+        [
+            "submit",
+            "--spec",
+            "workflows/repository/fleet_job_submission.yaml",
+            "--goal",
+            "g",
+            "--model",
+            "anthropic/claude-sonnet-5",
+            "--workdir",
+            "/tmp/wt_cli",
+            "--aio-session-id",
+            "ses_aio",
+            "--aio-agent",
+            "aio-control",
+            "--binding-id",
+            binding_id,
+            "--task-revision",
+            "1",
+            "--binding-context-version",
+            "1",
+            "--retry-safe",
+            "--json",
+        ]
+    )
     assert rc == 0
     payload = json.loads(capsys.readouterr().out.strip())
     assert payload["task_note"] == ""  # recorded cleanly
@@ -1067,18 +1308,37 @@ def test_a_stale_revision_never_overwrites_the_task_state(tmp_path, monkeypatch,
     store, binding_id = _binding_store(tmp_path)
     monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(store))
     si.update_binding_context(
-        "ses_aio", context={"next_action": "the newer AIO action"}, expected_version=1,
+        "ses_aio",
+        context={"next_action": "the newer AIO action"},
+        expected_version=1,
         artifact_dir=store,
     )
 
-    rc = fm.main([
-        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
-        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
-        "--aio-session-id", "ses_aio", "--aio-agent", "aio-control",
-        "--binding-id", binding_id, "--task-revision", "1",
-        "--binding-context-version", "1",
-        "--retry-safe", "--json",
-    ])
+    rc = fm.main(
+        [
+            "submit",
+            "--spec",
+            "workflows/repository/fleet_job_submission.yaml",
+            "--goal",
+            "g",
+            "--model",
+            "anthropic/claude-sonnet-5",
+            "--workdir",
+            "/tmp/wt_cli",
+            "--aio-session-id",
+            "ses_aio",
+            "--aio-agent",
+            "aio-control",
+            "--binding-id",
+            binding_id,
+            "--task-revision",
+            "1",
+            "--binding-context-version",
+            "1",
+            "--retry-safe",
+            "--json",
+        ]
+    )
     assert rc == 0  # the submission itself is unaffected (the job is durable)
     payload = json.loads(capsys.readouterr().out.strip())
     assert "task state not updated" in payload["task_note"]
@@ -1092,13 +1352,29 @@ def test_a_submission_without_a_store_reports_the_missing_task_update(monkeypatc
     r = _FakeRedis()
     monkeypatch.setattr(fm, "_connect", lambda: r)
     monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", "/nonexistent/kb-store")
-    rc = fm.main([
-        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
-        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
-        "--aio-session-id", "ses_aio", "--aio-agent", "aio-control",
-        "--binding-id", "b" * 64, "--task-revision", "1",
-        "--retry-safe", "--json",
-    ])
+    rc = fm.main(
+        [
+            "submit",
+            "--spec",
+            "workflows/repository/fleet_job_submission.yaml",
+            "--goal",
+            "g",
+            "--model",
+            "anthropic/claude-sonnet-5",
+            "--workdir",
+            "/tmp/wt_cli",
+            "--aio-session-id",
+            "ses_aio",
+            "--aio-agent",
+            "aio-control",
+            "--binding-id",
+            "b" * 64,
+            "--task-revision",
+            "1",
+            "--retry-safe",
+            "--json",
+        ]
+    )
     assert rc == 0
     payload = json.loads(capsys.readouterr().out.strip())
     assert "task state not updated" in payload["task_note"]
@@ -1115,13 +1391,22 @@ def _submit_fixture(tmp_path, monkeypatch):
     repo.mkdir()
     subprocess.run(["git", "init", "-q", str(repo)], check=True)
     subprocess.run(
-        ["git", "-C", str(repo), "remote", "add", "origin",
-         "git@github.com:peparhugo/agentic-dynamics.git"],
+        [
+            "git",
+            "-C",
+            str(repo),
+            "remote",
+            "add",
+            "origin",
+            "git@github.com:peparhugo/agentic-dynamics.git",
+        ],
         check=True,
     )
     spec_src = (
         Path(__file__).resolve().parent.parent
-        / "workflows" / "repository" / "fleet_job_submission.yaml"
+        / "workflows"
+        / "repository"
+        / "fleet_job_submission.yaml"
     )
     spec_dst = repo / "workflows" / "repository" / "fleet_job_submission.yaml"
     spec_dst.parent.mkdir(parents=True)
@@ -1138,19 +1423,31 @@ def _submit_fixture(tmp_path, monkeypatch):
 
 def _aio_argv(*, auth_id, auth_version, context_version, workdir, extra=()):
     return [
-        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
-        "--goal", "g", "--model", "anthropic/claude-sonnet-5",
-        "--workdir", str(workdir),
-        "--aio-session-id", "ses_aio", "--aio-agent", "aio-control",
-        "--binding-id", auth_id, "--task-revision", str(auth_version),
-        "--binding-context-version", str(context_version),
-        *extra, "--json",
+        "submit",
+        "--spec",
+        "workflows/repository/fleet_job_submission.yaml",
+        "--goal",
+        "g",
+        "--model",
+        "anthropic/claude-sonnet-5",
+        "--workdir",
+        str(workdir),
+        "--aio-session-id",
+        "ses_aio",
+        "--aio-agent",
+        "aio-control",
+        "--binding-id",
+        auth_id,
+        "--task-revision",
+        str(auth_version),
+        "--binding-context-version",
+        str(context_version),
+        *extra,
+        "--json",
     ]
 
 
-def test_a_recorded_submission_still_passes_delayed_consumption(
-    tmp_path, monkeypatch, capsys
-):
+def test_a_recorded_submission_still_passes_delayed_consumption(tmp_path, monkeypatch, capsys):
     """Round-9 regression: the submit's own recording must not invalidate the queued command.
     Mint through the real CLI (which records progress), then validate + dry-run the SAME
     queued command exactly as the worker and the broker would — binding id and revision
@@ -1163,10 +1460,15 @@ def test_a_recorded_submission_still_passes_delayed_consumption(
     monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(store))
     monkeypatch.setattr("scripts.fleet.launch_broker.admission_required", lambda: False)
 
-    rc = fm.main(_aio_argv(
-        auth_id=auth_id, auth_version=1, context_version=1, workdir=workdir,
-        extra=("--retry-safe",),
-    ))
+    rc = fm.main(
+        _aio_argv(
+            auth_id=auth_id,
+            auth_version=1,
+            context_version=1,
+            workdir=workdir,
+            extra=("--retry-safe",),
+        )
+    )
     assert rc == 0
     payload = json.loads(capsys.readouterr().out.strip())
     assert payload["task_note"] == ""  # the recording happened (context 1 -> 2)
@@ -1180,9 +1482,7 @@ def test_a_recorded_submission_still_passes_delayed_consumption(
     assert outcome["ok"] is True
 
 
-def test_a_genuine_task_change_still_rejects_its_pending_command(
-    tmp_path, monkeypatch, capsys
-):
+def test_a_genuine_task_change_still_rejects_its_pending_command(tmp_path, monkeypatch, capsys):
     """The stale-task rejection is preserved for genuine changes: an acceptance update
     advances the authorization epoch and the previously queued command is refused."""
     from agentic_dynamics.knowledge import session_ingestion as si
@@ -1192,10 +1492,18 @@ def test_a_genuine_task_change_still_rejects_its_pending_command(
     store, auth_id = _binding_store(tmp_path)
     monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(store))
 
-    assert fm.main(_aio_argv(
-        auth_id=auth_id, auth_version=1, context_version=1, workdir=workdir,
-        extra=("--retry-safe",),
-    )) == 0
+    assert (
+        fm.main(
+            _aio_argv(
+                auth_id=auth_id,
+                auth_version=1,
+                context_version=1,
+                workdir=workdir,
+                extra=("--retry-safe",),
+            )
+        )
+        == 0
+    )
     capsys.readouterr()
     command = json.loads(r._lists[fm.COMMANDS_KEY][0])
 
@@ -1210,9 +1518,7 @@ def test_a_genuine_task_change_still_rejects_its_pending_command(
     assert any("stale task revision" in e for e in errors), errors
 
 
-def test_multiple_pending_submissions_survive_progress_recording(
-    tmp_path, monkeypatch, capsys
-):
+def test_multiple_pending_submissions_survive_progress_recording(tmp_path, monkeypatch, capsys):
     """Progress recording is per-write, not per-command: two commands minted against the
     same task state both survive each other's recordings — and a repeated reconciliation
     reuses the first job without disturbing either authorization."""
@@ -1222,17 +1528,33 @@ def test_multiple_pending_submissions_survive_progress_recording(
     store, auth_id = _binding_store(tmp_path)
     monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(store))
 
-    assert fm.main(_aio_argv(
-        auth_id=auth_id, auth_version=1, context_version=1, workdir=workdir,
-        extra=("--retry-safe",),
-    )) == 0
+    assert (
+        fm.main(
+            _aio_argv(
+                auth_id=auth_id,
+                auth_version=1,
+                context_version=1,
+                workdir=workdir,
+                extra=("--retry-safe",),
+            )
+        )
+        == 0
+    )
     first = json.loads(capsys.readouterr().out.strip())
 
     # The second submission reads the POST-recording context version (as the tool would).
-    assert fm.main(_aio_argv(
-        auth_id=auth_id, auth_version=1, context_version=2, workdir=workdir,
-        extra=("--retry-safe", "--task-identity", "second-pending"),
-    )) == 0
+    assert (
+        fm.main(
+            _aio_argv(
+                auth_id=auth_id,
+                auth_version=1,
+                context_version=2,
+                workdir=workdir,
+                extra=("--retry-safe", "--task-identity", "second-pending"),
+            )
+        )
+        == 0
+    )
     second = json.loads(capsys.readouterr().out.strip())
     assert second["job_id"] != first["job_id"]
 
@@ -1243,10 +1565,109 @@ def test_multiple_pending_submissions_survive_progress_recording(
         assert errors == [], (command["job_id"], errors)
 
     # A repeated reconciliation (the FIRST submission retried) returns its original job.
-    assert fm.main(_aio_argv(
-        auth_id=auth_id, auth_version=1, context_version=3, workdir=workdir,
-        extra=("--retry-safe",),
-    )) == 0
+    assert (
+        fm.main(
+            _aio_argv(
+                auth_id=auth_id,
+                auth_version=1,
+                context_version=3,
+                workdir=workdir,
+                extra=("--retry-safe",),
+            )
+        )
+        == 0
+    )
     retry = json.loads(capsys.readouterr().out.strip())
     assert retry["reconciled"] is True and retry["job_id"] == first["job_id"]
     assert len(r._lists[fm.COMMANDS_KEY]) == 2  # nothing new queued
+
+
+def _load_session_open(name: str):
+    """Load scripts/session_open.py by path (it lives under scripts/, not the package).
+
+    The same importlib seam tests/test_session_binding.py uses — the capsule composer is the
+    carrier under test, and it is deliberately not importable as a package module.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(name, ROOT / "scripts" / "session_open.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_a_submission_supersedes_a_completed_next_action_in_the_capsule(
+    tmp_path, monkeypatch, capsys
+):
+    """End-to-end: the REAL submit path records over a stale instruction, and the capsule the
+    per-request carrier composes no longer instructs the completed sequence.
+
+    This closes the loop the binding-layer tests leave open — action -> binding -> carrier:
+    seed the c15 stale next action, run ``fleet_manager submit`` (the confirmed action the AIO
+    actually takes), then compose the capsule from the read-back binding and assert the stale
+    instruction is gone while the [auto] job record is the one next action.
+    """
+    from agentic_dynamics.knowledge import session_ingestion as si
+
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    store, binding_id = _binding_store(tmp_path)
+    monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(store))
+
+    stale = "After the controller activates PR #77 then call run_workflow"
+    si.update_binding_context(
+        "ses_aio",
+        context={"next_action": stale},
+        expected_version=1,
+        artifact_dir=store,
+        publish=False,
+    )
+
+    rc = fm.main(
+        [
+            "submit",
+            "--spec",
+            "workflows/repository/fleet_job_submission.yaml",
+            "--goal",
+            "g",
+            "--model",
+            "anthropic/claude-sonnet-5",
+            "--workdir",
+            "/tmp/wt_cli",
+            "--aio-session-id",
+            "ses_aio",
+            "--aio-agent",
+            "aio-control",
+            "--binding-id",
+            binding_id,
+            "--task-revision",
+            "1",
+            "--binding-context-version",
+            "2",
+            "--retry-safe",
+            "--json",
+        ]
+    )
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert payload["task_note"] == ""  # recorded cleanly
+
+    binding = si.read_binding("ses_aio", artifact_dir=store).binding
+    assert binding is not None
+    assert "[auto]" in binding["next_action"]
+    assert payload["job_id"] in binding["next_action"]
+    assert stale not in binding["next_action"]  # replaced, not appended
+
+    # The carrier: composing from the read-back binding must not resurrect the finished sequence.
+    module = _load_session_open("session_open_fleet_test")
+    capsule = module.compose_capsule(
+        binding,
+        artifact_dir=store,
+        packet={"status": "unavailable", "reason": "test"},
+        budget={"verdict": "OK"},
+    )
+    assert capsule["next_action"]["source"] == "binding"
+    assert payload["job_id"] in capsule["text"]
+    assert "activate PR #77" not in capsule["next_action"]["text"]
+    assert "activate PR #77" not in capsule["text"]

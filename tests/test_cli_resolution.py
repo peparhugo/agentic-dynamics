@@ -81,12 +81,12 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     (("knowledge", "sources"), "kb_produce_sources.py", ()),
     (("knowledge", "facts"), "kb_produce_facts.py", ()),
     (("knowledge", "worker"), "kb_worker.py", ()),
-    # read — the reader verb (2026-09-21 retrieval audit): given a scope, read the KB through
-    # the ranked pipeline with a deterministic artifact-scan fallback.
-    (("knowledge", "read"), "kb_read.py", ()),
     (("knowledge", "context-report"), "context_snapshot_report.py", ()),
     (("knowledge", "shadow-report"), "shadow_decision_report.py", ()),
     (("knowledge", "arm-comparison"), "decision_arm_comparison.py", ()),
+    # knowledge read — the reader verb (d6cdc0270). It was added to _COMMANDS + _HELP but not to
+    # this hand-authored table, so this guard was red until the row landed (world-model-loop G3).
+    (("knowledge", "read"), "kb_read.py", ()),
     # registry — special-cased: argv[1] is forwarded to registry.py as its first positional
     (("registry", "query"), "registry.py", ("query",)),
     (("registry", "show"), "registry.py", ("show",)),
@@ -111,6 +111,9 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     # the table row landed with it only when this guard caught the drift — main was red
     # between #48's merge and this fix).
     (("validate", "render"), "verify_control_room_rendering.py", ()),
+    # validate preflight — the local CI-parity runner (scripts/ci_preflight.py): the five
+    # gates .github/workflows/pytest.yml runs on every push, in cheap→expensive order.
+    (("validate", "preflight"), "ci_preflight.py", ()),
     # supervise — the P1-2 regression: the two forms MUST resolve to different scripts.
     (("supervise",), "supervise.py", ()),
     (("supervise", "claude-agents"), "claude_agents_supervisor.py", ()),

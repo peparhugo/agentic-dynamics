@@ -30,6 +30,7 @@ maintained: scoreboard.py
 maintained: reflect.py
 maintained: workflow_new.py workflow_lint.py workflow_plan.py
 maintained: verify_control_room_rendering.py
+maintained: ci_preflight.py
 <!-- scripts-classification: end -->
 
 - **maintained command** — reached via `agentic-dynamics <subcommand>` (the Stage 3 CLI).
