@@ -17,6 +17,8 @@ import importlib
 import json
 import subprocess
 import sys
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -1671,3 +1673,112 @@ def test_a_submission_supersedes_a_completed_next_action_in_the_capsule(
     assert payload["job_id"] in capsule["text"]
     assert "activate PR #77" not in capsule["next_action"]["text"]
     assert "activate PR #77" not in capsule["text"]
+
+
+# ── the reconcile sweeps (loose-ends register L2 + L7) ────────────────────────────────────────
+
+
+def _age_job(r, fm, job_id: str, hours: float, **fields) -> None:
+    """Rewrite a job row's ts to ``hours`` ago (and merge fields), keeping its identity."""
+    rec = json.loads(r._hashes[fm.JOBS_KEY][job_id])
+    rec["ts"] = time.time() - hours * 3600
+    rec.update(fields)
+    r._hashes[fm.JOBS_KEY][job_id] = json.dumps(rec)
+
+
+def test_sweep_stale_jobs_reports_without_apply_and_writes_nothing():
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    cmd = fm._send_submit_command(
+        r, spec="workflows/repository/x.yaml", goal="g", model="m", workdir="/tmp/wt_z"
+    )
+    _age_job(r, fm, cmd["job_id"], 7.0)
+
+    report = fm.sweep_stale_jobs(r, apply=False)
+    assert report["examined"] == 1
+    assert [e["job_id"] for e in report["stale"]] == [cmd["job_id"]]
+    assert report["reconciled"] == []
+    # Nothing written: the row is still non-terminal, its ts untouched.
+    assert json.loads(r._hashes[fm.JOBS_KEY][cmd["job_id"]])["status"] in (
+        "launching",
+        "queued",
+    )
+
+
+def test_sweep_stale_jobs_reconciles_to_failed_and_from_an_ok_ledger(tmp_path):
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    ghost = fm._send_submit_command(
+        r, spec="workflows/repository/x.yaml", goal="g", model="m", workdir="/tmp/wt_z"
+    )
+    _age_job(r, fm, ghost["job_id"], 30.0)
+
+    ledger = tmp_path / "run.json"
+    ledger.write_text(json.dumps({"ok": True, "state": "succeeded"}))
+    done = fm._send_submit_command(
+        r, spec="workflows/repository/y.yaml", goal="g", model="m", workdir="/tmp/wt_z2"
+    )
+    _age_job(r, fm, done["job_id"], 30.0, ledger=str(ledger))
+
+    report = fm.sweep_stale_jobs(r, apply=True)
+    assert len(report["stale"]) == 2 and len(report["reconciled"]) == 2
+    first = json.loads(r._hashes[fm.JOBS_KEY][ghost["job_id"]])
+    assert first["status"] == "failed" and "stale" in first["error"]
+    assert "stale_ts" in first  # the prior ts is preserved
+    second = json.loads(r._hashes[fm.JOBS_KEY][done["job_id"]])
+    assert second["status"] == "completed"
+
+
+def _runs_db(tmp_path, rows) -> Path:
+    import sqlite3
+
+    db = tmp_path / "control.db"
+    con = sqlite3.connect(db)
+    con.execute("CREATE TABLE runs (run_id TEXT, state TEXT, ended_at TEXT)")
+    con.executemany("INSERT INTO runs VALUES (?,?,?)", rows)
+    con.commit()
+    con.close()
+    return db
+
+
+def test_prune_runs_classifies_by_state_and_age_and_keeps_unpromoted(tmp_path):
+    fm = _fleet_manager()
+    now = time.time()
+    old = datetime.fromtimestamp(now - 40 * 86400, tz=timezone.utc).isoformat()
+    recent = datetime.fromtimestamp(now - 86400, tz=timezone.utc).isoformat()
+    db = _runs_db(
+        tmp_path,
+        [
+            ("run-merged-old", "merged", old),
+            ("run-cancelled-old", "cancelled", old),
+            ("run-failed-old", "failed", old),
+            ("run-promotable", "promotable", old),
+            ("run-merged-recent", "merged", recent),
+        ],
+    )
+    root = tmp_path / "runs"
+    for name in (
+        "run-merged-old",
+        "run-cancelled-old",
+        "run-failed-old",
+        "run-promotable",
+        "run-merged-recent",
+        "run-unknown",
+    ):
+        (root / name).mkdir(parents=True)
+        (root / name / "f.txt").write_text("x")
+
+    report = fm.prune_runs(db=str(db), runs_root=root, now=now, apply=False)
+    assert {i["run_id"] for i in report["prunable"]} == {
+        "run-merged-old",
+        "run-cancelled-old",
+        "run-failed-old",
+    }
+    assert (root / "run-merged-old").is_dir()  # dry run deletes nothing
+
+    fm.prune_runs(db=str(db), runs_root=root, now=now, apply=True)
+    assert not (root / "run-merged-old").exists()
+    assert not (root / "run-failed-old").exists()
+    assert (root / "run-promotable").is_dir()  # an unpromoted candidate is never pruned
+    assert (root / "run-unknown").is_dir()  # unknown provenance is not garbage
+    assert (root / "run-merged-recent").is_dir()  # within the keep window

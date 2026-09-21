@@ -1,0 +1,67 @@
+name: control_room_facelift_adversarial2
+question: >-
+  SECOND adversarial pass over the REVISED facelift artifacts (a1/a2 after a4): verify every
+  disposition actually exists in the documents (not just claimed), attack the revised task
+  plan and dynamic-workflow design for NEW holes the first pass and the revision missed, and
+  return a verdict: ACCEPT / REWORK (severity-ranked corrections) / PARK. Write
+  docs/reviews/control_room_facelift_adversarial_v2.md. Independent reviewer: a different
+  model family than pass 1 (DeepSeek flash) — this pass runs on openai/gpt-5.6-sol.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    phases:
+      - name: b1_adversarial2
+        kind: agent
+        scope: implementation
+        timeout: 2400
+        prompt: |
+          GOAL: {goal}
+          You are a SECOND, INDEPENDENT ADVERSARY — a different model family than pass 1.
+          Inputs (read-only): docs/website/control_room_ui/facelift_task_plan.md,
+          docs/website/control_room_ui/dynamic_workflow_design.md,
+          docs/reviews/control_room_facelift_adversarial.md (pass 1),
+          docs/research/control_room_ui_reference_synthesis_v2.md,
+          docs/research/control_room_direction.md.
+          1. DISPOSITION AUDIT: for every disposition in the task plan's disposition table and
+             the design's revision notes, check the claimed correction ACTUALLY EXISTS in the
+             artifact (cite file:line / section / task text). List every disposition that is
+             nominal — claimed but not present — with evidence. Include the pass-1 resolved
+             items you disagree with and say why.
+          2. ATTACK THE REVISED ARTIFACTS (new holes): the task plan (bad splits, missing
+             deps, gates that can pass vacuously or cannot see their claim, ordering that
+             half-migrates the room, tasks silently over the one-session bound) and the
+             dynamic-workflow design (executor gap, convergence/brakes, circularity,
+             ungrounded mechanisms, the honest-gap list itself).
+          3. ATTACK THE FIRST WAVE {F01a, F01b, F02a, F02b, F04, F07, F11}: is each
+             executable exactly as specified? Any task missing its named gate from the
+             gate-of-record table? Any acceptance that a green run could satisfy without the
+             claimed behavior?
+          4. VERDICT: ACCEPT / REWORK / PARK with severity-ranked required corrections (and
+             the acceptance that proves each), plus the three highest-value corrections.
+          Precision over volume; no praise sections; no restating. Do NOT modify a1/a2.
+          Write docs/reviews/control_room_facelift_adversarial_v2.md.
+      - name: b2_verify
+        kind: test
+        scope: implementation
+        timeout: 600
+        tests:
+          - tests/test_doc_lifecycle.py
+          - tests/test_fast_path_gate.py
+        prompt: |
+          The declared target keeps the docs tree honest; fix doc-lifecycle failures in the
+          new review document, never weaken the gate.
+factors:
+  - {name: model, levels: [openai/gpt-5.6-sol]}
+design: factorial
+rules: []
+metrics: []
+writeup: {format: lab_book, sections: [question]}
+stop: {budget_usd: 3.0, max_attempts: 1}
