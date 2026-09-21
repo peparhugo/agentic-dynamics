@@ -1,140 +1,163 @@
-# Plan — Item 4: land the missing regression check for the stale next-action state
+# Plan — close the live-KB test-emission leak (test-seam fix)
 
 *Execute phase follows this file. Deviations go in `notes/deviations.md`; the posterior diffs
 against `notes/world_model.md` and this plan.*
 
 ## 0. Decision (from the world model)
 
-The c15 stale-next-action gap is **already closed** for the one confirmed AIO action that has a
-durable recording path — a workflow submit (`scripts/fleet/fleet_manager.py:853`,
-`_record_submission_in_task`, commit `246490028`, an ancestor of HEAD). The recording REPLACES
-`next_action` with a version-guarded `[auto] submitted job …` string, and the capsule renders
-the binding's `next_action` with precedence over predecessor threads
-(`scripts/session_open.py:393-400`).
+The leak is a **test-seam** defect, not a production defect. `tests/test_world_model_gates.py`'s
+shared spec opts in `rag.emit_self: true` / `rag.emit_report: true`
+(`tests/test_world_model_gates.py:42-44`), and `_finding_emit_enabled` deliberately lets an
+explicit opt-in outrank the suite-wide `FINFOPS_EMIT_SELF=0` disarm
+(`src/agentic_dynamics/runtime/workflow_runner.py:1836-1839`; pinned by
+`tests/test_workflow_runner.py:1136-1153`). Four tests in the module therefore reach the real
+`emit_phase_finding` write on every run.
 
-Therefore this task lands the **missing regression check**, not a source change. The check must
-pin the carrier-level property the c15 finding names: *a completed instruction can never remain
-the actionable next action after its confirmed action happened.* No new memory format, no
-`handoff` object, no generalized prose compiler.
+**The fix is test-only:** add a module-local autouse guard that intercepts the emit write path,
+plus one regression proving the closure. Do **not** change `_finding_emit_enabled`, the opt-in
+precedence, or any production file. Do **not** change the shared `SPEC`'s `emit_self`/`emit_report`
+values: `test_emit_report_opts_in_for_committed_phases` depends on the opt-in being true to reach
+its own stubbed assertions (`tests/test_world_model_gates.py:116-136`).
 
-Fallback (only if a test fails): apply the smallest existing-machinery fix that makes it pass,
-and record the deviation. Do not invent a new record family.
-
-## 1. Files to touch
+## Files
 
 | file | change |
 |---|---|
-| `tests/test_session_binding.py` | ADD two tests: (a) replace-not-append for a non-empty prior `next_action`; (b) capsule-level regression that a completed `next_action` is superseded by a progress write and cannot appear as the capsule's next action. |
-| `tests/test_fleet_manager.py` | ADD one end-to-end regression: seed the exact c15 stale instruction, run the REAL `fleet_manager submit` (confirmed action), then compose the capsule and assert the stale instruction is gone and the `[auto]` job record is the next action. |
-| `notes/deviations.md` | CREATE only if a deviation occurs (the execute prompt requires it when reality differs). |
+| `tests/test_world_model_gates.py` | ADD a module-local `autouse` fixture (e.g. `_stub_emit_write_path`) that (1) monkeypatches `agentic_dynamics.knowledge.knowledge_ingestion.emit_phase_finding` to a recorder no-op, and (2) redirects `FINOPS_RESULTS_DIR` to a `tmp_path_factory` dir (containing `_emit_research_report`'s direct `path.write_text`). ADD one regression test proving no live-tree write escapes the module under the disarm. |
+| `notes/deviations.md` | CREATE only if reality differs from this plan (the execute prompt requires it). |
+| `notes/sources.jsonl` | Written by the prior phase (gate requirement); execute leaves it. |
 
-Explicitly NOT touched: `scripts/session_open.py`, `src/agentic_dynamics/knowledge/session_ingestion.py`,
-`scripts/fleet/fleet_manager.py`, `.opencode/plugins/aio-context.ts`, `docs/reviews/*` — unless the
-fallback is triggered.
+Explicitly NOT touched: `src/agentic_dynamics/runtime/workflow_runner.py`,
+`src/agentic_dynamics/knowledge/knowledge_ingestion.py`, `tests/conftest.py` (the suite-wide
+disarm stays as-is), any other test module, and the shared `SPEC`/`PLAN_GATE_SPEC` constants.
 
-## 2. Tests to create
+### Fixture shape (why this seam)
 
-### 2.1 `tests/test_session_binding.py` (pure unit; no Redis, no subprocess)
+The established seams both work; choose the *write seam* because it contains both leak channels
+in one place and is transparent to the routing under test:
 
-1. `test_a_progress_write_replaces_a_completed_next_action` — in `TestVersionedContext`:
-   - write a binding with `next_action="activate PR #77 then call run_workflow"`;
-   - `si.update_binding_context("ses_test_1", context={"next_action": "observe job abc123"},
-     expected_version=1, artifact_dir=tmp_path, connect_fn=_FakeRedis)`;
-   - assert the read-back `next_action == "observe job abc123"` (replaced, not concatenated);
-   - assert the superseded text is retained in `context_history[0]["next_action"]`
-     (nothing lost — the audit trail is the history, not the live carrier);
-   - assert `context_version == 2` and the authorization id/epoch are unchanged (progress-only,
-     per round-9).
-   - Rationale: today's tests only exercise a non-empty `next_action` on an EMPTY prior value
-     (`tests/test_session_binding.py:491-520`), so replace semantics against a stale non-empty
-     value are unproven.
+```python
+@pytest.fixture(autouse=True)
+def _stub_emit_write_path(monkeypatch, tmp_path_factory):
+    """No test in this module may reach the live KB/report tree (2026-09-21 leak).
 
-2. `test_the_capsule_cannot_show_a_completed_next_action` — in `TestConstraintPreservation`
-   (it already has the `_capsule` helper and `compose_capsule`):
-   - write the binding with the c15 stale `next_action`;
-   - perform the progress write that records the confirmed action;
-   - compose the capsule from the read-back binding (packet/budget stubbed as in
-     `tests/test_session_binding.py:590-598`);
-   - assert `"activate PR #77" not in capsule["next_action"]["text"]` AND not in `capsule["text"]`;
-   - assert `capsule["next_action"]["source"] == "binding"` and the new record is present.
-   - Rationale: this is c15 §4.6 rendered against the machinery that actually exists.
-
-### 2.2 `tests/test_fleet_manager.py` (the real submit path)
-
-3. `test_a_submission_supersedes_a_completed_next_action_in_the_capsule` — reuse the existing
-   harness (`_binding_store`, `_fleet_manager`, `_FakeRedis`, and either the light `fm.main`
-   argv at `tests/test_fleet_manager.py:1034-1041` or the full `_submit_fixture`/`_aio_argv`
-   pair at `:1110-1148`):
-   - after `_binding_store`, issue an `si.update_binding_context` that sets the c15 stale
-     `next_action` (the binding was created empty by `_binding_store`, so version 1→2);
-   - run the real submit with `--binding-context-version 2` and `--retry-safe --json`;
-   - assert `payload["task_note"] == ""` (recorded cleanly) and the `[auto]`/`job_id` in the
-     read-back `next_action`;
-   - compose the capsule (load `scripts/session_open.py` exactly as
-     `tests/test_session_binding.py:45-49` does, or import `compose_capsule` via the same
-     `importlib` seam) with the read-back binding and stubbed packet/budget;
-   - assert the capsule text contains the new `job_id` and does NOT contain `"activate PR #77"`.
-   - Rationale: proves the *path* that the AIO actually uses records, not just that the writer
-     can; closes the loop from action → binding → carrier.
-
-## 3. Local verification commands
-
-```bash
-# the two touched test modules (and the neighbouring binding/exec suites)
-python3 -m pytest tests/test_session_binding.py tests/test_fleet_manager.py \
-                 tests/test_spawn_wrapper.py -q -p no:cacheprovider
-
-# lint the touched files (whole-surface ruff is the repo rule)
-ruff check tests/test_session_binding.py tests/test_fleet_manager.py
-
-# the fast smoke, to confirm no fast-marked guard broke
-python3 -m pytest tests/ -m fast -q -p no:cacheprovider
+    SPEC/SHAPE_SPEC opt in with rag.emit_self/emit_report: true, which outranks the suite
+    FINFOPS_EMIT_SELF=0 disarm (workflow_runner._finding_emit_enabled). Intercept the single
+    durable write+publish entry (knowledge_ingestion.emit_phase_finding) and point the durable
+    results tree at tmp, so neither the kb/*.json artifact/publish nor the
+    workflows/<spec>/reports/*.md file can land in the checkout. Tests that exercise the real
+    write path stub these themselves and override this fixture.
+    """
+    import agentic_dynamics.knowledge.knowledge_ingestion as ki
+    results = tmp_path_factory.mktemp("live_kb_guard")
+    monkeypatch.setenv("FINOPS_RESULTS_DIR", str(results))
+    emitted = []
+    monkeypatch.setattr(ki, "emit_phase_finding",
+                        lambda pr, **kw: emitted.append((pr.phase, kw)))
+    yield emitted
 ```
 
-If a fast-eligible module already carries the `fast` marker selectively, follow the existing
-marking convention in the module; do not mark a test `fast` if it spins up the real spec fixture
-(the parallel-safety audit in `tests/test_fast_path_gate.py` will reject it).
+Notes:
+- `_emit_self_finding` and `_emit_research_report` both import `emit_phase_finding` *inside* the
+  function (`workflow_runner.py:1851, 1925`), so patching the module attribute is honored.
+- `monkeypatch` sharing: `test_emit_report_opts_in_for_committed_phases` (`:127-132`) and
+  `test_report_path_honors_the_results_dir_contract` (`:208`) already `setattr`/`setenv` on the
+  same monkeypatch instance in the test body, so their values win at call time and teardown
+  restores cleanly (LIFO undo).
+- The fixture yields the recorder so the regression can request it by name.
 
-## 4. Acceptance criteria
+## Tests
 
-1. The three named tests exist, are deterministic, and pass.
-2. The capsule-level tests assert the completed instruction is absent from BOTH
-   `capsule["next_action"]["text"]` and the rendered `capsule["text"]` — the carrier, not just
-   the JSON.
-3. `tests/test_session_binding.py` and `tests/test_fleet_manager.py` and
-   `tests/test_spawn_wrapper.py` are green; `ruff check` on the touched files is clean.
-4. No source file is modified unless the fallback fires; if it fires, the change is additive and
-   uses `update_binding_context` only, and `notes/deviations.md` names the failing test, the
-   observed behavior, and the minimal change.
-5. `notes/deviations.md` exists and records any delta between this plan and what was done.
+| test | file | proves |
+|---|---|---|
+| `test_no_emission_escapes_the_module_under_the_suite_disarm` (ADD) | `tests/test_world_model_gates.py` | With `FINFOPS_EMIT_SELF == "0"` asserted active and `SPEC` (opt-in) driven through the **real** `wr._emit_self_finding` / `wr._emit_research_report` routing, the module fixture intercepts the emission and **no file lands under the real** `PROJECT_ROOT/experiments/results/kb/` or `experiments/results/workflows/t_wml/`. |
+| existing 11 tests | `tests/test_world_model_gates.py` | all still pass; the fixture is transparent to the gate/path contracts. |
 
-## 5. Risks and deviations to watch
+### Regression shape (ADD)
 
-- **Fixture heaviness / non-determinism.** The full `_submit_fixture` builds a real git repo and
-  copies `workflows/repository/fleet_job_submission.yaml`; prefer the lighter `fm.main` argv
-  (`tests/test_fleet_manager.py:1034-1041`) if it suffices, to keep the test fast and hermetic.
-  If the light path cannot satisfy the submit validator, fall back to `_submit_fixture`.
-- **Import seam for `compose_capsule`.** `tests/test_session_binding.py` loads `session_open.py`
-  by path via `importlib` (`:45-49`) because the module lives under `scripts/`, not the package.
-  Reuse that helper; do not add a new import mechanism.
-- **Over-claiming scope.** The tests must cover the submit path only. Non-submit confirmed
-  actions (e.g. approvals) have no binding address today (see world model §4.2). Do NOT add a
-  test that implies coverage there, and do NOT extend `approve_workflow.py` — that is out of the
-  bounded ask.
-- **The covered path may reveal a real gap.** If the end-to-end capsule test fails because the
-  capsule is served from a 30 s TTL cache (`.opencode/plugins/aio-context.ts:86`) or because the
-  recording did not run, STOP and record the deviation rather than widening the change.
-- **KB read degradation in the worktree.** `experiments/results/registry_index.jsonl` is absent
-  in this worktree, so `scripts/kb_read.py --contains` raises `FileNotFoundError`; use the
-  canonical checkout for KB probes, and note the degradation rather than mistaking it for an
-  empty corpus.
+```python
+def test_no_emission_escapes_the_module_under_the_suite_disarm(
+    tmp_path, monkeypatch, _stub_emit_write_path
+):
+    _init_repo(tmp_path)
+    # The disarm is ACTIVE and the spec nevertheless opts in — the exact leak precondition.
+    assert os.environ.get("FINOPS_EMIT_SELF") == "0"
+    assert wr._finding_emit_enabled({"emit_self": True}, {}) is True
 
-## 6. Out of scope (explicitly)
+    kb_dir = PROJECT_ROOT / "experiments" / "results" / "kb"
+    reports_dir = PROJECT_ROOT / "experiments" / "results" / "workflows" / "t_wml"
+    before_kb = set(kb_dir.glob("*")) if kb_dir.is_dir() else set()
+    before_reports = set(reports_dir.rglob("*")) if reports_dir.is_dir() else set()
 
-- The c15 `handoff` object / any new binding field or record family.
-- A generalized prose compiler or a new governance framework (controller direction,
-  `aio_arc_findings_and_results.md:204-205`).
-- `work_unit` backfill, monitor pointers, corrections arrays, lineage beyond one hop — the other
-  c15 categories; this item is the next-action state only.
-- The in-process (`orchestrator=false`) run mode, which by the project rules is not the fleet
-  path and does not record.
+    spec = load_spec(_write_spec(tmp_path))
+    def fake(prompt, **kwargs):
+        (tmp_path / "notes").mkdir(exist_ok=True)
+        (tmp_path / "notes" / "plan.md").write_text("## Files\nx\n## Tests\ny\n## Acceptance\nz")
+        return _R()
+    wr.run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=fake)
+
+    # (i) the emission fired and was intercepted (NOT silently skipped) ...
+    assert any(phase == "prior" for phase, _kw in _stub_emit_write_path)
+    # (ii) ... and nothing escaped to the live tree.
+    assert (set(kb_dir.glob("*")) if kb_dir.is_dir() else set()) == before_kb
+    assert (set(reports_dir.rglob("*")) if reports_dir.is_dir() else set()) == before_reports
+```
+
+Adjust the interception assertion to the actual fixture return shape chosen in execution; the
+two contract points are: *the route fired and was seen by the stub*, and *the live dirs are
+byte-identical before/after*.
+
+## Acceptance
+
+1. `python3 -m pytest tests/test_world_model_gates.py -q -p no:cacheprovider` → 12 passed
+   (11 existing + 1 regression), 0 failed, in the loop worktree with the suite disarm active
+   (`tests/conftest.py:15`).
+2. With `FINOPS_RESULTS_DIR` **unset** and `experiments/results/kb/` absent, a full module run
+   creates **no** `experiments/results/kb/` directory and no
+   `experiments/results/workflows/t_wml/` directory. Verify by snapshotting before/after:
+   `find experiments/results/kb experiments/results/workflows/t_wml -type f 2>/dev/null` is empty
+   and unchanged (the fix's stated acceptance).
+3. The regression fails if the guard is removed: temporarily deleting the fixture's
+   `ki.emit_phase_finding` stub leaves the recorder empty → assertion (i) fails; deleting the
+   `FINOPS_RESULTS_DIR` redirect lets a report file land under the live
+   `workflows/t_wml/reports/` → assertion (ii) fails. (Run this check once during execution;
+   do not leave the sabotage in the commit.)
+4. `ruff check tests/test_world_model_gates.py` is clean.
+5. No production file is modified. `git diff --stat` touches only
+   `tests/test_world_model_gates.py` (+ `notes/deviations.md` only if a deviation occurred).
+
+## Risks
+
+- **Fixture/over-stub interference.** `test_report_path_honors_the_results_dir_contract` calls
+  the real `wr._emit_research_report`. The write-seam fixture must NOT stub
+  `wr._emit_research_report` (that would break this test); stub at
+  `knowledge_ingestion.emit_phase_finding` instead. Verify the 11 existing tests individually.
+- **Ordering of `monkeypatch` setters.** The fixture and the two tests that self-stub share one
+  function-scoped `monkeypatch`. If an existing test starts failing after the guard is added,
+  the guard is over-reaching: narrow it (e.g. stub `wr` functions only for the four leaking
+  tests) rather than editing the tests.
+- **Redirection could hide a real write from the acceptance check.** The regression must assert
+  both the interception and the untouched live dirs; an unchanged live-dir assertion alone
+  passes even without the stub (because the redirect contains the write). Keep both assertions.
+- **Do not "fix" the production precedence.** `_finding_emit_enabled`'s explicit-opt-in-wins
+  behaviour is intended and pinned by `tests/test_workflow_runner.py:1136-1153`. Changing it is
+  out of scope and would break `test_finding_emit_explicit_true_outranks_env_disarm`.
+- **Scope is not the fix.** `FINFOPS_CELL_ID` is set inside a loop run (this phase carries
+  `FINFOPS_CELL_ID=world_model_loop:prior`), so leaked records would be scoped to the run cell,
+  not `self-<tmpdir>`. Do not attempt to key the guard on a scope name; intercept the write.
+- **Stale notes from the previous loop.** `notes/deviations.md` / `notes/posterior.md` /
+  `notes/minted.md` in this worktree belong to the prior Item-4 run and are overwritten by the
+  current phases. Do not treat their presence as this run's work.
+- **KB read degradation.** `kb_read.py` fails in this worktree (no registry index, no
+  `neo4j_vectors` module). This is expected; do not mistake it for an empty corpus, and do not
+  add a KB fetch to satisfy a gap that does not need one.
+
+## Out of scope (explicitly)
+
+- Any production change to `_finding_emit_enabled`, the emit gate, `emit_phase_finding`, or the
+  `FINOPS_EMIT_SELF`/`FINOPS_RESULTS_DIR` contracts.
+- A repo-wide autouse guard in `tests/conftest.py`: it would break
+  `tests/test_workflow_runner.py::test_finding_emit_default_run_writes_enriched_records`
+  (`:1217-1254`), which intentionally exercises the real write path against a tmp tree. The guard
+  is module-local by design.
+- The previous loop run's Item-4 / stale-next-action work; unrelated and already landed.

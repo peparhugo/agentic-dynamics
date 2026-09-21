@@ -1,0 +1,8 @@
+{"kind": "file", "ref": "tests/test_world_model_gates.py", "sha256": "2ea5484dd5fd3d841f507eedbb6ecd9b75291e522dbcc86862f08aec45d8a720"}
+{"kind": "file", "ref": "src/agentic_dynamics/runtime/workflow_runner.py", "sha256": "1bae62682aa2cadedfb9f07d2084abaaad8612ed8fb1f98f9a88ee1ed9dd849c"}
+{"kind": "file", "ref": "src/agentic_dynamics/knowledge/knowledge_ingestion.py", "sha256": "d7f776d481d2bf50731520f625044c430cb9431769155f676d0cf75f0c1f1668"}
+{"kind": "file", "ref": "tests/conftest.py", "sha256": "0282bbe2b1c3ce3f5dea7604ea8fdbce83e0f49523625a90319ad08cb690e41e"}
+{"kind": "file", "ref": "tests/test_workflow_runner.py", "sha256": "96ec8e0bcf76721a42f92cb9501a1ab9575c7198e700a2c952887c01b015db59"}
+{"kind": "file", "ref": "workflows/repository/world_model_loop.yaml", "sha256": "8cf6f518bd350e62284963af6ac1032ca1206d301b7c930ae6ac34213c61b4f9"}
+{"kind": "file", "ref": "docs/designs/proposed/world_model_loop.md", "sha256": "f4f13dd8fd64e041e9085886c1de74087363c795e7f35d3a9276589b3d84b3a6"}
+{"kind": "file", "ref": "src/agentic_dynamics/core/paths.py", "sha256": "6d4b7cc042d9774fbe85cb0968e25d5b96cdc1bf4af8a417cd91ff5448a70e95"}
