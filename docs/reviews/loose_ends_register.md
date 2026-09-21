@@ -23,7 +23,9 @@ next action.
 directions: main's committed index listed five `control_room_*` specs whose files were never
 committed (a stale regeneration) and missed the two `world_model_loop` specs that were committed
 later. Both directions are closed by committing the parked files + regenerating the index + README
-together. Stage 1 also fixed a latent anchor: `ARCHITECTURE.md` cited a gitignored run ledger
+together. **Closing addendum (the sync after #116):** a sixth parked spec,
+`control_room_working_slice.yaml`, surfaced once the checkout synced to main — committed in the
+same wave, with the corpus/index/README/data.js all at **237 (11 + 226)**. Stage 1 also fixed a latent anchor: `ARCHITECTURE.md` cited a gitignored run ledger
 (`green_main_closure`) that no fresh clone or scan worktree can resolve.
 | L2 | **Fleet job-row rot** — `4eb6c446982e` stuck `running` since 2026-09-01 (its runs actually **succeeded**); sibling `3a60905572d1` recorded `failed` | **fixed 2026-09-21** | the new `fleet_manager.py sweep-stale-jobs` rail: the ghost is now `completed`, reconciled from its own ledger (`docs_refresh_remediation/20260901T133313Z.json (ok)`); `stale_ts` preserves the prior timestamp; report-only by default, `--apply` to write | none — the docs-drift proposal gate can re-propose |
 | L3 | **DLQ piles** — `story_jobs:dead_letter` 85 · `fleet_jobs:dead_letter` 43 · `analysis_jobs:dead_letter` 17 | **fixed 2026-09-21** | `dlq.py triage --out … --apply`: the 145 entries are archived to `experiments/results/fleet/dlq_report_20260921.json` (80 KB; counts by reason + full entries) and the live lists are cleared. **No requeues** — re-driving a dead job EXECUTES it; that stays a per-entry operator act via `requeue_one`. Diagnostic cluster: `launch-broker unreachable ×7` (the broker was down at some point — a fleet-reliability signal worth watching) | none |

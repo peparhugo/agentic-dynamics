@@ -1,0 +1,79 @@
+name: control_room_working_slice
+question: >-
+  Make the Control Room's resting screen WORKING and honest: the run row reads correctly
+  (no mid-word truncation), the state language renders lifecycle + attention from the
+  packet's EMITTED fields only, and the truth strip carries real provenance or a labelled
+  unknown. Fold the adversarial corrections that touch the UI work (no vacuous acceptance,
+  no fabricated values, no client-derived consequential values). The dynamic-workflow /
+  automatic question-tree execution is PARKED — this is the bounded UI slice.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [docs/website/control_room_ui/facelift_task_plan.md (first wave:
+        F04 state language, F07 truth strip, F11 run row), docs/reviews/
+        control_room_facelift_adversarial_v2.md and _v2_flash.md (the required corrections),
+        docs/research/control_room_direction.md (accepted direction), apps/control_room/
+        static/app.js + style.css + keyed-list.js, apps/control_room/routes/glance.py (the
+        payload — attention.state is ONLY active|none), scripts/verify_control_room_rendering.py,
+        tests/test_admin_frontend.py, tests/test_control_room_glance_integrity.py,
+        tests/test_control_room_static_views.py]
+        policies: [render ONLY packet-emitted values — never derive a consequential value
+        client-side; an unmeasured value renders a labelled unknown (never zero, never
+        fabricated); no mid-word truncation at 1440x900 / 1024x768 / 390x844; keep every
+        render-gate fixture and selector working; vanilla JS only, no build step; the tree
+        must stay lint-clean (ruff over src/ scripts/ apps/ tests/ in CI)]
+        verification: [scripts/verify_control_room_rendering.py --check-fixtures,
+        tests/test_admin_frontend.py, tests/test_control_room_glance_integrity.py,
+        tests/test_control_room_static_views.py, tests/test_admin_server.py,
+        tests/test_fast_path_gate.py]
+    phases:
+      - name: w1_row_states_truth
+        kind: agent
+        scope: implementation
+        timeout: 2400
+        prompt: |
+          GOAL: {goal}
+          Implement the bounded first-wave UI on the resting screen.
+          1. RUN ROW: readable at 1440x900, 1024x768 and 390x844 with NO mid-word truncation
+             (two-line rows, labelled cells, and/or drop the lowest-signal fields — never
+             render "unk…", "missin…", "promotab…"). Fields come from the glance payload only.
+          2. STATE LANGUAGE: render lifecycle + attention from the packet's emitted fields
+             (lifecycle state; attention.state is only `active`|`none` — do NOT invent an
+             `unknown` member). Blocked/failed lead; stale rows dim with their age.
+          3. TRUTH STRIP: every value carries source/age provenance when the payload has it,
+             otherwise a legible labelled unknown.
+          Rules: no fabricated values; no client-derived consequential values (the client
+          renders what the packet emits); keep the render gate green; run every verification
+          target before finishing.
+      - name: w2_verify
+        kind: test
+        scope: implementation
+        timeout: 900
+        tests:
+          - tests/test_admin_frontend.py
+          - tests/test_control_room_glance_integrity.py
+          - tests/test_control_room_static_views.py
+          - tests/test_admin_server.py
+          - tests/test_fast_path_gate.py
+        prompt: |
+          The declared target verifies the slice end to end: fix the code, never weaken a
+          pin. `scripts/verify_control_room_rendering.py --check-fixtures` is the acceptance
+          companion.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+writeup: {format: lab_book, sections: [question]}
+stop: {budget_usd: 3.0, max_attempts: 2}
