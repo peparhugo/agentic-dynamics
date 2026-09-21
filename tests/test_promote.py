@@ -27,6 +27,7 @@ from promote import (  # noqa: E402
     _default_close_row,
     _PromoteAwaitingError,
     _PromoteRefusedError,
+    _push_squashed,
     _run_promotion,
 )
 
@@ -207,7 +208,10 @@ def test_awaiting_run_with_binding_approval_promotes(tmp_path):
     data["ok"] = False
     ledger = _write_ledger(tmp_path, data)
     tree = subprocess.run(
-        ["git", "rev-parse", f"{sha}^{{tree}}"], cwd=wt, capture_output=True, text=True,
+        ["git", "rev-parse", f"{sha}^{{tree}}"],
+        cwd=wt,
+        capture_output=True,
+        text=True,
         check=True,
     ).stdout.strip()
     approval = tmp_path / "approval.md"
@@ -768,9 +772,7 @@ def test_b5_decision_record_carries_the_true_rationale_and_command_id(tmp_path):
 
     wt = _make_candidate(tmp_path)
     args = _promote_args(tmp_path, wt, tmp_path / "ledger.json", rationale="because green")
-    record = _promote_decision_record(
-        args, _ledger(wt), _candidate_sha(wt), command_id="cmd-b5"
-    )
+    record = _promote_decision_record(args, _ledger(wt), _candidate_sha(wt), command_id="cmd-b5")
     assert record["why"] == "because green (command cmd-b5)"
 
 
@@ -837,7 +839,10 @@ def test_replay_through_the_real_journal_refuses_the_duplicate_act(tmp_path):
 
     # A prior, COMPLETED act recorded through the real helper, keyed exactly as promote keys it.
     command = begin_command(
-        db, verb="promote", actor="drseuss", rationale="first attempt",
+        db,
+        verb="promote",
+        actor="drseuss",
+        rationale="first attempt",
         act_key=f"promote:promote_test:{sha[:12]}",
     )
     finish_command(db, command_id=command.command_id, state="completed", receipt={"squash": "x"})
@@ -845,7 +850,7 @@ def test_replay_through_the_real_journal_refuses_the_duplicate_act(tmp_path):
     pushed = []
     em = _noop_emissions()
     em["push"] = lambda *args, **kwargs: pushed.append(True) or _PUSHED
-    em.pop("journal_intent")   # use the REAL default journal
+    em.pop("journal_intent")  # use the REAL default journal
     em.pop("journal_receipt")
     args = _promote_args(tmp_path, wt, ledger, dry_run=False, db=str(db))
 
@@ -887,8 +892,11 @@ def _seed_bound_run(tmp_path: Path, wt: Path, *, state: str = "promotable"):
         # The binding rides the queued -> running transition here (any pre-terminal mutable
         # transition can carry it); a still-running row is done at this point.
         db.transition_run(
-            run.run_id, RunState.RUNNING, actor="orchestrator",
-            ledger_path=str(path), result_digest=digest,
+            run.run_id,
+            RunState.RUNNING,
+            actor="orchestrator",
+            ledger_path=str(path),
+            result_digest=digest,
         )
         if state != "running":
             db.transition_run(run.run_id, RunState.PROMOTABLE, actor="orchestrator")
@@ -1023,3 +1031,73 @@ def test_f1_unknown_run_identity_refuses_before_the_push(tmp_path):
     with ControlDB.open_read_only(db_path) as db:
         assert db.get_run("run-f1ghost0001") is None
         assert [c.state for c in db.commands()] == ["refused"]
+
+
+# ── L19: the fleet-clone base fallback + the promotion-commit hook bypass ─────────────────────
+
+
+def _bare_origin(tmp_path: Path, wt: Path) -> Path:
+    """A file-backed bare remote carrying the repo's ``main``."""
+    remote = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True)
+    subprocess.run(["git", "remote", "add", "origin", str(remote)], cwd=wt, check=True)
+    subprocess.run(["git", "push", "-q", "origin", "main"], cwd=wt, check=True)
+    return remote
+
+
+def _remote_subject(remote: Path, ref: str = "main") -> str:
+    out = subprocess.run(
+        ["git", "-C", str(remote), "log", "-1", "--format=%s", ref],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return out.stdout.strip()
+
+
+def test_base_resolves_from_origin_when_the_candidate_has_no_local_main(tmp_path):
+    """A fleet run clone is checked out DETACHED (no local ``main``). The promoter must resolve
+    the base from ``origin/main``, creating the local branch itself (live L19, 2026-09-21)."""
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    remote = _bare_origin(tmp_path, wt)
+    subprocess.run(["git", "branch", "-D", "main"], cwd=wt, check=True)  # no local base
+    subprocess.run(["git", "fetch", "-q", "origin"], cwd=wt, check=True)
+
+    data = _ledger(wt)
+    ledger = _write_ledger(tmp_path, data)
+    em = _noop_emissions()
+    em["push"] = _push_squashed  # the REAL squash-and-push, against the file remote
+    args = _promote_args(tmp_path, wt, ledger, dry_run=False)
+    _run_promotion(args, **em)
+
+    # The local base was created from origin, and the squash reached the remote main.
+    assert (
+        subprocess.run(
+            ["git", "rev-parse", "--verify", "refs/heads/main"],
+            cwd=wt,
+            capture_output=True,
+        ).returncode
+        == 0
+    )
+    assert _remote_subject(remote) == "[workflow] promote_test"
+
+
+def test_promotion_commit_bypasses_a_run_worktrees_commit_msg_hook(tmp_path):
+    """Run worktrees carry a commit-msg hook that rewrites subjects to the phase prefix; the
+    first promoted candidate landed on main as ``[workflow] g_adversarial — …`` (L19). The
+    promotion commit must bypass hooks so the canonical subject lands verbatim."""
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    remote = _bare_origin(tmp_path, wt)
+    hook = wt / ".git" / "hooks" / "commit-msg"
+    hook.parent.mkdir(parents=True, exist_ok=True)
+    hook.write_text('#!/bin/sh\nprintf "[workflow] g_adversarial — rewritten\\n" > "$1"\n')
+    hook.chmod(0o755)
+
+    data = _ledger(wt)
+    ledger = _write_ledger(tmp_path, data)
+    em = _noop_emissions()
+    em["push"] = _push_squashed
+    args = _promote_args(tmp_path, wt, ledger, dry_run=False)
+    _run_promotion(args, **em)
+
+    assert _remote_subject(remote) == "[workflow] promote_test"  # NOT the hook's rewrite

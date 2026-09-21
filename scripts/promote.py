@@ -808,7 +808,10 @@ def _run_promotion(
     # awaiting operator approval and is now bound by a valid approval promotes as "approved";
     # a straight verified run promotes as "requested" (routed on the packet's promotable_runs).
     decision = _promote_decision(
-        args, ledger, candidate, status="approved" if awaiting else "requested",
+        args,
+        ledger,
+        candidate,
+        status="approved" if awaiting else "requested",
         command_id=command.command_id,
     )
     emitted = _emit_best_effort("promote decision", lambda: emit_decision(decision))
@@ -1159,12 +1162,29 @@ def _git_head(workdir: Path) -> str:
 
 
 def _require_branch(workdir: Path, base: str) -> None:
+    """Ensure the candidate worktree carries a local ``base`` branch.
+
+    Fast path: the branch already exists (a normal checkout). Fleet fallback (L19, the
+    2026-09-21 promote): run clones are checked out DETACHED — no local ``base`` — so resolve
+    it from ``origin/<base>`` (refresh first; a failed fetch — no remote, offline — still
+    falls back to the existing remote-tracking ref) and create the local branch at it.
+    Refuses only when neither a local nor a remote-tracking ``base`` exists: no base, no
+    promotion.
+    """
     try:
         _git(workdir, "rev-parse", f"refs/heads/{base}")
+        return
+    except _PromoteRefusedError:
+        pass
+    _git(workdir, "fetch", "origin", base, check=False)
+    try:
+        _git(workdir, "rev-parse", f"refs/remotes/origin/{base}")
     except _PromoteRefusedError:
         raise _PromoteRefusedError(
-            f"base branch '{base}' not found in the candidate worktree"
+            f"base branch '{base}' not found in the candidate worktree (no local '{base}' "
+            f"and no origin/{base} to resolve it from)"
         ) from None
+    _git(workdir, "branch", base, f"origin/{base}")
 
 
 # ── stale-candidate guard (promote_row_closeout a2) ────────────────────────────
@@ -1271,7 +1291,12 @@ def _push_squashed(workdir: Path, base: str, subject: str, candidate: str) -> st
     branch = f"promote-{candidate[:8]}"
     _git(workdir, "checkout", "-q", "-b", branch, base)
     _git(workdir, "merge", "--squash", "--no-commit", candidate)
-    _git(workdir, "commit", "-q", "-m", subject)
+    # ``--no-verify`` (L19): the squash is the PROMOTION commit, never a phase commit. Run
+    # worktrees carry a commit-msg hook that rewrites subjects to the phase prefix — live,
+    # the first promoted candidate landed on main as '[workflow] g_adversarial — …' instead
+    # of the canonical '[workflow] <spec>' (2026-09-21). The promotion bypasses hooks so the
+    # canonical subject lands verbatim.
+    _git(workdir, "commit", "-q", "--no-verify", "-m", subject)
     pushed = _git(workdir, "rev-parse", "HEAD")
     _git(workdir, "push", "-q", "origin", f"{branch}:{base}")
     return pushed
