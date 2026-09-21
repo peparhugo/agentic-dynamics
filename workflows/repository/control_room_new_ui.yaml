@@ -1,0 +1,133 @@
+name: control_room_new_ui
+question: >-
+  Build the NEW Control Room resting screen per the accepted direction and the v2 synthesis
+  corrections, as SEQUENTIAL small steps — one region per phase, each with its own gate and
+  commit: tokens -> state language -> truth strip -> attention inbox -> run tiles ->
+  money/health -> session dock -> verify. Packet-emitted values only; unknown renders as a
+  labelled unknown; every render-gate fixture and selector keeps working.
+version: "0.2"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [docs/research/control_room_direction.md (accepted), docs/research/
+        control_room_ui_reference_synthesis_v2.md (§4 DISPOSE, §5 conflicts, §6 reconcile),
+        docs/website/control_room_ui/facelift_task_plan.md (task unit contract + workstreams),
+        apps/control_room/static/app.js + index.html + style.css + keyed-list.js + charts.js,
+        apps/control_room/routes/glance.py + operations.py, scripts/verify_control_room_rendering.py,
+        tests/test_admin_frontend.py, tests/test_control_room_glance_integrity.py,
+        tests/test_control_room_static_views.py, tests/test_control_room_feature_parity.py]
+        policies: [packet-emitted values only — never derive a consequential value client-side;
+        an unmeasured value is a labelled unknown (never zero, never fabricated); no mid-word
+        truncation at 1440x900/1024x768/390x844; the direction's restraint budget (no
+        decorative pulse, no vanity score, counts are addressable filters); every render-gate
+        fixture + selector keeps working; vanilla JS, no build step; lint-clean]
+        verification: [scripts/verify_control_room_rendering.py --check-fixtures,
+        tests/test_admin_frontend.py, tests/test_control_room_glance_integrity.py,
+        tests/test_control_room_static_views.py, tests/test_admin_server.py,
+        tests/test_control_room_feature_parity.py, tests/test_fast_path_gate.py]
+    phases:
+      - name: s1_tokens
+        kind: agent
+        scope: implementation
+        timeout: 1200
+        prompt: |
+          GOAL: {goal}
+          STEP 1 — VISUAL TOKENS in apps/control_room/static/style.css only: the synthesis v2
+          §4.4 system (four-step surface ramp, warm-white text, amber operator accent, cyan
+          machine accent, green/red reserved for success/failure, mono for all data with
+          tabular numerals, corner brackets only on active/selected, glass only for overlays,
+          focus rings, forced-colors + reduced-motion preserved). No layout changes yet.
+          Run: python3 scripts/verify_control_room_rendering.py --check-fixtures — keep it green.
+      - name: s2_state_language
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          STEP 2 — STATE LANGUAGE (app.js + style.css): every run renders glyph + word +
+          colour + settled timestamp from the packet's lifecycle; attention renders the
+          packet's `attention.state` (active|none ONLY — never invent unknown); blocked/failed
+          lead the roster; stale rows dim with their age; animation ONLY for genuinely live
+          transitions, fully collapsed under reduced-motion. No region layout changes yet.
+          Run: --check-fixtures + tests/test_admin_frontend.py + tests/test_control_room_glance_integrity.py.
+      - name: s3_truth_strip
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          STEP 3 — R0 SCOPE/TRUTH STRIP (index.html + app.js + style.css): the persistent
+          strip — counts (running/blocked/done-unseen), spend vs cap, projection lag, stream
+          state — each with source/age provenance and a lens link; counts are FILTERS;
+          a stale value says so with its age. Packet values only.
+          Run: --check-fixtures + tests/test_control_room_static_views.py.
+      - name: s4_attention_inbox
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          STEP 4 — R1 ATTENTION INBOX: decision/risk/near-cap items expand IN PLACE (remove
+          the dead role=button with no handler); read-only detail; mutations stay behind the
+          confirm bar. Packet values only.
+          Run: --check-fixtures + tests/test_admin_frontend.py + tests/test_control_room_static_views.py.
+      - name: s5_run_tiles
+        kind: agent
+        scope: implementation
+        timeout: 2400
+        prompt: |
+          GOAL: {goal}
+          STEP 5 — R2 RUN TILES: one tile per run — identity, spec, model, phase n/m as a
+          segmented bar, state language, cost with provenance, staleness. NO mid-word
+          truncation at any of the three viewports (two-line tiles allowed). Packet values only.
+          Run: --check-fixtures + tests/test_admin_frontend.py + tests/test_control_room_glance_integrity.py.
+      - name: s6_money_health
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          STEP 6 — R3: the five constraint values as a labelled ledger with provenance (NOT
+          money cards), measured statuses (worst lag/age) instead of a composite vanity score,
+          and the token-split composition bars. Packet values only; unknowns stay labelled.
+          Run: --check-fixtures + tests/test_control_room_glance_integrity.py + tests/test_control_room_static_views.py.
+      - name: s7_session_dock
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          STEP 7 — R4 SELECTION DOCK: the selected run's detail affordances (transcript /
+          tools / diff) using EXISTING routes only; list+detail behavior; no new endpoints.
+          Run: --check-fixtures + tests/test_admin_server.py + tests/test_control_room_static_views.py.
+      - name: s8_verify
+        kind: test
+        scope: implementation
+        timeout: 900
+        tests:
+          - tests/test_admin_frontend.py
+          - tests/test_control_room_glance_integrity.py
+          - tests/test_control_room_static_views.py
+          - tests/test_admin_server.py
+          - tests/test_control_room_feature_parity.py
+          - tests/test_fast_path_gate.py
+        prompt: |
+          The declared target verifies all seven steps end to end: fix the code, never weaken
+          a pin. The render-gate fixture check is the acceptance companion.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+writeup: {format: lab_book, sections: [question]}
+stop: {budget_usd: 3.0, max_attempts: 2}

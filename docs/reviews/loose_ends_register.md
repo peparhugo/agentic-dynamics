@@ -17,17 +17,17 @@ next action.
 
 | ID | item | status | evidence | next action |
 |---|---|---|---|---|
-| L1 | **Docs drift, 5 items** — 2× cli_surface (mental-model "full CLI" missing `--fork-checkpoint`/`--parent-run-id`), 1× spec_lifecycle (README count 235 vs index 236), 2× manifest_counts (coverage stale + orphan `_command_journal.py`) | **fixed in this PR** | `scripts/scan_docs_drift.py` fresh scan was 5/1,443 drift; report `experiments/results/docs_drift/latest.json` | flag clears on the next watchdog transition to drift 0 |
+| L1 | **Docs drift, 5 items** — 2× cli_surface (mental-model "full CLI" missing `--fork-checkpoint`/`--parent-run-id`), 1× spec_lifecycle (README count 235 vs index 236), 2× manifest_counts (coverage stale + orphan `_command_journal.py`) | **fixed 2026-09-21 (two stages)** | stage 1 (PR #113): the CLI flags, the manifest helper, the latent anchor. Stage 2 (this PR): the five parked `control_room_*` specs **committed**, the modified `control_room_run_journey.yaml` committed, the index/STATUS regenerated (`world_model_loop` + `world_model_loop_refusal_probe` now indexed; `control_room_working_slice` dropped — no file), README → 236 (11+225). **Scan: 0 / 1,443** | flag clears on the next watchdog transition to drift 0 |
 
-**L1 note (checkout dirt).** Two of the five items were real (the CLI flags; the unclassified
-`_command_journal.py` helper). The spec-count item was the **main checkout's dirt**: six untracked
-`control_room_*` spec YAMLs (plus a modified `control_room_run_journey.yaml`) regenerate the index
-to 236 while the COMMITTED index — and the README — hold 235, so local scans report a count drift
-that does not exist in a clean tree. Commit or park those specs; then regenerate the index and
-README together. The register also fixed a latent anchor: `ARCHITECTURE.md` cited a gitignored run
-ledger (`green_main_closure`) that no fresh clone or scan worktree can resolve.
-| L2 | **Fleet job-row rot** — `4eb6c446982e` stuck `running` since 2026-09-01 (its runs actually **succeeded**); sibling `3a60905572d1` recorded `failed` | open | `fleet:jobs` hash; run ledgers `experiments/results/workflows/docs_refresh_remediation/20260901T01*` | add a stale-fleet-job reconcile to `scripts/fleet/fleet_manager.py` (no rail prunes job rows today; `control sweep-zombies` covers control runs only) |
-| L3 | **DLQ piles** — `story_jobs:dead_letter` 85 · `fleet_jobs:dead_letter` 43 · `analysis_jobs:dead_letter` 17 | open | `scripts/fleet/dlq.py` (`list_dead`/`requeue_one`) | triage pass: requeue the real ones, archive the historical (story DLQ is Aug-31 experiment-era; fleet DLQ holds broker-unreachable ×7 + binding refusals ×5) |
+**L1 note (resolved).** The local "dirt" was a real corpus/index inconsistency in **both**
+directions: main's committed index listed five `control_room_*` specs whose files were never
+committed (a stale regeneration) and missed the two `world_model_loop` specs that were committed
+later. Both directions are closed by committing the parked files + regenerating the index + README
+together. Stage 1 also fixed a latent anchor: `ARCHITECTURE.md` cited a gitignored run ledger
+(`green_main_closure`) that no fresh clone or scan worktree can resolve.
+| L2 | **Fleet job-row rot** — `4eb6c446982e` stuck `running` since 2026-09-01 (its runs actually **succeeded**); sibling `3a60905572d1` recorded `failed` | **fixed 2026-09-21** | the new `fleet_manager.py sweep-stale-jobs` rail: the ghost is now `completed`, reconciled from its own ledger (`docs_refresh_remediation/20260901T133313Z.json (ok)`); `stale_ts` preserves the prior timestamp; report-only by default, `--apply` to write | none — the docs-drift proposal gate can re-propose |
+| L3 | **DLQ piles** — `story_jobs:dead_letter` 85 · `fleet_jobs:dead_letter` 43 · `analysis_jobs:dead_letter` 17 | **fixed 2026-09-21** | `dlq.py triage --out … --apply`: the 145 entries are archived to `experiments/results/fleet/dlq_report_20260921.json` (80 KB; counts by reason + full entries) and the live lists are cleared. **No requeues** — re-driving a dead job EXECUTES it; that stays a per-entry operator act via `requeue_one`. Diagnostic cluster: `launch-broker unreachable ×7` (the broker was down at some point — a fleet-reliability signal worth watching) | none |
+| L4-note | **broker-unreachable cluster** (inside L3) — 7 fleet submits died with `Connection refused — /run/launch-broker.sock` | open | `dlq_report_20260921.json` `fleet_jobs` entries | if it recurs, check the broker unit's restart history (`journalctl --user -u agentic-dynamics-launch-broker`) |
 | L4 | **Supervisor flags** — 69 entries: 68 `orphaned` delegation flags (newest **2026-08-27**) + 1 `off_track` (docs-drift, cleared by L1) | open | redis list `supervisor_flags`; file `experiments/results/supervisor/` | a fresh `supervise.py --once` pass when live state is wanted; decide an aging policy (observe-only rail keeps history by design) |
 | L5 | **Projection watermark rows stale** — rows report lag 15; live `XINFO` says lag 0/pending 0 for all four groups | open (self-clearing) | `projection_lag()` vs `XINFO GROUPS kb:v1:changes` | clears on the next processed batch; if it persists, an orchestrator-side refresh |
 | L6 | **Phase watchdog** — healthy; 4 stall events on record | parked | `stall_evidence` on ledgers: 2026-08-27 `p2_run_grid`, 2026-08-28 `p0_pin_spec`, 2026-09-01 `p4_activation_gate` (docs run), 2026-09-20 `synthesis_rerun` | none |
@@ -39,10 +39,49 @@ ledger (`green_main_closure`) that no fresh clone or scan worktree can resolve.
 
 | ID | item | status | evidence | next action |
 |---|---|---|---|---|
-| L7 | **Worktree + clone sprawl** — 164 registered worktrees (all on disk), ~3,119 `/tmp` exp/story/wt dirs, and **42 GB** of run clones in `/tmp/agentic-dynamics-runs` (96 dirs) | open | `git worktree list`; `du -sh /tmp/agentic-dynamics-runs` | prune policy: `git worktree prune` for dead registrations; archive/remove old `/tmp` trees and run clones (keep the current run's until promoted) |
-| L8 | **Unmerged branches** — 55 local + 11 remote `feature/*` ahead of main (2026-08-14 → 2026-09-19, up to 20 commits) | open | `git for-each-ref` vs `main` | per-branch triage: merge / archive to `refs/archive/*` / delete; start with the newest (chroma-healthcheck, control-room-run-journey, graph-leg-closeout) |
-| L9 | **Spec lifecycle** — 24 `failed` + 6 `blocked` specs (last runs 2026-08-14 → 2026-09-16) | open | `experiments/specs/INDEX`/`STATUS.md` statuses | per-spec verdict (supersede / close / rerun); start with recent-activity ones: `control_db_publication`, `engine_gaps_verifier_revision`, `control_room_instrument_build` |
+| L7 | **Worktree + clone sprawl** — 164 registered worktrees (all on disk), ~3,119 `/tmp` exp/story/wt dirs, and **42 GB** of run clones in `/tmp/agentic-dynamics-runs` (96 dirs) | **partially fixed 2026-09-21** | the new `fleet_manager.py prune-runs` rail (report-only by default): **54 clones pruned = 21.9 GB freed** (42→21 GB); the **24 `promotable` clones are kept — an unpromoted candidate's commits exist nowhere else**; 17 failed-within-keep + 1 merged-within-keep skipped. Policy: `merged`/`cancelled` after 3 days, `failed` after 7; unknown provenance is never pruned | the remaining `promotable` backups need a promote-or-abandon decision per candidate; worktree removal still needs a policy (see L8 note) |
+| L8 | **Unmerged branches** — 55 local + 11 remote `feature/*` ahead of main (2026-08-14 → 2026-09-19, up to 20 commits) | **partially fixed 2026-09-21** | triage executed: **110 fully-merged local branches deleted** (their commits are ancestors of main — names only), **52 unmerged branches archived to `refs/archive/*`** (non-destructive copies) and kept for review; **101 further deletions were skipped — those branches are checked out by `/tmp` worktrees** (they clear once the worktree policy removes the stale trees); remote branches untouched | worktree policy (which of the 164 to retire) unblocks the rest |
+| L9 | **Spec lifecycle** — 24 `failed` + 6 `blocked` specs (last runs 2026-08-14 → 2026-09-16) | **proposal attached 2026-09-21** | the full table (name · status · last-run) is below; several are demonstrably superseded (the mental model names `admission_leases`, `control_db_publication`/`control_db_evidence`, `promote_row_closeout`, the `cap_site_revamp*` chain as landed work) | batch decision needed: mark the demonstrably-landed ones closed/superseded (a status sweep across their YAMLs), rerun or close the rest. **Controller's call — content decisions, not mechanical.** |
 | L10 | **Legacy data stores** — `experiments/results/legacy_labs/` (20 entries + README), quarantine store (README only) | parked | dir READMEs | leave as documented; revisit only if a consumer appears |
+
+**L9 — the stalled-spec table (for the batch decision).** 30 specs carry `failed`/`blocked` from
+their last run (2026-08-14 → 2026-09-16). The mental model already names several as landed work
+(`admission_leases`, `control_db_publication`, `control_db_evidence`, `promote_row_closeout`, the
+`cap_site_revamp*` chain) — those are candidates to close/supersede; the rest need a rerun-or-close
+call.
+
+| spec | status | last run |
+|---|---|---|
+| control_room_portal | failed | 2026-08-14 |
+| design_sessions | failed | 2026-08-14 |
+| claude_background_sessions | failed | 2026-08-14 |
+| evidence_redesign | failed | 2026-08-14 |
+| workflow_step_routing | blocked | 2026-08-14 |
+| agentic_dynamics_rebrand | failed | 2026-08-14 |
+| rag_knowledge_base | failed | 2026-08-14 |
+| remediation_data_integrity | blocked | 2026-08-15 |
+| routing_kb_wiring | blocked | 2026-08-17 |
+| canonical_state_design | failed | 2026-08-18 |
+| semantic_integrity_release | failed | 2026-08-21 |
+| cap_shadow_campaign | blocked | 2026-08-24 |
+| cap_addendum_implement | failed | 2026-08-24 |
+| cap_site_revamp2 | failed | 2026-08-26 |
+| cap_site_revamp3 | failed | 2026-08-27 |
+| cap_site_revamp4 | failed | 2026-08-27 |
+| cap_adaptive_2c | failed | 2026-08-27 |
+| cap_site_revamp4_diagrams | failed | 2026-08-27 |
+| cap_adaptive_2d | failed | 2026-08-28 |
+| fleet_ladder_implementation | blocked | 2026-08-30 |
+| concurrency_ladder | failed | 2026-08-31 |
+| control_room_usage_wiring | failed | 2026-09-01 |
+| admission_leases | blocked | 2026-09-01 |
+| control_db_publication | failed | 2026-09-02 |
+| control_db_evidence | failed | 2026-09-02 |
+| engine_gaps_verifier_revision | failed | 2026-09-02 |
+| authoring_product_aio | failed | 2026-09-03 |
+| promote_row_closeout | failed | 2026-09-04 |
+| flash_exploration_build | failed | 2026-09-10 |
+| control_room_instrument_build | failed | 2026-09-16 |
 
 ## C. Loop & arc follow-ups
 

@@ -1,0 +1,136 @@
+name: control_room_design_determination
+question: >-
+  DETERMINE the Control Room design by process, not by asking the controller: run an
+  ideation-and-evaluation workflow over the full evidence base (the v2 reference synthesis
+  with its mechanisms/dispositions, the old destination-board dashboard at 1457b9299 as the
+  blessed base, the new-UI work and its truth contracts, and the controller's explicit ask:
+  a SCROLLABLE, chart-rich, workforce-managing dashboard that shows how long things take)
+  and output a FINAL design determination: the chosen direction, the page/board inventory
+  (what survives from the old dashboard, what is added), the chart set (SVG; step/phase
+  durations, cost, throughput), the workforce view, the visual language, and the
+  implementation order. Every choice is grounded in a cited mechanism or the brief; the
+  workflow decides the open questions itself (no questions back except authority-level).
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    rag_augment: true
+    rag_params:
+      repository_id: "agentic-dynamics"
+      rag_token_limit: 8000
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [docs/research/control_room_ui_reference_synthesis_v2.md (mechanisms
+        with anchors + dispositions + reconcile), docs/research/control_room_direction.md
+        (data/truth contracts ONLY — its no-scroll/no-chart presentation constraints are
+        SUPERSEDED), the OLD dashboard at 1457b9299 (git show 1457b9299:apps/control_room/
+        static/index.html + app.js + the server routes; enumerate its boards), docs/website/
+        control_room_ui/facelift_task_plan.md (new surfaces + writers), apps/control_room/
+        static/ current files, apps/control_room/routes/ (available data), decision record
+        9f357fce (the re-baseline), scripts/verify_control_room_rendering.py]
+        policies: [the controller's brief is binding: scrollable pages, charts/SVG, workforce
+        management, step/phase duration charts, the old dashboard as the base — no single
+        fixed non-scrolling screen; keep the truth contracts (packet-emitted values only,
+        labelled unknowns, no client-derived consequential values); every design choice must
+        cite its grounding: a v2 mechanism anchor, the old dashboard, or the brief; the
+        workflow DETERMINES choices — it does not return open questions unless they are
+        authority-level (spend, permanence); vanilla JS, no build step]
+        verification: [tests/test_doc_lifecycle.py, tests/test_fast_path_gate.py]
+    phases:
+      - name: d1_evidence_and_criteria
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Build the evidence pack and the evaluation criteria into
+          docs/website/control_room_ui/design_brief.md:
+          1. EVIDENCE: (a) the old dashboard's boards/pages/charts inventory (from
+             1457b9299 — enumerate every board, chart, and interaction it had); (b) the v2
+             synthesis mechanisms + dispositions (cite section/anchor); (c) the new-UI work's
+             data surfaces and writers now available (timings, cost split, states); (d) the
+             controller's brief verbatim (scroll, charts/SVG, workforce, step durations).
+          2. CRITERIA: 6-10 weighted evaluation criteria, each with its source (controller
+             [P], reference mechanism [X] with anchor, truth contract [M]). Include at least:
+             immediate legibility, information density without wall-of-noise, chart coverage
+             (step/phase duration, cost, throughput), workforce visibility, scroll/navigation,
+             truthfulness, feasibility with existing routes, and working-set fidelity to the
+             old dashboard.
+      - name: d2_directions
+        kind: agent
+        scope: implementation
+        timeout: 2400
+        prompt: |
+          GOAL: {goal}
+          Generate THREE genuinely distinct candidate directions into
+          docs/website/control_room_ui/design_candidates.md. Each candidate is FULLY specified:
+          navigation model (pages/sections, scrolling), page/board inventory (which old boards
+          survive + what is added), the chart set (SVG; step/phase durations, cost, throughput,
+          queue timing; where each lives), the workforce view (agents/workers/operators),
+          visual language (type, colour, density), and the data mapping (which packet
+          fields/writers feed each element). Ground every choice in a cited mechanism from the
+          v2 synthesis, the old dashboard, or the brief. Do not reuse the single-screen shell.
+      - name: d3_evaluation_and_selection
+        kind: agent
+        scope: implementation
+        timeout: 2400
+        prompt: |
+          GOAL: {goal}
+          Evaluate the three candidates against d1's criteria into
+          docs/website/control_room_ui/design_evaluation.md: a weighted decision matrix with
+          per-criterion reasoning; pick a WINNER and a runner-up; then run ONE refinement
+          round on the winner's weakest dimensions — decide those open questions yourself
+          (highest-uncertainty first), documenting what was decided and why. The output must
+          be determinations, not questions.
+      - name: d4_adversarial
+        kind: agent
+        scope: implementation
+        timeout: 2400
+        prompt: |
+          GOAL: {goal}
+          ADVERSARIAL review of the evaluation and the winner into
+          docs/reviews/control_room_design_determination_adversarial.md: attack the criteria
+          (weighting bias, criteria that cannot falsify), the evidence use (uncited choices,
+          ignored mechanisms, ignored old-dashboard affordances), the winner (where it fails
+          the brief: scroll/charts/workforce/durations), and feasibility (routes/data not
+          available). Format: severity-ranked finding, required correction, the acceptance that
+          proves it. No praise; precision over volume.
+      - name: d5_determination
+        kind: agent
+        scope: implementation
+        timeout: 2400
+        prompt: |
+          GOAL: {goal}
+          Fold the adversarial findings into a FINAL determination:
+          docs/website/control_room_ui/design_determination.md. Contents: the chosen
+          direction with its rationale table (criterion → how satisfied → grounding); the
+          FINAL page/board inventory (old-dashboard survivors + additions + cuts); the chart
+          spec list (each: purpose, data source, placement, SVG approach); the workforce view
+          spec; the visual language spec; the migration order from the old dashboard (phases
+          of implementation with their gates); and a short "authority-level items only"
+          section (expected empty). This document IS the design decision — no questions back.
+      - name: d6_verify
+        kind: test
+        scope: implementation
+        timeout: 600
+        tests:
+          - tests/test_doc_lifecycle.py
+          - tests/test_fast_path_gate.py
+        prompt: |
+          The declared target keeps the docs tree honest; fix doc-lifecycle failures in the
+          documents, never weaken the gate.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+writeup: {format: lab_book, sections: [question]}
+stop: {budget_usd: 4.0, max_attempts: 1}

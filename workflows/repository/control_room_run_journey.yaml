@@ -1,10 +1,20 @@
 name: control_room_run_journey
 question: >-
-  The Control Room run journey is not yet truthful or lossless: selecting a durable run on the
-  ordinary overview shows COST unknown and "test result unknown" although the control record holds
-  cost_usd and the ledger records the independent test outcome; and Escape inside the Operations
-  run-detail drawer dismisses the whole workbench instead of returning to the found list.
-version: "0.1"
+  The served Control Room run drawer still cannot explain a real run. /api/runs/<id> returns
+  only raw control records (run/attempts/gates/approvals/commands); the loaded drawer
+  (app.js renderRunDetail) prints run.cost_usd — a NOT NULL 0.0, so a never-recorded cost
+  renders $0.0000 — shows gate rows with no verification state or independence, and shows no
+  delivered knowledge although the run ledger records selected evidence ids, augmentation
+  evidence (id/revision/source_type/locator), retrieval fallback and leg errors; and no
+  prepared-step reference. The correct derivations (_cost_provenance, _measured_state,
+  _receipt_state, _recorded_ledger) exist only inside the glance route, which the served
+  drawer never reads. Deliver only the missing slice: share the pure derivations at the
+  service boundary, extend run_detail additively, record the prepared-step reference through
+  its existing owners, render it in the loaded drawer, and extend the restored-board render
+  gate — with the required failure-mode acceptance (missing and measured-zero cost, mixed
+  provenance, failed/pending/non-independent verification, missing knowledge artifacts,
+  HTTP-200 error envelopes, long-content reachability, Enter/Escape/focus return).
+version: "0.2"
 artifact_kind: workflow
 intent: mutate
 side_effects:
@@ -17,140 +27,175 @@ design: factorial
 rules: []
 metrics: []
 comparison: null
-writeup: {format: lab_book, sections: [question, implement, verify]}
+writeup: {format: lab_book, sections: [question, evidence, verify]}
 stop: {budget_usd: 2.0, max_attempts: 1}
 adapt: {strategy: manual, selection: highest_regret}
 workflow:
   kind: agent_task
   params:
     language: python
+    fork: false
     rag_augment: true
     rag:
       repository_id: agentic-dynamics
       acl_scope: public
       pattern_projection: false
+      emit_self: false
       pinned_policy: |
-        ## Pinned requirements — CURRENT policy (re-baselined 2026-09-18)
+        ## Pinned requirements — run-evidence slice (2026-09-19)
 
-        SUPERSESSION NOTICE: decision 9f357fce re-baselined the resting screen. Vertical page
-        scrolling IS allowed; there is no below-the-fold failure. The earlier "page does not
-        scroll / nothing below the fold" requirement is SUPERSEDED — never pin it as policy and
-        never fail content for being below the fold; require reachability instead.
+        TRUTHFULNESS: a measured zero stays a measured zero ("$0.0000 · metered"); a missing
+        cost stays unknown (never $0.0000, never a fabricated amount); mixed contributors stay
+        mixed. An unobserved timing or verification carries a named unknown, never a 0. The
+        independent verification is shown separately from the agent's own claim — a process or
+        agent claim is not independent acceptance.
 
-        ## J1 — Glance
-        *Continuous; no interaction. Rules [R1,R2,R5,R7,R10]. Surface: rest `R0 R1 R2 R3a R3b R3c`.*
+        DELIVERY vs USE: show WHICH records were selected and WHAT was delivered into the
+        prepared prompt (ids, revisions, locators, fallback mode, leg errors); an id proves
+        neither relevance nor use — use is a separate, later judgement and is NOT claimed.
 
-        1. **Return to the room, don't click.** Read `R0`: `ON-G1` (browser/control/workers/projections,
-           each state + worst age) and `ON-G6` (epoch, worst age, `stale/partial/unknown` counts).
-           → *Expected:* four named states; a non-zero `stale` never renders green.
-        2. **Read the attention inbox** `R1`: `R1a` decision (`ON-G5`) or `none pending`; `R1b` risk
-           (`ON-G3`) or `all clear`; `R1c` next.
-           → *Expected:* three reserved rows; a pending decision and a risk are both visible at once.
-        3. **Read the run ledger** `R2`: exact counts (running/queued/failed/live) then 8 ranked rows with
-           identity, phase `n/t`, lifecycle, live marker, claim/proof, cost provenance, eligibility.
-           → *Expected:* live state never hidden behind a filter.
-        4. **Read the constraint stack** `R3a` cost (all five `money.*` values + exception), `R3b` health,
-           `R3c` four composition marginals.
-           → *Expected:* unknown money is `unknown`, never `$0.00`.
+        SCOPE: the served page (index.html + app.js) is the journey; the parked parity.js
+        workbench is NOT the target. No second read model or live-state authority; no
+        business rules in JavaScript; no new endpoints; preserve the raw
+        run/attempt/gate/approval/command blocks and existing callers; preserve every existing
+        test that does not encode the old defect. Missing instrumentation is a named gap, not
+        a frontend estimation task. Do not expose private coordinator history or raw
+        unrestricted prompts through the UI.
 
-        **PASS:** at 1440×900 and 390×844 a screenshot contains exactly one `[data-answer]` anchor for each
-        of `ON-G1..G7`, in its canonical region (`G1→R0,G2→R2,G3→R1,G4→R3a,G5→R1,G6→R0,G7→R3c`); the page
-        MAY scroll vertically (decision 9f357fce superseded the no-scroll resting screen) and must not
-        overflow horizontally; every answer and control remains REACHABLE by scrolling or a drill-down.
-        **FAIL:** any answer is missing, duplicated, unreachable, or answered by a lens/mirror.
-
-        ---
-
-        ## J4 — Inspect
-        *On demand, per selected run/attempt; per decision. Rules [R1,R2,R3,R5,R8,R9]. Surface: drill `R4c R4d L-WORKFORCE`.*
-
-        1. **Select a run** in `R2` → `R4a` address band appears.
-        2. **Read the evidence ladder** `R4c`: identity → lifecycle → narration → measured facts →
-           independent verification → change/commit → cost provenance → decision → registry record.
-           Each rung carries an evidence class + source + age.
-        3. **Read the step timings** `R4d`: one `[data-timing]` row per
-           `queue_wait|service_time|first_token|duration|retries|tokens.answer|tokens.explanation|cost|exit_code|verification`,
-           each `[data-state="measured|unknown"]` with `[data-value]`. `[R2,R9]`
-        4. **Aggregate across the fleet.** Open `L-WORKFORCE` for p50/p95 queue wait/service time, retry
-           rate, tokens by model, Grit, narration penalty. `[R1,R2,R5,R8,R9]`
-
-        **PASS:** `R4c` has one `[data-attempt-boundary]` per attempt; `R4d` renders the exact timing field
-        set; an unobserved timing carries `data-state="unknown"` and **no** fabricated `0`; a measured row
-        carries source+age. **FAIL:** a missing timing renders `0`, or narration is shown as truth.
-
-        ---
-
-        ## J5 — Watch Spend
-        *Continuous; decisions at thresholds. Rules [R3,R4,R6,R7,R10]. Surface: rest `R3a` → drill `L-MONEY`.*
-
-        1. **Glance money at rest.** `R3a` shows exactly five values: `money.spend`, `money.burn`,
-           `money.quota`, `money.wallet`, `money.leases`, plus a money-risk marker. `[R7]`
-        2. **Open the ledger.** Click `R3a` → `L-MONEY`: spend history, per-window usage, lease-by-lease
-           reconciliation, settlement status, cost provenance.
-        3. **Read the arc and horizons.** `L-MONEY` shows the story session arc + `snowball_factor` `[R3]`,
-           the EPM scenario `[R4]`, `T_max`/retry rate `[R7]`, and the batch scenario `[R6]`.
-        4. **Read value.** `L-COMPOSITION`/`L-MONEY` show accepted outcomes per arm and BVI `[R10]`.
-
-        **PASS:** `R3a` contains all five `[data-field^="money."]` nodes and an exception marker; an unknown
-        cost renders explicit `unknown`, never `$0.00`; `L-MONEY` shows the arc, EPM scenario, and T_max
-        with `[P]/[X]` provenance. **FAIL:** fewer than five values, a fabricated `$0.00`, or a ratio
-        without coverage.
-
-        ---
+        LAYOUT: keep the seven-board recovery direction; do not copy the superseded
+        R0/R1/workbench selector requirements; preserve historical run artifacts; report
+        coverage truthfully (an omitted check is not a pass).
     context:
       domain_context: >-
-        canonical_sources: [apps/control_room/routes/glance.py (_recorded_ledger, _measured_state,
-        _run_row cost.provenance), apps/control_room/static/parity.js (run-detail drawer, trapFocus),
-        apps/control_room/static/app.js (selection-dock openDock), tests/test_control_room_glance_integrity.py,
-        tests/test_control_room_feature_parity.py, tests/test_control_room_static_views.py,
-        tests/test_admin_frontend.py, docs/reviews/control_room_run_journey_recovery.md]
-        policies: [fix ONLY the run-journey fidelity and return defects; never fabricate a value,
-        never render a missing cost as $0.00; keep honest unknown/unbound states; do not introduce a
-        new read model, status authority, or dashboard; preserve every existing test and parity
-        contract; a ledger pointer spelled /repo/... must resolve to the checkout for host-side
-        reads; the selected-run detail must distinguish the agent narrative (said) from the
-        independent verification (measured) from the run records; Escape in the Operations
-        run-detail drawer returns to the found list with focus on the originating row and the finder
-        intact, and only a second Escape closes the workbench]
-        verification: [python3 -m pytest tests/test_control_room_glance_integrity.py
-        tests/test_control_room_feature_parity.py tests/test_control_room_static_views.py
-        tests/test_admin_frontend.py -q, python3 scripts/verify_control_room_rendering.py --check-fixtures]
+        canonical_sources: [apps/control_room/services/operations.py (run_detail),
+        apps/control_room/services/context.py (run_detail wrapper + status/error envelopes),
+        apps/control_room/routes/operations.py (GET /api/runs/<run_id>),
+        apps/control_room/routes/glance.py (_recorded_ledger, _cost_provenance,
+        _measured_state, _receipt_state, _narration_state, _attempt_number,
+        _workspace_target, _cell_binding, _run_row),
+        apps/control_room/static/app.js (openRunDetail, renderRunDetail, closeRunDetail,
+        dataTable runIds wiring), apps/control_room/static/index.html,
+        apps/control_room/static/style.css,
+        apps/control_room/verification/fixtures/boards_endpoints.json,
+        scripts/verify_control_room_rendering.py (restored-board classes: navigation,
+        loading, degraded, scrolling, keyboard),
+        src/agentic_dynamics/runtime/workflow_runner.py (PhaseResult fields:
+        selected_evidence_ids, augmentation_evidence, retrieval_leg_errors, fallback_mode,
+        augmentation_versions/tokens/cost), src/agentic_dynamics/runtime/executor.py
+        (StepRequest/prepared-step/v1, load_prepared_step), scripts/fleet/docker_executor.py
+        (_write_prepared_step, execute),
+        tests/test_control_room_operations.py, tests/test_control_room_glance_integrity.py,
+        tests/test_control_room_static_views.py, tests/test_control_room_feature_parity.py,
+        tests/test_admin_frontend.py, tests/test_admin_server.py,
+        tests/test_workflow_runner.py, tests/test_prepared_step_exactness.py,
+        tests/test_prepared_step_transport.py,
+        experiments/results/workflows/control_room_run_journey/20260918T192606777266Z_run-f8ec919c1601.json
+        (a real ledger with phases + test verdicts) and
+        experiments/results/workflows/flash_ladder_kb/20260918T221835639512Z_run-75e8319533fb.json
+        (a real ledger with delivered knowledge: augmentation_evidence, fallback_mode,
+        retrieval_leg_errors)]
+        policies: [derive once at the service boundary and share between glance and run
+        detail so both give the same answer for the same run; keep run_detail additive and
+        its existing six top-level keys compatible; a missing cost stays unknown, a measured
+        zero stays $0.0000 metered, mixed stays mixed; verification independence is shown
+        separately from the agent's own claim; delivered knowledge is shown as selection +
+        delivery and NEVER as use; a missing ledger or missing phase key is a named absence,
+        never fabricated; timings are declared with measured|unknown state and no fabricated
+        0; the prepared-step reference comes from its existing owner (no new transport, no
+        broker/compose change); preserve raw blocks for existing callers; vanilla JS only,
+        no build step; keep the tree lint-clean (ruff over src/ scripts/ apps/ tests/)]
+        verification: [python3 scripts/verify_control_room_rendering.py --check-fixtures,
+        python3 -m pytest tests/test_control_room_operations.py
+        tests/test_control_room_glance_integrity.py tests/test_control_room_static_views.py
+        tests/test_control_room_feature_parity.py tests/test_admin_frontend.py
+        tests/test_admin_server.py tests/test_workflow_runner.py
+        tests/test_prepared_step_exactness.py tests/test_prepared_step_transport.py -q]
     phases:
-      - name: journey
+      - name: evidence
         kind: agent
         scope: implementation
         requires_deliverable: true
         timeout: 5400
         prompt: |
           GOAL: {goal}
-          Two browser-verified defects on current main (revision 4d834e9a9, 1440x900), both in the
-          "find a run, open its details" journey:
-          1. FIDELITY - selecting run-dc61bcb7d334 on the ordinary overview shows COST "unknown" and
-             MEASURED "test result unknown", although the control record carries cost_usd=0.027517
-             and the run ledger records test_executed_success=true / evaluator_independent=true.
-             Verify and fix at the owners: the glance route reads the run ledger pointer
-             "/repo/experiments/..." with a raw Path (it must resolve to the checkout on the host, or
-             every ledger-derived field is silently unknown), and cost.provenance is hard-coded
-             "unknown". The dock SAID/MEASURED rows must distinguish the agent narrative from the
-             independent verification; a missing cost stays an explicit unknown (never $0.00).
-          2. RETURN - with the Operations run-detail drawer open, Escape closes the whole workbench
-             (drawer left open inside) instead of returning to the found list; the drawer own Escape
-             listener never fires because focus sits on the originating row. Make Escape drawer-first:
-             restore focus to the row, keep the finder value, and let a second Escape close the
-             workbench. Preserve keyboard reachability.
-          Work in apps/control_room/ (routes/glance.py, static/parity.js) and extend the existing tests
-          only where a concrete risk is unasserted. Run the verification commands in
-          context.verification and commit.
+          The served Control Room run drawer must explain a real run. Build the missing slice
+          without a second read model.
+
+          1. SHARE THE PURE DERIVATIONS AT THE SERVICE BOUNDARY. Move the pure presentation
+             derivations out of apps/control_room/routes/glance.py into a service-owned module
+             (apps/control_room/services/run_evidence.py, or services/operations.py):
+             _resolve_recorded_path/_recorded_ledger (the "/repo/..." path must resolve to the
+             checkout on the host), _cost_provenance, _measured_state, _receipt_state,
+             _narration_state, _attempt_number, _workspace_target, _cell_binding. glance.py
+             imports them (no duplicate implementations remain); operations.run_detail uses
+             the same functions. Route -> service is the correct dependency direction.
+
+          2. EXTEND run_detail ADDITIVELY. Keep the existing six top-level keys and the raw
+             run/attempt/gate/approval/command blocks compatible. Add derived blocks:
+             - cost: {provenance: "<label>"} — measured zero = "$0.0000 · metered"; absent =
+               unknown; mixed contributors = mixed.
+             - evidence: {measured, receipt, narration} — the same labels glance emits.
+             - recorded: {ledger_path, present} — the pointer and whether it resolved.
+             - delivered_knowledge: per phase, from the recorded ledger: selected_evidence_ids,
+               augmentation_evidence [{id, revision, source_type, locator}], fallback_mode,
+               retrieval_leg_errors, augmentation_versions/tokens/cost. Selection/delivery only
+               — do NOT claim use. Missing ledger/key = named absence, never fabricated.
+             - prepared: per phase, when recorded (see 3): the prepared step clone-relative
+               path + prompt_sha256; otherwise a named missing.
+             - timings: one row per timing field ACTUALLY recorded (declare the exact set from
+               the run/attempt records + ledger; do not invent queue wait or first-token values
+               that are not recorded): {field, value, state: measured|unknown}.
+
+          3. RECORD THE PREPARED-STEP REFERENCE through existing owners (no new transport, no
+             broker/compose change): when the orchestrator parent prepares a child step, record
+             the prepared step's clone-relative path + prompt_sha256 on the phase result and the
+             run ledger (copy through DockerAgentExecutor's StepResult into the PhaseResult; if
+             the child envelope already carries it, reuse that field). Extend tests.
+
+          4. RENDER IT IN THE LOADED DRAWER (app.js renderRunDetail). Show: cost provenance
+             (fall back to "unavailable" — never a fabricated value); a Verification section
+             with the independent verification separate from the agent's own claim (SAID vs
+             MEASURED); a Delivered knowledge section (ids, revisions/locators, fallback mode,
+             leg errors, "selected — use not established"); the prepared-step reference or its
+             named gap; Timings rows with data-state="measured|unknown". Keep the existing
+             identity/attempts/gates/approvals/commands tables and the existing error handling.
+             Do not touch parity.js. No new endpoints. No client-side derivation of
+             consequential values.
+
+          5. FIXTURE + GATE. Update the run_detail seed in
+             apps/control_room/verification/fixtures/boards_endpoints.json to the real payload
+             shape (the current seed uses fields the real record does not have) plus the new
+             blocks. Extend scripts/verify_control_room_rendering.py (restored-board classes)
+             with drawer-content assertions: cost provenance including a measured-zero and an
+             unknown case, one measured verification with independence, delivered-knowledge
+             ids, one [data-state="unknown"] timing, and a run-detail HTTP-200 error-envelope
+             case. Keep --check-fixtures green.
+
+          6. TESTS. Extend tests/test_control_room_operations.py (block keys, the 200 envelope
+             through the services layer, timings/delivered knowledge with and without a
+             ledger), tests/test_control_room_glance_integrity.py (import path change; keep
+             every existing assertion), tests/test_control_room_static_views.py and
+             tests/test_control_room_feature_parity.py (drawer anchors),
+             tests/test_admin_frontend.py, and the prepared-step/workflow-runner tests you
+             touch. Run the verification commands in context.verification. Commit.
       - name: verify
         kind: test
         scope: implementation
         timeout: 900
         tests:
+          - tests/test_control_room_operations.py
           - tests/test_control_room_glance_integrity.py
-          - tests/test_control_room_feature_parity.py
           - tests/test_control_room_static_views.py
+          - tests/test_control_room_feature_parity.py
           - tests/test_admin_frontend.py
+          - tests/test_admin_server.py
+          - tests/test_workflow_runner.py
+          - tests/test_prepared_step_exactness.py
+          - tests/test_prepared_step_transport.py
         prompt: |
-          Independently verify the run-journey slice: the glance projection reports recorded cost and
-          the independent verification verdict (or an explicit unknown), and the drawer Escape
-          precedence is drawer-first with focus restored. Fix the code, never weaken a pin.
+          Independently verify the run-evidence slice: run_detail carries the shared derived
+          blocks and the raw blocks stay compatible; a missing cost is unknown (never
+          $0.0000), a measured zero stays metered zero, mixed stays mixed; verification
+          independence renders separately; delivered knowledge shows ids + revisions + fallback
+          + leg errors and never claims use; timings carry measured|unknown with no fabricated
+          0; the prepared-step reference is recorded. Fix the code, never weaken a pin.

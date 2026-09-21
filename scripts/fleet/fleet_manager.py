@@ -43,6 +43,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -112,15 +113,19 @@ def _connect() -> redis.Redis:
     while True:
         try:
             client = redis.Redis(
-                host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB,
-                decode_responses=True, socket_connect_timeout=5,
+                host=REDIS_HOST,
+                port=REDIS_PORT,
+                db=REDIS_DB,
+                decode_responses=True,
+                socket_connect_timeout=5,
                 socket_timeout=broker_contract.FLEET_REDIS_SOCKET_TIMEOUT,
             )
             client.ping()
             return client
         except Exception as exc:  # noqa: BLE001 — the manager must survive a Redis blip
-            print(f"[fleet-manager] redis unavailable ({exc}); retrying in {delay:.0f}s",
-                  flush=True)
+            print(
+                f"[fleet-manager] redis unavailable ({exc}); retrying in {delay:.0f}s", flush=True
+            )
             time.sleep(delay)
             delay = min(delay * 2, 30.0)
 
@@ -339,10 +344,15 @@ def _workspace_identity_digest(
 ) -> str:
     """The PRE-workdir digest that names the derived workspace (stable across a retry)."""
     payload = {
-        "spec": str(spec or ""), "goal": str(goal or ""), "model": str(model or ""),
-        "image": str(image or ""), "spec_sha256": str(spec_sha256 or ""),
-        "resume": bool(resume), "parent_run_id": str(parent_run_id or ""),
-        "admission": admission or {}, "execution": execution or {},
+        "spec": str(spec or ""),
+        "goal": str(goal or ""),
+        "model": str(model or ""),
+        "image": str(image or ""),
+        "spec_sha256": str(spec_sha256 or ""),
+        "resume": bool(resume),
+        "parent_run_id": str(parent_run_id or ""),
+        "admission": admission or {},
+        "execution": execution or {},
     }
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
@@ -352,7 +362,11 @@ def _git_run(*args: str, cwd: Path, timeout: int = 120) -> tuple[int, str]:
     """One git call for the preparation path; a missing/broken git is a named refusal."""
     try:
         proc = subprocess.run(  # noqa: S603 — the submission tier owns workspace preparation
-            ["git", *args], cwd=str(cwd), capture_output=True, text=True, timeout=timeout,
+            ["git", *args],
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return 127, f"git unavailable ({type(exc).__name__}: {exc})"
@@ -364,9 +378,12 @@ def _derived_workspace_path(spec: str, digest: str) -> Path:
     from agentic_dynamics.core.paths import PathConfig
 
     worktrees_root = Path(PathConfig.from_env(require_existing=False).worktrees_root)
-    stem = "".join(
-        c if (c.isalnum() or c in "-_") else "_" for c in Path(str(spec or "run")).stem
-    )[:48] or "run"
+    stem = (
+        "".join(c if (c.isalnum() or c in "-_") else "_" for c in Path(str(spec or "run")).stem)[
+            :48
+        ]
+        or "run"
+    )
     return worktrees_root / f"wt_{stem}_{digest[:8]}"
 
 
@@ -469,14 +486,11 @@ def _shares_root(clone: Path, repo_root: Path) -> bool:
         return False
     roots = [line.strip() for line in roots_out.splitlines() if line.strip()]
     return any(
-        _git_run("cat-file", "-e", f"{root}^{{commit}}", cwd=repo_root)[0] == 0
-        for root in roots
+        _git_run("cat-file", "-e", f"{root}^{{commit}}", cwd=repo_root)[0] == 0 for root in roots
     )
 
 
-def _ensure_clone_provenance(
-    clone: Path, repo_root: Path, *, parent_run_id: str = ""
-) -> list[str]:
+def _ensure_clone_provenance(clone: Path, repo_root: Path, *, parent_run_id: str = "") -> list[str]:
     """Verify a clone's project identity and stamp it when needed — the SHARED rule.
 
     Preparation and the submission validator both call
@@ -600,39 +614,56 @@ def prepare_workspace(
     if resume and str(parent_run_id or "").strip():
         ledger = _parent_run_ledger(str(parent_run_id))
         if ledger is None:
-            return None, "", [
-                f"submit: no ledger found for parent run {parent_run_id!r} — its completed "
-                "phases cannot be established; pass --workdir explicitly for this continuation"
-            ]
+            return (
+                None,
+                "",
+                [
+                    f"submit: no ledger found for parent run {parent_run_id!r} — its completed "
+                    "phases cannot be established; pass --workdir explicitly for this continuation"
+                ],
+            )
         candidate = str(ledger.get("git_sha") or "").strip()
         from agentic_dynamics.runtime.run_clone import run_clone_dir
 
         clone = run_clone_dir(str(parent_run_id))
         if not (clone / ".git").exists():
-            return None, "", [
-                f"submit: the parent run's private clone {clone} is gone — its completed "
-                f"work lives there, not in the source tree; a continuation cannot be "
-                f"prepared without it (candidate {candidate[:12] or 'unknown'})"
-            ]
+            return (
+                None,
+                "",
+                [
+                    f"submit: the parent run's private clone {clone} is gone — its completed "
+                    f"work lives there, not in the source tree; a continuation cannot be "
+                    f"prepared without it (candidate {candidate[:12] or 'unknown'})"
+                ],
+            )
         errors = _candidate_present(clone, candidate)
         if errors:
             return None, "", errors
         # A PRE-FIX clone (created before the provenance stamp) is verified by its origin /
         # the run-source relationship (shared ancestry only corroborates) and stamped here,
         # so validation sees the canonical project identity.
-        errors = _ensure_clone_provenance(
-            clone, Path(_REPO_ROOT), parent_run_id=str(parent_run_id)
-        )
+        errors = _ensure_clone_provenance(clone, Path(_REPO_ROOT), parent_run_id=str(parent_run_id))
         if errors:
             return None, "", errors
-        return clone, (
-            f"workspace reused from parent run {parent_run_id}: {clone} "
-            f"(candidate {candidate[:12]})"
-        ), []
+        return (
+            clone,
+            (
+                f"workspace reused from parent run {parent_run_id}: {clone} "
+                f"(candidate {candidate[:12]})"
+            ),
+            [],
+        )
 
     digest = _workspace_identity_digest(
-        spec=spec, goal=goal, model=model, image=image, spec_sha256=spec_sha256,
-        resume=resume, parent_run_id=parent_run_id, admission=admission, execution=execution,
+        spec=spec,
+        goal=goal,
+        model=model,
+        image=image,
+        spec_sha256=spec_sha256,
+        resume=resume,
+        parent_run_id=parent_run_id,
+        admission=admission,
+        execution=execution,
     )
     path = _derived_workspace_path(spec, digest)
     main_sha = _main_tip()
@@ -650,10 +681,14 @@ def prepare_workspace(
             if errors:
                 return None, "", errors
             if not _workspace_compatible(path, main_sha):
-                return None, "", [
-                    f"submit: the SHA-suffixed workspace {path} is also behind the main tip "
-                    f"{main_sha[:12]} — refusing to reset existing work; clean or move it aside"
-                ]
+                return (
+                    None,
+                    "",
+                    [
+                        f"submit: the SHA-suffixed workspace {path} is also behind the main tip "
+                        f"{main_sha[:12]} — refusing to reset existing work; clean or move it aside"
+                    ],
+                )
             return path, f"workspace reused: {path} (suffixed for main {main_sha[:7]})", []
 
     repo_root = Path(_REPO_ROOT)
@@ -669,10 +704,14 @@ def prepare_workspace(
         # instead of resetting it (-B would move the branch under any existing commits).
         rc, out = _git_run("worktree", "add", str(path), branch, cwd=repo_root)
     if rc != 0:
-        return None, "", [
-            f"submit: workspace preparation failed ({out or 'git worktree add failed'}) — "
-            "pass an explicit --workdir"
-        ]
+        return (
+            None,
+            "",
+            [
+                f"submit: workspace preparation failed ({out or 'git worktree add failed'}) — "
+                "pass an explicit --workdir"
+            ],
+        )
     return path, f"workspace prepared: {path} (branch {branch}, base {base[:12]})", []
 
 
@@ -734,14 +773,16 @@ def build_board(client: redis.Redis) -> dict:
     workers: list[dict] = []
     for k, hb in heartbeat.read_all(client).items():
         last_seen = float(hb.get("last_seen", 0) or 0)
-        workers.append({
-            "key": k,
-            "last_seen": last_seen,
-            "age_s": round(now - last_seen, 1),
-            "alive": (now - last_seen) < STALE_SECONDS,
-            "jobs": int(hb.get("jobs", 0) or 0),
-            "pid": hb.get("pid"),
-        })
+        workers.append(
+            {
+                "key": k,
+                "last_seen": last_seen,
+                "age_s": round(now - last_seen, 1),
+                "alive": (now - last_seen) < STALE_SECONDS,
+                "jobs": int(hb.get("jobs", 0) or 0),
+                "pid": hb.get("pid"),
+            }
+        )
     workers.sort(key=lambda w: w["key"])
 
     queues = {}
@@ -770,8 +811,9 @@ def publish_board(client: redis.Redis, board: dict) -> None:
 
 def watch(client: redis.Redis, interval: float, once: bool = False) -> None:
     """The read-only watcher loop: refresh the board on a cadence (``--once`` for one pass)."""
-    print(f"[fleet-manager] watcher started (interval {interval}s, board -> {BOARD_KEY})",
-          flush=True)
+    print(
+        f"[fleet-manager] watcher started (interval {interval}s, board -> {BOARD_KEY})", flush=True
+    )
     while True:
         board = build_board(client)
         publish_board(client, board)
@@ -781,8 +823,9 @@ def watch(client: redis.Redis, interval: float, once: bool = False) -> None:
         time.sleep(interval)
 
 
-def _send_command(client: redis.Redis, action: str, service: str, count: int | None,
-                  backoff: int | None) -> dict:
+def _send_command(
+    client: redis.Redis, action: str, service: str, count: int | None, backoff: int | None
+) -> dict:
     """LPUSH a bounded command onto ``fleet:commands`` (the supervisor's only hands, D-14)."""
     command = {
         "action": action,
@@ -909,17 +952,24 @@ def _record_submission_in_task(*, aio: dict | None, job: dict, spec: str, workdi
     return f"task state not updated (status {status_value or 'unknown'})"
 
 
-def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: str,
-                         workdir: str, image: str | None = None,
-                         spec_sha256: str | None = None,
-                         resume: bool = False,
-                         parent_run_id: str | None = None,
-                         admission: dict | None = None,
-                         execution: dict | None = None,
-                         aio: dict | None = None,
-                         request_key: str | None = None,
-                         retry_safe: bool = False,
-                         task_identity: str | None = None) -> dict:
+def _send_submit_command(
+    client: redis.Redis,
+    *,
+    spec: str,
+    goal: str,
+    model: str,
+    workdir: str,
+    image: str | None = None,
+    spec_sha256: str | None = None,
+    resume: bool = False,
+    parent_run_id: str | None = None,
+    admission: dict | None = None,
+    execution: dict | None = None,
+    aio: dict | None = None,
+    request_key: str | None = None,
+    retry_safe: bool = False,
+    task_identity: str | None = None,
+) -> dict:
     """LPUSH a submit command onto ``fleet:commands`` and record its "launching" board entry.
 
     The fleet-manager mints the ``job_id`` (the board's join key) but does NOT validate the
@@ -989,35 +1039,60 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
         command["actor"] = "aio"
         command["aio"] = dict(aio)
     fingerprint = request_fingerprint(
-        spec=spec, goal=goal, model=model, workdir=workdir, image=image,
-        spec_sha256=spec_sha256, resume=resume, parent_run_id=parent_run_id,
-        admission=admission, execution=execution,
+        spec=spec,
+        goal=goal,
+        model=model,
+        workdir=workdir,
+        image=image,
+        spec_sha256=spec_sha256,
+        resume=resume,
+        parent_run_id=parent_run_id,
+        admission=admission,
+        execution=execution,
     )
     scope_digest = _workspace_identity_digest(
-        spec=spec, goal=goal, model=model, image=image, spec_sha256=spec_sha256,
-        resume=resume, parent_run_id=parent_run_id, admission=admission, execution=execution,
+        spec=spec,
+        goal=goal,
+        model=model,
+        image=image,
+        spec_sha256=spec_sha256,
+        resume=resume,
+        parent_run_id=parent_run_id,
+        admission=admission,
+        execution=execution,
     )
     key = _derive_request_key(
-        explicit=request_key, retry_safe=retry_safe,
-        task_identity=str(task_identity or ""), scope_digest=scope_digest,
+        explicit=request_key,
+        retry_safe=retry_safe,
+        task_identity=str(task_identity or ""),
+        scope_digest=scope_digest,
     )
     if str(task_identity or "").strip():
         command["task_identity"] = str(task_identity).strip()
     if key:
         command["request_key"] = key
     if key:
-        entry = json.dumps({
-            "job_id": command["job_id"],
-            "fingerprint": fingerprint,
-            # The RESOLVED workspace is part of the retained identity (reviewer finding,
-            # 2026-09-16): a retry must reuse exactly the workspace the submission was
-            # assigned — including a SHA-suffixed one — never re-resolve it.
-            "workdir": workdir,
-        })
+        entry = json.dumps(
+            {
+                "job_id": command["job_id"],
+                "fingerprint": fingerprint,
+                # The RESOLVED workspace is part of the retained identity (reviewer finding,
+                # 2026-09-16): a retry must reuse exactly the workspace the submission was
+                # assigned — including a SHA-suffixed one — never re-resolve it.
+                "workdir": workdir,
+            }
+        )
         result = client.eval(
-            _SUBMIT_LUA, 3, REQUESTS_KEY, COMMANDS_KEY, JOBS_KEY,
-            key, command["job_id"], json.dumps(command),
-            json.dumps(_job_launch_record(command)), entry,
+            _SUBMIT_LUA,
+            3,
+            REQUESTS_KEY,
+            COMMANDS_KEY,
+            JOBS_KEY,
+            key,
+            command["job_id"],
+            json.dumps(command),
+            json.dumps(_job_launch_record(command)),
+            entry,
         )
         first = str(result[0] or "")
         if first and first != command["job_id"]:
@@ -1056,6 +1131,213 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
     return command
 
 
+# ── the reconcile sweeps (loose-ends register L2 + L7) ───────────────────────────────────────
+
+#: A legitimate job runs its phases well under an hour; a non-terminal row past this window
+#: lost its observer between transitions and is a ghost until reconciled (live L2: the
+#: docs-remediation job sat "running" for 20 days and wedged the docs-drift proposal gate,
+#: whose "in flight" reading depends on it).
+STALE_JOB_SECONDS = float(os.environ.get("FINOPS_STALE_JOB_S", str(6 * 3600)))
+_NON_TERMINAL_JOB_STATES = ("launching", "queued", "running")
+
+
+def _resolve_ledger_path(raw: str) -> Path | None:
+    """A job-row ledger path as this host can read it: an existing path, elided; a container
+    ``/repo/...`` path resolves against this checkout; anything else is ``None``."""
+    if not raw:
+        return None
+    candidate = Path(raw)
+    if candidate.is_file():
+        return candidate
+    if raw.startswith("/repo/"):
+        candidate = _REPO_ROOT / raw[len("/repo/") :]
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def sweep_stale_jobs(
+    client: redis.Redis,
+    *,
+    stale_after_s: float = STALE_JOB_SECONDS,
+    results_dir: Path | None = None,
+    now: float | None = None,
+    apply: bool = False,
+) -> dict:
+    """Reconcile job rows whose observer never wrote a terminal transition.
+
+    The board's job rows are written by their observers (submit -> "launching"; the
+    wrapper/orchestrator -> running/completed/failed). An observer that dies between those
+    leaves the row non-terminal forever, and every reader of job state treats the ghost as
+    live (L2). A non-terminal row older than ``stale_after_s`` is marked ``completed`` when
+    it carries a ledger whose file records success — or when its spec's newest ledger under
+    ``results_dir/<spec>/`` does — else ``failed`` with a reason naming the sweep; the prior
+    ``ts`` lands in ``stale_ts`` so nothing is lost. Pure report unless ``apply``.
+    """
+    now = time.time() if now is None else now
+    results_root = results_dir or (_REPO_ROOT / "experiments" / "results")
+    report: dict = {"examined": 0, "stale": [], "reconciled": [], "applied": bool(apply)}
+    for job in _job_records(client):
+        status = str(job.get("status") or "")
+        if status not in _NON_TERMINAL_JOB_STATES:
+            continue
+        report["examined"] += 1
+        age = now - float(job.get("ts") or 0)
+        if age <= stale_after_s:
+            continue
+        entry = {
+            "job_id": job.get("job_id"),
+            "status": status,
+            "age_h": round(age / 3600.0, 1),
+            "spec": job.get("spec"),
+        }
+        report["stale"].append(entry)
+        if not apply:
+            continue
+        disposition = "failed"
+        reason = (
+            f"stale: no terminal transition after {age / 3600.0:.1f}h "
+            f"(swept {time.strftime('%Y-%m-%d', time.gmtime(now))})"
+        )
+        ledger_path = _resolve_ledger_path(str(job.get("ledger") or ""))
+        if ledger_path is None:
+            ledger_path = _latest_spec_ledger(job.get("spec"), results_root)
+        if ledger_path is not None:
+            try:
+                data = json.loads(ledger_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                data = None
+            if isinstance(data, dict) and data.get("ok"):
+                disposition = "completed"
+                reason = f"reconciled from ledger {ledger_path} (ok)"
+        record_job_status(
+            client,
+            entry["job_id"],
+            disposition,
+            swept_at=now,
+            stale_ts=job.get("ts"),
+            error=reason,
+        )
+        entry["disposition"] = disposition
+        report["reconciled"].append(entry)
+    return report
+
+
+def _latest_spec_ledger(spec: str | None, results_root: Path) -> Path | None:
+    """The newest run ledger for a spec under ``results_root/workflows/<spec>/`` (if any).
+
+    A ghost row usually carries no ledger field (the observer that would have written it
+    died), but the run's own ledger is still on disk — reconciling from it reports what
+    actually happened instead of a bare "stale".
+    """
+    if not spec:
+        return None
+    spec_dir = results_root / "workflows" / Path(str(spec)).stem
+    if not spec_dir.is_dir():
+        return None
+    candidates = sorted(spec_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    return candidates[0] if candidates else None
+
+
+def _dir_size(path: Path) -> int:
+    total = 0
+    for dirpath, _dirnames, filenames in os.walk(path):
+        for name in filenames:
+            try:
+                total += (Path(dirpath) / name).stat().st_size
+            except OSError:
+                continue
+    return total
+
+
+def prune_runs(
+    *,
+    db: str | None = None,
+    keep_days: float = 3.0,
+    failed_keep_days: float = 7.0,
+    runs_root: Path | None = None,
+    now: float | None = None,
+    apply: bool = False,
+) -> dict:
+    """Prune run CLONES whose work is already durable elsewhere (L7).
+
+    A run's clone (``runs_root/<run-id>/repo``) holds its candidate commits — for an
+    UNPROMOTED candidate that is the only copy — so the policy is conservative: only runs
+    whose control-db row is terminal AND whose content already has a durable home are
+    prunable — ``merged`` (the squash is on the base) and ``cancelled`` after ``keep_days``;
+    ``failed`` after ``failed_keep_days`` (kept longer for debugging). ``promotable`` /
+    ``succeeded`` (unpromoted candidates), ``running`` / ``awaiting_*``, and any directory
+    with NO control-db row are never pruned: unknown provenance is not garbage. Pure report
+    unless ``apply``.
+    """
+    now = time.time() if now is None else now
+    root = runs_root or Path(os.environ.get("FINOPS_RUNS_ROOT") or "/tmp/agentic-dynamics-runs")
+    db_path = Path(
+        db
+        or os.environ.get("FINOPS_CONTROL_DB")
+        or (_REPO_ROOT / "experiments" / "results" / "control" / "control.db")
+    )
+    states: dict[str, tuple[str, str | None]] = {}
+    if db_path.is_file():
+        import sqlite3
+
+        con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        try:
+            for run_id, state, ended in con.execute("SELECT run_id, state, ended_at FROM runs"):
+                states[run_id] = (state, ended)
+        finally:
+            con.close()
+    report: dict = {
+        "runs_root": str(root),
+        "examined": 0,
+        "prunable": [],
+        "pruned": [],
+        "skipped": {},
+        "applied": bool(apply),
+    }
+    if not root.is_dir():
+        report["error"] = "runs root absent"
+        return report
+    for entry in sorted(root.iterdir()):
+        if not entry.is_dir() or not entry.name.startswith("run-"):
+            continue
+        report["examined"] += 1
+        row = states.get(entry.name)
+        if row is None:
+            key = "unknown-provenance"
+            report["skipped"][key] = report["skipped"].get(key, 0) + 1
+            continue
+        state, ended = row
+        if state in ("merged", "cancelled"):
+            allowed_days = keep_days
+        elif state == "failed":
+            allowed_days = failed_keep_days
+        else:
+            report["skipped"][state] = report["skipped"].get(state, 0) + 1
+            continue
+        ended_ts = None
+        if ended:
+            try:
+                ended_ts = datetime.fromisoformat(str(ended).replace("Z", "+00:00")).timestamp()
+            except ValueError:
+                ended_ts = None
+        if ended_ts is None or (now - ended_ts) / 86400.0 < allowed_days:
+            key = f"{state}-within-keep"
+            report["skipped"][key] = report["skipped"].get(key, 0) + 1
+            continue
+        item = {
+            "run_id": entry.name,
+            "state": state,
+            "ended_at": ended,
+            "size_bytes": _dir_size(entry),
+        }
+        report["prunable"].append(item)
+        if apply:
+            shutil.rmtree(entry, ignore_errors=True)
+            report["pruned"].append(item)
+    return report
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="The fleet manager (supervisor tier).")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -1070,99 +1352,202 @@ def main(argv: list[str] | None = None) -> int:
     p_restart = sub.add_parser("restart", help="command a restart-with-backoff")
     p_restart.add_argument("--service", required=True)
     p_restart.add_argument("--backoff", type=int, default=5, help="initial backoff seconds")
+    p_sweep = sub.add_parser(
+        "sweep-stale-jobs",
+        help="reconcile non-terminal job rows whose observer never wrote a terminal "
+        "transition (L2; report-only unless --apply)",
+    )
+    p_sweep.add_argument("--stale-after-h", type=float, default=STALE_JOB_SECONDS / 3600.0)
+    p_sweep.add_argument(
+        "--results-dir",
+        default=None,
+        help="run-ledger root for the reconcile evidence (default: this checkout's "
+        "experiments/results)",
+    )
+    p_sweep.add_argument("--apply", action="store_true", help="write the dispositions")
+    p_sweep.add_argument("--json", action="store_true")
+    p_prune = sub.add_parser(
+        "prune-runs",
+        help="prune run clones whose content is already durable (L7; report-only unless --apply)",
+    )
+    p_prune.add_argument("--keep-days", type=float, default=3.0)
+    p_prune.add_argument("--failed-keep-days", type=float, default=7.0)
+    p_prune.add_argument(
+        "--db", default=None, help="control database path (default: $FINOPS_CONTROL_DB)"
+    )
+    p_prune.add_argument("--apply", action="store_true", help="delete the prunable clones")
+    p_prune.add_argument("--json", action="store_true")
     p_submit = sub.add_parser(
         "submit", help="command the orchestrator to validate and launch a workflow job"
     )
-    p_submit.add_argument("--spec", required=True, help="spec path, e.g. workflows/repository/<name>.yaml")
-    p_submit.add_argument("--fork-checkpoint", default=None, metavar="REF",
-                          help="checkpoint ref for fork phases: '<workflow>/<attempt_id>' or "
-                               "'latest:<workflow>' (resolved ONCE here and pinned into the "
-                               "run request so queued siblings share one exact seed)")
+    p_submit.add_argument(
+        "--spec", required=True, help="spec path, e.g. workflows/repository/<name>.yaml"
+    )
+    p_submit.add_argument(
+        "--fork-checkpoint",
+        default=None,
+        metavar="REF",
+        help="checkpoint ref for fork phases: '<workflow>/<attempt_id>' or "
+        "'latest:<workflow>' (resolved ONCE here and pinned into the "
+        "run request so queued siblings share one exact seed)",
+    )
     p_submit.add_argument("--goal", required=True)
     p_submit.add_argument("--model", required=True)
-    p_submit.add_argument("--workdir", default=None,
-                          help="a worktree path under FINOPS_WORKTREE_ROOT; OMITTED, the "
-                               "preparation path selects/creates one (deterministic name, "
-                               "reused across an identical retry; a continuation works from "
-                               "the parent run's private clone at its candidate SHA)")
-    p_submit.add_argument("--task-identity", default=None,
-                          help="the durable TASK identity the submit belongs to (the AIO "
-                               "binding's task_identity): retry-safe keys are scoped by it, "
-                               "so identical inputs from a DIFFERENT task are a different "
-                               "logical submission")
-    p_submit.add_argument("--json", action="store_true",
-                          help="emit the machine result (fleet-submit/v1) instead of human lines")
-    p_submit.add_argument("--image", default=None,
-                          help="optional per-job image for the spec's phase cells "
-                               "(fleet/job-<name>, built via scripts/fleet/build.sh job <name> "
-                               "— p3_base_image_caching); default: fleet/base")
-    p_submit.add_argument("--spec-sha256", default=None,
-                          help="sha256 of the spec file's bytes (source/spec identity — "
-                               "verified by the broker before the compose call)")
-    p_submit.add_argument("--resume", action="store_true",
-                          help="the submit resumes an existing run (continuation identity — "
-                               "the broker skips the main-freshness refusal)")
-    p_submit.add_argument("--parent-run-id", default=None,
-                          help="the control-db run id this submit continues (requires --resume)")
-    p_submit.add_argument("--admission-required", action="store_true",
-                          help="arm the admission gate in the orchestrator container "
-                               "(FINOPS_ADMISSION_REQUIRED=1 — a submit WITHOUT this flag "
-                               "while the host gate is armed is refused by the broker)")
-    p_submit.add_argument("--campaign-budget-usd", type=float, default=None,
-                          help="the campaign budget ceiling the run applies to the lease "
-                               "registry (distinct from any daily real-cash allowance)")
-    p_submit.add_argument("--campaign-concurrency", type=int, default=None,
-                          help="the campaign concurrency cap the run applies to the lease "
-                               "registry")
-    p_submit.add_argument("--reserve-usd", type=float, default=None,
-                          help="per-phase dollar reservation for per-token models "
-                               "(FINOPS_RESERVE_USD — the armed gate DENIES without a stated "
-                               "reserve: an unknown cost is never free)")
-    p_submit.add_argument("--hard-cap-usd", type=float, default=None,
-                          help="per-lease dollar ceiling for per-token models "
-                               "(FINOPS_HARD_CAP_USD)")
-    p_submit.add_argument("--backend", default=None, choices=["opencode", "claude_cli"],
-                          help="the execution backend (pass-through; the orchestrator "
-                               "default is auto-routing)")
-    p_submit.add_argument("--thinking-effort", default=None,
-                          help="the thinking effort level (pass-through)")
-    p_submit.add_argument("--thinking-budget-tokens", type=int, default=None,
-                          help="the thinking token budget (pass-through)")
-    p_submit.add_argument("--output-token-limit", type=int, default=None,
-                          help="the output token limit (pass-through)")
-    p_submit.add_argument("--timeout-seconds", type=int, default=None,
-                          help="the per-phase timeout in seconds (pass-through)")
-    p_submit.add_argument("--no-commit", action="store_true",
-                          help="run phases without runner commits (pass-through)")
+    p_submit.add_argument(
+        "--workdir",
+        default=None,
+        help="a worktree path under FINOPS_WORKTREE_ROOT; OMITTED, the "
+        "preparation path selects/creates one (deterministic name, "
+        "reused across an identical retry; a continuation works from "
+        "the parent run's private clone at its candidate SHA)",
+    )
+    p_submit.add_argument(
+        "--task-identity",
+        default=None,
+        help="the durable TASK identity the submit belongs to (the AIO "
+        "binding's task_identity): retry-safe keys are scoped by it, "
+        "so identical inputs from a DIFFERENT task are a different "
+        "logical submission",
+    )
+    p_submit.add_argument(
+        "--json",
+        action="store_true",
+        help="emit the machine result (fleet-submit/v1) instead of human lines",
+    )
+    p_submit.add_argument(
+        "--image",
+        default=None,
+        help="optional per-job image for the spec's phase cells "
+        "(fleet/job-<name>, built via scripts/fleet/build.sh job <name> "
+        "— p3_base_image_caching); default: fleet/base",
+    )
+    p_submit.add_argument(
+        "--spec-sha256",
+        default=None,
+        help="sha256 of the spec file's bytes (source/spec identity — "
+        "verified by the broker before the compose call)",
+    )
+    p_submit.add_argument(
+        "--resume",
+        action="store_true",
+        help="the submit resumes an existing run (continuation identity — "
+        "the broker skips the main-freshness refusal)",
+    )
+    p_submit.add_argument(
+        "--parent-run-id",
+        default=None,
+        help="the control-db run id this submit continues (requires --resume)",
+    )
+    p_submit.add_argument(
+        "--admission-required",
+        action="store_true",
+        help="arm the admission gate in the orchestrator container "
+        "(FINOPS_ADMISSION_REQUIRED=1 — a submit WITHOUT this flag "
+        "while the host gate is armed is refused by the broker)",
+    )
+    p_submit.add_argument(
+        "--campaign-budget-usd",
+        type=float,
+        default=None,
+        help="the campaign budget ceiling the run applies to the lease "
+        "registry (distinct from any daily real-cash allowance)",
+    )
+    p_submit.add_argument(
+        "--campaign-concurrency",
+        type=int,
+        default=None,
+        help="the campaign concurrency cap the run applies to the lease registry",
+    )
+    p_submit.add_argument(
+        "--reserve-usd",
+        type=float,
+        default=None,
+        help="per-phase dollar reservation for per-token models "
+        "(FINOPS_RESERVE_USD — the armed gate DENIES without a stated "
+        "reserve: an unknown cost is never free)",
+    )
+    p_submit.add_argument(
+        "--hard-cap-usd",
+        type=float,
+        default=None,
+        help="per-lease dollar ceiling for per-token models (FINOPS_HARD_CAP_USD)",
+    )
+    p_submit.add_argument(
+        "--backend",
+        default=None,
+        choices=["opencode", "claude_cli"],
+        help="the execution backend (pass-through; the orchestrator default is auto-routing)",
+    )
+    p_submit.add_argument(
+        "--thinking-effort", default=None, help="the thinking effort level (pass-through)"
+    )
+    p_submit.add_argument(
+        "--thinking-budget-tokens",
+        type=int,
+        default=None,
+        help="the thinking token budget (pass-through)",
+    )
+    p_submit.add_argument(
+        "--output-token-limit", type=int, default=None, help="the output token limit (pass-through)"
+    )
+    p_submit.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=None,
+        help="the per-phase timeout in seconds (pass-through)",
+    )
+    p_submit.add_argument(
+        "--no-commit", action="store_true", help="run phases without runner commits (pass-through)"
+    )
     # The AIO binding identity (Unit D). The tool derives these from the NATIVE context
     # (ctx.sessionID / ctx.agent) plus the durable binding read — never from model-supplied
     # fields. Presence of --aio-session-id marks the submit as the AIO actor; the orchestrator
     # and the broker then resolve + validate the binding by identity before any launch.
-    p_submit.add_argument("--aio-session-id", default=None,
-                          help="the native opencode session id the AIO submit runs as "
-                               "(presence marks the AIO actor)")
-    p_submit.add_argument("--aio-agent", default=None,
-                          help="the resolved native agent (must match the binding)")
-    p_submit.add_argument("--binding-id", default=None,
-                          help="the durable AIO binding record id (validated against the store)")
-    p_submit.add_argument("--task-revision", type=int, default=None,
-                          help="the binding's AUTHORIZATION epoch (stale task definitions are "
-                               "refused; routine progress recording never advances it)")
-    p_submit.add_argument("--binding-context-version", type=int, default=None,
-                          help="the binding's context version at gate-read time: the optimistic "
-                               "guard for the optional task-state recording (a stale session's "
-                               "recording is refused)")
-    p_submit.add_argument("--request-key", default=None,
-                          help="a caller-stable request key: a retry with the SAME key "
-                               "reconciles to the existing job instead of minting a second one "
-                               "(retain the key before sending; reuse it after an ambiguous or "
-                               "lost submit response). Reconciliation compares the FULL "
-                               "execution-relevant fingerprint — a changed request refuses.")
-    p_submit.add_argument("--retry-safe", action="store_true",
-                          help="derive the request key from the submission's execution-"
-                               "relevant inputs (the ordinary tool path sets this when the "
-                               "caller supplied no explicit key): an identical retry "
-                               "reconciles automatically; an explicit --request-key wins")
+    p_submit.add_argument(
+        "--aio-session-id",
+        default=None,
+        help="the native opencode session id the AIO submit runs as (presence marks the AIO actor)",
+    )
+    p_submit.add_argument(
+        "--aio-agent", default=None, help="the resolved native agent (must match the binding)"
+    )
+    p_submit.add_argument(
+        "--binding-id",
+        default=None,
+        help="the durable AIO binding record id (validated against the store)",
+    )
+    p_submit.add_argument(
+        "--task-revision",
+        type=int,
+        default=None,
+        help="the binding's AUTHORIZATION epoch (stale task definitions are "
+        "refused; routine progress recording never advances it)",
+    )
+    p_submit.add_argument(
+        "--binding-context-version",
+        type=int,
+        default=None,
+        help="the binding's context version at gate-read time: the optimistic "
+        "guard for the optional task-state recording (a stale session's "
+        "recording is refused)",
+    )
+    p_submit.add_argument(
+        "--request-key",
+        default=None,
+        help="a caller-stable request key: a retry with the SAME key "
+        "reconciles to the existing job instead of minting a second one "
+        "(retain the key before sending; reuse it after an ambiguous or "
+        "lost submit response). Reconciliation compares the FULL "
+        "execution-relevant fingerprint — a changed request refuses.",
+    )
+    p_submit.add_argument(
+        "--retry-safe",
+        action="store_true",
+        help="derive the request key from the submission's execution-"
+        "relevant inputs (the ordinary tool path sets this when the "
+        "caller supplied no explicit key): an identical retry "
+        "reconciles automatically; an explicit --request-key wins",
+    )
 
     parser.add_argument("--interval", type=float, default=DEFAULT_INTERVAL)
     parser.add_argument("--once", action="store_true")
@@ -1190,8 +1575,10 @@ def main(argv: list[str] | None = None) -> int:
             if board["jobs"]:
                 print("jobs:")
                 for j in board["jobs"]:
-                    print(f"  [{j.get('status')}] {j.get('job_id')} spec={j.get('spec')} "
-                          f"model={j.get('model')}")
+                    print(
+                        f"  [{j.get('status')}] {j.get('job_id')} spec={j.get('spec')} "
+                        f"model={j.get('model')}"
+                    )
         return 0
 
     if args.command == "resize":
@@ -1209,10 +1596,55 @@ def main(argv: list[str] | None = None) -> int:
         print(f"fleet:commands <- {json.dumps(cmd)}")
         return 0
 
+    if args.command == "sweep-stale-jobs":
+        report = sweep_stale_jobs(
+            client,
+            stale_after_s=args.stale_after_h * 3600.0,
+            results_dir=Path(args.results_dir) if args.results_dir else None,
+            apply=args.apply,
+        )
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print(
+                f"stale-job sweep: examined {report['examined']} non-terminal rows; "
+                f"stale {len(report['stale'])}; reconciled {len(report['reconciled'])}"
+                + ("" if report["applied"] else " (report only — pass --apply)")
+            )
+            for item in report["stale"]:
+                state = item.get("disposition") or item["status"]
+                print(f"  [{state}] {item['job_id']} age={item['age_h']}h spec={item['spec']}")
+        return 0
+
+    if args.command == "prune-runs":
+        report = prune_runs(
+            db=args.db,
+            keep_days=args.keep_days,
+            failed_keep_days=args.failed_keep_days,
+            apply=args.apply,
+        )
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            gb = sum(i["size_bytes"] for i in report["prunable"]) / 1e9
+            print(
+                f"run-clone prune: examined {report['examined']}; prunable "
+                f"{len(report['prunable'])} ({gb:.1f} GB); pruned {len(report['pruned'])}"
+                + ("" if report["applied"] else " (report only — pass --apply)")
+            )
+            for item in report["prunable"][:20]:
+                print(
+                    f"  {item['run_id']} state={item['state']} ended={item['ended_at']} "
+                    f"size={item['size_bytes'] / 1e6:.0f} MB"
+                )
+        return 0
+
     if args.command == "submit":
         admission: dict | None = None
-        if args.admission_required or args.campaign_budget_usd is not None or (
-            args.campaign_concurrency is not None
+        if (
+            args.admission_required
+            or args.campaign_budget_usd is not None
+            or (args.campaign_concurrency is not None)
         ):
             admission = {"required": bool(args.admission_required)}
             if args.campaign_budget_usd is not None:
@@ -1224,10 +1656,20 @@ def main(argv: list[str] | None = None) -> int:
             if args.hard_cap_usd is not None:
                 admission["hard_cap_usd"] = args.hard_cap_usd
         execution: dict | None = None
-        if any(value is not None for value in (
-            args.backend, args.thinking_effort, args.thinking_budget_tokens,
-            args.output_token_limit, args.timeout_seconds,
-        )) or args.no_commit or args.fork_checkpoint:
+        if (
+            any(
+                value is not None
+                for value in (
+                    args.backend,
+                    args.thinking_effort,
+                    args.thinking_budget_tokens,
+                    args.output_token_limit,
+                    args.timeout_seconds,
+                )
+            )
+            or args.no_commit
+            or args.fork_checkpoint
+        ):
             execution = {}
             if args.backend is not None:
                 execution["backend"] = args.backend
@@ -1269,17 +1711,27 @@ def main(argv: list[str] | None = None) -> int:
             # re-resolving after a main advance could turn the retry into a different
             # request instead of a reconciliation).
             digest = _workspace_identity_digest(
-                spec=args.spec, goal=args.goal, model=args.model, image=args.image,
-                spec_sha256=args.spec_sha256, resume=bool(args.resume),
-                parent_run_id=args.parent_run_id, admission=admission, execution=execution,
+                spec=args.spec,
+                goal=args.goal,
+                model=args.model,
+                image=args.image,
+                spec_sha256=args.spec_sha256,
+                resume=bool(args.resume),
+                parent_run_id=args.parent_run_id,
+                admission=admission,
+                execution=execution,
             )
             candidate = _candidate_workspace_path(
-                spec=args.spec, digest=digest, resume=bool(args.resume),
+                spec=args.spec,
+                digest=digest,
+                resume=bool(args.resume),
                 parent_run_id=args.parent_run_id,
             )
             probe_key = _derive_request_key(
-                explicit=args.request_key, retry_safe=args.retry_safe,
-                task_identity=task_identity, scope_digest=digest,
+                explicit=args.request_key,
+                retry_safe=args.retry_safe,
+                task_identity=task_identity,
+                scope_digest=digest,
             )
             probe_exists, probe_entry = (
                 _request_entry_lookup(client, probe_key) if probe_key else (False, None)
@@ -1299,9 +1751,14 @@ def main(argv: list[str] | None = None) -> int:
                 )
             else:
                 resolved, prep_note, prep_errors = prepare_workspace(
-                    spec=args.spec, goal=args.goal, model=args.model, image=args.image,
-                    spec_sha256=args.spec_sha256, resume=bool(args.resume),
-                    parent_run_id=args.parent_run_id, admission=admission,
+                    spec=args.spec,
+                    goal=args.goal,
+                    model=args.model,
+                    image=args.image,
+                    spec_sha256=args.spec_sha256,
+                    resume=bool(args.resume),
+                    parent_run_id=args.parent_run_id,
+                    admission=admission,
                     execution=execution,
                 )
                 if prep_errors:
@@ -1310,10 +1767,20 @@ def main(argv: list[str] | None = None) -> int:
                 workdir = str(resolved)
         try:
             cmd = _send_submit_command(
-                client, spec=args.spec, goal=args.goal, model=args.model, workdir=workdir,
-                image=args.image, spec_sha256=args.spec_sha256, resume=args.resume,
-                parent_run_id=args.parent_run_id, admission=admission, execution=execution,
-                aio=aio, request_key=args.request_key, retry_safe=args.retry_safe,
+                client,
+                spec=args.spec,
+                goal=args.goal,
+                model=args.model,
+                workdir=workdir,
+                image=args.image,
+                spec_sha256=args.spec_sha256,
+                resume=args.resume,
+                parent_run_id=args.parent_run_id,
+                admission=admission,
+                execution=execution,
+                aio=aio,
+                request_key=args.request_key,
+                retry_safe=args.retry_safe,
                 task_identity=task_identity,
             )
         except (RequestKeyConflictError, RequestKeyUnresolvedError) as exc:
@@ -1324,29 +1791,37 @@ def main(argv: list[str] | None = None) -> int:
         # state (version-guarded; best-effort with a REPORTED note, never silent, never
         # fatal — the job itself is already durable on the board).
         task_note = _record_submission_in_task(
-            aio=aio, job=cmd, spec=args.spec, workdir=workdir,
+            aio=aio,
+            job=cmd,
+            spec=args.spec,
+            workdir=workdir,
         )
         if args.json:
             # The structured result (fleet-submit/v1): job identity, state, resolved
             # source/spec, request identity, and the prep note — machine-first, so no caller
             # parses a human log line as the durable interface.
-            print(json.dumps({
-                "schema": "fleet-submit/v1",
-                "job_id": cmd.get("job_id", ""),
-                "reconciled": bool(cmd.get("reconciled")),
-                "status": cmd.get("status") or ("unknown" if cmd.get("reconciled") else "launching"),
-                "request_key": cmd.get("request_key", ""),
-                "task_identity": cmd.get("task_identity", ""),
-                "spec": args.spec,
-                "spec_sha256": args.spec_sha256 or "",
-                "goal": args.goal,
-                "model": args.model,
-                "workdir": workdir,
-                "resume": bool(args.resume),
-                "parent_run_id": args.parent_run_id or "",
-                "prep_note": prep_note,
-                "task_note": task_note,
-            }))
+            print(
+                json.dumps(
+                    {
+                        "schema": "fleet-submit/v1",
+                        "job_id": cmd.get("job_id", ""),
+                        "reconciled": bool(cmd.get("reconciled")),
+                        "status": cmd.get("status")
+                        or ("unknown" if cmd.get("reconciled") else "launching"),
+                        "request_key": cmd.get("request_key", ""),
+                        "task_identity": cmd.get("task_identity", ""),
+                        "spec": args.spec,
+                        "spec_sha256": args.spec_sha256 or "",
+                        "goal": args.goal,
+                        "model": args.model,
+                        "workdir": workdir,
+                        "resume": bool(args.resume),
+                        "parent_run_id": args.parent_run_id or "",
+                        "prep_note": prep_note,
+                        "task_note": task_note,
+                    }
+                )
+            )
             return 0
         if prep_note:
             print(f"fleet:prep {prep_note}")

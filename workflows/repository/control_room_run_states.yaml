@@ -1,0 +1,98 @@
+name: control_room_run_states
+question: >-
+  The Control Room's resting screen still reads as broken on real data: run-row cells
+  truncate mid-word ("unk…", "receipt missin…") and the screen is state-blind against the
+  d4 truth table. Implement the wireframe's E10 run row and the per-state screens so the
+  room is readable and state-driven, from the real read services only.
+  Acceptance: E10's declared content fits without mid-word truncation at 1440x900 /
+  1024x768 / 390x844; each run state (running/blocked/stalled/failed/escalated/done)
+  renders its truth-table primary elements; unknown stays a legible labelled unknown
+  (never fabricated, never a bare unlabelled token); the render gate's fixture check
+  passes and the admin/frontend/glance/static-view tests stay green.
+  Design sources: docs/research/control_room_wireframe.md (E10 + regions),
+  docs/research/control_room_state_screens.md (truth table + state machine),
+  docs/research/control_room_direction.md (the run-first thesis + restraint budget).
+  Data sources: the existing /api/glance + run-detail services and the writer-backed
+  fields (attempt numbers, timings, cost split, receipts) — NO new backend routes,
+  NO fabricated values.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [docs/research/control_room_wireframe.md (E10 row content +
+        dimensions; region layout), docs/research/control_room_state_screens.md (the
+        per-state truth table + state machine), docs/research/control_room_direction.md,
+        apps/control_room/static/app.js + style.css + parity.js + visuals.js,
+        apps/control_room/routes/glance.py (the row payload),
+        tests/test_admin_frontend.py, tests/test_control_room_glance_integrity.py,
+        tests/test_control_room_static_views.py, scripts/verify_control_room_rendering.py]
+        policies: [no fabricated values — an unknown renders as a labelled unknown with its
+        reason when the payload carries one; no mid-word truncation — restructure, wrap, or
+        drop the lowest-signal fields instead; keep every render-gate selector working;
+        vanilla JS only, no build step; keep the tree lint-clean (ruff runs over src/
+        scripts/ apps/ tests/ in CI)]
+        verification: [tests/test_admin_frontend.py, tests/test_control_room_glance_integrity.py,
+        tests/test_control_room_static_views.py, tests/test_admin_server.py,
+        scripts/verify_control_room_rendering.py --check-fixtures]
+    phases:
+      - name: s1_row
+        kind: agent
+        scope: implementation
+        timeout: 2400
+        prompt: |
+          GOAL: {goal}
+          Implement the wireframe's E10 run row (docs/research/control_room_wireframe.md §4)
+          in the resting screen. The row carries: identity, target, model x attempt, phase
+          n/t, state, live, claim/proof, commit, cost-provenance, eligibility, receipt.
+          Rules:
+          - Readable at 1440x900, 1024x768 and 390x844 with NO mid-word truncation:
+            two-line rows, labelled cells, and/or drop the lowest-signal fields instead of
+            eliding everything (never render "unk…", "missin…", "promotab…").
+          - Every unmeasured value renders as a legible labelled unknown (with the payload's
+            reason when present); never fabricate and never hide.
+          - Work only in apps/control_room/static/ (plus tests if a selector pin needs it).
+          - Run: python3 scripts/verify_control_room_rendering.py --check-fixtures (must PASS)
+            and the focused tests listed in context.verification.
+      - name: s2_states
+        kind: agent
+        scope: implementation
+        timeout: 2400
+        prompt: |
+          Implement the per-state screens (docs/research/control_room_state_screens.md
+          §1-§2) on the resting screen: the R0/R1/R2/R3 regions render the truth table's
+          primary elements for the run state the payload reports (running / blocked /
+          stalled / failed / escalated / done). Rules:
+          - Unknown stays unknown: a run the payload cannot classify renders as a labelled
+            unknown with the reason, never as a default state.
+          - Keep every selector the render gate asserts (see the gate's fixture checks).
+          - Run the same checks as s1 (render gate --check-fixtures + the focused tests).
+      - name: s3_verify
+        kind: test
+        scope: implementation
+        timeout: 900
+        tests:
+          - tests/test_admin_frontend.py
+          - tests/test_control_room_glance_integrity.py
+          - tests/test_control_room_static_views.py
+          - tests/test_admin_server.py
+          - tests/test_fast_path_gate.py
+        prompt: |
+          The declared target verifies the slice end to end: fix the code, never weaken a
+          pin. The render gate's fixture check is the acceptance companion.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+writeup: {format: lab_book, sections: [question]}
+stop: {budget_usd: 3.0, max_attempts: 2}
