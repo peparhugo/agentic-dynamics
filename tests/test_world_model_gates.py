@@ -15,6 +15,7 @@ from pathlib import Path
 
 from agentic_dynamics.experiment.experiment_spec import load_spec
 from agentic_dynamics.runtime import workflow_runner as wr
+from agentic_dynamics.runtime.executor import StepResult
 
 SPEC = """name: t_wml
 question: q
@@ -222,3 +223,153 @@ def test_report_path_honors_the_results_dir_contract(tmp_path, monkeypatch):
     path = str(captured.get("report_path", ""))
     assert str(results) in path and path.endswith("_prior.md")
     assert Path(path).is_file()
+
+
+# ── v1.3: the plan-driven test gate (tests_from_plan + the explicit skip) ─────────────────────
+
+PLAN_GATE_SPEC = """name: t_wml_plan_gate
+question: q
+version: "0.1"
+artifact_kind: workflow
+intent: measure
+side_effects: {repository: true, external_services: false}
+repeatable: true
+factors: [{name: model, levels: [m]}]
+design: factorial
+rules: []
+metrics: []
+comparison: null
+writeup: {format: lab_book, sections: [question]}
+stop: {budget_usd: 1.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_uncertainty}
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: false
+    rag: {emit_self: false, emit_report: false}
+    context:
+      domain_context: TEST
+    phases:
+      - name: prior
+        kind: agent
+        timeout: 60
+        prompt: |
+          prior {goal}
+      - name: g_test_gate
+        kind: test
+        scope: implementation
+        timeout: 60
+        tests_from_plan: notes/plan.md
+        prompt: |
+          The declared target verifies the worktree.
+"""
+
+
+def test_plan_test_targets_resolve_existing_files_in_the_tests_section_only(tmp_path):
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_in_section.py").write_text("x")
+    (tmp_path / "tests" / "test_outside_section.py").write_text("x")
+    notes = tmp_path / "notes"
+    notes.mkdir()
+    (notes / "plan.md").write_text(
+        "# Plan\n\n"
+        "## Files\n- `tests/test_outside_section.py`\n- `src/not_a_test.py`\n\n"
+        "## Tests\n- `tests/test_in_section.py`\n- `tests/test_missing.py`\n"
+        "- `tests/test_in_section.py`\n\n"
+        "## Acceptance\n- done\n"
+    )
+    # Only the ## Tests section; only files that exist; deduplicated.
+    assert wr._test_targets_from_plan(notes / "plan.md", tmp_path) == ["tests/test_in_section.py"]
+
+
+def test_plan_driven_test_gate_skips_explicitly_when_the_plan_names_no_targets(tmp_path):
+    _init_repo(tmp_path)
+    spec_path = tmp_path / "spec.yaml"
+    spec_path.write_text(PLAN_GATE_SPEC, encoding="utf-8")
+    spec = load_spec(spec_path)
+
+    def fake(prompt, **kwargs):
+        (tmp_path / "notes").mkdir(exist_ok=True)
+        (tmp_path / "notes" / "plan.md").write_text(
+            "## Tests\nNo suites are named for this analysis-only run.\n"
+        )
+        return _R()
+
+    result = wr.run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=fake)
+    gate = {p.phase: p for p in result.phases}["g_test_gate"]
+    assert gate.status == "ok"
+    assert "SKIPPED" in gate.test_gate_note  # explicit, visible — never a silent pass
+    assert gate.test_executed_success is None  # never ran — never a fabricated verdict
+
+
+# ── v1.3: the artifact gate is clone-aware (the fleet clone is the candidate) ──────────────────
+
+
+def _clone_with_plan(parent: Path, *, with_plan: bool) -> Path:
+    """A minimal run-clone-shaped git repo beside the host worktree."""
+    clone = parent / "runclone"
+    clone.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=clone, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=clone, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=clone, check=True)
+    if with_plan:
+        (clone / "notes").mkdir()
+        (clone / "notes" / "plan.md").write_text("## Files\nx\n## Tests\ny\n## Acceptance\nz\n")
+    else:
+        (clone / "seed.txt").write_text("seed")
+    subprocess.run(["git", "add", "-A"], cwd=clone, check=True)
+    subprocess.run(["git", "commit", "-qm", "seed"], cwd=clone, check=True)
+    return clone
+
+
+class _OkExecutor:
+    """The containerized path's step executor, scripted: every phase returns ok."""
+
+    def __init__(self) -> None:
+        self.executed: list[str] = []
+
+    def execute(self, request):
+        self.executed.append(request.phase_name)
+        return StepResult(ok=True, state="ok")
+
+
+def test_artifact_gate_reads_the_run_clone_in_the_containerized_path(tmp_path, monkeypatch):
+    """Live regression (run-037d7d760bd6): the first fleet (clone-world) submission of the
+    loop died ARTIFACT_MISSING because the gate checked the host worktree while the prior
+    phase had committed the plan INTO the run's clone. The gate must read the candidate —
+    ``git_wd`` (the clone) when one is bound, the worktree otherwise."""
+    _init_repo(tmp_path)  # host worktree: deliberately NO notes/plan.md
+    clone = _clone_with_plan(tmp_path, with_plan=True)
+    monkeypatch.setenv("FINOPS_RUN_CLONE", str(clone))
+    spec_path = tmp_path / "spec.yaml"
+    spec_path.write_text(SHAPE_SPEC, encoding="utf-8")
+    spec = load_spec(spec_path)
+
+    executor = _OkExecutor()
+    result = wr.run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path, commit=False, step_executor=executor
+    )
+    phases = {p.phase: p for p in result.phases}
+    assert phases["execute"].status == "ok"  # the clone's plan satisfies the gate
+    assert executor.executed == ["prior", "execute"]
+
+
+def test_artifact_gate_still_refuses_when_the_clone_lacks_the_plan(tmp_path, monkeypatch):
+    """The negative control: a clone WITHOUT the plan still refuses, before the step runs."""
+    _init_repo(tmp_path)
+    clone = _clone_with_plan(tmp_path, with_plan=False)
+    monkeypatch.setenv("FINOPS_RUN_CLONE", str(clone))
+    spec_path = tmp_path / "spec.yaml"
+    spec_path.write_text(SHAPE_SPEC, encoding="utf-8")
+    spec = load_spec(spec_path)
+
+    executor = _OkExecutor()
+    result = wr.run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path, commit=False, step_executor=executor
+    )
+    phases = {p.phase: p for p in result.phases}
+    assert phases["execute"].status == "failed"
+    assert "ARTIFACT_MISSING" in phases["execute"].error
+    assert executor.executed == ["prior"]  # refused BEFORE the execute step ran

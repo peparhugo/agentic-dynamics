@@ -88,6 +88,38 @@ what we didn't know."
   reports/records into `/tmp/wml_v1/` — durable only while that worktree lived, and invisible
   to a reader in another worktree (the posterior's own V5 false-negative).
 
+## v1.3 built (2026-09-21, `feature/wml-v1.3`) — the three named gaps + the fleet scopes
+
+- **Fleet-runnable (scopes).** v1.2 could only run in-process: its agent phases declared no
+  `scope:`, so the durable path's spawn validation refused the spec, and the AIO
+  local-execution exception forbids in-process agent runs. v1.3 declares them —
+  `prior`/`posterior: proposal_write`, `execute`/`p2_mint`/`g_test_gate: implementation`,
+  `g_adversarial: adversarial_readonly` — and the loop rides the fleet
+  (first submission: `run-037d7d760bd6`).
+- **`g_test_gate` (the missing independent verification).** A `kind: test` phase after execute
+  whose targets come from the plan: `tests_from_plan: notes/plan.md` parses `## Tests`, keeps
+  only `tests/` paths that EXIST in the worktree, and hands them to the independent runner. A
+  plan that names no targets SKIPS explicitly (`test_gate_note` on the ledger;
+  `test_executed_success` stays None — never a fabricated verdict), so the gate is harmless
+  for analysis-only runs and exact for code-producing ones. Declared `tests:` lists are
+  unchanged.
+- **`p2_mint` (the runtime-skill path as a step, not a convention).** After the posterior, the
+  mint phase turns each SKILL/PATTERN candidate in §UPDATES into a `notes/skills/<slug>.json`
+  and mints it through the existing producer (`scripts/kb_produce_skill.py`, pattern/v1).
+  Candidates that cannot be minted are recorded, never dropped; promotion remains a reviewed
+  commit — generated surfaces are never hand-edited.
+- **Forced research (mechanized as far as the vocabulary allows).** The prior must write
+  `notes/sources.jsonl` — one provenance line per source actually used (KB id / file / URL +
+  sha256; an explicit `{"none": true, "reason": ...}` when no external fact was needed) — the
+  execute gate requires the file, and `g_adversarial` checks it against the world model: an
+  external gap with no fetched source is a finding. The semantic check stays adversarial by
+  design; the DECISION is no longer optional.
+- **The notes-collision finding (from the merge).** Two loop runs committed different artifacts
+  at the same fixed `notes/*.md` paths, so merging their branches conflicted on all four files.
+  The merge preserved both (main's canonical at `notes/*`, the second run's under
+  `notes/ci-preflight/`), and the next convention candidate is: namespace run notes by
+  run/task, or route them to the durable results dir.
+
 ## Open extension: execute as a workflow (controller, 2026-09-21)
 
 A massive plan must not run as ONE execute phase — the execute step should itself be a

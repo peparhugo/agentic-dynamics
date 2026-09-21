@@ -321,6 +321,10 @@ class PhaseResult:
     prepared_step_prompt_sha256: str = ""
     # test phases
     test_executed_success: bool | None = None
+    #: Why a plan-driven test gate ran nothing (``tests_from_plan`` resolved to zero targets):
+    #: an EXPLICIT skip, never a fabricated pass — ``test_executed_success`` stays None (never
+    #: ran) and this note names the plan. Empty when the gate ran or the phase is not a gate.
+    test_gate_note: str = ""
     # G-14 — True when the verdict above came from the independent test_runner (the harness),
     # None when no independent verdict ran (the gate was skipped/failed before executing).
     # Never ``False``: the field asks whether an independent evaluator produced the verdict,
@@ -411,6 +415,9 @@ class PhaseResult:
             "checkpoint_ref": self.checkpoint_ref,
             "archive_error": self.archive_error,
             "test_executed_success": self.test_executed_success,
+            # ADDED key (world-model loop v1.3 — never renames an existing key): the explicit
+            # skip note of a plan-driven test gate; old ledgers lack the key.
+            "test_gate_note": self.test_gate_note,
             "evaluator_independent": self.evaluator_independent,
             "tests_passed": self.tests_passed,
             "tests_total": self.tests_total,
@@ -1425,6 +1432,64 @@ def _resolve_rag_params(
     if rag_augment:
         resolved["workdir"] = str(wd)
     return resolved
+
+
+#: The repo-relative test paths a plan may name (world-model loop v1.3 ``tests_from_plan``):
+#: suite files under ``tests/`` with a runnable extension. Only paths that EXIST in the
+#: worktree are targeted — a plan can never point the gate at a file that is not there.
+_PLAN_TEST_TARGET_RE = re.compile(r"\btests/[\w./-]+\.(?:py|ts|tsx|js|jsx|sh|go|rs)\b")
+
+
+def _test_targets_from_plan(plan_path: Path, wd: Path) -> list[str]:
+    """The test targets a plan names: existing ``tests/`` paths in its ``## Tests`` section.
+
+    The world-model loop's plan (``notes/plan.md``) is shape-gated to carry ``## Tests``; that
+    section's test paths are the gate's targets. A missing section falls back to the whole
+    document (still only existing ``tests/`` paths — the filter is what matters). Order is
+    preserved and duplicates are dropped.
+    """
+    try:
+        text = plan_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    section = text
+    heading = re.search(r"^##\s+Tests\s*$", text, re.MULTILINE)
+    if heading:
+        rest = text[heading.end() :]
+        nxt = re.search(r"^##\s+", rest, re.MULTILINE)
+        section = rest[: nxt.start()] if nxt else rest
+    targets: list[str] = []
+    for cand in _PLAN_TEST_TARGET_RE.findall(section):
+        rel = cand.strip()
+        if rel in targets:
+            continue
+        if (wd / rel).exists():
+            targets.append(rel)
+    return targets
+
+
+def _resolve_test_targets(
+    phase_def: dict[str, Any], wd: Path
+) -> tuple[str | list[str] | None, bool]:
+    """``(targets, skipped)`` for a ``kind: test`` phase.
+
+    Precedence: a declared ``tests:`` list wins (unchanged semantics); else
+    ``tests_from_plan: <path>`` resolves against the worktree; else ``(None, False)`` — the
+    historical whole-tree default. A plan that resolves to ZERO existing targets returns
+    ``(None, True)``: the gate SKIPS explicitly (the caller records ``test_gate_note`` and
+    leaves ``test_executed_success`` at its None default) — harmless for analysis-only runs,
+    exact for code-producing ones.
+    """
+    declared = phase_def.get("tests")
+    if declared:
+        return declared, False
+    plan_rel = str(phase_def.get("tests_from_plan") or "").strip()
+    if not plan_rel:
+        return None, False
+    targets = _test_targets_from_plan(wd / plan_rel, wd)
+    if not targets:
+        return None, True
+    return targets, False
 
 
 def _run_test_gate(
@@ -4771,39 +4836,60 @@ def run_workflow(
                 #
                 # The phase receives the resolved test target + language so the suite the
                 # verifier runs is the SAME target list the in-process path uses (local
-                # parity — test_suite_speed p2 scoping preserved on both sides).
-                _run_test_gate(
-                    pr,
-                    wd,
-                    language,
-                    phase_timeout,
-                    target=phase_def.get("tests"),
-                    verifier_executor=verifier_executor,
-                    containerized_path=containerized_path,
-                    phase_def=phase_def,
-                    name=name,
-                    model=model,
-                    goal=goal,
-                    spec_name=spec.name,
-                    # The explicit phase's b5 rule: zero tests refuse when a target was
-                    # DECLARED; a whole-tree empty collection stays honest (no target).
-                    empty_refuses=bool(phase_def.get("tests")),
-                )
+                # parity — test_suite_speed p2 scoping preserved on both sides). Targets come
+                # from the declared ``tests:`` list or, for a plan-driven gate
+                # (``tests_from_plan``, world-model loop v1.3), from the plan's ``## Tests``
+                # section; a plan naming no resolvable targets SKIPS explicitly below.
+                gate_targets, gate_skipped = _resolve_test_targets(phase_def, git_wd)
+                if gate_skipped:
+                    pr.test_gate_note = (
+                        f"SKIPPED: tests_from_plan={str(phase_def.get('tests_from_plan'))!r} "
+                        "resolved to zero test targets (no such file, or none of its named "
+                        "targets exist in the worktree)"
+                    )
+                else:
+                    _run_test_gate(
+                        pr,
+                        git_wd,
+                        language,
+                        phase_timeout,
+                        target=gate_targets,
+                        verifier_executor=verifier_executor,
+                        containerized_path=containerized_path,
+                        phase_def=phase_def,
+                        name=name,
+                        model=model,
+                        goal=goal,
+                        spec_name=spec.name,
+                        # The explicit phase's b5 rule: zero tests refuse when a target was
+                        # DECLARED (a static list or a resolved plan); a whole-tree empty
+                        # collection stays honest (no target).
+                        empty_refuses=bool(phase_def.get("tests"))
+                        or bool(phase_def.get("tests_from_plan")),
+                    )
             else:
                 # Artifact gate (world-model loop v1, 2026-09-21): a phase may declare
                 # ``requires_files: [...]`` — the runner REFUSES (raised before any prompt
                 # build, admission, or spend; recorded as a failed phase by the handler
-                # below) when a declared artifact is absent from the worktree. The
+                # below) when a declared artifact is absent from the CANDIDATE tree. The
                 # world-model loop's plan gate depends on this: execute cannot run without
                 # the prior phase's plan.
-                _missing_required = _missing_required_files(phase_def, wd)
+                #
+                # The candidate tree is ``git_wd`` (the b2 run-clone convention): in the
+                # containerized path the phases' world is the run's PRIVATE CLONE — cells
+                # commit INTO it — so a gate reading the host worktree checks the wrong tree
+                # and refuses artifacts that exist (observed live: run-037d7d760bd6, the first
+                # fleet submission of the loop, died ARTIFACT_MISSING on the prior's plan,
+                # which sat committed in the clone). In-process runs have no clone; git_wd IS
+                # wd and nothing changes.
+                _missing_required = _missing_required_files(phase_def, git_wd)
                 if _missing_required:
                     raise RuntimeError(
                         f"ARTIFACT_MISSING — phase '{name}' requires "
                         f"{', '.join(_missing_required)}; the declared artifact(s) are "
-                        "absent from the worktree (the plan gate refuses before spend)"
+                        "absent from the candidate worktree (the plan gate refuses before spend)"
                     )
-                _missing_markers = _missing_required_markers(phase_def, wd)
+                _missing_markers = _missing_required_markers(phase_def, git_wd)
                 if _missing_markers:
                     raise RuntimeError(
                         f"ARTIFACT_SHAPE — phase '{name}' requires: "
