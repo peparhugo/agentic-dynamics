@@ -31,6 +31,8 @@ ledger (`green_main_closure`) that no fresh clone or scan worktree can resolve.
 | L4 | **Supervisor flags** — 69 entries: 68 `orphaned` delegation flags (newest **2026-08-27**) + 1 `off_track` (docs-drift, cleared by L1) | open | redis list `supervisor_flags`; file `experiments/results/supervisor/` | a fresh `supervise.py --once` pass when live state is wanted; decide an aging policy (observe-only rail keeps history by design) |
 | L5 | **Projection watermark rows stale** — rows report lag 15; live `XINFO` says lag 0/pending 0 for all four groups | open (self-clearing) | `projection_lag()` vs `XINFO GROUPS kb:v1:changes` | clears on the next processed batch; if it persists, an orchestrator-side refresh |
 | L6 | **Phase watchdog** — healthy; 4 stall events on record | parked | `stall_evidence` on ledgers: 2026-08-27 `p2_run_grid`, 2026-08-28 `p0_pin_spec`, 2026-09-01 `p4_activation_gate` (docs run), 2026-09-20 `synthesis_rerun` | none |
+| L17 | **KB finding-layer backfill** — `kb_backfill_findings` derives **208 wave findings**, none present in the local KB store (`already_present=0`) | open | `python3 scripts/kb_backfill_findings.py --dry-run` (deterministic, no LLM, rerun-safe) | decide the run/duplicate policy, then run it (it seeds the finding layer the retrieval queries read) |
+| L18 | **`source_uri` uses the container path** — fleet emissions record `file:///repo/experiments/...`; the bytes land durably in the right place (reports + `kb/*.json` verified in the checkout), but the pointer is not host-resolvable | open | registry rows emitted by the 2026-09-21 runs (`source_uri: file:///repo/...`) | add a host-prefix normalization (or a documented rewrite rule) at the emit seam |
 
 ## B. Repo & store state
 
