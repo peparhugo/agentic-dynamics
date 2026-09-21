@@ -40,6 +40,7 @@ workflow:
     phases:
       - name: prior
         kind: agent
+        scope: proposal_write
         timeout: 1800
         prompt: |
           You are the PRIOR phase of a world-model loop. The task is: {goal}
@@ -58,6 +59,7 @@ workflow:
           Do NOT implement — the plan gates the execute phase. Commit both files.
       - name: execute
         kind: agent
+        scope: implementation
         timeout: 3600
         requires_files: [notes/plan.md]
         requires_content:
@@ -71,6 +73,7 @@ workflow:
           Commit your work.
       - name: posterior
         kind: agent
+        scope: proposal_write
         timeout: 1800
         requires_files: [notes/world_model.md, notes/plan.md]
         prompt: |
