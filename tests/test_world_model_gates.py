@@ -11,6 +11,7 @@ Covers the two runner additions of 2026-09-21:
 from __future__ import annotations
 
 import subprocess
+from pathlib import Path
 
 from agentic_dynamics.experiment.experiment_spec import load_spec
 from agentic_dynamics.runtime import workflow_runner as wr
@@ -138,3 +139,86 @@ def _write_spec(tmp_path):
     path = tmp_path / "spec.yaml"
     path.write_text(SPEC, encoding="utf-8")
     return path
+
+
+def test_artifact_path_honors_the_results_dir_contract(tmp_path, monkeypatch):
+    import agentic_dynamics.knowledge.knowledge_ingestion as ki
+
+    results = tmp_path / "durable" / "experiments" / "results"
+    monkeypatch.setenv("FINOPS_RESULTS_DIR", str(results))
+    assert ki._artifact_path("abc") == results / "kb" / "abc.json"
+
+
+SHAPE_SPEC = SPEC.replace(
+    "        requires_files: [notes/plan.md]",
+    "        requires_files: [notes/plan.md]\n"
+    "        requires_content:\n"
+    '          notes/plan.md: ["## Files", "## Tests", "## Acceptance"]',
+)
+
+
+def test_shape_gate_refuses_an_unsectioned_plan(tmp_path):
+    _init_repo(tmp_path)
+    spec_path = tmp_path / "spec.yaml"
+    spec_path.write_text(SHAPE_SPEC, encoding="utf-8")
+    spec = load_spec(spec_path)
+    calls = []
+
+    def fake(prompt, **kwargs):
+        calls.append(prompt)
+        (tmp_path / "notes").mkdir(exist_ok=True)
+        (tmp_path / "notes" / "plan.md").write_text("a plan with no required sections")
+        return _R()
+
+    result = wr.run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=fake)
+    phases = {p.phase: p for p in result.phases}
+    assert phases["execute"].status == "failed"
+    assert "ARTIFACT_SHAPE" in phases["execute"].error
+    assert len(calls) == 1  # refused before the execute agent ran
+
+
+def test_shape_gate_passes_when_the_plan_carries_its_sections(tmp_path):
+    _init_repo(tmp_path)
+    spec_path = tmp_path / "spec.yaml"
+    spec_path.write_text(SHAPE_SPEC, encoding="utf-8")
+    spec = load_spec(spec_path)
+    calls = []
+
+    def fake(prompt, **kwargs):
+        calls.append(prompt)
+        (tmp_path / "notes").mkdir(exist_ok=True)
+        (tmp_path / "notes" / "plan.md").write_text("## Files\nx\n## Tests\ny\n## Acceptance\nz")
+        return _R()
+
+    result = wr.run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=fake)
+    phases = {p.phase: p for p in result.phases}
+    assert phases["execute"].status == "ok"
+    assert len(calls) == 2
+
+
+def test_report_path_honors_the_results_dir_contract(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    import agentic_dynamics.knowledge.knowledge_ingestion as ki
+
+    results = tmp_path / "durable" / "experiments" / "results"
+    monkeypatch.setenv("FINOPS_RESULTS_DIR", str(results))
+    captured = {}
+    monkeypatch.setattr(ki, "emit_phase_finding", lambda pr, **kw: captured.update(kw))
+    monkeypatch.setattr(wr, "_capture_session_report", lambda sid: "the report body")
+    pr = SimpleNamespace(
+        phase="prior",
+        session_id="ses_x",
+        final_response="the report body",
+        status="ok",
+        cost_usd=0.0,
+        tokens={},
+        test_executed_success=None,
+        commit_hash="x",
+    )
+    wr._emit_research_report(
+        pr, goal="g", spec_name="t_wml", wd=tmp_path, rag_params={"emit_scope": "s"}
+    )
+    path = str(captured.get("report_path", ""))
+    assert str(results) in path and path.endswith("_prior.md")
+    assert Path(path).is_file()

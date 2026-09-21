@@ -53,8 +53,14 @@ scope", not "empty KB". `acl_scope` defaults to the scope value.
 ## For phases (in-loop retrieval)
 
 - `rag_augment: true` + `rag_params` retrieves evidence before the first turn of a phase
-  (the augmentation seam); `emit_scope` controls where a phase's own findings land;
-  `emit_self` defaults ON, and a research phase's report is persisted and emitted as a
-  retrievable finding.
+  (the augmentation seam); `emit_self` defaults ON, and a research phase's report is persisted
+  and emitted as a retrievable finding.
+- **Emission scope gotcha (measured 2026-09-21):** the metadata finding lands in the phase's
+  CELL scope (`self-<workdir>`); the full REPORT record honors `emit_scope` (or the cell scope
+  when unset). To retrieve a phase's own findings later, read with the scope it emitted into —
+  a reader in another worktree will not see cell-scoped records.
+- **Durable emission:** a run executing from an ephemeral worktree should set
+  `FINOPS_RESULTS_DIR=<durable-checkout>/experiments/results` so its KB artifacts and reports
+  land where their links stay resolvable (the emissions and this reader both honor it).
 - A step's own writes are readable by itself: findings emitted into the cell scope are
   retrievable with the same scope (`self-<workdir>`).

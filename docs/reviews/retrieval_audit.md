@@ -59,3 +59,8 @@ as good as the corpus, and the corpus is only as good as what we emit.
 pipeline with a deterministic artifact-scan fallback (`--contains`, offline), documented by the
 `knowledge-reader` skill. The scope rules are unchanged (exact-match pre-filter; a non-empty
 explicit scope is the shared override).
+
+**Update 2, 2026-09-21.** Gap 1 resolved for every tracked workflow spec: all 20 `emit_self:
+false` opt-outs were flipped to `emit_self: true` (`control_room_run_journey.yaml` pending its
+uncommitted v0.2 edit). Research/analysis runs now emit their reports as retrievable findings
+by default — the corpus should begin carrying analysis content, not just telemetry.
