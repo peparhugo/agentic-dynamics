@@ -118,6 +118,13 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("validate", "session"): "validate_session.py",
     ("validate", "tests"): "verify_tests.py",
     ("validate", "prereq"): "evidence_prereq_gate.py",
+    # validate preflight — the local CI-parity preflight: runs the five gates
+    # .github/workflows/pytest.yml runs on every push (ruff check .; generated-instruction
+    # surfaces --check; docs-drift spec lifecycle; the fast path; the deterministic suite with
+    # external excluded), prints one PASS/FAIL line per gate, and exits non-zero if any fails.
+    # Zero model calls, subprocess-only — deliberately disjoint from the Redis-driven
+    # `pipeline ci` plan (a different mechanism and a different gate set).
+    ("validate", "preflight"): "ci_preflight.py",
     # validate render — the Control Room facelift render gate: serves the resting screen under
     # committed fixtures, captures screenshots at the three breakpoints in dark/light/
     # forced-colors, and asserts the IA §10 glance contract (Playwright; --check-fixtures runs
@@ -233,7 +240,7 @@ Subcommands (each forwards to its backing script):
   registry    query|show|lineage
   review      all|stories|trigger|enqueue|finalize
   spec        status|pipeline
-  validate    session|tests|prereq|preexisting|render
+  validate    session|tests|prereq|preexisting|render|preflight
   supervise   [claude-agents|orphans|leases]
   control     status|drain-outbox|sweep-zombies|recording-sweep
   session     open|close|budget|cache-report
