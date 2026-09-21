@@ -1,0 +1,81 @@
+name: world_model_loop
+question: >-
+  Can a prior -> execute -> posterior loop with an explicit world model and a written plan
+  improve an agent task's quality and verifiability, and produce a posterior update set
+  (violations, unknowns discovered, KB/skill updates) at the end?
+version: "0.1"
+artifact_kind: workflow
+intent: measure
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+comparison: null
+writeup: {format: lab_book, sections: [question, evidence]}
+stop: {budget_usd: 2.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_uncertainty}
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: false
+    rag:
+      emit_self: true
+      emit_scope: agentic-dynamics
+    context:
+      domain_context: >-
+        THE WORLD-MODEL LOOP. You are one phase of a three-phase loop over the SAME task:
+        PRIOR (read + world model + plan) -> EXECUTE (do the work, record deviations) ->
+        POSTERIOR (diff the model against reality; name violations and unknowns; produce the
+        update set). Read the KB with your scope: `python3 scripts/kb_read.py --query "..."
+        --scope agentic-dynamics` (ranked; add `--contains` for an offline scan). Ground every
+        claim in a file, a KB record, or a command output — never in memory.
+    phases:
+      - name: prior
+        kind: agent
+        timeout: 1800
+        prompt: |
+          You are the PRIOR phase of a world-model loop. The task is: {goal}
+
+          Before any implementation:
+          1. READ what is known. Use `python3 scripts/kb_read.py --query "..." --scope
+             agentic-dynamics` for prior findings/decisions/sessions; `git log` and the code
+             tree for the current state; and `python3 scripts/research_fetch.py <url>` only if an
+             external fact is genuinely needed (record what you fetched and why).
+          2. WRITE `notes/world_model.md`: what the problem is believed to be; what exists;
+             what is unknown (gaps); what would reduce each gap.
+          3. WRITE `notes/plan.md`: the files to touch, the tests to create, the local
+             verification commands, the acceptance criteria, the risks.
+
+          Do NOT implement — the plan gates the execute phase. Commit both files.
+      - name: execute
+        kind: agent
+        timeout: 3600
+        prompt: |
+          You are the EXECUTE phase. Implement the task ({goal}) FOLLOWING `notes/plan.md`.
+
+          Where reality differs from the plan or the world model, do not silently adapt: record
+          it in `notes/deviations.md` (what the plan said, what was true, what you did instead).
+          Create the tests the plan names; run the local verification commands it lists.
+          Commit your work.
+      - name: posterior
+        kind: agent
+        timeout: 1800
+        prompt: |
+          You are the POSTERIOR phase of the world-model loop. The task was: {goal}
+
+          Read `notes/world_model.md`, `notes/plan.md`, `notes/deviations.md`, and the run's
+          commits (`git log`, `git diff`). Do NOT change code. WRITE `notes/posterior.md`:
+
+          1. VIOLATIONS: where reality differed from the world model (cite a file/line or commit).
+          2. UNKNOWNS DISCOVERED: what we did not know at prior-time (what the next model must carry).
+          3. UPDATES: the concrete update set — KB findings to emit, skills/knowledge to create,
+             conventions to record — and what should change in the next loop's prior phase.
+
+          Commit the file.
