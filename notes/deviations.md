@@ -1,30 +1,49 @@
-# Deviations — Item 4: the missing regression check for the stale next-action state
+# Deviations — close the live-KB test-emission leak (test-seam fix)
 
-**Verdict: no plan deviation. The plan's central prediction held — the c15 gap is already
-closed for the confirmed action wired today (a durable submit), so this phase lands the missing
-regression check, not a source change. No production source file was modified.**
+**Verdict: no plan deviation. The world model's prediction held exactly — the leak is a
+test-seam defect, the fix is test-only, and no production file changed.**
+
+This file replaces the previous loop run's stale `notes/deviations.md` (the Item-4 /
+stale-next-action record). The world model (`notes/world_model.md` §5) names this overwrite as
+expected: the current run's execute/posterior/mint phases own these paths, and leaving the prior
+prose would invite the posterior to mis-attribute it to this run.
 
 ## What the plan said vs. what was true
 
 | # | Plan | Reality | Delta |
 |---|---|---|---|
-| 1 | Gap closed for the submit path; land three named regression tests (`plan.md` §0–§2). | Confirmed mechanically by the tests themselves: the submit records over a non-empty stale `next_action`, the capsule renders the new binding value with precedence, and the stale text is absent from both the JSON slot and the rendered text. | None. |
-| 2 | `notes/deviations.md` CREATED only if a deviation occurs (§1, §4.5). | No deviation in scope or behavior. The three named tests exist and pass; no fallback fix was needed. | This file is the honest record of that: created to state "no delta", per §4.5's "exists and records any delta". |
-| 3 | Prefer the lighter `fm.main` argv over `_submit_fixture` (§5). | Used the light argv (`tests/test_fleet_manager.py:1034-1041` shape) for the real submit — no real git repo, hermetic and fast. | None; the plan preferred exactly this. |
-| 4 | Reuse the `importlib` seam for `compose_capsule`, do not add a new import mechanism (§5). | Added `_load_session_open` to `tests/test_fleet_manager.py` using the same `importlib.util.spec_from_file_location` seam as `tests/test_session_binding.py:45-49`. | None. |
-| 5 | KB read degradation expected in this worktree (`plan.md` §5; registry index absent). | `experiments/results/registry_index.jsonl` is absent and `python3 scripts/kb_read.py --query ... --scope agentic-dynamics` returned `hits=0` (ranked). | Anticipated by the plan; noted, not mistaken for an empty corpus. |
+| 1 | Leak is a test-seam defect: `SPEC`'s explicit `rag.emit_self/emit_report: true` outranks the suite `FINFOPS_EMIT_SELF=0` disarm (`plan.md` §0). | Confirmed mechanically: `_finding_emit_enabled({"emit_self": True}, {})` returns `True` while `os.environ["FINOPS_EMIT_SELF"] == "0"` — asserted live in the new regression. | None. |
+| 2 | ADD a module-local autouse fixture stubbing `knowledge_ingestion.emit_phase_finding` + redirecting `FINOPS_RESULTS_DIR` (§Files). | Implemented verbatim. Both `_emit_self_finding` and `_emit_research_report` import `emit_phase_finding` inside the function, so the module-attribute patch is honored; the redirect contains `_emit_research_report`'s direct `path.write_text`. | None. |
+| 3 | ADD one regression driving the REAL emit routing and asserting (i) interception, (ii) live dirs unchanged (§Tests). | Implemented; both assertions are present and both were individually shown to fail under sabotage (see Verification). | None. |
+| 4 | Do NOT touch production, `tests/conftest.py`, or the shared `SPEC`/`PLAN_GATE_SPEC` (§0, Out of scope). | `git diff --stat` touches only `tests/test_world_model_gates.py` (+ this note). | None. |
+| 5 | Acceptance 2: with `FINOPS_RESULTS_DIR` unset, a module run creates no live `kb/` or `workflows/t_wml/` dirs. | Verified with `env -u FINFOPS_RESULTS_DIR`: both dirs absent before and after; `find` returns nothing. | None. |
+| 6 | KB read degradation expected in this worktree (`plan.md` §Risks). | Not exercised — no fact needed. The world model already recorded the degradation; no new read was attempted. | None. |
 
 ## Implementation choices worth naming (not deviations)
 
-- The stale-instruction seeding update in `test_a_submission_supersedes_a_completed_next_action_in_the_capsule`
-  passes `publish=False`, matching `_binding_store`'s `publish=False` — the test is hermetic
-  (no real Redis stream), and the durable artifact/slot still land. The tested property
-  (replace semantics + capsule precedence) is independent of the pointer publish.
-- No `fast` marker was added: neither `tests/test_session_binding.py` nor
-  `tests/test_fleet_manager.py` carries the marker today, and the fast-path parallel-safety
-  audit governs modules that do.
+- Added three imports the plan's snippets used implicitly: `os`, `pytest`, and
+  `PROJECT_ROOT` (from `agentic_dynamics.core.paths`, the tier-0 path owner). Purely mechanical.
+- The fixture's `monkeypatch.setattr` fits on one line (ruff's formatting), otherwise identical
+  to the plan's shape.
 
-## Out of scope (unchanged, per plan §6)
+## Verification (acceptance, run in this worktree with the suite disarm active)
 
-Residual: confirmed actions other than submit (e.g. `approve_workflow.py`) carry no session
-identity and do not record — deliberately not covered by a test and not fixed here.
+1. `python3 -m pytest tests/test_world_model_gates.py -q -p no:cacheprovider` → **12 passed**
+   (11 existing + 1 regression), 0 failed.
+2. `env -u FINFOPS_RESULTS_DIR python3 -m pytest tests/test_world_model_gates.py -q
+   -p no:cacheprovider` → 12 passed; `experiments/results/kb/` and
+   `experiments/results/workflows/t_wml/` never created; `find` empty and unchanged.
+3. Sabotage (throwaway copies under `tests/`, removed afterwards; the real file was never at
+   risk):
+   - removing the `ki.emit_phase_finding` stub → recorder empty → assertion (i) **failed**
+     (`assert False`), no live-tree files;
+   - removing the `FINOPS_RESULTS_DIR` redirect → assertion (ii) **failed** with a live
+     `workflows/t_wml/reports/20260921181610_{prior,execute}.md` landing. The leaked dir was
+     deleted; the live tree is clean again.
+4. `ruff check tests/test_world_model_gates.py` → **All checks passed!**
+5. `git diff --stat` → only `tests/test_world_model_gates.py` (+ this note).
+
+## Out of scope (unchanged, per plan)
+
+`_finding_emit_enabled`, the opt-in precedence, `emit_phase_finding`, the
+`FINOPS_EMIT_SELF`/`FINOPS_RESULTS_DIR` contracts, and `tests/conftest.py` were not modified.
