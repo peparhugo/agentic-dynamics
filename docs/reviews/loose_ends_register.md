@@ -92,7 +92,16 @@ call.
 | L11 | **Notes-collision convention** — loop runs commit `notes/*.md` at fixed paths; two runs conflicted at merge time (#109) | open | `notes/ci-preflight/` namespacing precedent; loop design doc | namespace run notes per run/task on the next loop touch |
 | L12 | **Loop candidates from `run-0fad6c313dcd`** — `emit-observability`, `emit_scope` split (metadata findings land in the cell scope), run-workflow skill amendments | open | `notes/minted.md` (7 pattern/v1 records minted); posterior §UPDATES | fold into the next loop iteration; doc/skill amendments stay reviewed commits |
 | L13 | **Re-run → promote** — `run-79fbc7f23d61` (v1.3.1 code) | **fixed 2026-09-21** | promoted → main `1217356c4` (squash: the emit-seam guard + the run record + 7 `pattern/v1` skills; control row `merged`, promotions row recorded; decision `6010a8da…`) | none — the next loop iteration starts from L11/L12 |
-| L14 | **Item-5 fork rating** — the rating package (arms + comparison + brief) is in main | with the controller | `experiments/results/fork_contemplation/item5/` | the controller rates; the rating sets the fork policy |
+| L14 | **Item-5 fork rating** — the rating package (arms + comparison + brief) is in main | **rated 2026-09-21: option (A)** | decision `b1d2105e…`; package `experiments/results/fork_contemplation/item5/` | **fork policy below** — no action |
+
+**Fork policy (controller-rated 2026-09-21, decision `b1d2105e…`).** Default to the **broad
+single-pass** analysis. Spend forks **on demand**: (a) a high-stakes decision, or (b) a question
+with a real option spread. Keep breadth capped at **2–3 lenses** to bound the controller's
+attention, and keep the **delivery-manifest requirement** for any synthesis — a synthesis must be
+able to prove which complete inputs it received. (The rating followed the item-5 evidence: the
+broad arm matched the top-line findings at ~¼ the reading time; the forks' marginal products — the
+arithmetic catch, the contradiction inventory, the preserved option spread — pay only where a
+missed contradiction is expensive.)
 
 ## D. Process
 
