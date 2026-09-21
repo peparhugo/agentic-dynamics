@@ -373,3 +373,108 @@ def test_artifact_gate_still_refuses_when_the_clone_lacks_the_plan(tmp_path, mon
     assert phases["execute"].status == "failed"
     assert "ARTIFACT_MISSING" in phases["execute"].error
     assert executor.executed == ["prior"]  # refused BEFORE the execute step ran
+
+
+# ── v1.3.1: F1 (run_model outranks the router) + F2 (unique report stamps) ────────────────────
+
+RUN_MODEL_SPEC = """name: t_wml_run_model
+question: q
+version: "0.1"
+artifact_kind: workflow
+intent: measure
+side_effects: {repository: true, external_services: false}
+repeatable: true
+factors: [{name: model, levels: [m]}]
+design: factorial
+rules: []
+metrics: []
+comparison: null
+writeup: {format: lab_book, sections: [question]}
+stop: {budget_usd: 1.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_uncertainty}
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: false
+    rag: {emit_self: false, emit_report: false}
+    context:
+      domain_context: TEST
+    phases:
+      - name: prior
+        kind: agent
+        timeout: 60
+        run_model: openai/gpt-5.6-terra
+        prompt: |
+          prior {goal}
+"""
+
+
+def test_declared_run_model_outranks_the_router(tmp_path):
+    """F1 (live run-0fad6c313dcd): the production root always injects route_step and that
+    router never reads phase_def, so a spec's ``run_model:`` was silently ignored — the loop's
+    "DIFFERENT model" adversarial phase ran on the run model. The declared override must win.
+
+    Exercised on the CONTAINERIZED shape (an injected step executor receives the
+    runner-resolved model): the in-process LocalAgentExecutor re-applies ``run_model`` late
+    (executor.py:386), which masks the runner-level bug — the prepared fleet step carries the
+    runner's choice, so that is where the override must resolve.
+    """
+    _init_repo(tmp_path)
+    spec_path = tmp_path / "spec.yaml"
+    spec_path.write_text(RUN_MODEL_SPEC, encoding="utf-8")
+    spec = load_spec(spec_path)
+
+    class _RecordingExecutor:
+        def __init__(self) -> None:
+            self.models: list[str] = []
+
+        def execute(self, request):
+            self.models.append(str(request.model))
+            return StepResult(ok=True, state="ok")
+
+    executor = _RecordingExecutor()
+    result = wr.run_workflow(
+        spec,
+        goal="g",
+        model="deepseek/deepseek-v4-flash",
+        workdir=tmp_path,
+        commit=False,
+        step_executor=executor,
+        router=lambda phase_def, state, preferences, signals=None: "router/picked-model",
+    )
+    assert result.ok
+    assert executor.models == ["openai/gpt-5.6-terra"]
+
+
+def test_report_stamp_is_unique_within_a_second(tmp_path, monkeypatch):
+    """F2 (live run-0fad6c313dcd): a whole-second stamp made two same-phase reports inside one
+    second overwrite each other — nondeterministic counts and a lost report. The stamp now
+    carries microseconds, so same-second reports are two files."""
+    from types import SimpleNamespace
+
+    import agentic_dynamics.knowledge.knowledge_ingestion as ki
+
+    results = tmp_path / "durable"
+    monkeypatch.setenv("FINOPS_RESULTS_DIR", str(results))
+    monkeypatch.setattr(ki, "emit_phase_finding", lambda pr, **kw: None)
+    monkeypatch.setattr(wr, "_capture_session_report", lambda sid: "the report body")
+    stamps = iter(["2026-09-21T18:25:45.111111+00:00", "2026-09-21T18:25:45.222222+00:00"])
+    monkeypatch.setattr(wr, "_now", lambda: next(stamps))
+    pr = SimpleNamespace(
+        phase="prior",
+        session_id="ses_x",
+        final_response="the report body",
+        status="ok",
+        cost_usd=0.0,
+        tokens={},
+        test_executed_success=None,
+        commit_hash="x",
+    )
+    for _ in range(2):
+        wr._emit_research_report(
+            pr, goal="g", spec_name="t_wml", wd=tmp_path, rag_params={"emit_scope": "s"}
+        )
+    reports = sorted((results / "workflows" / "t_wml" / "reports").glob("*_prior.md"))
+    assert len(reports) == 2  # same wall-clock second, two files — no overwrite

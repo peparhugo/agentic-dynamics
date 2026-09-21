@@ -120,6 +120,26 @@ what we didn't know."
   `notes/ci-preflight/`), and the next convention candidate is: namespace run notes by
   run/task, or route them to the durable results dir.
 
+## v1.3.1 (2026-09-21, `feature/wml-v131`) — the live run's findings, fixed
+
+The first successful fleet run (`run-0fad6c313dcd`, 6/6 phases, candidate `921252b82`) had its
+adversarial phase attack the run itself; three findings were engine/spec defects:
+
+- **F1 — a declared `run_model` now OUTRANKS the router.** The production root always injects
+  `route_step`, and the router never reads `phase_def`, so `run_model:` was silently dead in
+  every fleet run — the loop's "DIFFERENT model" adversarial phase ran on the run model.
+  Explicit override wins over routing; regression on the containerized shape (the in-process
+  executor's late override masks the bug and cannot show it).
+- **F2 — report stamps carry microseconds.** A whole-second stamp let two same-phase reports in
+  one second overwrite each other (nondeterministic counts, a lost report). Regression added.
+- **F8 — `g_adversarial` is `proposal_write`.** A read-only scope cannot write the review file
+  its prompt orders committed, and a phase without a commit blocks promotion (promote verifies
+  per-phase commits; it refused exactly this candidate). `proposal_write` carries assemble_docs
+  + git_commit — the review document's own write path.
+
+Next: re-run the loop on this revision; a candidate whose adversarial phase commits is
+promotable.
+
 ## Open extension: execute as a workflow (controller, 2026-09-21)
 
 A massive plan must not run as ONE execute phase — the execute step should itself be a

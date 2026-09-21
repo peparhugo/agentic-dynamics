@@ -129,7 +129,12 @@ workflow:
           `none: <reason>` line — an explicit empty, never a silent skip. Commit your files.
       - name: g_adversarial
         kind: agent
-        scope: adversarial_readonly
+        # F8 (live run-0fad6c313dcd): a read-only scope cannot write the review file this
+        # prompt orders it to commit — and a phase without a commit blocks the candidate's
+        # promotion (promote verifies per-phase commits). proposal_write carries
+        # assemble_docs + git_commit: exactly this phase's job (its review document), while
+        # the attack itself stays analytics-only by prompt.
+        scope: proposal_write
         timeout: 1800
         requires_files: [notes/world_model.md, notes/plan.md, notes/posterior.md]
         run_model: openai/gpt-5.6-terra
