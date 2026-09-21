@@ -49,14 +49,14 @@ ledger (`green_main_closure`) that no fresh clone or scan worktree can resolve.
 |---|---|---|---|---|
 | L11 | **Notes-collision convention** — loop runs commit `notes/*.md` at fixed paths; two runs conflicted at merge time (#109) | open | `notes/ci-preflight/` namespacing precedent; loop design doc | namespace run notes per run/task on the next loop touch |
 | L12 | **Loop candidates from `run-0fad6c313dcd`** — `emit-observability`, `emit_scope` split (metadata findings land in the cell scope), run-workflow skill amendments | open | `notes/minted.md` (7 pattern/v1 records minted); posterior §UPDATES | fold into the next loop iteration; doc/skill amendments stay reviewed commits |
-| L13 | **Re-run → promote** — `run-79fbc7f23d61` (v1.3.1 code) | **in flight** | control packet `active_runs`; clone `/tmp/agentic-dynamics-runs/run-79fbc7f23d61/repo` | `workflow promote --dry-run` → promote on completion |
+| L13 | **Re-run → promote** — `run-79fbc7f23d61` (v1.3.1 code) | **fixed 2026-09-21** | promoted → main `1217356c4` (squash: the emit-seam guard + the run record + 7 `pattern/v1` skills; control row `merged`, promotions row recorded; decision `6010a8da…`) | none — the next loop iteration starts from L11/L12 |
 | L14 | **Item-5 fork rating** — the rating package (arms + comparison + brief) is in main | with the controller | `experiments/results/fork_contemplation/item5/` | the controller rates; the rating sets the fork policy |
 
 ## D. Process
 
 | ID | item | status | evidence | next action |
 |---|---|---|---|---|
-| L15 | **Session close** for the 2026-09-21 unit | open | this register + decision records | write after L13 lands |
+| L15 | **Session close** for the 2026-09-21 unit | **fixed 2026-09-21** | slug `aio-world-model-loop-live-merge-closeout`; knowledge_id `d1e99149…` (`session-close/v1`) | none |
 | L16 | **Supervisor flag storage split** — live flags in the `supervisor_flags` redis list; `experiments/results/supervisor/` holds only `monitor_session.json` | parked | noted during the 2026-09-21 landscape | document in the next supervisor touch |
 
 ## Not forgotten (recorded, resolved)
