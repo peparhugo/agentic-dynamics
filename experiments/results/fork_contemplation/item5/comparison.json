@@ -1,0 +1,77 @@
+[
+  {
+    "arm": "A",
+    "run": "run-62f5d3886939",
+    "spec": "item5_broad",
+    "ok": true,
+    "cost_usd": 0.061662,
+    "phases": 1,
+    "report_chars": 14159,
+    "per_phase": [
+      {
+        "name": "broad",
+        "chars": 14149,
+        "status": "ok"
+      }
+    ],
+    "answers_delivered": []
+  },
+  {
+    "arm": "B",
+    "run": "run-7cf09daf2b34",
+    "spec": "item5_forks",
+    "ok": true,
+    "cost_usd": 0.083764,
+    "phases": 5,
+    "report_chars": 58774,
+    "per_phase": [
+      {
+        "name": "lens_risks",
+        "chars": 11902,
+        "status": "ok"
+      },
+      {
+        "name": "lens_opportunities",
+        "chars": 11289,
+        "status": "ok"
+      },
+      {
+        "name": "lens_contradictions",
+        "chars": 11977,
+        "status": "ok"
+      },
+      {
+        "name": "lens_next_moves",
+        "chars": 11591,
+        "status": "ok"
+      },
+      {
+        "name": "synthesis",
+        "chars": 11911,
+        "status": "ok"
+      }
+    ],
+    "answers_delivered": [
+      {
+        "name": "lens_risks",
+        "chars": 11902,
+        "complete": true
+      },
+      {
+        "name": "lens_opportunities",
+        "chars": 11289,
+        "complete": true
+      },
+      {
+        "name": "lens_contradictions",
+        "chars": 11977,
+        "complete": true
+      },
+      {
+        "name": "lens_next_moves",
+        "chars": 11591,
+        "complete": true
+      }
+    ]
+  }
+]
