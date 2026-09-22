@@ -3006,3 +3006,133 @@ textarea:focus {
 .run-log-follow {
   margin-top: var(--cr-space-1);
 }
+
+/* ── 13. The Operations run roster — the E10 run row ──────────────────────────────────────────
+   Labelled, wrapping fields instead of the shared nowrap table: no mid-word truncation at any
+   width. `overflow-wrap: anywhere` lets a 40-char candidate sha wrap rather than clip, and the
+   field grid collapses to one column on a phone. */
+.run-roster {
+  margin-top: var(--cr-space-2);
+  overflow-x: hidden; /* the grid wraps; nothing scrolls sideways */
+}
+
+.run-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.run-table caption {
+  text-align: left;
+}
+
+.run-row {
+  cursor: pointer;
+}
+
+.run-row:focus-visible {
+  outline: 2px solid var(--cr-accent);
+  outline-offset: -2px;
+}
+
+/* Blocked/failed (or decisions-owed) runs lead with a rose edge — attention, never lifecycle. */
+.run-row-leads td {
+  border-left: 3px solid var(--attention-off-track);
+}
+
+.run-row-cell {
+  width: 100%;
+  padding: var(--cr-space-2) var(--cr-space-3);
+  border-bottom: 1px solid var(--cr-line-subtle);
+  vertical-align: top;
+}
+
+.run-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--cr-space-2) var(--cr-space-3);
+}
+
+.run-field {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.run-label {
+  font-size: var(--fs-eyebrow);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.run-value {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--cr-text-primary);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+
+.run-value-unknown {
+  color: var(--status-unknown);
+  font-style: italic;
+}
+
+.run-attention.none {
+  color: var(--text-faint);
+}
+
+/* ── 13b. The truth strip — source + age provenance, or a labelled unknown ──────────────────── */
+.truth-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--cr-space-2) var(--cr-space-3);
+  margin-top: var(--cr-space-2);
+  padding: var(--cr-space-2) var(--cr-space-3);
+  border: 1px solid var(--cr-line-subtle);
+  border-radius: var(--cr-radius-sm);
+  background: var(--cr-surface-inset);
+}
+
+.truth-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--cr-space-1);
+  min-width: 0;
+}
+
+.truth-label {
+  font-size: var(--fs-eyebrow);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.truth-value {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--cr-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.truth-value[data-state="unknown"] {
+  color: var(--status-unknown);
+  font-style: italic;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* No motion is introduced by this slice; the marker keeps the a11y contract explicit. */
+  .run-row {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  /* The unknown token must stay legible in forced-colors: shape (italic) + text carry it. */
+  .run-value-unknown,
+  .truth-value[data-state="unknown"] {
+    color: GrayText;
+  }
+}

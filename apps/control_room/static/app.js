@@ -3010,24 +3010,252 @@
     return element("p", className, text)
   }
 
-  /** One run-reference row -> table cells (packet fields, never re-derived). */
-  function runRow(entry) {
-    const progress =
-      entry.phases_completed === undefined && entry.phases_total === undefined
-        ? "—"
-        : `${entry.phases_completed ?? 0}/${entry.phases_total ?? 0}`
-    return [
-      entry.run_id,
-      entry.spec_name,
-      entry.state,
-      progress,
-      entry.model,
-      entry.candidate_sha ? String(entry.candidate_sha).slice(0, 12) : "—",
-      entry.started_at ? formatAge(entry.started_at) : "—",
-    ]
+  /* ── The E10 run row (docs/research/control_room_wireframe.md §4) ─────────────────────────
+     The roster is the room's run-first surface. Every value is the packet the /api/operations
+     read model returned; an E10 facet the packet does not carry renders the literal, LABELLED
+     `unknown` with its reason — never a fabricated value and never a bare unlabelled token.
+
+     The roster is deliberately NOT the shared `dataTable`: that table carries `.routing-table`'s
+     `white-space: nowrap`, the exact mechanism that clipped "unk…"/"missin…" mid-word. Here every
+     value wraps (`overflow-wrap: anywhere`), so a long identifier reads in full at every width
+     instead of being elided. Rows still keep `data-run-id` + role + aria-label + tabIndex, so the
+     click/keyboard drawer journey the render gate exercises is unchanged. */
+
+  /** The E10 facet labels, in wireframe order — one row model, one label source (no drift). */
+  const RUN_FIELDS = [
+    ["session.identity", "Run"],
+    ["spec.cell", "Spec"],
+    ["model.provider", "Model"],
+    ["phase.progress", "Phase"],
+    ["lifecycle.state", "State"],
+    ["source.commit", "Commit"],
+    ["run.live", "Live"],
+    ["terminal.target", "Target"],
+    ["attempt.number", "Attempt"],
+    ["cost.provenance", "Cost"],
+    ["decision.eligibility", "Eligibility"],
+    ["decision.receipt", "Receipt"],
+    ["evidence.advisory", "Evidence"],
+    ["attention.state", "Attention"],
+    ["started.age", "Started"],
+  ]
+
+  /** Kept as the roster's field legend (also read by the structural suite as a literal). */
+  const RUN_HEADERS = RUN_FIELDS.map(([, label]) => label)
+
+  /** The reason an E10 facet is unknown when the /api/operations row does not emit it. */
+  const FACET_NOT_EMITTED = "not emitted by /api/operations"
+
+  /** One known value node: monospace and never ellipsized; the full text rides in `title`. */
+  function runValue(text, { identifier = false, title = "" } = {}) {
+    const node = element(
+      "span",
+      "run-value",
+      text === null || text === undefined ? "" : String(text),
+    )
+    node.dataset.noEllipsis = ""
+    if (identifier) node.dataset.identifier = ""
+    if (title) node.title = title
+    return node
   }
 
-  const RUN_HEADERS = ["Run", "Spec", "State", "Phases", "Model", "Candidate", "Started"]
+  /** An unmeasured value node: the literal `unknown`, labelled with its reason (never blank/0). */
+  function runUnknown(reason = FACET_NOT_EMITTED) {
+    const node = element("span", "run-value run-value-unknown", "unknown")
+    node.dataset.state = "unknown"
+    node.dataset.reason = reason
+    node.dataset.noEllipsis = ""
+    node.title = reason
+    return node
+  }
+
+  /** One labelled E10 field: a `data-field` block carrying its `data-label` + `data-value`. */
+  function runField(field, label, valueNode) {
+    const block = element("div", "run-field")
+    block.dataset.field = field
+    const labelNode = element("span", "run-label", label)
+    labelNode.dataset.label = ""
+    const value = valueNode || runUnknown()
+    value.dataset.value = ""
+    block.appendChild(labelNode)
+    block.appendChild(value)
+    return block
+  }
+
+  /**
+   * The lifecycle chip for a run's emitted state, through the room's SHIPPED vocabulary.
+   *
+   * `ControlRoomFleet.lifecycle` knows the seven execution statuses (queued/running/done/
+   * failed/timeout/retry/unknown). The packet's run vocabulary is the twelve-value RunState
+   * (`control_db.py:140`); several values have no token there (`promotable`, `awaiting_approval`).
+   * For those the honest render is the UNKNOWN token — its class and glyph — carrying the raw
+   * state as a labelled word and its reason, never an invented default and never silently hidden.
+   */
+  function runStateChip(rawState) {
+    const vocabulary = fleet.lifecycle(rawState)
+    if (vocabulary.key !== "unknown") {
+      return applyStatusWord(element("span", "status-word"), vocabulary)
+    }
+    const word = rawState ? String(rawState).replace(/_/g, " ").toUpperCase() : "UNKNOWN"
+    const node = element("span", "status-word status-unknown")
+    const glyph = element("span", "status-glyph", "?")
+    glyph.setAttribute("aria-hidden", "true")
+    node.appendChild(glyph)
+    node.appendChild(document.createTextNode(word))
+    node.dataset.state = "unknown"
+    node.dataset.reason = rawState
+      ? `no lifecycle token for run state '${rawState}'`
+      : "run state not emitted"
+    node.title = node.dataset.reason
+    return node
+  }
+
+  /**
+   * The attention facet: `active` when the packet's attention (decisions-owed) block lists this
+   * run, else `none`. The block is the emitted evidence; the kind it carries is the chip word,
+   * and the attention axis is the SHIPPED `flag-status-*` vocabulary — never the lifecycle's
+   * (`board-fleet.js` keeps the two axes apart on purpose). No `unknown` attention member is
+   * invented: `active`/`none` is the packet's whole domain.
+   */
+  function runAttentionValue(entry) {
+    if (!entry) {
+      const none = element("span", "run-value run-attention", "none")
+      none.dataset.attentionState = "none"
+      none.title = "the run is not in the packet's attention (decisions-owed) block"
+      return none
+    }
+    const kind = String(entry.kind || "attention").toLowerCase()
+    const vocabulary = fleet.attention(kind)
+    const value = element("span", `run-value run-attention ${vocabulary.className}`)
+    value.dataset.attentionState = "active"
+    value.dataset.attentionClass = kind
+    value.title = entry.purpose || entry.reason || `attention: ${kind}`
+    const glyph = element("span", "status-glyph", vocabulary.glyph)
+    glyph.setAttribute("aria-hidden", "true")
+    value.replaceChildren(glyph, document.createTextNode(kind.toUpperCase()))
+    return value
+  }
+
+  /** True when the packet puts the run in decisions-owed, or its emitted state needs a human. */
+  function runLeads(entry, attentionEntry) {
+    if (attentionEntry) return true
+    return entry.state === "awaiting_approval" || entry.state === "failed"
+  }
+
+  /** Build one E10 field's value node from the packet row. Never re-derives a packet value. */
+  function runFieldValue(field, entry, attentionByRun) {
+    switch (field) {
+      case "session.identity":
+        return runValue(entry.run_id || "unknown", { identifier: true })
+      case "spec.cell":
+        return runValue(entry.spec_name || "unknown")
+      case "model.provider":
+        return runValue(entry.model || "unknown")
+      case "phase.progress": {
+        const missing =
+          entry.phases_completed === undefined && entry.phases_total === undefined
+        return missing
+          ? runUnknown("no phases_completed/phases_total emitted")
+          : runValue(`${entry.phases_completed ?? 0}/${entry.phases_total ?? 0}`)
+      }
+      case "lifecycle.state":
+        return runStateChip(entry.state)
+      case "source.commit": {
+        const sha = entry.candidate_sha ? String(entry.candidate_sha) : ""
+        return sha
+          ? runValue(sha.slice(0, 12), { identifier: true, title: sha })
+          : runUnknown("no candidate_sha emitted")
+      }
+      case "attention.state":
+        return runAttentionValue(attentionByRun.get(entry.run_id) || null)
+      case "started.age":
+        return entry.started_at
+          ? runValue(formatAge(entry.started_at))
+          : runUnknown("no started_at emitted")
+      default:
+        // run.live / terminal.target / attempt.number / cost.provenance / decision.eligibility /
+        // decision.receipt / evidence.advisory: facets the served /api/operations row does not
+        // carry. A labelled unknown is the honest render; the escalation to bind /api/glance is
+        // recorded in the run's decision record, not adopted silently here.
+        return runUnknown()
+    }
+  }
+
+  /**
+   * The run roster: a table of labelled, wrapping E10 rows.
+   *
+   * `tr[data-run-id]` + role=button + aria-label + tabIndex are preserved exactly (the gate's
+   * scrolling and keyboard classes depend on all four); the layout inside the single cell is a
+   * responsive field grid so nothing is clipped and the page never overflows horizontally.
+   */
+  function runRoster(captionText, runs, attentionByRun) {
+    const wrap = element("div", "run-roster")
+    const table = element("table", "run-table")
+    table.appendChild(element("caption", "sr-only", captionText))
+    const body = element("tbody")
+    ;(runs || []).forEach((entry) => {
+      const attentionEntry = attentionByRun.get(entry.run_id) || null
+      const tr = element("tr", "run-row")
+      tr.dataset.runId = entry.run_id
+      tr.tabIndex = 0
+      tr.setAttribute("role", "button")
+      tr.setAttribute("aria-label", `Open run ${entry.run_id} detail`)
+      if (runLeads(entry, attentionEntry)) tr.classList.add("run-row-leads")
+      const cell = element("td", "run-row-cell")
+      cell.colSpan = RUN_HEADERS.length
+      const fields = element("div", "run-fields")
+      RUN_FIELDS.forEach(([field, label]) => {
+        fields.appendChild(runField(field, label, runFieldValue(field, entry, attentionByRun)))
+      })
+      cell.appendChild(fields)
+      tr.appendChild(cell)
+      body.appendChild(tr)
+    })
+    table.appendChild(body)
+    wrap.appendChild(table)
+    return wrap
+  }
+
+  /* ── The truth strip: source + age provenance, or a labelled unknown ──────────────────────
+     The operations snapshot's own provenance is rendered beside it. Nothing consequential is
+     derived client-side: the epoch, repo head, packet schema, and each projection's unconfirmed
+     event count are the read model's values, or the literal `unknown` when it carried none. */
+
+  /** One provenance chip: a label, its value (or a labelled unknown), and its source. */
+  function truthItem(label, value, { source = "" } = {}) {
+    const item = element("span", "truth-item")
+    item.appendChild(element("span", "truth-label", label))
+    const missing = value === null || value === undefined || value === ""
+    const node = element("span", "truth-value", missing ? "unknown" : String(value))
+    node.dataset.state = missing ? "unknown" : "measured"
+    if (source) item.dataset.source = source
+    item.appendChild(node)
+    return item
+  }
+
+  function renderTruthStrip(source, lag) {
+    const strip = element("div", "truth-strip")
+    strip.setAttribute("role", "group")
+    strip.setAttribute("aria-label", "Snapshot provenance")
+    const schema = source.packet_schema || ""
+    strip.appendChild(truthItem("packet", source.packet_schema, { source: "control status" }))
+    strip.appendChild(truthItem("control epoch", source.control_epoch, { source: schema }))
+    strip.appendChild(truthItem("repo head", source.repo_head_sha, { source: schema }))
+    const projections =
+      lag && typeof lag === "object"
+        ? Object.entries(lag).sort(([left], [right]) => left.localeCompare(right))
+        : []
+    if (!projections.length) {
+      // A null (or empty) lag block means the read model confirmed nothing — say unknown,
+      // never fabricate a zero-lag all-clear.
+      strip.appendChild(truthItem("projection lag", null, { source: "projection_watermarks" }))
+    } else {
+      projections.forEach(([name, events]) => {
+        strip.appendChild(truthItem(name, events, { source: "projection_watermarks" }))
+      })
+    }
+    return strip
+  }
 
   /** The Operations board: the packet-derived snapshot, rendered as it was returned. */
   async function loadOperations(force = false) {
@@ -3062,6 +3290,12 @@
     const attention = data.attention || []
     const degraded = data.degraded || []
     const lag = data.projection_lag || {}
+    // The packet's own decisions-owed block, keyed by run, so each roster row can render its
+    // attention facet (the emitted evidence) instead of inventing one.
+    const attentionByRun = new Map()
+    attention.forEach((entry) => {
+      if (entry.run_id && !attentionByRun.has(entry.run_id)) attentionByRun.set(entry.run_id, entry)
+    })
 
     // A degraded control DB means every count derived from it reads "unavailable", never 0
     // (the payload is a legitimate HTTP 200 with empty arrays plus a named degradation).
@@ -3081,7 +3315,7 @@
       card.appendChild(element("strong", "metric-value", value))
       summary.appendChild(card)
     })
-    const children = [summary]
+    const children = [summary, renderTruthStrip(source, lag)]
 
     if (degraded.length) {
       const block = element("section", "surface-block")
@@ -3133,10 +3367,16 @@
     } else if (runs.length === 0) {
       runsBlock.appendChild(paragraph("No active or promotable runs."))
     } else {
+      // Blocked/failed runs lead (state screens §1: they are what needs the operator next).
+      // `Array.sort` is stable, so runs the packet does not flag keep the packet's own order.
+      const rank = (entry) => (runLeads(entry, attentionByRun.get(entry.run_id) || null) ? 0 : 1)
+      runs.sort((left, right) => rank(left) - rank(right))
       runsBlock.appendChild(
-        dataTable("Active and promotable runs", RUN_HEADERS, runs.map(runRow), {
-          runIds: runs.map((entry) => entry.run_id),
-        }),
+        runRoster(
+          `Active and promotable runs — E10 fields: ${RUN_HEADERS.join(", ")}`,
+          runs,
+          attentionByRun,
+        ),
       )
     }
     children.push(runsBlock)
