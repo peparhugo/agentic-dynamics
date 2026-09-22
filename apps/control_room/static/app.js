@@ -3355,8 +3355,6 @@
         ),
       )
     }
-    children.push(attentionBlock)
-
     const runsBlock = element("section", "surface-block")
     runsBlock.appendChild(element("h3", "", "Active + promotable runs"))
     const runs = active.concat(promotable)
@@ -3379,7 +3377,12 @@
         ),
       )
     }
+    // LIVE FIRST (2026-09-22, operator-flagged): the attention block (approvals + the failed
+    // roster — 19 historical rows on the live board) used to render BEFORE the run roster, so
+    // the ONE running run sat below a wall of old failures and could not be found. The board's
+    // order is now: what is RUNNING, then what needs a decision, then the rest.
     children.push(runsBlock)
+    children.push(attentionBlock)
 
     const lagBlock = element("section", "surface-block")
     lagBlock.appendChild(element("h3", "", "Projection lag"))
