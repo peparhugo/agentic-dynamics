@@ -1299,3 +1299,64 @@ def test_failed_squash_restores_the_workdir_for_a_retry(tmp_path):
         ["git", "status", "--porcelain"], cwd=wt, capture_output=True, text=True
     ).stdout.strip()
     assert dirty == "", f"the workdir must be clean for the retry, found: {dirty!r}"
+
+
+# ── the modify/delete class (2026-09-22 L23): ignored paths excluded at the MERGE input ─────
+
+
+def _repo_with_a_modify_delete_conflict(tmp_path: Path) -> Path:
+    """The L23 topology: the merge base TRACKS an ignored path; main deletes it (the
+    convention); the candidate modifies it. The merge conflicts before any staged drop runs."""
+    wt = tmp_path / "candidate"
+    wt.mkdir()
+    for cmd in (
+        ["git", "init", "-q", "-b", "main"],
+        ["git", "config", "user.email", "t@t"],
+        ["git", "config", "user.name", "t"],
+    ):
+        subprocess.run(cmd, cwd=wt, check=True)
+    (wt / ".gitignore").write_text("notes/\n")
+    (wt / "notes").mkdir()
+    (wt / "notes" / "plan.md").write_text("v1\n")
+    (wt / "base.txt").write_text("base\n")
+    subprocess.run(["git", "add", ".gitignore", "base.txt"], cwd=wt, check=True)
+    subprocess.run(["git", "add", "-f", "notes/plan.md"], cwd=wt, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "base carries the ignored path"], cwd=wt, check=True)
+
+    # the candidate: modifies the ignored path + a real change
+    subprocess.run(["git", "checkout", "-q", "-b", "candidate"], cwd=wt, check=True)
+    (wt / "notes" / "plan.md").write_text("v2 — the candidate's process record\n")
+    (wt / "calc.py").write_text("def add(a, b): return a + b\n")
+    subprocess.run(["git", "add", "calc.py"], cwd=wt, check=True)
+    subprocess.run(["git", "add", "-f", "notes/plan.md"], cwd=wt, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "[workflow] scope — candidate"], cwd=wt, check=True)
+
+    # main advances: the convention untracks the ignored path (delete)
+    subprocess.run(["git", "checkout", "-q", "main"], cwd=wt, check=True)
+    subprocess.run(["git", "rm", "-q", "-r", "notes"], cwd=wt, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "the convention: untrack ignored paths"], cwd=wt, check=True)
+    subprocess.run(["git", "checkout", "-q", "candidate"], cwd=wt, check=True)
+    return wt
+
+
+def test_squash_resolves_a_modify_delete_conflict_on_ignored_paths(tmp_path):
+    """The promotion must not stop on paths it will not carry: the merge input excludes the
+    ignored paths, so a modify/delete between main (deleted) and the candidate (modified)
+    resolves as delete-by-both, while the candidate's real change rides."""
+    from promote import _push_squashed
+
+    wt = _repo_with_a_modify_delete_conflict(tmp_path)
+    sha = _candidate_sha(wt)
+    remote = _bare_origin(tmp_path, wt)
+
+    _push_squashed(wt, "main", "[workflow] promote_test", sha)
+
+    listing = subprocess.run(
+        ["git", "-C", str(remote), "ls-tree", "-r", "--name-only", "main"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split()
+    assert "notes/plan.md" not in listing, "an ignored path must never ride a promotion"
+    assert "calc.py" in listing, "the candidate's real change still rides"
+    assert ".gitignore" in listing
