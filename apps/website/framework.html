@@ -232,7 +232,7 @@
 <section class="fsec" id="levers"><div class="inr wide">
 <div class="section-kicker">WHY — ECONOMIC INPUTS / MEASURED AND MODELED</div>
 <h2>Separate what is measured,<br>controlled, and modeled.</h2>
-<p class="lead">Observed cost, outcome, and narration fields come from the 227-session precursor perturbation corpus [M] (distinct from the 1,027-session story corpus). Retry rate is a workload input until the attempt ledger measures it directly — it now IS measured (the attempt ledger emits attempt_count, retry_reason, first_pass, and accepted). Modeling parameters (&beta;, EPM) are calibrated to your codebase and provider-pricing horizon; EPM is the selection-time + budget-horizon risk factor, never a session lever. Separating observations, controls, and assumptions is the difference between deterministic budgeting and surprise overruns.</p>
+<p class="lead">Observed cost, outcome, and narration fields come from the precursor perturbation corpus — 227 sessions [M] (distinct from the 1,027-session story corpus). Retry rate is a workload input until the attempt ledger measures it directly — it now IS measured (the attempt ledger emits attempt_count, retry_reason, first_pass, and accepted). Modeling parameters (&beta;, EPM) are calibrated to your codebase and provider-pricing horizon; EPM is the selection-time + budget-horizon risk factor, never a session lever. Separating observations, controls, and assumptions is the difference between deterministic budgeting and surprise overruns.</p>
 <div class="lever-console">
   <article class="lever-lane">
     <div class="lane-head"><h3>Augmented Workforce (Rules 1&ndash;5)</h3><span>human + AI / per session</span></div>
@@ -805,7 +805,7 @@
 <section class="fsec" id="cost-model"><div class="inr wide">
 <div class="section-kicker">HOW — ECONOMICS / COST MODEL</div>
 <h2>One equation. Every cost driver.<br>Any scenario. Your numbers.</h2>
-<p class="lead" style="margin-bottom:1rem">Every rule derives from these equations. Cost parameters (C₀, P) are measured from the 227-session precursor perturbation corpus [M]. Modeling parameters (β, EPM) use IEA energy projections and your codebase growth rate. See methodology for provenance detail on each parameter.</p>
+<p class="lead" style="margin-bottom:1rem">Every rule derives from these equations. Cost parameters (C₀, P) are measured from the precursor perturbation corpus — 227 sessions [M]. Modeling parameters (β, EPM) use IEA energy projections and your codebase growth rate. See methodology for provenance detail on each parameter.</p>
 <div class="cost-station">
   <div class="formula-rail">
     <article class="formula-plate"><strong>Augmented Workforce <span style="color:var(--t3);font-size:0.7em">(Rules 1–5)</span></strong>c(t) = C&#8320;&times;EPM(t)&times;(1+&beta;&middot;v&middot;t)<br>C(N,v) = C&#8320;&times;EPM(N)&times;[N+&beta;&middot;v&middot;N(N&minus;1)/2]<br>CostPerOutcome = C(K/P, v)/K<br>C<sub>mo</sub> = E&times;C&#8320;&times;EPM(N)&times;[N+&beta;&middot;v&middot;N(N&minus;1)/2]<span class="formula-controls">Controls: C&#8320; / P / &beta; / v / EPM</span></article>
