@@ -35,6 +35,7 @@ from apps.control_room.services.operations import (  # noqa: E402
     logs_block,
     operational_snapshot,
     read_run_logs,
+    resolve_live_cell,
     run_detail,
 )
 
@@ -501,6 +502,33 @@ def test_read_run_logs_names_each_absence():
     assert tail_down["state"] == "unavailable"
     assert tail_down["cell_id"] == "job-aa"
     assert "redis unavailable" in tail_down["reason"]
+
+
+def test_resolve_live_cell_maps_a_fleet_job_to_its_live_phase_stream():
+    """A job cell (no run_id yet) resolves to the newest live phase stream; the basis names
+    the substitution; a finished job and a non-job id pass through unchanged."""
+    board = {
+        "job-live": json.dumps(
+            {"job_id": "job-live", "spec": "workflows/repository/flow.yaml", "ts": 1790105820.0,
+             "status": "running"}
+        ),
+        "job-done": json.dumps(
+            {"job_id": "job-done", "spec": "workflows/repository/flow.yaml", "ts": 1790105820.0,
+             "run_id": "run-1", "status": "completed"}
+        ),
+    }
+    logs = {
+        "events_log:flow:execute": [
+            json.dumps({"type": "step_start", "timestamp": "1790105944000"}),
+        ],
+    }
+    redis = _FakeRedis(board=board, logs=logs)
+    cell, basis = resolve_live_cell(redis, "job-live")
+    assert cell == "flow:execute"
+    assert "job-live" in basis and "flow:execute" in basis
+
+    assert resolve_live_cell(redis, "job-done") == ("job-done", "")
+    assert resolve_live_cell(redis, "alpha") == ("alpha", "")
 
 
 def test_read_run_logs_binds_the_live_phase_stream_for_an_in_flight_run():

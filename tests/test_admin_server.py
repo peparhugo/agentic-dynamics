@@ -678,12 +678,69 @@ def test_event_stream_replays_in_order_then_marks_live_boundary(monkeypatch):
     assert next(iterator).decode() == "data: new\n\n"
     boundary = next(iterator).decode()
     assert boundary.startswith("event: replay_complete\ndata: ")
-    assert json.loads(boundary.split("data: ", 1)[1]) == {"cell_id": "alpha"}
+    # The boundary now names BOTH ids (2026-09-22): the resolved cell and the requested one —
+    # equal for a pass-through cell, distinct when a fleet job resolves to its live phase.
+    assert json.loads(boundary.split("data: ", 1)[1]) == {
+        "cell_id": "alpha",
+        "requested": "alpha",
+    }
     assert next(iterator).decode() == "data: live\n\n"
     assert redis.pubsub_client.subscriptions == ["events:alpha"]
     response.close()
     assert redis.pubsub_client.unsubscriptions == ["events:alpha"]
     assert redis.pubsub_client.closed is True
+
+
+def test_event_stream_resolves_a_fleet_job_to_its_live_phase_stream(monkeypatch):
+    """A workflow run's cell-list entry is its fleet JOB id, whose own stream carries only
+    orchestrator milestones. The stream resolves the job to the run's newest live PHASE
+    stream and NAMES the substitution (first frame), so the Cell/Transcript panel shows the
+    agent's own output; the replay boundary names both ids and the live subscription follows
+    the resolved cell."""
+    class JobAwareRedis(FakeRedis):
+        def hgetall(self, key):
+            if key == "fleet:jobs":
+                return self.fleet_jobs
+            return super().hgetall(key)
+
+        def scan_iter(self, match=None, count=None):
+            prefix = str(match or "").rstrip("*")
+            for key in sorted(self.logs):
+                if key.startswith(prefix):
+                    yield key
+
+        def lindex(self, key, index):
+            values = list(self.logs.get(key, []))
+            return values[index] if values else None
+
+    redis = JobAwareRedis(
+        logs={
+            "events_log:flow:execute": [
+                json.dumps({"type": "text", "timestamp": "1790105944000",
+                            "part": {"text": "agent step"}}),
+            ],
+        },
+    )
+    redis.fleet_jobs = {
+        "job-live": json.dumps(
+            {"job_id": "job-live", "spec": "workflows/repository/flow.yaml",
+             "ts": 1790105820.0, "status": "running"}
+        ),
+    }
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+    response = server.app.test_client().get("/api/events/job-live", buffered=False)
+    iterator = iter(response.response)
+
+    note = next(iterator).decode()
+    assert "[room]" in note and "job-live" in note and "flow:execute" in note
+    replay = next(iterator).decode()
+    assert "agent step" in replay
+    boundary = next(iterator).decode()
+    payload = json.loads(boundary.split("data: ", 1)[1])
+    assert payload["cell_id"] == "flow:execute"
+    assert payload["requested"] == "job-live"
+    assert redis.pubsub_client.subscriptions == ["events:flow:execute"]
+    response.close()
 
 
 def test_index_and_existing_static_asset_routes_remain_available():

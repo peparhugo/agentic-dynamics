@@ -203,10 +203,20 @@
       const sample = common.sample
       if (!sample) return { ...common, kind: "step", label: "STEP", text: "No usage reported" }
       const fields = []
-      if (sample?.input_tokens !== null) fields.push(`${sample.input_tokens.toLocaleString()} in`)
-      if (sample?.output_tokens !== null) fields.push(`${sample.output_tokens.toLocaleString()} out`)
-      if (sample?.reasoning_tokens !== null) fields.push(`${sample.reasoning_tokens.toLocaleString()} reasoning`)
-      if (sample?.cache_tokens !== null) fields.push(`${sample.cache_tokens.toLocaleString()} cache`)
+      const split = [sample?.input_tokens, sample?.output_tokens, sample?.reasoning_tokens]
+      const splitAbsent = split.every((value) => value === null || value === 0)
+      if (splitAbsent && sample?.total_tokens) {
+        // The provider arm reports a TOTAL without the in/out split (2026-09-22 review:
+        // "cost with no tokens" was this renderer printing "0 in · 0 out" beside real cost).
+        // A measured total is shown as a total; zeros are never printed in its place.
+        fields.push(`${sample.total_tokens.toLocaleString()} total`)
+        if (sample?.cache_tokens) fields.push(`${sample.cache_tokens.toLocaleString()} cache`)
+      } else {
+        if (sample?.input_tokens !== null) fields.push(`${sample.input_tokens.toLocaleString()} in`)
+        if (sample?.output_tokens !== null) fields.push(`${sample.output_tokens.toLocaleString()} out`)
+        if (sample?.reasoning_tokens !== null) fields.push(`${sample.reasoning_tokens.toLocaleString()} reasoning`)
+        if (sample?.cache_tokens !== null) fields.push(`${sample.cache_tokens.toLocaleString()} cache`)
+      }
       if (sample?.cost !== null) fields.push(`$${sample.cost.toFixed(4)} reported`)
       return { ...common, kind: "step", label: "STEP", text: fields.join(" · ") || "No usage reported" }
     }
