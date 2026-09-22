@@ -434,6 +434,17 @@ class _FakeRedis:
         self._check("llen")
         return len(self._logs.get(key, []))
 
+    def scan_iter(self, match=None, count=None):
+        prefix = str(match or "").rstrip("*")
+        for key in sorted(self._logs):
+            if key.startswith(prefix):
+                yield key
+
+    def lindex(self, key, index):
+        self._check("lindex")
+        values = list(self._logs.get(key, []))
+        return values[index] if values else None
+
 
 def _board(run_id: str, job_id: str) -> dict[str, str]:
     return {job_id: json.dumps({"job_id": job_id, "run_id": run_id, "status": "completed"})}
@@ -490,6 +501,70 @@ def test_read_run_logs_names_each_absence():
     assert tail_down["state"] == "unavailable"
     assert tail_down["cell_id"] == "job-aa"
     assert "redis unavailable" in tail_down["reason"]
+
+
+def test_read_run_logs_binds_the_live_phase_stream_for_an_in_flight_run():
+    """An IN-FLIGHT run (a job entry without a run_id) reads and follows the newest live phase
+    stream — the agent's own output and steps — never the orchestrator's two-line job tail
+    (the 2026-09-22 miss: the drawer followed the job stream and showed milestones while the
+    agent streamed hundreds of events). The fleet identity stays named on ``job_id``."""
+    board = {
+        "job-live": json.dumps(
+            {"job_id": "job-live", "spec": "flow.yaml", "ts": 1790105820.0, "status": "running"}
+        )
+    }
+    logs = {
+        # the job stream: orchestrator milestones only
+        "events_log:job-live": [
+            json.dumps({"type": "step_finish", "part": {"text": "phase prior ok"}}),
+            json.dumps({"type": "text", "part": {"text": "workflow flow — started"}}),
+        ],
+        # the phase streams (newest-first, like the producer): the execute is live at 1004s
+        "events_log:flow:prior": [
+            json.dumps({"type": "step_finish", "timestamp": "1790105800000"}),
+        ],
+        "events_log:flow:execute": [
+            json.dumps({"type": "tool_use", "timestamp": "1790105944000", "part": {"text": "write notes"}}),
+            json.dumps({"type": "step_start", "timestamp": "1790105930000"}),
+        ],
+    }
+    block = read_run_logs(
+        _FakeRedis(board=board, logs=logs), "run-x", spec_name="flow", started_at="1790105829.7"
+    )
+    assert block["state"] == "recorded"
+    assert block["cell_id"] == "flow:execute"
+    assert block["job_id"] == "job-live"
+    assert block["live_cell_id"] == "flow:execute"
+    assert block["match"] == "by_spec_time"
+    assert block["stream_match"] == "by_phase_time"
+    assert [event["class"] for event in block["events"]] == ["step_start", "tool_use"]
+    assert block["events"][1]["text"] == "write notes"
+
+
+def test_read_run_logs_keeps_the_job_tail_when_no_phase_stream_qualifies():
+    """A stored phase stream whose newest event PREDATES the run is not this run's output: the
+    binding falls back to the job tail (never a guessed neighbour)."""
+    board = {
+        "job-live": json.dumps(
+            {"job_id": "job-live", "spec": "flow.yaml", "ts": 1790105820.0, "status": "running"}
+        )
+    }
+    logs = {
+        "events_log:job-live": [
+            json.dumps({"type": "step_finish", "part": {"text": "phase prior ok"}}),
+        ],
+        "events_log:flow:prior": [
+            json.dumps({"type": "text", "timestamp": "1790105000000", "part": {"text": "old run"}}),
+        ],
+    }
+    block = read_run_logs(
+        _FakeRedis(board=board, logs=logs), "run-x", spec_name="flow", started_at="1790105829.7"
+    )
+    assert block["cell_id"] == "job-live"
+    assert block["job_id"] == "job-live"
+    assert block["live_cell_id"] == ""
+    assert block["stream_match"] == ""
+    assert block["events"][0]["text"] == "phase prior ok"
 
 
 def test_run_detail_carries_the_run_logs_block(tmp_path):
