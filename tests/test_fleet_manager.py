@@ -1237,6 +1237,9 @@ def _binding_store(tmp_path):
             "resolved_agent": "aio-control",
             "task_identity": "unit-3",
             "original_request": "record the submission into the task state",
+            # L29 step 4: the gate is STRICT about capability vectors — the fixture carries
+            # the AIO role's grant (the new normal for every binding).
+            "capabilities": si.mint_capabilities("aio-control"),
         },
         artifact_dir=store,
         publish=False,

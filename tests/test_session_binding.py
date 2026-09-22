@@ -851,3 +851,60 @@ def test_a_legacy_binding_keeps_its_authorization_identity():
         si.binding_authorization_id(legacy)
         == "24df445592e37b0fcf1f47a4dc748acfeaa3f295bfdc4bb19868f6d60739b559"
     )
+
+
+def test_a_scoped_child_binding_can_only_narrow_its_parents_authority():
+    """L29 step 4: the SUBSET RULE — a child's verbs are its role's grant INTERSECTED with
+    the parent's. A child can never hold more than its parent; a LEGACY parent grants nothing
+    (a grant descends from a declared grant, never from an absence)."""
+    parent = _binding(capabilities=si.mint_capabilities("aio-control"))
+    child = si.mint_scoped_binding(parent, child_session_id="ses_child_1", role="aio-control")
+    assert child["resolved_agent"] == "aio-control"
+    assert child["capabilities"]["verbs"] == ["run_workflow", "promote", "abandon"]
+    assert child["derived_from"]["parent_session_id"] == "ses_test_1"
+    assert child["derived_from"]["parent_authorization_id"] == si.binding_authorization_id(
+        si.binding_payload(parent)
+    )
+    # A role the table does not know: nothing to narrow TO.
+    unknown = si.mint_scoped_binding(parent, child_session_id="ses_child_2", role="site-editor")
+    assert unknown["capabilities"]["verbs"] == []
+    # A legacy parent: no declared grant to descend from.
+    legacy = si.mint_scoped_binding(_binding(), child_session_id="ses_child_3", role="aio-control")
+    assert legacy["capabilities"]["verbs"] == []
+
+
+def test_a_childs_identity_follows_its_parents_grant():
+    """The provenance is authorization-relevant: when the parent's vector changes, the child
+    minted afterwards carries a different identity — a child is bound to the grant it
+    descends from, not to the session id alone."""
+    granted = _binding(capabilities=si.mint_capabilities("aio-control"))
+    narrowed_parent = _binding(
+        capabilities={**si.mint_capabilities("aio-control"), "verbs": ["run_workflow"]}
+    )
+    a = si.mint_scoped_binding(granted, child_session_id="ses_child_1", role="aio-control")
+    b = si.mint_scoped_binding(narrowed_parent, child_session_id="ses_child_1", role="aio-control")
+    assert a["capabilities"]["verbs"] == ["run_workflow", "promote", "abandon"]
+    assert b["capabilities"]["verbs"] == ["run_workflow"]  # narrowed with the parent
+    assert si.binding_authorization_id(si.binding_payload(a)) != si.binding_authorization_id(
+        si.binding_payload(b)
+    )
+
+
+def test_a_grant_update_advances_the_authorization_epoch(tmp_path):
+    """The GRANT path (`--grant-capabilities`): capabilities are updatable, and because they
+    ride AUTHORIZATION_FIELDS the update bumps the epoch and mints a new identity — commands
+    minted against the old grant refuse by design (re-read the binding)."""
+    si.write_binding(_binding(), artifact_dir=tmp_path, connect_fn=_FakeRedis)
+    first = si.read_binding("ses_test_1", artifact_dir=tmp_path)
+    before_id = si.binding_authorization_id(first.binding)
+    assert si.binding_authorization_version(first.binding) == 1
+    updated = si.update_binding_context(
+        "ses_test_1",
+        context={"capabilities": si.mint_capabilities("aio-control")},
+        expected_version=1,
+        artifact_dir=tmp_path,
+        connect_fn=_FakeRedis,
+    )
+    assert si.binding_authorization_version(updated.binding) == 2
+    assert si.binding_authorization_id(updated.binding) != before_id
+    assert updated.binding["capabilities"]["verbs"] == ["run_workflow", "promote", "abandon"]

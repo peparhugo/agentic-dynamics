@@ -1214,11 +1214,25 @@ def _validate_aio_binding(
                 "submit exercises"
             )
     else:
-        print(
-            "submit: aio binding carries no capability vector (legacy record) — "
-            f"the {required_verb!r} verb was not checked",
-            file=sys.stderr,
-        )
+        # STRICT BY DEFAULT (L29 step 4): an absent vector refuses — the grant is the proof,
+        # and an absence is not one. The documented escape exists ONLY for a staged migration
+        # (a deployment whose live bindings predate vectors): it must be set explicitly and the
+        # skip is named on stderr, so it can never be mistaken for a verified capability.
+        legacy_ok = str(os.environ.get("FINOPS_AIO_CAPABILITIES_LEGACY_OK", "") or "").strip() == "1"
+        if legacy_ok:
+            print(
+                "submit: aio binding carries no capability vector (legacy record) — "
+                f"the {required_verb!r} verb was not checked "
+                "(FINOPS_AIO_CAPABILITIES_LEGACY_OK=1)",
+                file=sys.stderr,
+            )
+        else:
+            errors.append(
+                "submit: the binding carries no capability vector (legacy record) — strict "
+                "capability mode refuses an absent grant; re-grant the binding "
+                "(session_open.py --grant-capabilities) or set "
+                "FINOPS_AIO_CAPABILITIES_LEGACY_OK=1 for a staged migration"
+            )
     # Conversation capacity is deliberately NOT consulted here (2026-09-16 policy): the
     # verdict — even an unavailable one — is a diagnostic about the coordinator's own chat
     # session, never an authorization for the submit. The report is measured separately
