@@ -100,7 +100,9 @@ workflow:
           `## Unknowns`, `## UPDATES`): which values moved server-side (with the fixture +
           capture that prove it), what remains client-side and why, and the gate evidence
           (capture paths). Commit — `notes/` is gitignored, so stage it explicitly
-          (`git add -f notes/posterior.md`) before committing.
+          (`git add -f notes/posterior.md`) before committing. Keep every write inside the
+          worktree (never `/tmp/...`, never `../...`): an outside edit raises a permission ask
+          the headless cell cannot answer.
       - name: g_adversarial
         kind: agent
         scope: proposal_write
@@ -115,3 +117,9 @@ workflow:
           and commit it — `notes/` is gitignored, so stage the review explicitly
           (`git add -f notes/adversarial_review.md`) before committing; the phase must record
           a commit (a silently uncommitted review fails the promotion gate).
+          KEEP EVERY WRITE INSIDE THE WORKTREE (`/repo`): the review goes to the
+          worktree-relative `notes/adversarial_review.md`, and any scratch experiment lives
+          under `notes/` (gitignored) — never `/tmp/...`, never `../...`. An edit outside the
+          worktree raises a permission ASK that this headless cell cannot answer, and the
+          phase stalls to its timeout (observed live: run-d0fdae00b0d6's g_adversarial sat on
+          `edit /tmp/l23-server-owned-operations/notes/adversarial_review.md`).
