@@ -470,6 +470,7 @@ def test_read_run_logs_resolves_the_job_and_parses_the_retained_tail():
     assert block["cell_id"] == "job-aa"
     assert block["count"] == 2
     assert block["history_capped"] is False
+    assert block["match"] == "by_run_id"
     assert [event["class"] for event in block["events"]] == ["text", "step_finish"]
     assert block["events"][0]["text"].startswith("workflow fixture")
     assert block["events"][1]["text"] == "phase implement ok"
@@ -549,3 +550,47 @@ def test_run_detail_route_reads_the_job_logs_through_the_live_context(monkeypatc
     assert payload["logs"]["state"] == "recorded"
     assert payload["logs"]["cell_id"] == "job-cc"
     assert payload["logs"]["events"][0]["text"] == "phase prior ok"
+
+
+def test_read_run_logs_matches_an_inflight_job_by_spec_and_time():
+    """An in-flight fleet job carries no ``run_id`` yet (the fleet writes it at completion),
+    so the board alone cannot bind a RUNNING run. The fallback matches the spec's job accepted
+    nearest the run's start and NAMES the basis; campaign_concurrency=1 is what makes
+    spec+time unambiguous. A stale job of the same spec (outside the window) never wins."""
+    board = {
+        "job-old": json.dumps(
+            {
+                "job_id": "job-old",
+                "spec": "workflows/repository/flow.yaml",
+                "ts": 1000.0,
+                "status": "completed",
+                "run_id": "run-other",
+            }
+        ),
+        "job-running": json.dumps(
+            {
+                "job_id": "job-running",
+                "spec": "workflows/repository/flow.yaml",
+                "ts": 1990.0,
+                "status": "running",
+            }
+        ),
+    }
+    raw = [json.dumps({"type": "step_finish", "part": {"text": "phase execute ok"}})]
+    redis = _FakeRedis(board=board, logs={"events_log:job-running": raw})
+    # 1970-01-01T00:33:30Z = epoch 2010: 20s after job-running's acceptance, 1010s after job-old's.
+    block = read_run_logs(
+        redis, "run-inflight", spec_name="flow", started_at="1970-01-01T00:33:30Z"
+    )
+    assert block["state"] == "recorded"
+    assert block["cell_id"] == "job-running"
+    assert block["match"] == "by_spec_time"
+    assert block["events"][0]["text"] == "phase execute ok"
+
+    # A different spec never rides the fallback.
+    other = read_run_logs(
+        redis, "run-inflight", spec_name="other", started_at="1970-01-01T00:33:30Z"
+    )
+    assert other["state"] == "unbound"
+
+
