@@ -12,6 +12,7 @@ The properties pinned here are the Phase-0 truth rules:
 from __future__ import annotations
 
 import json
+import pytest
 import sys
 from pathlib import Path
 
@@ -30,7 +31,9 @@ from agentic_dynamics.control.control_status import build_packet  # noqa: E402
 from apps.control_room.services.operations import (  # noqa: E402
     RUN_DETAIL_SCHEMA,
     SCHEMA,
+    logs_block,
     operational_snapshot,
+    read_run_logs,
     run_detail,
 )
 
@@ -43,7 +46,10 @@ def _db(tmp_path) -> ControlDB:
 
 def _seed_awaiting(db: ControlDB) -> str:
     run = db.create_run(
-        spec_name="flow", model="m", state=RunState.RUNNING, reason="start",
+        spec_name="flow",
+        model="m",
+        state=RunState.RUNNING,
+        reason="start",
         candidate_sha="a" * 40,
     )
     db.transition_run(run.run_id, RunState.AWAITING_APPROVAL, reason="checkpoint")
@@ -52,7 +58,10 @@ def _seed_awaiting(db: ControlDB) -> str:
 
 def _seed_failed(db: ControlDB) -> str:
     run = db.create_run(
-        spec_name="flow", model="m", state=RunState.RUNNING, reason="start",
+        spec_name="flow",
+        model="m",
+        state=RunState.RUNNING,
+        reason="start",
         candidate_sha="b" * 40,
     )
     db.transition_run(run.run_id, RunState.FAILED, reason="phase failed")
@@ -105,9 +114,9 @@ def test_absent_data_stays_absent_and_degraded_is_named(tmp_path):
     assert snapshot["active_runs"] == []
     # an unreadable surface is NAMED in degraded (the packet's null-not-zero discipline) —
     # never a healthy-looking empty block: with no watermark rows, projection lag is unknown.
-    assert any(row.get("surface") == "projection_lag" for row in snapshot["degraded"]), (
-        snapshot["degraded"]
-    )
+    assert any(row.get("surface") == "projection_lag" for row in snapshot["degraded"]), snapshot[
+        "degraded"
+    ]
     # the lag block itself stays the packet's value (possibly null per projection), never zeros.
     assert isinstance(snapshot["projection_lag"], dict)
 
@@ -256,11 +265,14 @@ def test_run_detail_derived_blocks_read_the_recorded_ledger(tmp_path):
     assert timings["run.started_at"]["state"] == "measured"
     # A duration recorded as 0.0 is a measured zero, not a missing value.
     duration = next(row for row in detail["timings"] if row["field"] == "phase.duration_s")
-    assert duration == {"field": "phase.duration_s", "value": 0.0, "state": "measured", "scope": "implement"}
+    assert duration == {
+        "field": "phase.duration_s",
+        "value": 0.0,
+        "state": "measured",
+        "scope": "implement",
+    }
     # A field the record does not carry stays an explicit unknown — never a fabricated 0.
-    first_token = next(
-        row for row in detail["timings"] if row["field"] == "phase.first_token_at"
-    )
+    first_token = next(row for row in detail["timings"] if row["field"] == "phase.first_token_at")
     assert first_token["state"] == "unknown" and first_token["value"] is None
 
 
@@ -325,9 +337,7 @@ def test_operator_loop_blocked_to_durable_receipt(tmp_path):
         )
 
         packet_before = build_packet(db, repo_head_sha="c" * 40, heartbeats={}, now=_NOW)
-        snapshot_before = operational_snapshot(
-            db, repo_head_sha="c" * 40, heartbeats={}, now=_NOW
-        )
+        snapshot_before = operational_snapshot(db, repo_head_sha="c" * 40, heartbeats={}, now=_NOW)
         detail_before = run_detail(db, run_id)
 
         # 1) blocked: the packet offers approve, bound to the exact gate + candidate.
@@ -352,12 +362,8 @@ def test_operator_loop_blocked_to_durable_receipt(tmp_path):
         command = db.record_command_intent(
             "approve", actor="aio", run_id=run_id, candidate_sha="a" * 40
         )
-        db.record_approval(
-            run_id, gate_id="gate-d5", candidate_sha="a" * 40, operator="dr-seuss"
-        )
-        db.complete_command(
-            command.command_id, state="completed", receipt={"approval_id": "apr-1"}
-        )
+        db.record_approval(run_id, gate_id="gate-d5", candidate_sha="a" * 40, operator="dr-seuss")
+        db.complete_command(command.command_id, state="completed", receipt={"approval_id": "apr-1"})
 
         packet_after = build_packet(db, repo_head_sha="c" * 40, heartbeats={}, now=_NOW)
         detail_after = run_detail(db, run_id)
@@ -365,9 +371,7 @@ def test_operator_loop_blocked_to_durable_receipt(tmp_path):
     # 5) the decision is recorded and the packet stops asking; the receipt is durable.
     assert packet_after["awaiting_approvals"] == []
     assert [apr["operator"] for apr in detail_after["approvals"]] == ["dr-seuss"]
-    assert [(c["verb"], c["state"]) for c in detail_after["commands"]] == [
-        ("approve", "completed")
-    ]
+    assert [(c["verb"], c["state"]) for c in detail_after["commands"]] == [("approve", "completed")]
     assert '"approval_id"' in detail_after["commands"][0]["receipt_json"]
 
 
@@ -402,3 +406,147 @@ def test_operations_handlers_serve_the_services_payload(monkeypatch):
     assert detail.status_code == 200
     assert detail.get_json()["run"]["run_id"] == "run-1"
     assert client.get("/api/runs/nope").status_code == 404
+
+
+class _FakeRedis:
+    """The smallest Redis stand-in for the run-log reads (hgetall/lrange/llen)."""
+
+    def __init__(self, board=None, logs=None, *, fail=None):
+        self._board = board or {}
+        self._logs = logs or {}
+        self._fail = fail
+
+    def _check(self, op):
+        if self._fail == op:
+            raise ConnectionError("redis unavailable")
+
+    def hgetall(self, key):
+        self._check("hgetall")
+        assert key == "fleet:jobs"
+        return self._board
+
+    def lrange(self, key, start, end):
+        self._check("lrange")
+        return list(self._logs.get(key, []))
+
+    def llen(self, key):
+        self._check("llen")
+        return len(self._logs.get(key, []))
+
+
+def _board(run_id: str, job_id: str) -> dict[str, str]:
+    return {job_id: json.dumps({"job_id": job_id, "run_id": run_id, "status": "completed"})}
+
+
+def test_logs_block_is_a_named_state_never_a_fabricated_zero():
+    """The block's honesty rules: a named state, a reason when not recorded, parsed events."""
+    block = logs_block(
+        cell_id="", state="unbound", reason="no fleet job on the board references this run"
+    )
+    assert block["state"] == "unbound"
+    assert block["cell_id"] == ""
+    assert block["events"] == []
+    assert block["count"] == 0
+    assert "no fleet job" in block["reason"]
+    assert block["history_capped"] is False
+
+
+def test_read_run_logs_resolves_the_job_and_parses_the_retained_tail():
+    """A bound run reads its job's event tail: newest-first storage is re-ordered oldest-first
+    for the reader, and the raw payload's ``part.text`` is what the drawer renders."""
+    raw = [
+        json.dumps(
+            {"type": "step_finish", "part": {"text": "phase implement ok", "tokens": {"total": 7}}}
+        ),
+        json.dumps({"type": "text", "part": {"text": "workflow fixture — started"}}),
+    ]
+    redis = _FakeRedis(
+        board=_board("run-1", "job-aa"),
+        logs={"events_log:job-aa": raw},
+    )
+    block = read_run_logs(redis, "run-1")
+    assert block["state"] == "recorded"
+    assert block["cell_id"] == "job-aa"
+    assert block["count"] == 2
+    assert block["history_capped"] is False
+    assert [event["class"] for event in block["events"]] == ["text", "step_finish"]
+    assert block["events"][0]["text"].startswith("workflow fixture")
+    assert block["events"][1]["text"] == "phase implement ok"
+
+
+def test_read_run_logs_names_each_absence():
+    """An unbound run and an unreadable Redis are both NAMED, never an empty success."""
+    unbound = read_run_logs(_FakeRedis(board={}), "run-1")
+    assert unbound["state"] == "unbound"
+    assert "no fleet job" in unbound["reason"]
+
+    down = read_run_logs(_FakeRedis(fail="hgetall"), "run-1")
+    assert down["state"] == "unavailable"
+    assert "redis unavailable" in down["reason"]
+
+    tail_down = read_run_logs(_FakeRedis(board=_board("run-1", "job-aa"), fail="lrange"), "run-1")
+    assert tail_down["state"] == "unavailable"
+    assert tail_down["cell_id"] == "job-aa"
+    assert "redis unavailable" in tail_down["reason"]
+
+
+def test_run_detail_carries_the_run_logs_block(tmp_path):
+    """``run_detail`` attaches the logs block from the injected client: a bound job's tail is
+    recorded on the detail, and an unbound read is a NAMED state on the same shape."""
+    db = _db(tmp_path)
+    run = db.create_run(
+        spec_name="flow",
+        model="m",
+        state=RunState.RUNNING,
+        reason="start",
+        candidate_sha="c" * 40,
+    )
+    raw = [json.dumps({"type": "step_finish", "part": {"text": "phase prior ok"}})]
+    bound = run_detail(
+        db,
+        run.run_id,
+        redis_client=_FakeRedis(
+            board=_board(run.run_id, "job-bb"), logs={"events_log:job-bb": raw}
+        ),
+    )
+    assert bound["logs"]["state"] == "recorded"
+    assert bound["logs"]["cell_id"] == "job-bb"
+    assert bound["logs"]["events"][0]["text"] == "phase prior ok"
+
+    unbound = run_detail(db, run.run_id)
+    assert unbound["logs"]["state"] == "unavailable"
+    assert unbound["logs"]["reason"]
+
+
+def test_run_detail_route_reads_the_job_logs_through_the_live_context(monkeypatch, tmp_path):
+    """The wiring proof: the real app's ``/api/runs/<id>`` resolves the injected Redis — the
+    context's late-binding accessor means a monkeypatched ``server._redis`` wins at call time."""
+    server = pytest.importorskip("apps.control_room.server")
+
+    db_file = tmp_path / "control.db"
+    db = ControlDB.open(db_file)
+    run = db.create_run(
+        spec_name="flow",
+        model="m",
+        state=RunState.RUNNING,
+        reason="start",
+        candidate_sha="d" * 40,
+    )
+    db.close()
+
+    monkeypatch.setenv("FINOPS_CONTROL_DB", str(db_file))
+    raw = [json.dumps({"type": "step_finish", "part": {"text": "phase prior ok"}})]
+    monkeypatch.setattr(
+        server,
+        "_redis",
+        lambda: _FakeRedis(
+            board=_board(run.run_id, "job-cc"), logs={"events_log:job-cc": raw}
+        ),
+    )
+
+    response = server.app.test_client().get(f"/api/runs/{run.run_id}")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["logs"]["state"] == "recorded"
+    assert payload["logs"]["cell_id"] == "job-cc"
+    assert payload["logs"]["events"][0]["text"] == "phase prior ok"
