@@ -72,6 +72,7 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("analyze", "stories"): "analyze_stories.py",
     ("analyze", "session-routing"): "retro_session_routing.py",
     ("analyze", "cascade-retrospective"): "cap_cascade_retrospective.py",
+    ("analyze", "confidence-cascade-retrospective"): "confidence_cascade_retrospective.py",
     ("analyze", "coverage-routing-impact"): "cap_coverage_routing_impact.py",
     ("analyze", "workflow-metrics"): "aggregate_workflow_metrics.py",
     # data
@@ -238,7 +239,7 @@ Subcommands (each forwards to its backing script):
   story       run|batch
   workflow    run|discard-tree|approve|promote|abandon|new|lint|plan
   queue       enqueue|worker|monitor|reinterleave|analysis-enqueue|analysis-worker
-  analyze     worktrees|trajectories|stories|session-routing|workflow-metrics|lab <name>
+  analyze     worktrees|trajectories|stories|session-routing|workflow-metrics|confidence-cascade-retrospective|lab <name>
   data        build|sync|manifest|inventory|bundle
   knowledge   ingest|sources|facts|worker|context-report|shadow-report|arm-comparison|read
   registry    query|show|lineage

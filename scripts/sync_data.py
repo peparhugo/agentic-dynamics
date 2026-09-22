@@ -461,6 +461,18 @@ def query(parquet_path: Path, sql: str) -> str:
 def main() -> None:
     import sys
 
+    # A bare positional is NOT a mode. `sync_data.py check` used to fall through to a full
+    # SYNC — the L21 retrospective's own how-to command silently rewrote the parquet (2026-09-22,
+    # reproduced live: it printed "Synced:" and touched the identity sidecar). A reader asking to
+    # "check" gets the opposite. Refuse the ambiguous form by name (fail-visible).
+    if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
+        print(
+            f"sync_data.py: unexpected positional {sys.argv[1]!r} — did you mean --check? "
+            "a bare positional would SYNC (rewrite) the parquet; refusing",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+
     if "--check" in sys.argv:
         sys.exit(check())
 
