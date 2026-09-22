@@ -968,6 +968,8 @@ def test_a_bound_aio_submit_still_reaches_the_compose_call(tmp_path, monkeypatch
         {
             "native_session_id": "ses_aio",
             "resolved_agent": "aio-control",
+            # L29 step 4: the strict gate needs a declared vector — the AIO role's grant.
+            "capabilities": si.mint_capabilities("aio-control"),
             "task_identity": "unit-d",
             "original_request": "enforce the binding at the exec boundary",
         },
@@ -1063,6 +1065,8 @@ def test_the_complete_submission_path_host_shape(tmp_path, monkeypatch):
         {
             "native_session_id": "ses_aio",
             "resolved_agent": "aio-control",
+            # L29 step 4: the strict gate needs a declared vector — the AIO role's grant.
+            "capabilities": si.mint_capabilities("aio-control"),
             "task_identity": "unit-d",
             "original_request": "walk the complete submission path",
         },
