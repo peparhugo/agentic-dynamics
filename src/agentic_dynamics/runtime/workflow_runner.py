@@ -2435,6 +2435,21 @@ def _completed_phases_from_index(
         return set()  # never block a resume on an index/ledger problem
 
 
+def _resolve_activity_db() -> Path | None:
+    """The per-attempt opencode store for child-session liveness, or None (never the host store).
+
+    The fleet cell sets ``XDG_DATA_HOME`` into its own ``/state`` namespace (spawn_wrapper's
+    STATE_ENV_KEYS) — that store is the cell's alone, so its newest message/part across all
+    sessions is legitimate phase activity. Without an explicit XDG_DATA_HOME (an in-process
+    run against the operator's shared store) the probe is DISABLED: an unrelated session's
+    writes must never keep a stalled phase alive.
+    """
+    base = os.environ.get("XDG_DATA_HOME", "").strip()
+    if not base:
+        return None
+    return Path(base).expanduser() / "opencode" / "opencode.db"
+
+
 class PhaseWatchdog:
     """Stall monitor for one agent phase (cap_runner_hardening p1).
 
@@ -2455,6 +2470,19 @@ class PhaseWatchdog:
     The monitor is cheap: each poll reads only the bytes appended to the transcript since the
     previous poll (a few lines), so it adds no meaningful overhead to a compliant phase.
 
+    CHILD-SESSION COVERAGE (2026-09-22, the delegation false positive): the adapter's
+    transcript carries only the TOP-LEVEL session's events, so a phase whose agent blocks on
+    delegated subagents (the roster's ``explore``/specialist children — normal since the agent
+    layer landed) looked STALLED while its children streamed tokens: L33's execute was
+    SIGTERM'd at exactly 20.0 min with three child sessions actively working. When the
+    per-attempt state namespace is EXPLICIT (``XDG_DATA_HOME`` points into the cell's
+    ``/state`` — the fleet's own isolation), the monitor ALSO probes that namespace's opencode
+    SQLite store for the newest message/part update ACROSS ALL SESSIONS: real child activity
+    advances the stall clock; a genuinely hung tree (no new rows anywhere) still fires. The
+    probe is deliberately DISABLED when ``XDG_DATA_HOME`` is unset (an in-process run on a
+    shared store must never be kept alive by an unrelated session), and every probe failure is
+    a no-op — the transcript remains the primary clock.
+
     Adversarial note (cap_runner_hardening p5): the stall clock advances ONLY on MEANINGFUL
     step events — a valid session event line whose ``type`` is in :data:`_MEANINGFUL_EVENT_TYPES`
     (the vocabulary the adapters emit: step_start/step_finish/text/reasoning/tool_use/…). A
@@ -2466,10 +2494,19 @@ class PhaseWatchdog:
     """
 
     def __init__(
-        self, workdir: str | Path, threshold_min: float, *, poll_interval_s: float | None = None
+        self,
+        workdir: str | Path,
+        threshold_min: float,
+        *,
+        poll_interval_s: float | None = None,
+        activity_db: str | Path | None = None,
     ) -> None:
         self.workdir = Path(workdir)
         self.threshold_min = float(threshold_min)
+        #: the child-session liveness source: the per-attempt namespace's opencode SQLite
+        #: store. Explicit path wins; otherwise resolved ONLY from an explicit XDG_DATA_HOME
+        #: (the fleet cell's /state mount) — never from the shared host store.
+        self.activity_db = Path(activity_db) if activity_db else _resolve_activity_db()
         self.threshold_s = self.threshold_min * 60.0
         if self.threshold_s <= 0:
             raise ValueError("phase watchdog threshold must be > 0")
@@ -2537,9 +2574,43 @@ class PhaseWatchdog:
             tail = tail[-max_chars:]
         return tail or "(no transcript yet)"
 
+    def _poll_activity_probe(self) -> None:
+        """Advance the stall clock on ANY session's newest message/part update (child work).
+
+        Read-only, fail-open: a missing/unreadable store is a no-op (the transcript clock
+        stands). Timestamps are epoch milliseconds in the store; the newest across the
+        ``message`` and ``part`` tables is the phase tree's last real activity.
+        """
+        if self.activity_db is None:
+            return
+        if not self.activity_db.is_file():
+            return
+        try:
+            import sqlite3
+
+            con = sqlite3.connect(
+                f"file:{self.activity_db}?mode=ro", uri=True, timeout=1.0
+            )
+            try:
+                newest = 0.0
+                for table in ("message", "part"):
+                    row = con.execute(f"select max(time_updated) from {table}").fetchone()
+                    value = float(row[0]) if row and row[0] is not None else 0.0
+                    newest = max(newest, value)
+            finally:
+                con.close()
+        except Exception:  # noqa: BLE001 — an unreadable store never fabricates activity
+            return
+        if newest <= 0:
+            return
+        seconds = newest / 1000.0 if newest > 1e11 else newest
+        if seconds > self._last_activity:
+            self._last_activity = seconds
+
     def check_stall(self) -> dict[str, Any] | None:
         """Return the STALLED evidence when no MEANINGFUL step has landed past the threshold."""
         self._poll_transcript()
+        self._poll_activity_probe()
         age = self._last_step_age()
         if age < self.threshold_s:
             return None

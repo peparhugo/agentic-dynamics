@@ -24,6 +24,7 @@ from agentic_dynamics.knowledge.augment import default_retrieve_fn
 from agentic_dynamics.runtime import workflow_runner
 from agentic_dynamics.runtime.workflow_runner import (
     PLAN_UNIT_CAP_DEFAULT,
+    PhaseWatchdog,
     ResumeState,
     _build_phase_prompt,
     _completed_phases_from_index,
@@ -1756,6 +1757,62 @@ def test_watchdog_threshold_env_override(tmp_path, monkeypatch):
     assert result.phases[0].status == "failed"
     assert result.phases[0].stall_evidence["reason"] == "STALLED"
     assert result.phases[0].stall_evidence["threshold_min"] == 0.03
+
+
+def _watchdog_child_db(root: Path, *, updated_ms: int) -> Path:
+    """A minimal opencode-shaped SQLite store: one message row (a child session's work)."""
+    import sqlite3
+
+    db = root / "opencode" / "opencode.db"
+    db.parent.mkdir(parents=True, exist_ok=True)
+    con = sqlite3.connect(db)
+    con.execute(
+        "create table message (id text, session_id text, time_created integer, "
+        "time_updated integer, data text)"
+    )
+    con.execute(
+        "create table part (id text, message_id text, session_id text, time_created integer, "
+        "time_updated integer, data text)"
+    )
+    con.execute(
+        "insert into message values ('m1', 'ses_child', ?, ?, '{}')", (updated_ms, updated_ms)
+    )
+    con.commit()
+    con.close()
+    return db
+
+
+def test_watchdog_child_session_activity_keeps_a_delegating_phase_alive(tmp_path):
+    """(d) The 2026-09-22 false positive: the top-level transcript is stale for an hour while
+    a delegated child session's message was updated seconds ago. With an explicit activity
+    store the child's update advances the stall clock — the phase is ALIVE, not STALLED."""
+    db = _watchdog_child_db(tmp_path, updated_ms=int(time.time() * 1000))
+    watchdog = PhaseWatchdog(tmp_path, 0.05, activity_db=db)  # 3s threshold
+    watchdog._last_activity = time.time() - 3600  # the transcript clock is cold
+    assert watchdog.check_stall() is None  # the child row advanced the clock
+
+
+def test_watchdog_stale_child_rows_still_stall(tmp_path):
+    """(e) The probe is not a blanket exemption: a child store whose newest row is ALSO stale
+    (a genuinely hung tree) fires STALLED exactly like the transcript clock."""
+    db = _watchdog_child_db(tmp_path, updated_ms=int((time.time() - 3600) * 1000))
+    watchdog = PhaseWatchdog(tmp_path, 0.05, activity_db=db)
+    watchdog._last_activity = time.time() - 3600
+    evidence = watchdog.check_stall()
+    assert evidence is not None
+    assert evidence["reason"] == "STALLED"
+
+
+def test_watchdog_activity_probe_is_scoped_to_the_cell_namespace(tmp_path, monkeypatch):
+    """(f) The probe is scoped: disabled without an explicit XDG_DATA_HOME (an in-process run
+    against the operator's shared store must never be kept alive by an unrelated session),
+    resolved to the cell's own store when the namespace is explicit."""
+    monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+    assert PhaseWatchdog(tmp_path, 20).activity_db is None
+
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "state"))
+    resolved = PhaseWatchdog(tmp_path, 20).activity_db
+    assert resolved == tmp_path / "state" / "opencode" / "opencode.db"
 
 
 def test_watchdog_explicit_arg_overrides_env(tmp_path, monkeypatch):
