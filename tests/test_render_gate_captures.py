@@ -13,6 +13,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from scripts.verify_control_room_rendering import write_report
 
 
@@ -381,6 +383,7 @@ def test_site_gate_fails_a_vacuous_zero_svg_scan(tmp_path: Path):
     unproven, and the controller's acceptance could not distinguish "all diagrams render" from
     "nothing was checked". A vacuous scan is a FAIL, structurally (the Control Room gate's
     zero-captures rule, applied to the site)."""
+    pytest.importorskip("playwright")  # the gate module imports playwright at module level
     from apps.website.verify_svg_rendering import _write_report
 
     md, fails = _write_report(
