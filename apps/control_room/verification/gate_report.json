@@ -14,7 +14,7 @@
     "scrolling",
     "keyboard"
   ],
-  "candidate": "ca1ef46dc",
+  "candidate": "a8c503939377c5537e8bc1c5311c3d35752fbdbb",
   "candidate_verified": true,
   "preview": "",
   "preview_verified": false,
@@ -24,49 +24,49 @@
     {
       "case": "boards-navigation",
       "viewport": "desktop",
-      "screenshot": "/tmp/wt_run_evidence/apps/control_room/verification/boards_fleet_desktop_dark_1440x900.png",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_fleet_desktop_dark_1440x900.png",
       "theme": "dark",
       "board": "fleet"
     },
     {
       "case": "boards-navigation",
       "viewport": "desktop",
-      "screenshot": "/tmp/wt_run_evidence/apps/control_room/verification/boards_status_desktop_dark_1440x900.png",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_status_desktop_dark_1440x900.png",
       "theme": "dark",
       "board": "status"
     },
     {
       "case": "boards-navigation",
       "viewport": "desktop",
-      "screenshot": "/tmp/wt_run_evidence/apps/control_room/verification/boards_flags_desktop_dark_1440x900.png",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_flags_desktop_dark_1440x900.png",
       "theme": "dark",
       "board": "flags"
     },
     {
       "case": "boards-navigation",
       "viewport": "desktop",
-      "screenshot": "/tmp/wt_run_evidence/apps/control_room/verification/boards_sessions_desktop_dark_1440x900.png",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_sessions_desktop_dark_1440x900.png",
       "theme": "dark",
       "board": "sessions"
     },
     {
       "case": "boards-navigation",
       "viewport": "desktop",
-      "screenshot": "/tmp/wt_run_evidence/apps/control_room/verification/boards_routing_desktop_dark_1440x900.png",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_routing_desktop_dark_1440x900.png",
       "theme": "dark",
       "board": "routing"
     },
     {
       "case": "boards-navigation",
       "viewport": "desktop",
-      "screenshot": "/tmp/wt_run_evidence/apps/control_room/verification/boards_operations_desktop_dark_1440x900.png",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_operations_desktop_dark_1440x900.png",
       "theme": "dark",
       "board": "operations"
     },
     {
       "case": "boards-navigation",
       "viewport": "desktop",
-      "screenshot": "/tmp/wt_run_evidence/apps/control_room/verification/boards_surfaces_desktop_dark_1440x900.png",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_surfaces_desktop_dark_1440x900.png",
       "theme": "dark",
       "board": "surfaces"
     },
@@ -79,49 +79,49 @@
     {
       "case": "boards-navigation",
       "viewport": "desktop",
-      "screenshot": "/tmp/wt_run_evidence/apps/control_room/verification/boards_fleet_desktop_light_1440x900.png",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_fleet_desktop_light_1440x900.png",
       "theme": "light",
       "board": "fleet"
     },
     {
       "case": "boards-navigation",
       "viewport": "desktop",
-      "screenshot": "/tmp/wt_run_evidence/apps/control_room/verification/boards_status_desktop_light_1440x900.png",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_status_desktop_light_1440x900.png",
       "theme": "light",
       "board": "status"
     },
     {
       "case": "boards-navigation",
       "viewport": "desktop",
-      "screenshot": "/tmp/wt_run_evidence/apps/control_room/verification/boards_flags_desktop_light_1440x900.png",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_flags_desktop_light_1440x900.png",
       "theme": "light",
       "board": "flags"
     },
     {
       "case": "boards-navigation",
       "viewport": "desktop",
-      "screenshot": "/tmp/wt_run_evidence/apps/control_room/verification/boards_sessions_desktop_light_1440x900.png",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_sessions_desktop_light_1440x900.png",
       "theme": "light",
       "board": "sessions"
     },
     {
       "case": "boards-navigation",
       "viewport": "desktop",
-      "screenshot": "/tmp/wt_run_evidence/apps/control_room/verification/boards_routing_desktop_light_1440x900.png",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_routing_desktop_light_1440x900.png",
       "theme": "light",
       "board": "routing"
     },
     {
       "case": "boards-navigation",
       "viewport": "desktop",
-      "screenshot": "/tmp/wt_run_evidence/apps/control_room/verification/boards_operations_desktop_light_1440x900.png",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_operations_desktop_light_1440x900.png",
       "theme": "light",
       "board": "operations"
     },
     {
       "case": "boards-navigation",
       "viewport": "desktop",
-      "screenshot": "/tmp/wt_run_evidence/apps/control_room/verification/boards_surfaces_desktop_light_1440x900.png",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_surfaces_desktop_light_1440x900.png",
       "theme": "light",
       "board": "surfaces"
     },
@@ -134,21 +134,21 @@
     {
       "case": "boards-navigation",
       "viewport": "narrow",
-      "screenshot": "/tmp/wt_run_evidence/apps/control_room/verification/boards_routing_narrow_dark_1024x768.png",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_routing_narrow_dark_1024x768.png",
       "theme": "dark",
       "board": "routing"
     },
     {
       "case": "boards-navigation",
       "viewport": "narrow",
-      "screenshot": "/tmp/wt_run_evidence/apps/control_room/verification/boards_operations_narrow_dark_1024x768.png",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_operations_narrow_dark_1024x768.png",
       "theme": "dark",
       "board": "operations"
     },
     {
       "case": "boards-navigation",
       "viewport": "narrow",
-      "screenshot": "/tmp/wt_run_evidence/apps/control_room/verification/boards_surfaces_narrow_dark_1024x768.png",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_surfaces_narrow_dark_1024x768.png",
       "theme": "dark",
       "board": "surfaces"
     },
@@ -161,7 +161,7 @@
     {
       "case": "boards-loading",
       "viewport": "desktop",
-      "screenshot": "/tmp/wt_run_evidence/apps/control_room/verification/boards_loading_operations_reload_desktop_dark_1440x900.png",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_loading_operations_reload_desktop_dark_1440x900.png",
       "theme": "dark",
       "board": "operations"
     },
@@ -198,7 +198,7 @@
     {
       "case": "boards-degraded",
       "viewport": "desktop",
-      "screenshot": "/tmp/wt_run_evidence/apps/control_room/verification/boards_degraded_operations_desktop_dark_1440x900.png",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_degraded_operations_desktop_dark_1440x900.png",
       "theme": "dark",
       "board": "operations"
     },
@@ -235,9 +235,16 @@
     {
       "case": "boards-keyboard",
       "viewport": "desktop",
-      "screenshot": "/tmp/wt_run_evidence/apps/control_room/verification/boards_keyboard_drawer_dark_1440x900.png",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_keyboard_drawer_dark_1440x900.png",
       "theme": "dark",
       "check": "drawer-open"
+    },
+    {
+      "case": "boards-keyboard",
+      "viewport": "desktop",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_keyboard_drawer_logs_dark_1440x900.png",
+      "theme": "dark",
+      "check": "drawer-logs"
     },
     {
       "case": "boards-keyboard",
@@ -248,9 +255,16 @@
     {
       "case": "boards-keyboard",
       "viewport": "desktop",
-      "screenshot": "/tmp/wt_run_evidence/apps/control_room/verification/boards_keyboard_drawer_light_1440x900.png",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_keyboard_drawer_light_1440x900.png",
       "theme": "light",
       "check": "drawer-open"
+    },
+    {
+      "case": "boards-keyboard",
+      "viewport": "desktop",
+      "screenshot": "/tmp/wt_room_logs/apps/control_room/verification/boards_keyboard_drawer_logs_light_1440x900.png",
+      "theme": "light",
+      "check": "drawer-logs"
     },
     {
       "case": "boards-keyboard",
