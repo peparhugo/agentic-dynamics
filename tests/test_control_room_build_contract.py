@@ -230,6 +230,10 @@ def test_domain_context_crosses_the_executor_boundary(build_spec, tmp_path, monk
     fallback contract (a retrieval failure reverts to the assembled base prompt, never
     blocks the phase, never makes a paid constructor call)."""
     monkeypatch.setenv("FINOPS_EMIT_SELF", "0")
+    # The workflow shell exports FINOPS_CELL_ID (the cell's KB scope override); this test
+    # asserts the DEFAULT worktree-derived scope, so the ambient override must be removed
+    # (the 2026-09-22 L33 gate: two suites failed in-cell for exactly this contamination).
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
     spec = build_spec
     wd = tmp_path / "wd"
     wd.mkdir()
@@ -252,7 +256,12 @@ def test_domain_context_crosses_the_executor_boundary(build_spec, tmp_path, monk
     assert "NO build step" in agent.prompts["p1b_gate_first_viewport"]
 
 
-def test_retrieval_scope_is_cell_scoped_by_default_and_explicit_override_is_preserved(build_spec):
+def test_retrieval_scope_is_cell_scoped_by_default_and_explicit_override_is_preserved(
+    build_spec, monkeypatch
+):
+    # A cell shell always exports FINOPS_CELL_ID; the default-scope assertions below are
+    # about the ABSENCE of an override, so the ambient value must not leak in (2026-09-22).
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
     spec = build_spec
     wd = Path("/tmp/wt_build_cell")
     # the authored spec: rag={} → the deliberate cell scope, never the org-wide scope
