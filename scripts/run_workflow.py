@@ -785,6 +785,23 @@ def _run_prepared_child(prepared: dict[str, Any], args: argparse.Namespace) -> N
     raise SystemExit(exit_code_for_result(result))
 
 
+
+def _parent_watchdog_min(orchestrator: bool, cli_value: int) -> int:
+    """The PARENT's per-phase stall threshold: 0 (disabled) in ``--orchestrator`` mode.
+
+    A Docker-executed phase runs as a sibling CELL that owns its own stall monitor: the
+    cell's watchdog resolves its per-attempt XDG state namespace, so the child-activity
+    probe is active, and it holds the kill handle for the agent it spawned. The PARENT
+    cannot see that namespace (its env carries none) and, for an executor-run phase, has no
+    kill handle — a parent-side monitor is a duplicate with strictly less information. It
+    fired a FALSE STALLED on L33's execute (2026-09-22) while the sibling cell streamed 429
+    message/part updates (writes the parent's transcript-only clock could not see). The
+    phase timeout carried on the launch request remains the parent's bound; the cell's own
+    watchdog remains the stall authority. In-process runs (no --orchestrator) keep the CLI
+    value unchanged.
+    """
+    return 0 if orchestrator else cli_value
+
 def _run_workflow_cli(
     spec: ExperimentSpec, args: argparse.Namespace, *, step_executor=None, verifier_executor=None
 ) -> None:
@@ -1078,7 +1095,11 @@ def _run_workflow_cli(
             commit=not args.no_commit,
             resume=args.resume,
             resume_state=resume_state,
-            phase_watchdog_min=args.phase_watchdog_min,
+            # The sibling cell owns the stall monitor for orchestrated phases — see
+            # ``_parent_watchdog_min`` (the 2026-09-22 false STALLED).
+            phase_watchdog_min=_parent_watchdog_min(
+                bool(getattr(args, "orchestrator", False)), args.phase_watchdog_min
+            ),
             signals=signals,
             router=router,
             publisher_factory=LivePublisher,
