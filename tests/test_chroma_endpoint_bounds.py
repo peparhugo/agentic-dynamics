@@ -139,7 +139,12 @@ def test_construction_fails_within_deadline_when_identity_stalls():
     finally:
         server.shutdown()
         server.server_close()
-    assert elapsed < 2.0, f"construction took {elapsed:.2f}s against an identity-stalling server"
+    # L32: the bound scales under CI shard load; the deadline MECHANISM is what this pins.
+    from conftest import wall_clock_tolerance
+
+    assert elapsed < 2.0 * wall_clock_tolerance(), (
+        f"construction took {elapsed:.2f}s against an identity-stalling server"
+    )
     message = str(excinfo.value)
     assert "deadline" in message or "identity" in message or "version" in message
 
