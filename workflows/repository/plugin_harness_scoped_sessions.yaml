@@ -1,0 +1,104 @@
+name: plugin_harness_scoped_sessions
+question: >-
+  Give `.opencode/plugins/` a test harness that can FAIL, then make subagent sessions inherit
+  SCOPED bindings (the L29 step-4 remainder): a child session binds to the same task with its
+  role's narrower capability vector, and the capsule injects the role subset.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+comparison: null
+writeup: {format: lab_book, sections: [question, evidence]}
+stop: {budget_usd: 4.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_uncertainty}
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: false
+    rag:
+      emit_self: true
+      emit_report: true
+      emit_scope: agentic-dynamics
+    context:
+      domain_context: >-
+        THE L29 STEP-4 REMAINDER (2026-09-22): the store-side machinery is ON MAIN —
+        `session_ingestion.mint_scoped_binding(parent, child_session_id, role)` enforces the
+        SUBSET RULE (child verbs = role's grant INTERSECTED with the parent's; a legacy parent
+        grants nothing) and `derived_from` rides the authorization identity; the exec gate is
+        STRICT (an absent vector refuses; `FINOPS_AIO_CAPABILITIES_LEGACY_OK=1` is the named
+        staging escape). What is MISSING is the plugin half: `.opencode/plugins/aio-context.ts`
+        binds ONLY the primary AIO session ("worker sessions are observed honestly and never
+        bound"), and no test harness exists for `.opencode/plugins/` — so any change there is
+        unverifiable today. FIRST deliverable: a harness that can fail (run the plugin's hooks
+        against fixture inputs and assert the observable effects — bound/unbound, capsule
+        attach, refusal); SECOND: subagent sessions (sessions whose start carries a parent)
+        mint a scoped child binding through the EXISTING store machinery and receive the role
+        subset capsule; the plugin stays NON-AUTHORITATIVE (the exec gate remains the refusal
+        point; a missing plugin degrades, never authorizes). Design + boundaries:
+        docs/designs/proposed/agent_layer_and_capability_vectors.md section 4-5; the plugin's
+        own header comment is the contract for what each hook does.
+    phases:
+      - name: prior
+        kind: agent
+        scope: proposal_write
+        timeout: 1200
+        prompt: |
+          Read the plugin (`aio-context.ts` + README), the store machinery
+          (`src/agentic_dynamics/knowledge/session_ingestion.py`: mint_scoped_binding,
+          mint_capabilities, ROLE_CAPABILITIES), the gate
+          (`scripts/fleet/spawn_wrapper.py` `_validate_aio_binding`), and the design doc.
+          WRITE `notes/plugin.md` (`## Problem`, `## What Exists`, `## Harness Options`,
+          `## Gaps`, `## Sources`) and `notes/plan.md` (`## Files`, `## Tests`,
+          `## Acceptance`, `## Risks`): NAME the harness (what runs the hooks; what fixtures
+          model a primary/child session; what a failing assertion looks like) and the exact
+          child-binding flow. Write `notes/sources.jsonl`. Commit.
+      - name: execute
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        requires_files: [notes/plan.md, notes/sources.jsonl]
+        prompt: |
+          Build the harness FIRST and DEMONSTRATE it can fail (break something on purpose,
+          show the failure, restore). Then implement the child-binding flow + the capsule
+          subset, wiring the plugin to the EXISTING mint_scoped_binding (never a second
+          store). Run the harness and the fast path. Commit.
+      - name: g_test_gate
+        kind: test
+        scope: implementation
+        timeout: 1800
+        requires_files: [notes/plan.md]
+        tests_from_plan: notes/plan.md
+        prompt: |
+          The independent runner verifies the worktree against the plan's targets.
+      - name: posterior
+        kind: agent
+        scope: proposal_write
+        timeout: 900
+        requires_files: [notes/plugin.md, notes/plan.md]
+        prompt: |
+          WRITE `notes/posterior.md` (`## Violations`, `## Unknowns`, `## UPDATES`): the
+          harness as built (with its failure demonstration), the child-binding flow as
+          shipped, what the plugin still does not cover, and the strict-flip implications.
+          Commit.
+      - name: g_adversarial
+        kind: agent
+        scope: proposal_write
+        timeout: 1800
+        run_model: openai/gpt-5.6-terra
+        prompt: |
+          ADVERSARIAL REVIEW — a different model by design. Attack: can a child session
+          acquire MORE than its parent (the subset rule is the safety property — find the
+          bypass)? does the harness actually exercise the plugin, or a mock of it? does an
+          absent/failed plugin now silently authorize anything? Name at least one falsifier
+          per major claim. Write `notes/adversarial_review.md` with a final `## FINDING`
+          paragraph and commit it.

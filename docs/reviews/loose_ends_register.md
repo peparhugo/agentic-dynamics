@@ -123,7 +123,8 @@ missed contradiction is expensive.)
 Five workflow specs, each fleet-runnable and self-briefed (the spec's question + prompts carry
 the context). A fresh AIO submits one with the `run_workflow` tool (orchestrator, admission
 armed) after reading this register. **Statuses: queued** = authored + validated, not yet run.
-**L20 and L21 are done (promoted 2026-09-22); L22–L24 remain queued.**
+**L20–L24 are DONE (promoted 2026-09-22). L33–L36 are the next wave (authored + validated,
+not yet run).**
 
 | ID | workflow | what it does | notes |
 |---|---|---|---|
@@ -132,6 +133,10 @@ armed) after reading this register. **Statuses: queued** = authored + validated,
 | L22 | `workflows/repository/loop_execute_as_workflow.yaml` | the loop's open extension: execute becomes workflow-driven (massive plans split into gated sub-phases) | **done 2026-09-22 — promoted `b70da1bb1`** (run-06eda7826fe7): the loop's execute is workflow-driven with gated sub-phases; 84 focused loop/spec tests passed. Adversarial caveats preserved: stale pre-seeded plans expand before the current prior; ignored `notes/*` vs the per-phase commit requirement; file ownership/acceptance/test relevance remain prompt-only; unit budgets do not mechanically bound aggregate spend |
 | L23 | `workflows/repository/control_room_apply_skills.yaml` | the Control Room's resting screen via the workflow path | **done 2026-09-22 — promoted `1b1697e1d`** (run-56d270a29a28): the resting screen restructured (one-packet header, attention/decisions-owed rows, per-run inspection rows). The required render-gate profile was completed ON THE HOST after the container could not run Playwright — 23 candidate-bound captures, no violations; 121 focused tests + fixture gate green. Adversarial caveats preserved (client-side attention derivation; partial state screens) |
 | L24 | `workflows/repository/site_golden_circle_revamp.yaml` | the website overhaul: Golden Circle narrative, architecture page + hand-built SVGs, framework simplification, broken things fixed | **done 2026-09-22 — promoted `0cc31b73a`** (run-2526641d168e): narrative reordered WHY→HOW→WHAT, `architecture.html` + four hand-built SVGs, nav/sitemap/firebase hygiene, census baseline tracked; census 12/12. Its adversarial P0s are corrected in PR #129 (stale badge-labelled values vs `data.js`; the false seven-model claim; the evidence table) and its missing browser acceptance was completed on the host (14 SVGs, all PASS) after the gate's own vacuous-pass defect was repaired. No deploy run (P0, controller's) |
+| L33 | `workflows/repository/control_room_detail_truth.yaml` | the Control Room's resting surfaces: attention/order/age + glance values derived SERVER-side from the one packet, the state screens rendered | queued — the L23 adversarial caveats as the brief; acceptance IS the render gate's required profile with captures |
+| L34 | `workflows/repository/plugin_harness_scoped_sessions.yaml` | a test harness for `.opencode/plugins/` that can FAIL, then subagent sessions inheriting SCOPED bindings (the L29 step-4 remainder) and the capsule role subset | queued — the store machinery (`mint_scoped_binding`, the subset rule, the strict gate) is on main; the harness comes FIRST (it is the precondition for any plugin change) |
+| L35 | `workflows/repository/site_data_stat_wiring.yaml` | wire the website's remaining static cells to the one data door (`data.js`), starting with the evidence table (register L30) | queued — acceptance: census + the repaired SVG gate + a SELF-CORRECTION demonstration (mutate a data value, the page changes) |
+| L36 | `workflows/repository/target_repo_scoping.yaml` | measure where the framework assumes the framework repo IS the subject repo, and write the generalization ladder for running against OTHER repos | queued — analysis only; the gate skips explicitly; every inventory row is file:line, every "configurable" claim carries the command that shows it |
 
 ## Not forgotten (recorded, resolved)
 
