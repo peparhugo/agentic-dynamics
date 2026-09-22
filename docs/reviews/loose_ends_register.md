@@ -110,6 +110,20 @@ missed contradiction is expensive.)
 | L15 | **Session close** for the 2026-09-21 unit | **fixed 2026-09-21** | slug `aio-world-model-loop-live-merge-closeout`; knowledge_id `d1e99149…` (`session-close/v1`) | none |
 | L16 | **Supervisor flag storage split** — live flags in the `supervisor_flags` redis list; `experiments/results/supervisor/` holds only `monitor_session.json` | parked | noted during the 2026-09-21 landscape | document in the next supervisor touch |
 
+## E. Queued workflows (the controller's next units, 2026-09-22)
+
+Five workflow specs, each fleet-runnable and self-briefed (the spec's question + prompts carry
+the context). A fresh AIO submits one with the `run_workflow` tool (orchestrator, admission
+armed) after reading this register. **Statuses: queued** = authored + validated, not yet run.
+
+| ID | workflow | what it does | notes |
+|---|---|---|---|
+| L20 | `workflows/repository/pattern_surface_adoption.yaml` | the loop's seven minted patterns onto their correct surfaces (test/skill/rule/tool/agent) — reviewed dispositions | two already landed as guard tests (check first); declines with reasons are valid |
+| L21 | `workflows/repository/confidence_cascade_study.yaml` | the confidence-cascade study, Phase A: ledger retrospective (calibration + escalation ROI) + the PRE-REGISTERED grid design with falsifiers | analysis-only — the `g_test_gate` skips explicitly; Phase B (the grid) is a later submission |
+| L22 | `workflows/repository/loop_execute_as_workflow.yaml` | the loop's open extension: execute becomes workflow-driven (massive plans split into gated sub-phases) | un-parked 2026-09-22; scan the skeleton contract first — the vocabulary usually exists |
+| L23 | `workflows/repository/control_room_apply_skills.yaml` | the Control Room's resting screen via the workflow path | acceptance IS the render gate's required profile with captures (zero captures = fail structurally); start the server for the capture passes |
+| L24 | `workflows/repository/site_golden_circle_revamp.yaml` | the website overhaul: Golden Circle narrative, architecture page + hand-built SVGs, framework simplification, broken things fixed | the two Firebase deploys stay the controller's P0 — the run prepares, never deploys |
+
 ## Not forgotten (recorded, resolved)
 
 The 2026-09-21 session's own findings and fixes, for continuity: the reader-verb CI repair

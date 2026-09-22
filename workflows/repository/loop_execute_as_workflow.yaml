@@ -1,0 +1,103 @@
+name: loop_execute_as_workflow
+question: >-
+  Implement the world-model loop's open extension: the execute phase becomes workflow-driven —
+  a massive plan splits into sub-phases with their own gates and commits, instead of running as
+  ONE unbounded execute turn.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+comparison: null
+writeup: {format: lab_book, sections: [question, evidence]}
+stop: {budget_usd: 4.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_uncertainty}
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: false
+    rag:
+      emit_self: true
+      emit_report: true
+      emit_scope: agentic-dynamics
+    context:
+      domain_context: >-
+        THE LOOP'S OPEN EXTENSION (controller direction, 2026-09-21): a massive plan must not
+        run as ONE execute phase — the execute step should itself be workflow-driven, so a plan
+        with N workstreams becomes N bounded sub-phases, each with its own commit and its own
+        gate, rather than one turn that silently grows unbounded. The design note lives at the
+        end of docs/designs/proposed/world_model_loop.md ("Open extension"), and the loop's own
+        machinery to extend: src/agentic_dynamics/runtime/workflow_runner.py (the phase loop,
+        the artifact/shape gates, tests_from_plan, the per-phase commits) and
+        workflows/repository/world_model_loop.yaml (prior -> execute -> g_test_gate ->
+        posterior -> p2_mint -> g_adversarial; v1.3/v1.3.1 lines). The skeleton contract —
+        docs/designs/proposed/workflow_skeleton_contract.md — is the enforcement map: scan it
+        and the ~230 specs BEFORE inventing a new mechanism (the vocabulary usually exists:
+        slices, gates, checkpoints, kind:test, requires_*). Prior art: the cap_* workflows
+        already split large plans into numbered slice phases (p0_pin_* -> build slices ->
+        gN_test_gate/gN_adversarial) — the extension should generalize THAT shape into the
+        loop, not create a parallel one.
+    phases:
+      - name: prior
+        kind: agent
+        scope: proposal_write
+        timeout: 1200
+        prompt: |
+          Read the Open extension note, the runner's phase machinery, the loop spec, and the
+          skeleton contract's slice/gate precedents (grep the specs for p0_pin_/g*_test_gate).
+          WRITE `notes/world_model.md` (`## Problem`, `## What Exists`, `## Gaps`, `## Sources`)
+          and `notes/plan.md` (`## Files`, `## Tests`, `## Acceptance`, `## Risks`): the
+          sub-phase mechanics (how a plan's workstreams become phases; how each gets its gate;
+          how the run stays one run), the exact files, and the tests that will prove it. Write
+          `notes/sources.jsonl`. Commit.
+      - name: execute
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        requires_files: [notes/plan.md, notes/sources.jsonl]
+        prompt: |
+          Implement the extension: the runner/spec changes the design names, plus the
+          conformance tests. Prefer the existing vocabulary (slices, gates, checkpoint) over a
+          new mechanism; if a genuinely new mechanism is needed, its one-line justification
+          goes in the plan and the code. Run the loop's gate suite
+          (tests/test_world_model_gates.py), the runner suite, and the fast path. Commit your
+          work.
+      - name: g_test_gate
+        kind: test
+        scope: implementation
+        timeout: 1800
+        requires_files: [notes/plan.md]
+        tests_from_plan: notes/plan.md
+        prompt: |
+          The independent runner verifies the worktree against the plan's targets.
+      - name: posterior
+        kind: agent
+        scope: proposal_write
+        timeout: 900
+        requires_files: [notes/world_model.md, notes/plan.md]
+        prompt: |
+          Diff the plan against what landed. WRITE `notes/posterior.md` (`## Violations`,
+          `## Unknowns`, `## UPDATES`): the mechanics as built, the residual gaps, and the
+          follow-ups (including whether the loop spec itself should adopt the extension in its
+          next revision). Commit.
+      - name: g_adversarial
+        kind: agent
+        scope: proposal_write
+        timeout: 1800
+        run_model: openai/gpt-5.6-terra
+        prompt: |
+          ADVERSARIAL REVIEW — a different model by design. Read the notes, the spec/document
+          changes, and the commits. Attack: does the extension preserve the loop's guarantees
+          (per-phase commits, gates before spend, the artifact/shape checks) or quietly bypass
+          one? is the new shape testable, and are the tests real? where does an unbounded plan
+          still slip through? Name at least one falsifier per major claim. Write
+          `notes/adversarial_review.md` with a final `## FINDING` paragraph and commit it.

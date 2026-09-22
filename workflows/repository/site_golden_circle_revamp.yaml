@@ -1,0 +1,113 @@
+name: site_golden_circle_revamp
+question: >-
+  Overhaul the front-facing website: the narrative rewritten on the Golden Circle (WHY ->
+  HOW -> WHAT), an architecture page with provenance-carrying SVG diagrams, a simplified
+  framework page, and the broken things fixed — all verified by the site census / hygiene /
+  render gates before any deploy (deploys are the controller's P0).
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+comparison: null
+writeup: {format: lab_book, sections: [question, evidence]}
+stop: {budget_usd: 6.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_uncertainty}
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: false
+    rag:
+      emit_self: true
+      emit_report: true
+      emit_scope: agentic-dynamics
+    context:
+      domain_context: >-
+        THE WEBSITE CAMPAIGN (controller direction, 2026-09-22): "huge update — the narrative
+        improved using the Golden Circle (Simon Sinek: WHY -> HOW -> WHAT), beautiful SVG
+        images with an architecture page, the framework page simplified, and certain things
+        don't even work right." The site lives in apps/website/ (README: apps/website/CONTEXT.md
+        — pages table + the dual-Firebase deploy config); today's pages: index, framework,
+        evidence, methodology, question, story, glossary, accelerator, databricks — there is NO
+        architecture page yet (it is new). THE GATES THAT EXIST — use them, do not invent:
+        `python3 scripts/site_census_check.py` (the mechanical preservation-gate census; its
+        baseline artifact lives at experiments/results/cap_site_revamp3/incumbent_census.json)
+        and the prior site campaigns' specs (workflows/repository/cap_site_revamp2/3/4*.yaml,
+        including cap_site_revamp4_diagrams.yaml — the diagrams prior art). The house rules:
+        the website prose is fact-checked against data.js / the canonical registry corpus /
+        reviews with provenance tags ([M] measured, [C] computed, [H] heuristic, [X] external,
+        [P] policy/prior) — a claim without provenance is a bug. Deliverables, in slices:
+        (s1) AUDIT — census + broken-things inventory (links, selectors, data wiring) as a
+        written list; (s2) NARRATIVE — index + framework rewritten WHY -> HOW -> WHAT, every
+        claim tagged; (s3) ARCHITECTURE PAGE + SVGs — hand-built SVG diagrams (the six planes,
+        the instrument->information->policy chain), each with a caption that states what it
+        depicts and its provenance; (s4) FRAMEWORK SIMPLIFICATION — one idea per screen,
+        detail moved, nothing lost; (s5) VERIFY — census/hygiene/render gates green. The TWO
+        Firebase deploys (`firebase deploy --only hosting` and `--project agentic-dynamics`,
+        from apps/website/) are the controller's P0 acts: this run PREPARES and verifies; it
+        NEVER deploys.
+    phases:
+      - name: prior
+        kind: agent
+        scope: proposal_write
+        timeout: 1200
+        prompt: |
+          Read apps/website/CONTEXT.md, the current index/framework pages, data.js's public
+          statistics, the site census checker + its baseline, and the cap_site_revamp* specs
+          (the prior campaigns' conventions). Run the census checker and record its output.
+          WRITE `notes/world_model.md` (`## Problem`, `## What Exists`, `## Gaps`,
+          `## Sources`) and `notes/plan.md` (`## Files`, `## Tests`, `## Acceptance`,
+          `## Risks`): the slice order, the broken-things list with evidence, the Golden Circle
+          outline for index + framework, the SVG/architecture-page inventory, and the gate
+          commands that will prove the result. Write `notes/sources.jsonl`. Commit.
+      - name: execute
+        kind: agent
+        scope: implementation
+        timeout: 5400
+        requires_files: [notes/plan.md, notes/sources.jsonl]
+        prompt: |
+          Execute the slices in order, committing as you go. Every factual claim on a page
+          carries its provenance tag and resolves to data.js / the registry corpus / a review —
+          check, don't trust. The SVGs are hand-built assets (no external fetches), each with
+          alt text and a caption. Keep the census counts stable or explain each delta. Run the
+          census/hygiene/render gates; the captures are the visual evidence. Do NOT deploy —
+          deploys are the controller's P0. Commit your work.
+      - name: g_test_gate
+        kind: test
+        scope: implementation
+        timeout: 1800
+        requires_files: [notes/plan.md]
+        tests_from_plan: notes/plan.md
+        prompt: |
+          The independent runner verifies the worktree against the plan's targets.
+      - name: posterior
+        kind: agent
+        scope: proposal_write
+        timeout: 900
+        requires_files: [notes/world_model.md, notes/plan.md]
+        prompt: |
+          Diff the plan against what landed. WRITE `notes/posterior.md` (`## Violations`,
+          `## Unknowns`, `## UPDATES`): slices landed, the census deltas with reasons, the
+          remaining broken things, and the exact deploy command the controller would run (both
+          Firebase targets). Commit.
+      - name: g_adversarial
+        kind: agent
+        scope: proposal_write
+        timeout: 1800
+        run_model: openai/gpt-5.6-terra
+        prompt: |
+          ADVERSARIAL REVIEW — a different model by design. Read the notes, the pages, the
+          SVGs, and the census output. Attack: which claim lacks a provenance tag or tags the
+          wrong source? which "simplification" dropped information? does the architecture page
+          depict the SYSTEM AS BUILT (cross-check against ARCHITECTURE.md) or a wish? Name at
+          least one falsifier per major claim. Write `notes/adversarial_review.md` with a final
+          `## FINDING` paragraph and commit it.
