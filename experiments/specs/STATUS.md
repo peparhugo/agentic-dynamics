@@ -3,22 +3,18 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-22T12:44:34.680611+00:00`  ·  242 spec(s)
-**Work remaining:** 231 open · 11 completed/retired
+Generated at: `2026-09-22T18:46:21.928739+00:00`  ·  242 spec(s)
+**Work remaining:** 202 open · 40 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `adapter_snapshot_guard` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `admission_leases` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `agentic_dynamics_rebrand` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `aio_controller_postmortem` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `authoring_product_aio` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `auto_posthoc_wiring` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `automatic_docs_sync` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `beta_lab_execution` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `campaign_join_dedup` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `canonical_publication_closure` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `canonical_state_design` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `canonical_state_finalize` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `canonical_state_implement` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `canonical_state_round2` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -40,12 +36,9 @@ Generated at: `2026-09-22T12:44:34.680611+00:00`  ·  242 spec(s)
 | `cap_2d_cell_incorrect_rebuilt` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_2e_cell_unseen_family` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_2f_cell_trivial_clean` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
-| `cap_adaptive_2c` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `cap_adaptive_2d` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_adaptive_2e` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_adaptive_2f` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_addendum_design` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `cap_addendum_implement` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_confidence_cascade` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_coverage_routing_impact` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_e2_cascade_run` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -70,33 +63,24 @@ Generated at: `2026-09-22T12:44:34.680611+00:00`  ·  242 spec(s)
 | `cap_session_routing_evidence` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `cap_session_routing_prospective` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_session_routing_spec` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `cap_shadow_campaign` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_shadow_comparison` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_shadow_fact_disposition` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_site_regression_analysis` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_site_revamp` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `cap_site_revamp2` | workflow | no | runnable | 0.1 | cap_site_revamp | — | — | — | — | 0 |
-| `cap_site_revamp3` | workflow | no | runnable | 0.1 | cap_site_revamp2 | — | — | — | — | 0 |
-| `cap_site_revamp4` | workflow | no | runnable | 0.1 | cap_site_revamp3 | — | — | — | — | 0 |
-| `cap_site_revamp4_diagrams` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_sonnet_adversary` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_stabilization_release` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_story_bridge` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_terra_postmortem` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_test_runner_wiring` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `claude_background_sessions` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `claude_tools_to_skills` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `code_review` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `concurrency_ladder` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `confidence_cascade_study` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `contemplation_fanout` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `contemplation_fanout_v2` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
-| `contemplation_synthesis_rerun` | workflow | yes | runnable | 0.1 | — | 2026-09-20 19:13 | ok | deepseek/deepseek-v4-flash | $0.0354 | 3 |
+| `contemplation_synthesis_rerun` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `context_abstraction_closure` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `context_abstraction_plane` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `control_db_evidence` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_db_followups` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `control_db_publication` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_apply_skills` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_design_determination` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_facelift` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -105,11 +89,9 @@ Generated at: `2026-09-22T12:44:34.680611+00:00`  ·  242 spec(s)
 | `control_room_facelift_repair` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_facelift_review` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_hardening` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `control_room_instrument_build` | workflow | no | runnable | 0.2 | — | — | — | — | — | 0 |
 | `control_room_live_board` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_new_ui` | workflow | no | runnable | 0.2 | — | — | — | — | — | 0 |
 | `control_room_parity_rebuild` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
-| `control_room_portal` | workflow | no | runnable | 0.2 | — | — | — | — | — | 0 |
 | `control_room_posthoc_visibility` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_refresh` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_refresh_integration` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -124,24 +106,19 @@ Generated at: `2026-09-22T12:44:34.680611+00:00`  ·  242 spec(s)
 | `control_room_ui_implement` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_ui_rebuild` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_ui_redesign` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `control_room_usage_wiring` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_ux_repair` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_workflow_phase` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_working_slice` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `deep_architecture_review` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `delta_entropy_response_campaign` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `design_sessions` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `docs_architecture_refresh` | workflow | no | runnable | 0.1 | opencode_docs_refresh | — | — | — | — | 0 |
 | `docs_refresh_remediation` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `engine_gaps_followups` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `engine_gaps_verifier_revision` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `entropy_beta_instruments` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `evidence_narrative` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `evidence_redesign` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `explanation_tax` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `finding_economics_closure` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `fix_review_findings` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `flash_exploration_build` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `flash_exploration_build_resume` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `flash_exploration_build_resume2` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `flash_exploration_build_resume3` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -150,7 +127,6 @@ Generated at: `2026-09-22T12:44:34.680611+00:00`  ·  242 spec(s)
 | `flash_ladder_bare` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `flash_ladder_kb` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `flash_ladder_score_review` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
-| `fleet_ladder_implementation` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `fleet_ladder_plan` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `fleet_ladder_revision` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `fleet_launch_boundary` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -186,13 +162,11 @@ Generated at: `2026-09-22T12:44:34.680611+00:00`  ·  242 spec(s)
 | `perturbation_operators_fix` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `posthoc_pipeline` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `process_perturbation_resample` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
-| `promote_row_closeout` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `prompt_branch_pilot` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `public_truth_closure` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `qualitative_routing_analysis` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `queue_steer` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `rag_bare_vs_augmented` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
-| `rag_knowledge_base` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `rag_knowledge_base_build` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `rag_knowledge_base_reconcile` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `rag_knowledge_base_wire` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -205,7 +179,6 @@ Generated at: `2026-09-22T12:44:34.680611+00:00`  ·  242 spec(s)
 | `refactor_master_plan` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `refactor_repair_release` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `registry_canonicalize` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
-| `remediation_data_integrity` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `repo_review_fable` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `retrieval_activation` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `retrieval_activation_augment_proof` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -220,7 +193,6 @@ Generated at: `2026-09-22T12:44:34.680611+00:00`  ·  242 spec(s)
 | `routing_regret_under_degradation` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `self_knowledge_layer` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `self_recommending_experiment` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `semantic_integrity_release` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `site_golden_circle` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `site_golden_circle_revamp` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `spec_lifecycle` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -236,9 +208,20 @@ Generated at: `2026-09-22T12:44:34.680611+00:00`  ·  242 spec(s)
 | `website_repoint` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `website_rewrite` | workflow | no | runnable | 0.3 | — | — | — | — | — | 0 |
 | `workflow_metrics` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `workflow_step_routing` | workflow | no | runnable | 0.2 | — | — | — | — | — | 0 |
 | `world_model_loop` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `world_model_loop_refusal_probe` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `admission_leases` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `agentic_dynamics_rebrand` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `authoring_product_aio` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `canonical_state_design` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `cap_adaptive_2c` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `cap_adaptive_2d` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `cap_addendum_implement` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `cap_shadow_campaign` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `cap_site_revamp4` | workflow | no | completed | 0.1 | cap_site_revamp3 | — | — | — | — | 0 |
+| `cap_site_revamp4_diagrams` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `claude_background_sessions` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `concurrency_ladder` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
 | `consolidation_release` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
 | `consolidation_release_execute` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
 | `consolidation_stage_0_architecture_spine` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
@@ -249,7 +232,24 @@ Generated at: `2026-09-22T12:44:34.680611+00:00`  ·  242 spec(s)
 | `consolidation_stage_5_apps_realignment` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
 | `consolidation_stage_6_verification_release` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
 | `context_abstraction_implement` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `control_db_evidence` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `control_db_publication` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `control_room_portal` | workflow | no | completed | 0.2 | — | — | — | — | — | 0 |
+| `control_room_usage_wiring` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `design_sessions` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `engine_gaps_verifier_revision` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `evidence_redesign` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `flash_exploration_build` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
 | `fleet_job_submission` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `fleet_ladder_implementation` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `promote_row_closeout` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `rag_knowledge_base` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `remediation_data_integrity` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `semantic_integrity_release` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
+| `workflow_step_routing` | workflow | no | completed | 0.2 | — | — | — | — | — | 0 |
+| `cap_site_revamp2` | workflow | no | superseded | 0.1 | cap_site_revamp | — | — | — | — | 0 |
+| `cap_site_revamp3` | workflow | no | superseded | 0.1 | cap_site_revamp2 | — | — | — | — | 0 |
+| `control_room_instrument_build` | workflow | no | superseded | 0.2 | — | — | — | — | — | 0 |
 
 ## Legend
 

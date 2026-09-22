@@ -20,6 +20,9 @@ side_effects:
   repository: true
   external_services: true
 repeatable: false
+# closed 2026-09-22 (the L9 sweep): the work landed — the register's L9 table
+# names the artifact that evidences it.
+status: completed
 workflow:
   kind: agent_task
   params:
