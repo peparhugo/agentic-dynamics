@@ -223,7 +223,21 @@ def api_events(cell_id) -> Response:
     The named boundary is additive: clients listening through ``onmessage``
     continue to receive the same raw event frames, while Control Room clients
     can exclude replay from the rolling burn-rate window.
+
+    Job-cell resolution (2026-09-22, operator-flagged): a WORKFLOW RUN's cell-list entry is
+    its fleet job id, whose own stream carries only orchestrator milestones while the agent
+    publishes under ``events_log:<spec>:<phase>``. When the requested cell resolves to a
+    live phase stream, the stream follows THAT and a named note leads the feed — never a
+    silent substitution; every other cell passes through unchanged.
     """
+    requested = cell_id
+    basis = ""
+    try:
+        from apps.control_room.services import operations as _operations
+
+        cell_id, basis = _operations.resolve_live_cell(_services.redis(), cell_id)
+    except Exception:  # noqa: BLE001 — an unresolvable cell streams what was asked for
+        cell_id, basis = requested, ""
     log_key = f"{EVENT_LOG_PREFIX}{cell_id}"
     channel = f"{EVENT_CHANNEL_PREFIX}{cell_id}"
 
@@ -234,12 +248,23 @@ def api_events(cell_id) -> Response:
         pubsub = r.pubsub()
         pubsub.subscribe(channel)
         try:
+            if basis:
+                note = {
+                    "type": "text",
+                    "sessionID": requested,
+                    "part": {"text": f"[room] {basis}"},
+                }
+                yield f"data: {json.dumps(note)}\n\n"
             history = r.lrange(log_key, 0, -1)
             for payload in reversed(history):
                 yield f"data: {payload}\n\n"
         except Exception:
             pass
-        yield f"event: replay_complete\ndata: {json.dumps({'cell_id': cell_id})}\n\n"
+        yield (
+            "event: replay_complete\ndata: "
+            + json.dumps({"cell_id": cell_id, "requested": requested})
+            + "\n\n"
+        )
         last_beat = time.time()
         try:
             while True:

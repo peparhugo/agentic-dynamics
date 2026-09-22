@@ -157,6 +157,48 @@ def _live_phase_cell(redis_client: Any, spec_name: str, started_at: str) -> str:
     return best[1] if best else ""
 
 
+def resolve_live_cell(redis_client: Any, cell_id: str) -> tuple[str, str]:
+    """Resolve a FLEET JOB cell id to its run's live phase stream (``(cell, basis)``).
+
+    Workflow runs appear in the room's cell list under their FLEET JOB id, whose own event
+    stream carries only orchestrator milestones ("phase prior ok" — two events for a whole
+    run) while the agent publishes under ``events_log:<spec>:<phase>`` (the sibling cell's
+    ``FINOPS_CELL_ID``). This resolves a job cell to the newest live phase stream qualified
+    by the job's own acceptance time — the SAME in-flight rule the run drawer applies
+    (2026-09-22, operator-flagged): a job entry that already carries a ``run_id`` (finished)
+    passes through unchanged, as does any id that is not a fleet job.
+
+    Best-effort and honest: an unreadable board or no qualifying phase stream returns the
+    requested id with an empty basis — the caller streams what it asked for.
+    """
+    if not cell_id:
+        return cell_id, ""
+    try:
+        board = redis_client.hgetall(FLEET_JOBS_KEY) or {}
+    except Exception:  # noqa: BLE001 — an unreadable store never redirects the stream
+        return cell_id, ""
+    entry: dict[str, Any] | None = None
+    for job_id, payload in board.items():
+        if str(job_id) != cell_id:
+            continue
+        try:
+            parsed = json.loads(payload)
+        except (TypeError, ValueError):
+            return cell_id, ""
+        entry = dict(parsed) if isinstance(parsed, Mapping) else None
+        break
+    if entry is None or str(entry.get("run_id") or ""):
+        return cell_id, ""
+    spec = str(entry.get("spec") or "")
+    spec_name = spec.rsplit("/", 1)[-1].removesuffix(".yaml") if spec else ""
+    if not spec_name:
+        return cell_id, ""
+    phase_cell = _live_phase_cell(redis_client, spec_name, str(entry.get("ts") or ""))
+    if not phase_cell or phase_cell == cell_id:
+        return cell_id, ""
+    return phase_cell, f"job {cell_id} -> live phase stream {phase_cell}"
+
+
 def read_run_logs(
     redis_client: Any,
     run_id: str,
