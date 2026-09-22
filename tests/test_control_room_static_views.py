@@ -221,3 +221,19 @@ def test_run_drawer_renders_the_run_inspection_blocks():
         'tr.dataset.state',
     ):
         assert anchor in app, anchor
+
+
+def test_run_drawer_renders_the_job_log_blocks():
+    """The drawer's Logs block: the job's recorded tail renders as entries, an unbound read is
+    NAMED (never an empty success), and the live follow reuses the room's /api/events stream."""
+    app = (STATIC / "app.js").read_text(encoding="utf-8")
+    for anchor in (
+        "renderRunLogs",
+        "dataset.logState",
+        "dataset.logEntry",
+        "Follow live",
+        "api/events/",
+        "closeRunLogStream",
+        "run-log",
+    ):
+        assert anchor in app, anchor

@@ -3156,6 +3156,8 @@
   /** The P1/P2 run detail: identity, attempts, gates, approvals, command receipts. */
   async function openRunDetail(runId) {
     if (!runId) return
+    // A fresh draw supersedes any live follow bound to the previous run.
+    closeRunLogStream()
     const drawer = $("#run-detail-drawer")
     const content = $("#run-detail-content")
     const title = $("#run-detail-title")
@@ -3187,6 +3189,7 @@
   }
 
   function closeRunDetail() {
+    closeRunLogStream()
     $("#run-detail-drawer").hidden = true
     $("#run-detail-content").replaceChildren()
     state.runDetailReturnFocus?.focus?.()
@@ -3264,6 +3267,8 @@
       ),
     )
     children.push(attemptBlock)
+
+    children.push(renderRunLogs(data.logs || {}))
 
     const gates = element("section", "surface-block")
     gates.appendChild(element("h3", "", "Gates"))
@@ -3413,6 +3418,118 @@
     scroll.appendChild(table)
     block.appendChild(scroll)
     return block
+  }
+
+  /* ── The drawer's Logs block: the run's job event tail + the live follow ─────────────── */
+
+  /** The live-follow stream bound to the open drawer (closed on close/replace). */
+  let runLogStream = null
+  let runLogStreamCell = ""
+
+  function closeRunLogStream() {
+    if (runLogStream) {
+      runLogStream.close()
+      runLogStream = null
+    }
+    runLogStreamCell = ""
+  }
+
+  /** One log entry: the producer's own class and text — the client formats, never invents. */
+  function runLogEntry(event) {
+    const entry = element("li", "run-log-entry")
+    entry.dataset.logEntry = ""
+    entry.dataset.logKind = String(event.class || "event")
+    if (event.live) entry.dataset.logLive = "true"
+    entry.appendChild(
+      element("span", "run-log-class", String(event.class || "event").toUpperCase()),
+    )
+    entry.appendChild(element("span", "run-log-text", event.text || "—"))
+    return entry
+  }
+
+  /**
+   * The Logs block: the run's fleet-job event tail as the service resolved it.
+   *
+   * The service's own state is rendered verbatim: `recorded` renders the bounded tail and
+   * offers the live follow; `unbound` / `unavailable` are NAMED with the service's reason —
+   * never an empty success. The follow subscribes to the SAME `/api/events/<cell>` stream the
+   * transcript panel uses (replay + live), so the drawer and the panel can never disagree.
+   */
+  function renderRunLogs(logs) {
+    const block = element("section", "surface-block")
+    block.appendChild(element("h3", "", "Logs"))
+    const state = logs.state || "unavailable"
+    const note = element("p", "pane-note")
+    note.dataset.logState = state
+    if (state !== "recorded") {
+      note.textContent =
+        state === "unbound"
+          ? `No fleet job bound to this run — ${logs.reason || "no job on the board references it"}.`
+          : `Logs unavailable — ${logs.reason || "the event store could not be read"}.`
+      block.appendChild(note)
+      return block
+    }
+    note.textContent = logs.history_capped
+      ? `job ${logs.cell_id} · ${logs.count} event(s) retained (bounded window — older events evicted)`
+      : `job ${logs.cell_id} · ${logs.count} event(s) retained`
+    block.appendChild(note)
+    const feed = element("ul", "run-log")
+    feed.dataset.logFeed = logs.cell_id || ""
+    for (const event of logs.events || []) feed.appendChild(runLogEntry(event))
+    block.appendChild(feed)
+    const follow = element("button", "run-log-follow")
+    follow.type = "button"
+    follow.dataset.logFollow = logs.cell_id || ""
+    follow.setAttribute("aria-pressed", "false")
+    follow.textContent = "Follow live"
+    follow.addEventListener("click", () => toggleRunLogStream(follow.dataset.logFollow, follow))
+    block.appendChild(follow)
+    return block
+  }
+
+  /** Toggle the drawer's live follow: replay then stream into the rendered feed. */
+  function toggleRunLogStream(cellId, button) {
+    if (!cellId) return
+    if (runLogStream && runLogStreamCell === cellId) {
+      closeRunLogStream()
+      button.textContent = "Follow live"
+      button.setAttribute("aria-pressed", "false")
+      return
+    }
+    closeRunLogStream()
+    const feed = document.querySelector("#run-detail-content .run-log")
+    if (!feed || typeof window.EventSource !== "function") {
+      button.textContent = "Live follow unavailable"
+      button.disabled = true
+      return
+    }
+    const source = new window.EventSource(`/api/events/${encodeURIComponent(cellId)}`)
+    runLogStream = source
+    runLogStreamCell = cellId
+    button.textContent = "Pause"
+    button.setAttribute("aria-pressed", "true")
+    source.onmessage = (message) => {
+      if (runLogStreamCell !== cellId) return
+      let event = null
+      try {
+        event = JSON.parse(message.data)
+      } catch (_error) {
+        return
+      }
+      const part = event && typeof event.part === "object" && event.part ? event.part : {}
+      feed.appendChild(
+        runLogEntry({
+          class: (event && event.type) || "event",
+          text: part.text || (event && event.text) || "",
+          live: true,
+        }),
+      )
+      while (feed.children.length > 200) feed.removeChild(feed.firstChild)
+    }
+    source.onerror = () => {
+      if (runLogStreamCell !== cellId) return
+      button.textContent = "Reconnecting…"
+    }
   }
 
   /* ── The Surfaces board: the step-6/7 read models, each panel independent ─────────────── */

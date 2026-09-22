@@ -243,7 +243,34 @@
         "scope": "implement",
         "state": "unknown"
       }
-    ]
+    ],
+    "logs": {
+      "state": "recorded",
+      "cell_id": "fixture-job-0001",
+      "reason": "",
+      "count": 3,
+      "history_capped": false,
+      "events": [
+        {
+          "ts": "2026-09-18T19:18:09Z",
+          "class": "text",
+          "text": "workflow control_room_followups — fixture run started",
+          "id": ""
+        },
+        {
+          "ts": "2026-09-18T19:18:30Z",
+          "class": "step_finish",
+          "text": "phase implement ok",
+          "id": ""
+        },
+        {
+          "ts": "2026-09-18T19:19:00Z",
+          "class": "step_finish",
+          "text": "phase verify ok",
+          "id": ""
+        }
+      ]
+    }
   },
   "run_detail_unknown": {
     "schema": "control-room-run-detail/v1",
@@ -300,7 +327,15 @@
         "value": null,
         "state": "unknown"
       }
-    ]
+    ],
+    "logs": {
+      "state": "unbound",
+      "cell_id": "",
+      "reason": "no fleet job on the board references this run",
+      "count": 0,
+      "history_capped": false,
+      "events": []
+    }
   },
   "run_detail_error": {
     "error": "control_db_unavailable",

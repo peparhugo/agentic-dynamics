@@ -2963,3 +2963,46 @@ textarea:focus {
   background: var(--cr-surface-1);
   padding: var(--cr-space-3);
 }
+
+/* The run drawer's Logs block: the run's job event tail (recorded replay + live follow).
+   Bounded and scrollable in place — the drawer never grows unbounded with a long log. */
+.run-log {
+  list-style: none;
+  margin: var(--cr-space-2) 0;
+  padding: var(--cr-space-1) var(--cr-space-2);
+  max-height: 16rem;
+  overflow-y: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  background: var(--cr-surface-inset);
+  border: 1px solid var(--cr-line-subtle);
+  border-radius: var(--cr-radius-sm);
+}
+
+.run-log-entry {
+  display: flex;
+  gap: var(--cr-space-2);
+  padding: 0.1rem 0;
+}
+
+.run-log-class {
+  flex: 0 0 auto;
+  opacity: 0.75;
+  letter-spacing: 0.04em;
+}
+
+.run-log-text {
+  flex: 1 1 auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--cr-text-primary);
+}
+
+.run-log-entry[data-log-live="true"] .run-log-class::after {
+  content: " ·live";
+}
+
+.run-log-follow {
+  margin-top: var(--cr-space-1);
+}

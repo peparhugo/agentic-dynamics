@@ -20,11 +20,13 @@ sockets, reads no clock (``now`` is injected through to ``build_packet``), and n
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from dataclasses import asdict
 from typing import Any
 
 from agentic_dynamics.control.control_status import build_packet
+from agentic_dynamics.control.live import EVENT_LOG_MAX, EVENT_LOG_PREFIX
 from apps.control_room.services import run_evidence
 
 #: The read model's schema id (additive; the source packet's schema rides in ``source``).
@@ -32,6 +34,99 @@ SCHEMA = "control-room-operations/v1"
 
 #: The per-run detail's schema id (step 5, P1/P2).
 RUN_DETAIL_SCHEMA = "control-room-run-detail/v1"
+
+#: The fleet job board (the supervisor's Redis key; each job record carries its ``run_id``).
+FLEET_JOBS_KEY = "fleet:jobs"
+
+#: How many retained job events the run detail's logs block carries (a bounded tail).
+LOGS_EVENT_LIMIT = 50
+
+
+def logs_block(
+    *,
+    cell_id: str,
+    state: str,
+    reason: str = "",
+    raw_events: list[str] | None = None,
+    total: int = 0,
+) -> dict[str, Any]:
+    """The run's job-log block: a NAMED state, a bounded parsed tail, no fabricated values.
+
+    States: ``recorded`` (the job's retained tail was read), ``unbound`` (no fleet job on the
+    board references this run), ``unavailable`` (the event store could not be read — the reason
+    names it). ``events`` is oldest-first for the reader; the producer stores newest-first
+    (LPUSH + LTRIM at ``EVENT_LOG_MAX``), and ``history_capped`` reports the producer's own
+    bounded-window eviction rather than implying the tail is the whole history.
+    """
+    events: list[dict[str, Any]] = []
+    for payload in raw_events or []:
+        try:
+            event = json.loads(payload)
+        except (TypeError, ValueError):
+            event = {"type": "event", "text": str(payload)}
+        if not isinstance(event, Mapping):
+            event = {"type": "event", "text": str(event)}
+        part = event.get("part") if isinstance(event.get("part"), Mapping) else {}
+        text = part.get("text", event.get("text", ""))
+        events.append(
+            {
+                "ts": part.get("time") or event.get("time") or None,
+                "class": str(event.get("type") or "event"),
+                "text": str(text if text is not None else ""),
+                "id": str(event.get("id") or ""),
+            }
+        )
+    return {
+        "state": state,
+        "cell_id": cell_id,
+        "reason": reason,
+        "events": events,
+        "count": int(total or 0),
+        "history_capped": int(total or 0) >= EVENT_LOG_MAX,
+    }
+
+
+def read_run_logs(
+    redis_client: Any, run_id: str, *, limit: int = LOGS_EVENT_LIMIT
+) -> dict[str, Any]:
+    """Resolve the run's fleet job and read its retained event tail (read-only, honest states).
+
+    The mapping is the fleet job board itself (``fleet:jobs``; each job record carries its
+    ``run_id``) — the identity the launcher wrote, never a re-derivation. A missing board entry
+    is ``unbound``; any Redis failure is ``unavailable`` with the reason named.
+    """
+    try:
+        board = redis_client.hgetall(FLEET_JOBS_KEY) or {}
+    except Exception as exc:  # noqa: BLE001 — an unreadable store is named, never a 500
+        return logs_block(cell_id="", state="unavailable", reason=f"{type(exc).__name__}: {exc}")
+    cell_id = ""
+    for job_id, payload in board.items():
+        try:
+            entry = json.loads(payload)
+        except (TypeError, ValueError):
+            continue
+        if isinstance(entry, Mapping) and str(entry.get("run_id") or "") == run_id:
+            cell_id = str(job_id)
+            break
+    if not cell_id:
+        return logs_block(
+            cell_id="",
+            state="unbound",
+            reason="no fleet job on the board references this run",
+        )
+    try:
+        raw = redis_client.lrange(f"{EVENT_LOG_PREFIX}{cell_id}", 0, limit - 1)
+        total = int(redis_client.llen(f"{EVENT_LOG_PREFIX}{cell_id}") or 0)
+    except Exception as exc:  # noqa: BLE001
+        return logs_block(
+            cell_id=cell_id, state="unavailable", reason=f"{type(exc).__name__}: {exc}"
+        )
+    return logs_block(
+        cell_id=cell_id,
+        state="recorded",
+        raw_events=list(reversed(list(raw or []))),
+        total=total,
+    )
 
 
 def operational_snapshot(
@@ -76,7 +171,7 @@ def operational_snapshot(
     }
 
 
-def run_detail(db: Any, run_id: str) -> dict[str, Any] | None:
+def run_detail(db: Any, run_id: str, *, redis_client: Any | None = None) -> dict[str, Any] | None:
     """The P1/P2 per-run view: identity, attempts, gates, approvals, command receipts.
 
     Every raw block is read from the control records AS THEY ARE: a record the database has
@@ -94,7 +189,9 @@ def run_detail(db: Any, run_id: str) -> dict[str, Any] | None:
     * ``recorded`` — the ledger pointer and whether it resolved;
     * ``delivered_knowledge`` — per phase, what was SELECTED and DELIVERED (never "used");
     * ``prepared`` — per phase, the prepared-step reference or a named missing;
-    * ``timings`` — one row per timing field actually recorded, each with a measured state.
+    * ``timings`` — one row per timing field actually recorded, each with a measured state;
+    * ``logs`` — the run's fleet-job event tail (recorded), or a NAMED absence. The client is
+      INJECTED by the context (which owns the accessor); a missing client is ``unavailable``.
     """
     run = db.get_run(run_id)
     if run is None:
@@ -116,4 +213,10 @@ def run_detail(db: Any, run_id: str) -> dict[str, Any] | None:
     detail["delivered_knowledge"] = run_evidence.delivered_knowledge_block(ledger)
     detail["prepared"] = run_evidence.prepared_block(ledger)
     detail["timings"] = run_evidence.timings_block(detail, ledger)
+    if redis_client is None:
+        detail["logs"] = logs_block(
+            cell_id="", state="unavailable", reason="no event store bound to the read model"
+        )
+    else:
+        detail["logs"] = read_run_logs(redis_client, run_id)
     return detail

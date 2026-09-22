@@ -165,13 +165,25 @@ class ControlRoomServices:
         return snapshot, 200
 
     def run_detail(self, run_id: str) -> tuple[Any, int]:
-        """The P1/P2 per-run detail; unknown run -> 404, unreadable control plane -> named 200."""
+        """The P1/P2 per-run detail; unknown run -> 404, unreadable control plane -> named 200.
+
+        The run's job log rides the same read: the injected Redis accessor is passed INTO the
+        pure read model (which owns no connection of its own), and an accessor that cannot
+        produce a client leaves a NAMED ``unavailable`` logs block — never a 500, never a
+        silently empty log.
+        """
         from agentic_dynamics.control.control_db import ControlDB
         from apps.control_room.services import operations as ops
 
+        redis_client: Any = None
+        redis_error = ""
+        try:
+            redis_client = self.redis()
+        except Exception as exc:  # noqa: BLE001 — a named absence, never a 500
+            redis_error = f"{type(exc).__name__}: {exc}"
         try:
             with ControlDB.open_read_only() as db:
-                detail = ops.run_detail(db, run_id)
+                detail = ops.run_detail(db, run_id, redis_client=redis_client)
         except Exception as exc:  # noqa: BLE001 — named degradation, never a 500
             return {
                 "error": "control_db_unavailable",
@@ -179,6 +191,8 @@ class ControlRoomServices:
             }, 200
         if detail is None:
             return {"error": "run not found", "run_id": run_id}, 404
+        if redis_error:
+            detail["logs"] = ops.logs_block(cell_id="", state="unavailable", reason=redis_error)
         return detail, 200
 
     # -- the analytic projections (step 6, P3/P4/P5/P6; read-only, on-demand) --
@@ -310,9 +324,7 @@ class ControlRoomServices:
         try:
             return load_published_data(self.root / "apps" / "website" / "data.js"), []
         except Exception as exc:  # noqa: BLE001 — scenario surfaces degrade to named unknowns
-            return None, [
-                {"surface": "published_data", "reason": f"{type(exc).__name__}: {exc}"}
-            ]
+            return None, [{"surface": "published_data", "reason": f"{type(exc).__name__}: {exc}"}]
 
     def _queue_jobs(self) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
         """Read BOTH lanes best-effort, tagging each job with its lane and ``batch_mode``.
@@ -360,9 +372,7 @@ class ControlRoomServices:
                 ]
         except Exception as exc:  # noqa: BLE001 — named degradation, never a 500
             degraded.append({"surface": "control_db", "reason": f"{type(exc).__name__}: {exc}"})
-        views, n_ledgers = sq.load_breach_views(
-            self.root / "experiments" / "results" / "workflows"
-        )
+        views, n_ledgers = sq.load_breach_views(self.root / "experiments" / "results" / "workflows")
         timings, n_skipped = sq.load_job_timings(
             self.root / "experiments" / "results" / "queue_timings.jsonl"
         )
@@ -447,9 +457,7 @@ class ControlRoomServices:
                     db, records, category=category, now=now, source=source
                 )
         except Exception as exc:  # noqa: BLE001 — an unreadable control plane is degraded data
-            degraded.append(
-                {"surface": "control_db", "reason": f"{type(exc).__name__}: {exc}"}
-            )
+            degraded.append({"surface": "control_db", "reason": f"{type(exc).__name__}: {exc}"})
             payload = dl.build_decision_ledger(
                 None, records, category=category, now=now, source=source
             )
@@ -479,4 +487,3 @@ class ControlRoomServices:
         payload = energy_projection.build_energy(published, now=now)
         payload["degraded"] = list(payload.get("degraded", [])) + degraded
         return payload, 200
-
