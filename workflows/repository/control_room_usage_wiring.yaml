@@ -14,6 +14,9 @@ side_effects:
   repository: true
   external_services: false
 repeatable: false
+# closed 2026-09-22 (the L9 sweep): the work landed — the register's L9 table
+# names the artifact that evidences it.
+status: completed
 # NOTE (execution path): reference path is the orchestrator; this is a small UI+service
 # spec — in-process is acceptable while the fleet is occupied (trivial-deterministic
 # fallback per the run-workflow skill).

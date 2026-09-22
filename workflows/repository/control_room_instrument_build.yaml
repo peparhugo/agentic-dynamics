@@ -13,6 +13,9 @@ side_effects:
   repository: true
   external_services: false
 repeatable: false
+# closed 2026-09-22 (the L9 sweep): superseded by the later work named in the
+# register's L9 table.
+status: superseded
 workflow:
   kind: agent_task
   params:
