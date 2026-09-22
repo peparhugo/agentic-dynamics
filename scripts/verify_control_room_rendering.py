@@ -2556,6 +2556,30 @@ def build_operations_payload(degraded: bool = False) -> dict[str, Any]:
         payload.setdefault("active_runs", [])
         payload.setdefault("promotable_runs", [])
         payload.setdefault("attention", [])
+        payload["runs"] = []
+        payload["counts"] = {
+            "active": None,
+            "attention": None,
+            "promotable": None,
+            "unhealthy_workers": None,
+        }
+        payload["state_screens"] = [
+            {
+                "key": key,
+                "label": label,
+                "state": "unavailable",
+                "reason": "control database not found",
+                "runs": [],
+            }
+            for key, label in (
+                ("running", "Running"),
+                ("blocked", "Blocked"),
+                ("stalled", "Stalled"),
+                ("failed", "Failed"),
+                ("escalated", "Escalated"),
+                ("done", "Done"),
+            )
+        ]
         return payload
     run_seed = seed["run_seed"]
     active_count = int(seed.get("active_count", 0))
@@ -2565,9 +2589,61 @@ def build_operations_payload(degraded: bool = False) -> dict[str, Any]:
         row = copy.deepcopy(run_seed)
         row["run_id"] = f"run-fixture-{index:04d}"
         row["state"] = "running" if index <= active_count else "promotable"
+        row["session.identity"] = row["run_id"]
+        row["spec.cell"] = "cell/control_room_followups"
+        row["terminal.target"] = "/tmp/wt/control-room-followups"
+        row["command.current"] = row["spec_name"]
+        row["model.provider"] = row["model"]
+        row["attempt.number"] = "1" if row["run_id"] == "run-fixture-0001" else "unknown"
+        row["phase.progress"] = f"{row['phases_completed']}/{row['phases_total']}"
+        row["lifecycle.state"] = row["state"]
+        row["run.live"] = "live" if row["state"] == "running" else "not-live"
+        row["source.commit"] = row["candidate_sha"]
+        row["cost.provenance"] = (
+            "$0.0000 · metered" if row["run_id"] == "run-fixture-0001" else "unknown"
+        )
+        row["attention.state"] = (
+            "active" if row["run_id"] in {"run-fixture-0001", "run-fixture-0007"} else "none"
+        )
+        row["attention.kind"] = (
+            "promotion"
+            if row["run_id"] == "run-fixture-0001"
+            else ("approval" if row["run_id"] == "run-fixture-0007" else "none")
+        )
+        row["attention.order"] = (
+            0
+            if row["run_id"] == "run-fixture-0001"
+            else (1 if row["run_id"] == "run-fixture-0007" else None)
+        )
+        row["evidence.advisory"] = (
+            "narration recorded" if row["run_id"] == "run-fixture-0001" else "narration unknown"
+        )
+        row["evidence.measured"] = (
+            "independent tests passed"
+            if row["run_id"] == "run-fixture-0001"
+            else "test result unknown"
+        )
+        row["evidence.source"] = f"commit {row['candidate_sha']}"
+        row["decision.eligibility"] = "promote" if row["state"] == "promotable" else "inspect"
+        row["decision.receipt"] = "recorded" if row["run_id"] == "run-fixture-0001" else "missing"
+        row["started.age"] = "4d"
+        row["operator.state"] = "running" if row["state"] == "running" else "blocked"
         runs.append(row)
     payload["active_runs"] = runs[:active_count]
     payload["promotable_runs"] = runs[active_count:]
+    payload["runs"] = runs
+    payload["counts"] = {
+        "active": active_count,
+        "attention": len(payload.get("attention", [])),
+        "promotable": promotable_count,
+        "unhealthy_workers": len(payload.get("unhealthy_workers", [])),
+    }
+    for screen in payload.get("state_screens", []):
+        key = screen.get("key")
+        selected = [row for row in runs if row.get("operator.state") == key]
+        screen["runs"] = selected
+        screen["state"] = "recorded" if selected else "unbound"
+        screen["reason"] = "" if selected else "no fixture run in this state"
     return payload
 
 
@@ -2611,6 +2687,45 @@ def check_boards_fixtures() -> list[str]:
     ):
         if key not in detail:
             problems.append(f"boards fixture: run_detail missing derived block {key!r}")
+    operations = build_operations_payload(False)
+    rows = operations.get("runs") or []
+    required_row_fields = (
+        "session.identity",
+        "spec.cell",
+        "model.provider",
+        "phase.progress",
+        "lifecycle.state",
+        "source.commit",
+        "run.live",
+        "terminal.target",
+        "attempt.number",
+        "cost.provenance",
+        "decision.eligibility",
+        "decision.receipt",
+        "evidence.advisory",
+        "evidence.measured",
+        "attention.state",
+        "started.age",
+        "operator.state",
+    )
+    if not rows:
+        problems.append("boards fixture: operations must carry server-owned runs")
+    for index, row in enumerate(rows):
+        for field in required_row_fields:
+            if row.get(field) in (None, ""):
+                problems.append(f"boards fixture: operations run {index} missing {field!r}")
+    screens = {str(screen.get("key")): screen for screen in operations.get("state_screens") or []}
+    expected_screens = {"running", "blocked", "stalled", "failed", "escalated", "done"}
+    if set(screens) != expected_screens:
+        problems.append(
+            "boards fixture: state_screens must name exactly "
+            f"{sorted(expected_screens)} (got {sorted(screens)})"
+        )
+    for key, screen in screens.items():
+        if screen.get("state") not in {"recorded", "unbound", "unavailable"}:
+            problems.append(f"boards fixture: state screen {key!r} has no named state")
+        if screen.get("state") != "recorded" and not screen.get("reason"):
+            problems.append(f"boards fixture: state screen {key!r} needs a named reason")
     cost = detail.get("cost") or {}
     if cost.get("provenance") != "$0.0000 \u00b7 metered":
         problems.append(
@@ -2640,13 +2755,13 @@ def check_boards_fixtures() -> list[str]:
         problems.append("boards fixture: run_detail_unknown must carry the unbound logs case")
     if "error" not in (fixture.get("run_detail_error") or {}):
         problems.append("boards fixture: run_detail_error must carry an error envelope")
-    normal = build_operations_payload(False)
-    rows = normal.get("active_runs", []) + normal.get("promotable_runs", [])
-    if len(rows) < 12:
+    normal = operations
+    packet_rows = normal.get("active_runs", []) + normal.get("promotable_runs", [])
+    if len(packet_rows) < 12:
         problems.append(
             "boards fixture: fewer than 12 run rows — the scroll check needs a long board"
         )
-    ids = {row["run_id"] for row in rows}
+    ids = {row["run_id"] for row in packet_rows}
     for item in normal.get("attention", []):
         if item.get("run_id") not in ids:
             problems.append(
@@ -3556,6 +3671,56 @@ def _check_board_keyboard(
             )
             context.close()
             continue
+        # The Operations table must render the service's row projection, not a client-side join
+        # against /api/glance or a browser-clock fallback.  Check the complete field vocabulary
+        # on the rich fixture row before opening its drawer.
+        rich_probe = page.locator('tr[data-run-id="run-fixture-0001"]')
+        required_fields = (
+            "session.identity",
+            "spec.cell",
+            "model.provider",
+            "phase.progress",
+            "lifecycle.state",
+            "source.commit",
+            "run.live",
+            "terminal.target",
+            "attempt.number",
+            "cost.provenance",
+            "decision.eligibility",
+            "decision.receipt",
+            "evidence.advisory",
+            "evidence.measured",
+            "attention.state",
+            "started.age",
+        )
+        for field in required_fields:
+            node = rich_probe.locator(f'[data-field="{field}"] [data-value]')
+            if node.count() != 1 or not (node.first.inner_text() or "").strip():
+                _row(
+                    errors,
+                    label,
+                    "keyboard",
+                    f"operations-field-{field}",
+                    f"the server-owned Operations row did not render field {field!r}",
+                )
+        state_nodes = page.locator("[data-state-screen]")
+        if state_nodes.count() != 6:
+            _row(
+                errors,
+                label,
+                "keyboard",
+                "state-screens",
+                f"expected six named state screens, got {state_nodes.count()}",
+            )
+        for state_name in ("Running", "Blocked", "Stalled", "Failed", "Escalated", "Done"):
+            if state_name not in (page.locator("#operations-content").inner_text() or ""):
+                _row(
+                    errors,
+                    label,
+                    "keyboard",
+                    f"state-screen-{state_name.lower()}",
+                    f"the named {state_name} state screen is not rendered",
+                )
         # The rich run-inspection assertions need the RICH fixture row EXPLICITLY: the first
         # row in DOM order is the Operations attention table's unknown-cost run
         # (run-fixture-0007), which deliberately lacks the rich blocks this class asserts

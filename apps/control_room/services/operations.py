@@ -41,6 +41,18 @@ FLEET_JOBS_KEY = "fleet:jobs"
 #: How many retained job events the run detail's logs block carries (a bounded tail).
 LOGS_EVENT_LIMIT = 50
 
+# The operator-facing situations are deliberately separate from the control database's
+# lifecycle enum.  A run can be ``running`` while the room has no run-bound stall evidence,
+# and ``promotable`` is a blocked decision rather than a successful terminal outcome.
+STATE_SCREENS: tuple[tuple[str, str], ...] = (
+    ("running", "Running"),
+    ("blocked", "Blocked"),
+    ("stalled", "Stalled"),
+    ("failed", "Failed"),
+    ("escalated", "Escalated"),
+    ("done", "Done"),
+)
+
 
 def logs_block(
     *,
@@ -151,7 +163,7 @@ def _live_phase_cell(redis_client: Any, spec_name: str, started_at: str) -> str:
                 break
         if ts is None or ts + 1.0 < started:
             continue
-        name = str(key)[len(EVENT_LOG_PREFIX):]
+        name = str(key)[len(EVENT_LOG_PREFIX) :]
         if best is None or ts > best[0]:
             best = (ts, name)
     return best[1] if best else ""
@@ -323,6 +335,243 @@ def _epoch(value: Any) -> float | None:
         return None
 
 
+def _age_label(value: Any, *, now: Any | None) -> str:
+    """Render a recorded timestamp as a stable, named age for the browser.
+
+    The browser used to read ``started_at`` and compare it with its own clock.  That made the
+    same run disagree between the Operations table and the glance row, and made fixture captures
+    depend on when Playwright happened to run.  The service owns the comparison now; when the
+    observation instant is unavailable the honest value is ``unknown``, never ``0s``.
+    """
+    started = _epoch(value)
+    observed = _epoch(now)
+    if started is None or observed is None:
+        return "unknown"
+    seconds = max(0, int(observed - started))
+    if seconds < 60:
+        return f"{seconds}s"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes}m"
+    hours = minutes // 60
+    if hours < 24:
+        return f"{hours}h"
+    return f"{hours // 24}d"
+
+
+def _row_events(detail: dict[str, Any] | None, *, limit: int = 8) -> list[dict[str, Any]]:
+    """Project only recorded control events into the shared run row.
+
+    This is intentionally a selection projection, not causal interpretation.  The drawer may
+    display these events, but the service does not claim that one event caused another.
+    """
+    if not detail:
+        return []
+    events: list[dict[str, Any]] = []
+    for attempt in detail.get("attempts") or []:
+        events.append(
+            {
+                "id": str(attempt.get("attempt_id") or ""),
+                "ts": str(attempt.get("started_at") or ""),
+                "class": "lifecycle",
+                "text": (
+                    f"attempt {run_evidence._token(attempt.get('attempt_no'))} "
+                    f"{run_evidence._token(attempt.get('state'))} · "
+                    f"{str(attempt.get('model') or 'model unknown')}"
+                ),
+            }
+        )
+    for gate in detail.get("gates") or []:
+        events.append(
+            {
+                "id": str(gate.get("gate_id") or ""),
+                "ts": str(gate.get("ended_at") or gate.get("started_at") or ""),
+                "class": "measured",
+                "text": (
+                    f"gate {str(gate.get('gate_id') or 'unnamed')} "
+                    f"{run_evidence._token(gate.get('verdict'))} · "
+                    f"{str(gate.get('executor') or 'executor unknown')}"
+                ),
+            }
+        )
+    for approval in detail.get("approvals") or []:
+        events.append(
+            {
+                "id": str(approval.get("approval_id") or ""),
+                "ts": str(approval.get("decided_at") or ""),
+                "class": "policy",
+                "text": f"approved by {str(approval.get('operator') or 'unknown')}",
+            }
+        )
+    for command in detail.get("commands") or []:
+        receipt = " · receipt" if str(command.get("receipt_json") or "").strip() else ""
+        events.append(
+            {
+                "id": str(command.get("command_id") or ""),
+                "ts": str(command.get("created_at") or ""),
+                "class": "source",
+                "text": (
+                    f"{str(command.get('verb') or 'command')} "
+                    f"{run_evidence._token(command.get('state'))}{receipt}"
+                ),
+            }
+        )
+    events.sort(key=lambda event: (event["ts"], event["id"]))
+    return events[-limit:] if limit > 0 else events
+
+
+def _operator_state(run: Mapping[str, Any], detail: dict[str, Any] | None) -> str:
+    """Map a lifecycle row to the named operator state screens.
+
+    Escalation wins because it is an advisory boundary on an otherwise running or completed
+    attempt.  Stall is not inferred from age alone: without a run-bound heartbeat or phase
+    status the service returns ``running`` and leaves the dedicated stalled screen unbound.
+    """
+    attempts = (detail or {}).get("attempts") or []
+    if any(
+        str(attempt.get("escalation_from") or "").strip()
+        or str(attempt.get("escalation_to") or "").strip()
+        for attempt in attempts
+        if isinstance(attempt, Mapping)
+    ):
+        return "escalated"
+    state = str(run.get("state") or "unknown")
+    if state in {"awaiting_approval", "promotable"}:
+        return "blocked"
+    if state == "failed":
+        return "failed"
+    if state in {"merged", "projecting", "published"}:
+        return "done"
+    return "running" if state in {"queued", "running", "verifying", "promoting"} else "unknown"
+
+
+def attention_projection(
+    packet: Mapping[str, Any], *, now: Any | None = None
+) -> list[dict[str, Any]]:
+    """Build the decisions-owed list once, including server-owned order and age values."""
+    attention: list[dict[str, Any]] = []
+    for entry in packet.get("awaiting_approvals", []):
+        attention.append({"kind": "approval", **dict(entry)})
+    for entry in packet.get("failed_runs", []):
+        attention.append({"kind": "failed", **dict(entry)})
+    # A promotable run is a controller decision even though it is not in `awaiting_approvals`.
+    for entry in packet.get("promotable_runs", []):
+        attention.append(
+            {
+                "kind": "promotion",
+                **dict(entry),
+                "gate_id": "",
+                "purpose": "candidate verified; awaiting the permanence decision",
+            }
+        )
+    priority = {"failed": 0, "approval": 1, "promotion": 2}
+    for index, entry in enumerate(attention):
+        entry["attention.state"] = "active"
+        entry["attention.order"] = index
+        entry["started.age"] = _age_label(entry.get("started_at"), now=now)
+    attention.sort(
+        key=lambda entry: (priority.get(str(entry.get("kind")), 99), str(entry.get("run_id")))
+    )
+    for index, entry in enumerate(attention):
+        entry["attention.order"] = index
+    return attention
+
+
+def run_row(
+    run: Mapping[str, Any],
+    *,
+    epoch: int,
+    detail: dict[str, Any] | None,
+    attention_entry: Mapping[str, Any] | None = None,
+    now: Any | None = None,
+) -> dict[str, Any]:
+    """Project one packet run reference into the shared Operations/glance row schema.
+
+    The packet supplies identity and lifecycle fields; ``run_evidence`` supplies recorded ledger
+    facts; this function supplies only presentation labels such as the age and operator state.
+    It never fills an absent record with a guessed attempt, workspace, receipt, or event.
+    """
+    state = str(run.get("state") or "unknown")
+    completed = run.get("phases_completed")
+    total = run.get("phases_total")
+    progress = "unknown" if completed is None or total is None else f"{completed}/{total}"
+    sha = str(run.get("candidate_sha") or "unknown")
+    ledger = run_evidence.recorded_ledger({"run": dict(run)} | (detail or {}))
+    attention_entry = attention_entry or {}
+    operator_state = _operator_state(run, detail)
+    eligibility = (
+        "approve"
+        if state == "awaiting_approval"
+        else "promote"
+        if state == "promotable"
+        else "inspect"
+    )
+    return {
+        **dict(run),
+        "session.identity": str(run.get("run_id") or "unknown"),
+        "spec.cell": run_evidence._cell_binding(ledger),
+        "terminal.target": run_evidence._workspace_target(detail, ledger),
+        "command.current": str(run.get("spec_name") or "unknown"),
+        "model.provider": str(run.get("model") or "unknown"),
+        "attempt.number": run_evidence._attempt_number(detail),
+        "phase.progress": progress,
+        "lifecycle.state": state,
+        "run.live": "live"
+        if state not in {"failed", "cancelled", "quarantined", "published"}
+        else "not-live",
+        "source.commit": sha,
+        "cost.provenance": run_evidence._cost_provenance(dict(run), detail, ledger),
+        "attention.state": str(attention_entry.get("attention.state") or "none"),
+        "attention.kind": str(attention_entry.get("kind") or "none"),
+        "attention.order": attention_entry.get("attention.order"),
+        "evidence.advisory": run_evidence._narration_state(detail, ledger),
+        "evidence.measured": run_evidence._measured_state(detail, ledger),
+        "evidence.source": f"commit {sha}",
+        "decision.eligibility": eligibility,
+        "decision.receipt": run_evidence._receipt_state(detail),
+        "started.age": _age_label(run.get("started_at"), now=now),
+        "operator.state": operator_state,
+        "operator.state_reason": (
+            "no run-bound heartbeat or phase stall evidence recorded"
+            if operator_state == "running"
+            else ""
+        ),
+        "control_epoch": epoch,
+        "run.events": _row_events(detail),
+    }
+
+
+def state_screens(rows: list[dict[str, Any]], *, available: bool = True) -> list[dict[str, Any]]:
+    """Return all six named state screens, including honest empty/unbound screens."""
+    screens: list[dict[str, Any]] = []
+    for key, label in STATE_SCREENS:
+        selected = [row for row in rows if row.get("operator.state") == key]
+        if not available:
+            screens.append(
+                {
+                    "key": key,
+                    "label": label,
+                    "state": "unavailable",
+                    "reason": "control database could not be read",
+                    "runs": [],
+                }
+            )
+        elif selected:
+            screens.append(
+                {"key": key, "label": label, "state": "recorded", "reason": "", "runs": selected}
+            )
+        else:
+            reason = (
+                "no run-bound heartbeat or phase stall evidence recorded"
+                if key == "stalled"
+                else "no run in this state was returned by the control packet"
+            )
+            screens.append(
+                {"key": key, "label": label, "state": "unbound", "reason": reason, "runs": []}
+            )
+    return screens
+
+
 def operational_snapshot(
     db: Any,
     *,
@@ -330,21 +579,46 @@ def operational_snapshot(
     heartbeats: Mapping[str, Mapping[str, Any]] | None,
     now: Any | None = None,
 ) -> dict[str, Any]:
-    """The room's operational view: the packet, plus a triage-ordered ``attention`` block.
+    """The room's operational view: packet blocks plus server-owned run projections.
 
-    ``attention`` is the decisions-owed view: every awaiting approval (with the purpose the
-    operator owes) and every failed run, carrying the packet's own identifiers. It is a
-    projection of the packet, not a second source of truth — the parity test asserts the
-    identifiers match block-for-block.
+    The raw packet arrays remain available for callers that need the control-status contract.
+    ``runs`` and the enriched arrays are additive read models: one service computes attention,
+    order, age, evidence fields, and state screens so the board and drawer cannot disagree.
     """
     packet = build_packet(db, repo_head_sha=repo_head_sha, heartbeats=heartbeats, now=now)
-
-    attention: list[dict[str, Any]] = []
-    for entry in packet.get("awaiting_approvals", []):
-        # pass-through with a discriminator: the packet's fields are carried verbatim.
-        attention.append({"kind": "approval", **dict(entry)})
-    for entry in packet.get("failed_runs", []):
-        attention.append({"kind": "failed", **dict(entry)})
+    attention = attention_projection(packet, now=now)
+    refs: list[dict[str, Any]] = []
+    refs.extend(packet.get("active_runs", []))
+    refs.extend(packet.get("promotable_runs", []))
+    refs.extend(packet.get("failed_runs", []))
+    attention_by_run = {
+        str(entry.get("run_id")): entry for entry in attention if entry.get("run_id")
+    }
+    rows: list[dict[str, Any]] = []
+    for ref in refs:
+        detail = run_detail(db, str(ref.get("run_id") or "")) if ref.get("run_id") else None
+        rows.append(
+            run_row(
+                ref,
+                epoch=int(packet.get("control_epoch") or 0),
+                detail=detail,
+                attention_entry=attention_by_run.get(str(ref.get("run_id"))),
+                now=now,
+            )
+        )
+    rows.sort(
+        key=lambda row: (
+            row.get("attention.order") is None,
+            row.get("attention.order") if row.get("attention.order") is not None else 999999,
+            str(row.get("run_id") or ""),
+        )
+    )
+    counts = {
+        "active": len(packet.get("active_runs", [])),
+        "attention": len(attention),
+        "promotable": len(packet.get("promotable_runs", [])),
+        "unhealthy_workers": len(packet.get("unhealthy_workers", [])),
+    }
 
     return {
         "schema": SCHEMA,
@@ -354,10 +628,15 @@ def operational_snapshot(
             "repo_head_sha": packet.get("repo_head_sha"),
         },
         "attention": attention,
-        # the packet's blocks flow through unchanged — the room renders what the authority
-        # returned (or names it in ``degraded``), never a re-derivation.
+        # Raw packet blocks stay available for packet parity; the enriched `runs` array is the
+        # board's row source.  This preserves the control-status contract while making the
+        # presentation projection authoritative.
         "active_runs": list(packet.get("active_runs", [])),
         "promotable_runs": list(packet.get("promotable_runs", [])),
+        "failed_runs": list(packet.get("failed_runs", [])),
+        "runs": rows,
+        "counts": counts,
+        "state_screens": state_screens(rows),
         "unhealthy_workers": list(packet.get("unhealthy_workers", [])),
         "projection_lag": packet.get("projection_lag", {}),
         "safe_actions": list(packet.get("safe_actions", [])),

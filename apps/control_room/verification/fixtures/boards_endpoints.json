@@ -45,6 +45,14 @@
         "session_id": "ses_fixture_stale",
         "age_seconds": 845
       }
+    ],
+    "state_screens": [
+      {"key": "running", "label": "Running"},
+      {"key": "blocked", "label": "Blocked"},
+      {"key": "stalled", "label": "Stalled"},
+      {"key": "failed", "label": "Failed"},
+      {"key": "escalated", "label": "Escalated"},
+      {"key": "done", "label": "Done"}
     ]
   },
   "operations_degraded": {

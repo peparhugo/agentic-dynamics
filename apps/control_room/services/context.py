@@ -44,6 +44,7 @@ filesystem, which would let a route quietly re-acquire the dependency the inject
 from __future__ import annotations
 
 import re
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -146,7 +147,7 @@ class ControlRoomServices:
         try:
             with ControlDB.open_read_only() as db:
                 snapshot = ops.operational_snapshot(
-                    db, repo_head_sha=repo_head_sha, heartbeats=heartbeats
+                    db, repo_head_sha=repo_head_sha, heartbeats=heartbeats, now=time.time()
                 )
         except Exception as exc:  # noqa: BLE001 — an unreadable control plane is degraded data
             return {
@@ -155,6 +156,24 @@ class ControlRoomServices:
                 "attention": [],
                 "active_runs": [],
                 "promotable_runs": [],
+                "failed_runs": [],
+                "runs": [],
+                "counts": {
+                    "active": None,
+                    "attention": None,
+                    "promotable": None,
+                    "unhealthy_workers": None,
+                },
+                "state_screens": [
+                    {
+                        "key": key,
+                        "label": label,
+                        "state": "unavailable",
+                        "reason": "control database could not be read",
+                        "runs": [],
+                    }
+                    for key, label in ops.STATE_SCREENS
+                ],
                 "unhealthy_workers": [],
                 "projection_lag": {},
                 "safe_actions": [],

@@ -108,6 +108,34 @@ def test_attention_is_a_projection_of_the_packet(tmp_path):
     assert snapshot["projection_lag"] == packet["projection_lag"]
 
 
+def test_operations_emits_server_owned_rows_and_named_state_screens(tmp_path):
+    """The board row is authoritative: attention, age, and state screens are not browser joins."""
+    with _db(tmp_path) as db:
+        awaiting_id = _seed_awaiting(db)
+        failed_id = _seed_failed(db)
+        snapshot = operational_snapshot(
+            db,
+            repo_head_sha="c" * 40,
+            heartbeats={},
+            now="2099-01-01T00:00:00Z",
+        )
+
+    rows = {row["run_id"]: row for row in snapshot["runs"]}
+    assert rows[awaiting_id]["operator.state"] == "blocked"
+    assert rows[awaiting_id]["attention.state"] == "active"
+    assert rows[awaiting_id]["started.age"] != "unknown"
+    assert rows[failed_id]["operator.state"] == "failed"
+    assert rows[failed_id]["attention.order"] == 0
+    assert snapshot["counts"]["attention"] == 2
+
+    screens = {screen["key"]: screen for screen in snapshot["state_screens"]}
+    assert set(screens) == {"running", "blocked", "stalled", "failed", "escalated", "done"}
+    assert screens["blocked"]["state"] == "recorded"
+    assert screens["failed"]["state"] == "recorded"
+    assert screens["stalled"]["state"] == "unbound"
+    assert screens["stalled"]["reason"]
+
+
 def test_absent_data_stays_absent_and_degraded_is_named(tmp_path):
     with _db(tmp_path) as db:
         snapshot = operational_snapshot(db, repo_head_sha="c" * 40, heartbeats={}, now=_NOW)
@@ -509,12 +537,21 @@ def test_resolve_live_cell_maps_a_fleet_job_to_its_live_phase_stream():
     the substitution; a finished job and a non-job id pass through unchanged."""
     board = {
         "job-live": json.dumps(
-            {"job_id": "job-live", "spec": "workflows/repository/flow.yaml", "ts": 1790105820.0,
-             "status": "running"}
+            {
+                "job_id": "job-live",
+                "spec": "workflows/repository/flow.yaml",
+                "ts": 1790105820.0,
+                "status": "running",
+            }
         ),
         "job-done": json.dumps(
-            {"job_id": "job-done", "spec": "workflows/repository/flow.yaml", "ts": 1790105820.0,
-             "run_id": "run-1", "status": "completed"}
+            {
+                "job_id": "job-done",
+                "spec": "workflows/repository/flow.yaml",
+                "ts": 1790105820.0,
+                "run_id": "run-1",
+                "status": "completed",
+            }
         ),
     }
     logs = {
@@ -552,7 +589,9 @@ def test_read_run_logs_binds_the_live_phase_stream_for_an_in_flight_run():
             json.dumps({"type": "step_finish", "timestamp": "1790105800000"}),
         ],
         "events_log:flow:execute": [
-            json.dumps({"type": "tool_use", "timestamp": "1790105944000", "part": {"text": "write notes"}}),
+            json.dumps(
+                {"type": "tool_use", "timestamp": "1790105944000", "part": {"text": "write notes"}}
+            ),
             json.dumps({"type": "step_start", "timestamp": "1790105930000"}),
         ],
     }
@@ -695,5 +734,3 @@ def test_read_run_logs_matches_an_inflight_job_by_spec_and_time():
         redis, "run-inflight", spec_name="other", started_at="1970-01-01T00:33:30Z"
     )
     assert other["state"] == "unbound"
-
-

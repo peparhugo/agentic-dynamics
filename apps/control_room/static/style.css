@@ -3084,6 +3084,43 @@ textarea:focus {
   color: var(--text-faint);
 }
 
+/* Named state screens keep the operator's six situations visible even when one is unbound. */
+.state-screen-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--cr-space-2);
+}
+
+.state-screen {
+  min-width: 0;
+  padding: var(--cr-space-2);
+  border: 1px solid var(--cr-line-subtle);
+  border-radius: var(--cr-radius-sm);
+  background: var(--cr-surface-inset);
+}
+
+.state-screen h4 {
+  margin: 0;
+  color: var(--cr-text-primary);
+}
+
+.state-screen [data-state="unbound"],
+.state-screen [data-state="unavailable"] {
+  color: var(--status-unknown);
+}
+
+@media (max-width: 900px) {
+  .state-screen-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .state-screen-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* ── 13b. The truth strip — source + age provenance, or a labelled unknown ──────────────────── */
 .truth-strip {
   display: flex;
