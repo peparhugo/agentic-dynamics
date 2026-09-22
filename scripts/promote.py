@@ -555,6 +555,13 @@ def _default_claim_run(
     attempting the same run blocks on the write lock, then sees ``promoting`` and refuses —
     the claim is the mutual-exclusion primitive the command lacked.
 
+    The ONE re-entry carve-out is a RETRY: a ``promoting`` row bound to the SAME candidate is
+    re-enterable when the command journal itself carries a ``failed`` promote row for this run
+    and candidate — the pre-push failure class (e.g. the squash refusal that wedged the 2026-09-22
+    L20 promotion), which must not strand a run in a state whose only graph exit is a landed
+    merge. A ``promoting`` row WITHOUT a recorded failure is another promoter's live claim and
+    refuses.
+
     Refusals (all :class:`_PromoteRefusedError`, all BEFORE any external act):
 
     * unknown identity — no row for the run id (the managed path acts only on a known run);
@@ -583,6 +590,28 @@ def _default_claim_run(
                     f"control row {run_id} is bound to candidate {row_sha[:12]}, not the "
                     f"promoted {candidate_sha[:12]} — refusing to claim a different tree; "
                     "nothing was pushed"
+                )
+            if run.state == RunState.PROMOTING:
+                failed_prior = any(
+                    getattr(command, "verb", "") == "promote"
+                    and getattr(command, "state", "") == "failed"
+                    and (
+                        not row_sha
+                        or str(getattr(command, "candidate_sha", "") or "").startswith(row_sha)
+                    )
+                    for command in db.commands(run_id=run_id)
+                )
+                if failed_prior:
+                    return {
+                        "claimed": True,
+                        "retried": True,
+                        "run_id": run_id,
+                        "candidate_sha": candidate_sha,
+                    }
+                raise _PromoteRefusedError(
+                    f"control row {run_id} is already promoting — another promotion attempt "
+                    "holds the claim and the journal records no failure of this act; only a "
+                    "retry after a recorded failure may re-enter; nothing was pushed"
                 )
             if run.state != RunState.PROMOTABLE:
                 raise _PromoteRefusedError(
@@ -785,6 +814,9 @@ def _run_promotion(
     # (4b) proved WHICH artifact is promoted; the claim proves the run may still act. The
     # refusal is reconciled onto the journal as a 'refused' receipt, so the intent row never
     # masquerades as an outcome and the push never runs on a run the control plane has ended.
+    # The claim itself detects a RETRY (a recorded failed attempt of the same act): the
+    # pre-push failure class — a squash refusal — must not wedge the run, because the graph's
+    # only exit from ``promoting`` is a landed merge.
     if run_id:
         try:
             claim_run(run_id, candidate_sha=candidate, base=base, db_path=args.db)
@@ -1162,29 +1194,45 @@ def _git_head(workdir: Path) -> str:
 
 
 def _require_branch(workdir: Path, base: str) -> None:
-    """Ensure the candidate worktree carries a local ``base`` branch.
+    """Ensure the candidate worktree's local ``base`` is the CURRENT origin base.
 
-    Fast path: the branch already exists (a normal checkout). Fleet fallback (L19, the
-    2026-09-21 promote): run clones are checked out DETACHED — no local ``base`` — so resolve
-    it from ``origin/<base>`` (refresh first; a failed fetch — no remote, offline — still
-    falls back to the existing remote-tracking ref) and create the local branch at it.
-    Refuses only when neither a local nor a remote-tracking ``base`` exists: no base, no
-    promotion.
+    The promote contract is "the base resolves from origin": a fleet run clone carries a
+    local ``base`` from its creation time, and when the origin base moved while the run ran
+    (a prior promotion landed), a squash against the stale local ref describes a base the
+    push cannot fast-forward — the 2026-09-22 L20 promotion aborted exactly this way. So the
+    refresh runs on BOTH paths:
+
+    * the local ``base`` exists → fast-forward it to ``origin/<base>`` when the remote is
+      ahead (never across a divergence: a diverged local base is left untouched and the push
+      guard names it);
+    * no local ``base`` (the L19 fleet fallback: detached run clones) → create it from
+      ``origin/<base>``.
+
+    A failed fetch (no remote, offline) falls back to the existing refs — never a fabricated
+    refusal. Refuses only when neither a local nor a remote-tracking ``base`` exists.
     """
-    try:
-        _git(workdir, "rev-parse", f"refs/heads/{base}")
-        return
-    except _PromoteRefusedError:
-        pass
     _git(workdir, "fetch", "origin", base, check=False)
     try:
-        _git(workdir, "rev-parse", f"refs/remotes/origin/{base}")
+        local_head = _git(workdir, "rev-parse", f"refs/heads/{base}")
     except _PromoteRefusedError:
-        raise _PromoteRefusedError(
-            f"base branch '{base}' not found in the candidate worktree (no local '{base}' "
-            f"and no origin/{base} to resolve it from)"
-        ) from None
-    _git(workdir, "branch", base, f"origin/{base}")
+        local_head = ""
+    try:
+        remote_head = _git(workdir, "rev-parse", f"refs/remotes/origin/{base}")
+    except _PromoteRefusedError:
+        remote_head = ""
+    if local_head and remote_head:
+        if local_head != remote_head and _git_is_ancestor(workdir, local_head, remote_head):
+            _git(workdir, "update-ref", f"refs/heads/{base}", remote_head)
+        return
+    if local_head:
+        return
+    if remote_head:
+        _git(workdir, "branch", base, f"origin/{base}")
+        return
+    raise _PromoteRefusedError(
+        f"base branch '{base}' not found in the candidate worktree (no local '{base}' "
+        f"and no origin/{base} to resolve it from)"
+    )
 
 
 # ── stale-candidate guard (promote_row_closeout a2) ────────────────────────────
