@@ -248,6 +248,7 @@
       "state": "recorded",
       "cell_id": "fixture-job-0001",
       "reason": "",
+      "match": "by_run_id",
       "count": 3,
       "history_capped": false,
       "events": [

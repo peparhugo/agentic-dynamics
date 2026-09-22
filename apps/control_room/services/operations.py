@@ -49,6 +49,7 @@ def logs_block(
     reason: str = "",
     raw_events: list[str] | None = None,
     total: int = 0,
+    match: str = "",
 ) -> dict[str, Any]:
     """The run's job-log block: a NAMED state, a bounded parsed tail, no fabricated values.
 
@@ -83,31 +84,53 @@ def logs_block(
         "events": events,
         "count": int(total or 0),
         "history_capped": int(total or 0) >= EVENT_LOG_MAX,
+        "match": match,
     }
 
 
 def read_run_logs(
-    redis_client: Any, run_id: str, *, limit: int = LOGS_EVENT_LIMIT
+    redis_client: Any,
+    run_id: str,
+    *,
+    spec_name: str = "",
+    started_at: str = "",
+    limit: int = LOGS_EVENT_LIMIT,
 ) -> dict[str, Any]:
     """Resolve the run's fleet job and read its retained event tail (read-only, honest states).
 
-    The mapping is the fleet job board itself (``fleet:jobs``; each job record carries its
-    ``run_id``) — the identity the launcher wrote, never a re-derivation. A missing board entry
-    is ``unbound``; any Redis failure is ``unavailable`` with the reason named.
+    Two match bases, both NAMED on the block (``match``):
+
+    * ``by_run_id`` — the fleet job board entry whose ``run_id`` is this run. The fleet writes
+      that field when the job COMPLETES (the ledger is the source), so a finished run always
+      resolves exactly.
+    * ``by_spec_time`` — for an IN-FLIGHT run the board entry carries no ``run_id`` yet (only
+      job_id/spec/ts/status). The fallback matches the spec's job accepted nearest before the
+      run's own start. ``campaign_concurrency = 1`` is what makes this unambiguous: a spec
+      has at most one live job, so spec + time identifies it without guessing across specs.
+
+    A missing board entry is ``unbound``; any Redis failure is ``unavailable`` with the reason
+    named; the match basis is always reported, never implied.
     """
     try:
         board = redis_client.hgetall(FLEET_JOBS_KEY) or {}
     except Exception as exc:  # noqa: BLE001 — an unreadable store is named, never a 500
         return logs_block(cell_id="", state="unavailable", reason=f"{type(exc).__name__}: {exc}")
-    cell_id = ""
+    entries: list[tuple[str, dict]] = []
     for job_id, payload in board.items():
         try:
             entry = json.loads(payload)
         except (TypeError, ValueError):
             continue
-        if isinstance(entry, Mapping) and str(entry.get("run_id") or "") == run_id:
-            cell_id = str(job_id)
+        if isinstance(entry, Mapping):
+            entries.append((str(job_id), dict(entry)))
+    cell_id = ""
+    match = ""
+    for job_id, entry in entries:
+        if str(entry.get("run_id") or "") == run_id:
+            cell_id, match = job_id, "by_run_id"
             break
+    if not cell_id and spec_name:
+        cell_id, match = _match_job_by_spec_time(entries, spec_name, started_at)
     if not cell_id:
         return logs_block(
             cell_id="",
@@ -126,7 +149,56 @@ def read_run_logs(
         state="recorded",
         raw_events=list(reversed(list(raw or []))),
         total=total,
+        match=match,
     )
+
+
+#: The in-flight fallback's tolerance: a job accepted within this many seconds of the run's
+#: start is a candidate (the acceptance precedes the orchestrator's first write by seconds).
+SPEC_TIME_WINDOW_S = 600.0
+
+
+def _match_job_by_spec_time(
+    entries: list[tuple[str, dict]], spec_name: str, started_at: str
+) -> tuple[str, str]:
+    """The in-flight fallback: the spec's job accepted nearest before the run's start."""
+    started = _epoch(started_at)
+    best: tuple[float, str] | None = None
+    suffix = f"{spec_name}.yaml"
+    for job_id, entry in entries:
+        spec = str(entry.get("spec") or "")
+        if not spec.endswith(suffix):
+            continue
+        accepted = _epoch(entry.get("ts"))
+        if started is not None and accepted is not None:
+            delta = started - accepted
+            if delta < -SPEC_TIME_WINDOW_S or delta > SPEC_TIME_WINDOW_S:
+                continue
+            distance = abs(delta)
+        else:
+            distance = 0.0
+        if best is None or distance < best[0]:
+            best = (distance, job_id)
+    return (best[1], "by_spec_time") if best else ("", "")
+
+
+def _epoch(value: Any) -> float | None:
+    """A tolerant epoch read: float seconds, a numeric string, or an ISO-8601 timestamp."""
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        pass
+    try:
+        from datetime import datetime
+
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
 
 
 def operational_snapshot(
@@ -218,5 +290,10 @@ def run_detail(db: Any, run_id: str, *, redis_client: Any | None = None) -> dict
             cell_id="", state="unavailable", reason="no event store bound to the read model"
         )
     else:
-        detail["logs"] = read_run_logs(redis_client, run_id)
+        detail["logs"] = read_run_logs(
+            redis_client,
+            run_id,
+            spec_name=str(detail["run"].get("spec_name") or ""),
+            started_at=str(detail["run"].get("started_at") or ""),
+        )
     return detail
