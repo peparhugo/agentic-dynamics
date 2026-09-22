@@ -5980,6 +5980,20 @@ def run_workflow(
                 # phase produced an analysis. No analyzer → prior unchanged → prompt identical.
                 if pr.change_analysis is not None:
                     prior.append(_evidence_context(pr))
+        # A wall-burned phase with NO committed deliverable is NOT ok (2026-09-22, the L33
+        # g_adversarial): killed at exactly its 1800s wall while stalled on a permission ask it
+        # could never clear, it recorded status ok + timed_out=True + commit "" — so the run
+        # read 'succeeded' and only promote's commit check refused it. The marker alone is a
+        # reader signal for a phase that FINISHED at the wall; a phase that burned the wall
+        # without producing anything FAILS by name here. Placed AFTER the commit attempt (both
+        # the test-phase binding and the agent commit/adoption paths), so a deliverable that
+        # committed at the boundary keeps its ok.
+        if pr.timed_out and pr.status == "ok" and not pr.commit_hash:
+            pr.status = "failed"
+            pr.error = (
+                "TIMEOUT: phase burned its full timeout window and recorded no committed "
+                "deliverable — a wall-burned phase without a deliverable cannot be ok"
+            )
         # Self-build ("progressive") producer — DEFAULT ON (kb_finding_layer k1). A committed
         # phase's finding is emitted into the cell's OWN scope so the cell's retrieval filter
         # can later read its own progress; a research phase (no commit, a free-text report)
