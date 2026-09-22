@@ -1534,6 +1534,38 @@ def _resolve_test_targets(
 EXPAND_FROM_PLAN_KEY = "expand_from_plan"
 #: The default ceiling on how many units one plan may expand into. The extension's whole point
 #: is that N is BOUNDED; an uncapped expansion re-creates the unbounded turn it removes.
+def resolve_phase_agent(
+    phase_def: Any,
+    params: Any = None,
+    *,
+    default: str = "",
+) -> str:
+    """The AGENT ROLE a phase runs as (L29, 2026-09-22) — a pure resolution, in order:
+
+    1. the phase's ``run_agent:`` (explicit per-phase intent — an independent reviewer, a
+       plane-scoped author);
+    2. the workflow's ``agent:`` param (the whole run's role);
+    3. ``default`` — the caller's ordinary-worker pin. EMPTY means "no role declared": the
+       adapter keeps its ``WORKER_AGENT`` pin, so a spec without the key behaves exactly as
+       before. This function never invents a role.
+
+    The name must be a defined agent in the roster (``agent_config/agents/``); the caller's
+    launch of an unknown profile fails at the runtime with opencode's own error, which is the
+    same surface an unknown ``--agent`` has always had.
+    """
+    phase = phase_def if isinstance(phase_def, Mapping) else {}
+    spec_params = params if isinstance(params, Mapping) else {}
+    for candidate in (
+        phase.get("run_agent"),
+        spec_params.get("agent"),
+        default,
+    ):
+        name = str(candidate or "").strip()
+        if name:
+            return name
+    return ""
+
+
 #: Overridable per spec with ``workflow.params.plan_unit_cap``.
 PLAN_UNIT_CAP_DEFAULT = 24
 #: A unit id must be usable as a phase-name token — it appears in the generated phase names,
@@ -2632,6 +2664,7 @@ def _executor_as_run_agent(
                 spec_name=spec_name,
                 workdir=str(agent_kwargs.get("workdir", "")),
                 backend=agent_kwargs.get("backend"),
+                agent=str(agent_kwargs.get("agent", "") or ""),
                 thinking_effort=str(agent_kwargs.get("thinking_effort", "high")),
                 thinking_budget_tokens=int(agent_kwargs.get("thinking_budget_tokens", 0) or 0),
                 output_token_limit=int(agent_kwargs.get("output_token_limit", 0) or 0),
@@ -4595,6 +4628,7 @@ def run_workflow(
     timeout: int = 1800,
     silent_mode: bool = False,
     enforce_pytest: bool = False,
+    agent_default: str = "",
     commit: bool = True,
     stop_on_error: bool = True,
     resume: bool = False,
@@ -5375,6 +5409,14 @@ def run_workflow(
                         prev_session_id=prev_session_id,
                         prev_cache_read_tokens=prev_cache_read_tokens,
                     )
+                    # L29: the phase's AGENT ROLE resolves alongside its model — phase
+                    # run_agent > workflow params.agent > the run's --agent default ("" = the
+                    # adapter pin). Threaded into the phase kwargs so the LOCAL executor
+                    # forwards ``agent=`` to the adapter and the StepRequest carries it for
+                    # the containerized path (which re-enters run_workflow with --agent).
+                    agent_i = resolve_phase_agent(
+                        phase_def, spec.workflow.params, default=agent_default
+                    )
                     if phase_def.get("run_model"):
                         # PER-PHASE EXECUTION OVERRIDE (cap_site_revamp4 p5 — the independence
                         # lesson): a phase may declare ``run_model:`` (e.g. the independent
@@ -5510,6 +5552,8 @@ def run_workflow(
                             "silent_mode": silent_mode,
                             "enforce_pytest": bool(phase_def.get("enforce_pytest", enforce_pytest)),
                         }
+                        if agent_i:
+                            agent_kwargs["agent"] = agent_i
                         # Cache-aware forking: reuse the previous phase's session prefix so
                         # the shared context is served as provider cache reads (DeepSeek
                         # cache read ~120x cheaper than input). A model switch breaks the

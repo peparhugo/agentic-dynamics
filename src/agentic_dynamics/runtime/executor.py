@@ -89,6 +89,11 @@ class StepRequest:
     workdir: str
     language: str = ""
     backend: str | None = None
+    #: The AGENT ROLE the step runs as (L29): a roster name from ``agent_config/agents/``
+    #: resolved by the engine (phase ``run_agent`` > workflow ``agent`` param > "" = the
+    #: adapter's ordinary-worker pin). The local executor forwards it to the adapter; the
+    #: Docker executor re-enters run_workflow with ``--agent``.
+    agent: str = ""
     thinking_effort: str = "high"
     thinking_budget_tokens: int = 0
     output_token_limit: int = 0

@@ -133,6 +133,10 @@ class DockerAgentExecutor(StepExecutor):
             sibling_cmd += ["--output-token-limit", str(self._output_token_limit)]
         if self._backend or request.backend:
             sibling_cmd += ["--backend", self._backend or request.backend]
+        # L29: the phase's agent role rides into the cell as the ordinary --agent flag; the
+        # child's engine resolves it as its run default (empty = the adapter's worker pin).
+        if request.agent:
+            sibling_cmd += ["--agent", request.agent]
         # Isolated conversation forks: a phase may declare
         # ``fork_checkpoint: <repo-relative or absolute path to a seed run's data dir>``.
         # The parent stages the seed session's db beside the prepared step (same transport
