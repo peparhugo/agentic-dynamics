@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-22T18:46:21.928739+00:00`  ·  242 spec(s)
-**Work remaining:** 202 open · 40 completed/retired
+Generated at: `2026-09-22T18:56:05.544616+00:00`  ·  246 spec(s)
+**Work remaining:** 206 open · 40 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -83,6 +83,7 @@ Generated at: `2026-09-22T18:46:21.928739+00:00`  ·  242 spec(s)
 | `control_db_followups` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_apply_skills` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_design_determination` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `control_room_detail_truth` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_facelift` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_facelift_adversarial2` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_facelift_adversarial2_flash` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -160,6 +161,7 @@ Generated at: `2026-09-22T18:46:21.928739+00:00`  ·  242 spec(s)
 | `pattern_surface_adoption` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `persistent_code_graph` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `perturbation_operators_fix` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `plugin_harness_scoped_sessions` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `posthoc_pipeline` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `process_perturbation_resample` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `prompt_branch_pilot` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -193,6 +195,7 @@ Generated at: `2026-09-22T18:46:21.928739+00:00`  ·  242 spec(s)
 | `routing_regret_under_degradation` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `self_knowledge_layer` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `self_recommending_experiment` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `site_data_stat_wiring` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `site_golden_circle` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `site_golden_circle_revamp` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `spec_lifecycle` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -200,6 +203,7 @@ Generated at: `2026-09-22T18:46:21.928739+00:00`  ·  242 spec(s)
 | `stack_knowledge_seed` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `stack_knowledge_verify` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `supervisor_control_room` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `target_repo_scoping` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `task_vocabulary_unify` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `test_suite_speed` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `test_suite_tiering` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |

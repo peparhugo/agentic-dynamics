@@ -1,0 +1,96 @@
+name: site_data_stat_wiring
+question: >-
+  Wire the website's remaining static cells to the one data door (`data.js`), so a data
+  rebuild self-corrects every page — starting with the evidence table, whose cells were stale
+  static HTML (register L30).
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+comparison: null
+writeup: {format: lab_book, sections: [question, evidence]}
+stop: {budget_usd: 4.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_uncertainty}
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: false
+    rag:
+      emit_self: true
+      emit_report: true
+      emit_scope: agentic-dynamics
+    context:
+      domain_context: >-
+        REGISTER L30 (2026-09-22): the site's evidence table carried per-model values as
+        STATIC HTML that drifted from `apps/website/data.js` (every cell was stale when the
+        L24 adversarial review compared them); the P0 corrections fixed the values BY HAND,
+        which means the next `build_data.py` run re-stales them. The one-data-door rule is
+        documented in `apps/website/CONTEXT.md` and enforced for other panels via `data-stat`
+        attributes + the existing guards. The acceptance instruments are real now and must
+        stay green: `python3 scripts/site_census_check.py` (12/12) and
+        `python3 apps/website/verify_svg_rendering.py` (the repaired gate — a scan that checks
+        ZERO diagrams FAILS). Guard modules that must not break:
+        tests/test_static_*_guard.py, tests/test_stale_path_guard.py, tests/test_build_data.py.
+        SCAN for existing `data-stat` wiring and the guards' expectations BEFORE adding a new
+        mechanism — the wiring pattern exists; extend it.
+    phases:
+      - name: prior
+        kind: agent
+        scope: proposal_write
+        timeout: 1200
+        prompt: |
+          Read `apps/website/CONTEXT.md`, the evidence table + the panels that ARE wired, the
+          guards, and `scripts/build_data.py`'s emitted shape. WRITE `notes/site.md`
+          (`## Problem`, `## What Exists`, `## Gaps`, `## Sources`) and `notes/plan.md`
+          (`## Files`, `## Tests`, `## Acceptance`, `## Risks`): every static cell that a
+          data.js field should own, the wiring mechanism chosen (reuse `data-stat`), and the
+          SELF-CORRECTION TEST (mutate a data.js value in a scratch copy, rebuild/render, and
+          assert the page changes). Write `notes/sources.jsonl`. Commit.
+      - name: execute
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        requires_files: [notes/plan.md, notes/sources.jsonl]
+        prompt: |
+          Wire the identified cells to data.js (reusing the existing `data-stat` mechanism),
+          extend the guards to catch a future drift in the wired panels, and run the census +
+          the SVG gate + the site guard modules. Record the self-correction demonstration in
+          `notes/` (the scratch-copy mutation + the differing render). Commit.
+      - name: g_test_gate
+        kind: test
+        scope: implementation
+        timeout: 1800
+        requires_files: [notes/plan.md]
+        tests_from_plan: notes/plan.md
+        prompt: |
+          The independent runner verifies the worktree against the plan's targets.
+      - name: posterior
+        kind: agent
+        scope: proposal_write
+        timeout: 900
+        requires_files: [notes/site.md, notes/plan.md]
+        prompt: |
+          WRITE `notes/posterior.md` (`## Violations`, `## Unknowns`, `## UPDATES`): which
+          cells are wired, which remain static and WHY (with the field that would own them),
+          and the self-correction evidence. Commit.
+      - name: g_adversarial
+        kind: agent
+        scope: proposal_write
+        timeout: 1800
+        run_model: openai/gpt-5.6-terra
+        prompt: |
+          ADVERSARIAL REVIEW — a different model by design. Attack: does any "wired" cell
+          merely LOOK wired (a default that hides a missing field)? does the self-correction
+          test falsify the claim or restate it? can a rebuild now produce a NAMED gap instead
+          of a stale number? Name at least one falsifier per major claim. Write
+          `notes/adversarial_review.md` with a final `## FINDING` paragraph and commit it.

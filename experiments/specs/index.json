@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-22T18:46:21.928739+00:00",
-  "n_specs": 242,
+  "generated_at": "2026-09-22T18:56:05.544616+00:00",
+  "n_specs": 246,
   "specs": [
     {
       "name": "adapter_snapshot_guard",
@@ -1509,6 +1509,26 @@
       "results_pointer": null,
       "n_runs": 0,
       "workflow_revision_id": "e4c2515cd8ab9253490431efc1b2087b22266f66d327e6a501c84d7a695bc3e3",
+      "authored_status": null
+    },
+    {
+      "name": "control_room_detail_truth",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/control_room_detail_truth.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": true,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0,
+      "workflow_revision_id": "9027e5d9cd994d79bbbcabc625e73e7c1df6c8aba485db2222a50f2353b4392d",
       "authored_status": null
     },
     {
@@ -3054,6 +3074,26 @@
       "authored_status": null
     },
     {
+      "name": "plugin_harness_scoped_sessions",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/plugin_harness_scoped_sessions.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": true,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0,
+      "workflow_revision_id": "8560e9d4e23869ebf0812b5d6fa9fe34919078cd404b12dd6936e08dd8998fa3",
+      "authored_status": null
+    },
+    {
       "name": "posthoc_pipeline",
       "version": "0.1",
       "status": "runnable",
@@ -3714,6 +3754,26 @@
       "authored_status": null
     },
     {
+      "name": "site_data_stat_wiring",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/site_data_stat_wiring.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": true,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0,
+      "workflow_revision_id": "eed7748e4557fd2391fd9b9e49d9e2fbe596bddbcab26a800cedbd98fa83a29a",
+      "authored_status": null
+    },
+    {
       "name": "site_golden_circle",
       "version": "0.1",
       "status": "runnable",
@@ -3851,6 +3911,26 @@
       "results_pointer": null,
       "n_runs": 0,
       "workflow_revision_id": "774e4b371e3b96c648595ae9349e558bfba066109bcd4c92dbf896b960855686",
+      "authored_status": null
+    },
+    {
+      "name": "target_repo_scoping",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/target_repo_scoping.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": true,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0,
+      "workflow_revision_id": "811914249b0111d394ac0af14a7c6b10a18245c37bf75438a79c2596c47dac77",
       "authored_status": null
     },
     {
