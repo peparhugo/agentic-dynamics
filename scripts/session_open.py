@@ -655,6 +655,13 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--bind", action="store_true", help="CREATE-or-read the session binding")
     mode.add_argument("--capsule", action="store_true", help="COMPOSE the session capsule")
     mode.add_argument(
+        "--grant-capabilities", action="store_true",
+        help="GRANT the binding's role capabilities (L29 step 4): mints the vector from the "
+             "binding's own resolved agent. The grant advances the AUTHORIZATION epoch by "
+             "construction; --expected-version is the optimistic concurrency check against "
+             "the binding's current CONTEXT version (read it with --binding).",
+    )
+    mode.add_argument(
         "--update-context", action="store_true",
         help="apply an EXPLICIT, VERSIONED task-context update (the original request is "
              "immutable; --expected-version must match the binding's current version)",
@@ -853,11 +860,43 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(report, indent=2) if args.json else f"[session-open] binding store initialized at {artifact_dir} (created={not existed})")
         return 0
 
-    if args.bind or args.binding or args.capsule or args.update_context:
+    if args.bind or args.binding or args.capsule or args.update_context or args.grant_capabilities:
         if not str(args.native_session_id or "").strip():
             print("[session-open] --native-session-id is required for binding modes", file=sys.stderr)
             return 2
-        if args.update_context:
+        if args.grant_capabilities:
+            if int(args.expected_version or 0) < 1:
+                print(
+                    "[session-open] --grant-capabilities requires --expected-version (the "
+                    "binding's current authorization version)",
+                    file=sys.stderr,
+                )
+                return 2
+            current = si.read_binding(
+                args.native_session_id, repository_id=args.repository_id, artifact_dir=artifact_dir
+            )
+            if current.binding is None:
+                print(
+                    f"[session-open] no binding for {args.native_session_id!r} to grant "
+                    f"(status {current.status})",
+                    file=sys.stderr,
+                )
+                return 2
+            granted = si.mint_capabilities(str(current.binding.get("resolved_agent") or ""))
+            try:
+                result = si.update_binding_context(
+                    args.native_session_id,
+                    context={"capabilities": granted},
+                    expected_version=int(args.expected_version),
+                    repository_id=args.repository_id,
+                    artifact_dir=artifact_dir,
+                )
+            except ValueError as exc:
+                print(f"[session-open] grant refused: {exc}", file=sys.stderr)
+                return 2
+            report = _binding_report(result)
+            report["granted"] = granted
+        elif args.update_context:
             if str(args.request or "").strip() or str(args.request_file or "").strip():
                 print(
                     "[session-open] --update-context never changes the original request — "

@@ -849,6 +849,10 @@ BINDING_ACCEPTANCE_SOURCES = ("raw", "interpretation")
 #: The task-context fields a versioned update may change. The ORIGINAL request fields are
 #: deliberately absent: no update can replace the request, only the context around it.
 BINDING_CONTEXT_FIELDS = (
+    # L29 step 4: a GRANT update — adding/narrowing a binding's verbs. Capabilities ride
+    # AUTHORIZATION_FIELDS, so the update advances the authorization epoch by construction
+    # and commands minted against the old grant refuse (re-read the binding).
+    "capabilities",
     "acceptance",
     "predecessor",
     "work_unit",
@@ -877,7 +881,13 @@ AUTHORIZATION_FIELDS = (
     # granted verbs is a capability change, so it advances the authorization epoch exactly
     # like a task-definition change does.
     "capabilities",
+    # L29 step 4: the child binding's provenance (parent session + parent authorization id).
+    "derived_from",
 )
+
+#: Authorization fields whose ABSENCE must hash as it did before the field existed (the
+#: added-field migration rule — a schema addition must never invalidate queued commands).
+OPTIONAL_AUTHORIZATION_FIELDS = ("capabilities", "derived_from")
 
 #: The verbs each agent ROLE is granted, at bind time (L29 step 3). Capabilities are data,
 #: GRANTED here and CHECKED at the exec boundary — never inferred from what a session is
@@ -936,7 +946,9 @@ def binding_authorization_id(payload: dict[str, Any]) -> str:
             **{
                 field: payload.get(field)
                 for field in AUTHORIZATION_FIELDS
-                if not (field == "capabilities" and payload.get(field) is None)
+                if not (
+                    field in OPTIONAL_AUTHORIZATION_FIELDS and payload.get(field) is None
+                )
             },
         },
         sort_keys=True,
@@ -993,6 +1005,66 @@ def _binding_text(value: Any, *, default: str = "") -> str:
     return str(value if value is not None else default).strip()
 
 
+def mint_scoped_binding(
+    parent: dict[str, Any],
+    *,
+    child_session_id: str,
+    role: str,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """A CHILD binding (L29 step 4): same task, a NARROWER vector, the parent as provenance.
+
+    The SUBSET RULE is the contract: the child's verbs are its role's grant INTERSECTED with
+    the parent's — a child can never hold more than its parent holds, so a scoped binding can
+    only narrow authority, never escalate it. A LEGACY parent (no declared vector) grants its
+    children NOTHING: a grant must descend from a declared grant, never from an absence.
+
+    The parent's authorization identity rides ``derived_from`` — traceable to the grant it
+    descends from, and the child's own identity changes when the parent's does.
+    """
+    parent_payload = parent if isinstance(parent, dict) else {}
+    parent_caps = (
+        parent_payload.get("capabilities")
+        if isinstance(parent_payload.get("capabilities"), dict)
+        else None
+    )
+    parent_verbs = (
+        [str(v).strip() for v in (parent_caps or {}).get("verbs") or [] if str(v).strip()]
+        if parent_caps is not None
+        else []
+    )
+    role_name = _binding_text(role)
+    role_verbs = list(ROLE_CAPABILITIES.get(role_name, DEFAULT_CAPABILITIES))
+    verbs = [verb for verb in role_verbs if verb in parent_verbs]
+    stamp = (now or datetime.now()).astimezone().isoformat()
+    parent_auth = _binding_text(parent_payload.get("authorization_id")) or binding_authorization_id(
+        binding_payload(parent_payload)
+    )
+    return {
+        "native_session_id": _binding_text(child_session_id),
+        "resolved_agent": role_name,
+        "task_identity": _binding_text(parent_payload.get("task_identity")),
+        "original_request": _binding_text(parent_payload.get("original_request")),
+        "source_revision": _binding_text(parent_payload.get("source_revision")),
+        "acceptance": parent_payload.get("acceptance"),
+        "predecessor": parent_payload.get("predecessor"),
+        "work_unit": _binding_text(parent_payload.get("work_unit")),
+        "project": _binding_text(parent_payload.get("project")),
+        "capabilities": {
+            "version": 1,
+            "role": role_name,
+            "verbs": verbs,
+            "granted_at": stamp,
+        },
+        "derived_from": {
+            "parent_session_id": _binding_text(parent_payload.get("native_session_id")),
+            "parent_authorization_id": parent_auth,
+        },
+        "created_at": stamp,
+        "context_version": 1,
+    }
+
+
 def binding_payload(
     binding: dict[str, Any], *, repository_id: str = REPOSITORY_ID
 ) -> dict[str, Any]:
@@ -1044,6 +1116,14 @@ def binding_payload(
         if isinstance(entry, dict):
             history.append({str(k): v for k, v in entry.items()})
 
+    raw_derived = binding.get("derived_from")
+    derived_from: dict[str, Any] | None = None
+    if isinstance(raw_derived, dict) and _binding_text(raw_derived.get("parent_authorization_id")):
+        derived_from = {
+            "parent_session_id": _binding_text(raw_derived.get("parent_session_id")),
+            "parent_authorization_id": _binding_text(raw_derived.get("parent_authorization_id")),
+        }
+
     raw_capabilities = binding.get("capabilities")
     capabilities: dict[str, Any] | None = None
     if isinstance(raw_capabilities, dict):
@@ -1070,9 +1150,10 @@ def binding_payload(
         "source_revision": _binding_text(binding.get("source_revision")),
         "acceptance": acceptance,
         "predecessor": predecessor,
-        # L29 step 3: the capability vector (None on legacy records — the exec boundary names
-        # the absence rather than inventing a grant).
+        # L29 step 3/4: the capability vector and the child's provenance (both None on legacy
+        # records — the exec boundary names the absence rather than inventing a grant).
         "capabilities": capabilities,
+        "derived_from": derived_from,
         # Capsule inputs (optional): the current work unit and the one next action / known
         # blocker the capsule renders. They ride on the binding so every capsule request reads
         # them from the durable record rather than from whichever message is in flight.

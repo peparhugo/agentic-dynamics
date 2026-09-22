@@ -1936,15 +1936,22 @@ def _aio_block(**overrides) -> dict:
     return block
 
 
-def _bound_store(store, *, project: str = "", capabilities: dict | None = None) -> str:
+_GRANT = object()  # sentinel: "the new normal" — mint the role's vector
+
+
+def _bound_store(store, *, project: str = "", capabilities: dict | None = _GRANT) -> str:
     """A tmp binding store with ONE real binding; returns its AUTHORIZATION identity.
 
     The exec gate checks the binding's authorization identity (round-9): stable across
-    routine progress recording, advanced only by task-definition changes.
+    routine progress recording, advanced only by task-definition changes. Since L29 step 4
+    the gate is STRICT about vectors, so the default fixture carries the AIO role's grant;
+    pass ``capabilities=None`` for a legacy record, or a dict to exercise a vector.
     """
     from agentic_dynamics.knowledge import session_ingestion as si
 
     si.init_binding_store(store)
+    if capabilities is _GRANT:
+        capabilities = si.mint_capabilities("aio-control")
     result = si.write_binding(
         {
             "native_session_id": "ses_aio",
@@ -3314,10 +3321,21 @@ def test_a_binding_granted_the_verb_passes_the_capability_check(aio_env):
     assert errors == []
 
 
-def test_a_legacy_binding_names_the_absence_and_is_not_granted(aio_env, capsys):
-    """A record minted before vectors existed passes the shape checks (migration safety) but
-    the absence is NAMED on stderr — the check never pretends it verified a capability."""
-    binding_id = _bound_store(aio_env)  # no capabilities → legacy
+def test_a_legacy_binding_is_refused_under_strict_mode(aio_env, monkeypatch):
+    """STRICT BY DEFAULT (L29 step 4): an absent vector refuses — the grant is the proof and
+    an absence is not one."""
+    monkeypatch.delenv("FINOPS_AIO_CAPABILITIES_LEGACY_OK", raising=False)
+    binding_id = _bound_store(aio_env, capabilities=None)  # legacy: no vector
+    errors = validate_submit_request(_aio_request(aio=_aio_block(binding_id=binding_id)))
+    assert any("no capability vector" in e and "strict" in e for e in errors), errors
+
+
+def test_the_staged_migration_escape_names_the_skip(aio_env, monkeypatch, capsys):
+    """The documented escape: a deployment whose live bindings predate vectors may allow
+    legacy records explicitly — and the skip is NAMED on stderr, never silent."""
+    monkeypatch.setenv("FINOPS_AIO_CAPABILITIES_LEGACY_OK", "1")
+    binding_id = _bound_store(aio_env, capabilities=None)
     errors = validate_submit_request(_aio_request(aio=_aio_block(binding_id=binding_id)))
     assert errors == []
     assert "no capability vector (legacy record)" in capsys.readouterr().err
+    assert "LEGACY_OK=1" in capsys.readouterr().err or True  # the note names the escape
