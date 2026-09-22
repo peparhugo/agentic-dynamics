@@ -213,7 +213,7 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
   <div class="finding">
     <div class="fn">Finding 2 <span class="ev-badge m">[M]</span></div>
     <h3>Later sessions cost more across the five-session arc.</h3>
-    <p>The measured story cost roughly doubles from its greenfield session ($0.16) to its cross-cutting session ($0.34), while tokens grow from 18.7K to 34.9K. Every session inherits a larger codebase, so per-session cost understates the observed maintenance arc by ~2×. Generalizing that mechanism beyond the measured arc remains modeled [P].</p>
+    <p>The measured story cost roughly doubles from its greenfield session ($0.173) to its cross-cutting session ($0.402), while tokens grow from 22.5K to 42.3K. Every session inherits a larger codebase, so per-session cost understates the observed maintenance arc by ~2×. Generalizing that mechanism beyond the measured arc remains modeled [P].</p>
     <p class="fsource">Source: <a href="evidence.html#story-models">The Evidence — story arc</a> [M]; the N² extrapolation is modeled, not measured.</p>
   </div>
   <div class="finding">
@@ -225,7 +225,7 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
   <div class="finding">
     <div class="fn">Finding 4 <span class="ev-badge m">[M]</span> <span class="ev-badge c">[C]</span></div>
     <h3>Degradation can leak across sessions, and recovery can be measured.</h3>
-    <p>Corrupting the session-1 spec (<code>early_degrade</code>) lowers the success rate to 86% (versus 97% clean) and raises the cascade rate (1.5% &rarr; 2.5%). Degradation raises risk at the margin; it does not dominate the outcome. Cells labelled <code>bad_seed</code>/<code>early_degrade</code> that carried no instrumented test verdict received no actual perturbation and are counted as <code>clean</code> (<code>docs/data_integrity_findings.md</code> treatment rule 1), so the arms above are the corrected ones.</p>
+    <p>Corrupting the session-1 spec (<code>early_degrade</code>) lowers the success rate to 95.8% (versus 97.0% clean) and raises the cascade rate (1.5% &rarr; 2.8%). Degradation raises risk at the margin; it does not dominate the outcome. Cells labelled <code>bad_seed</code>/<code>early_degrade</code> that carried no instrumented test verdict received no actual perturbation and are counted as <code>clean</code> (<code>docs/data_integrity_findings.md</code> treatment rule 1), so the arms above are the corrected ones.</p>
     <p class="fsource">Source: <a href="evidence.html">The Evidence</a> — independent test-executed verdicts [M] and computed rates [C]; the no-op relabel is a documented [P] treatment rule.</p>
   </div>
   <div class="hero-actions"><a href="evidence.html" class="cta-btn">Inspect the Evidence →</a></div>
@@ -237,10 +237,10 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
   <h2>Correctness is not verification.</h2>
   <p class="lead"><span class="ev-badge m">[M]</span> A model can pass every test it writes and still leave a system unverified. The gap is measured by test thoroughness:</p>
   <p style="font-family:'JetBrains Mono',monospace;color:var(--ac);font-size:0.85rem;line-height:2;text-align:center;padding:1rem;background:var(--bg3);border-radius:10px;border:1px solid var(--b)">
-    Tests per story: Luna 7 &middot; Terra 9 &middot; Sol 13 &middot; Flash 34 &middot; Pro 34 &middot; Haiku 117 &middot; Sonnet 122
+    Tests per story: Luna 14 &middot; Terra 15 &middot; Sol 24 &middot; Flash 52 &middot; Pro 45 &middot; Haiku 153 &middot; Sonnet 138
   </p>
   <p class="fsource" style="text-align:center">Source: measured test counts per story in <a href="evidence.html">The Evidence</a> [M]; the comparison is within this corpus.</p>
-  <p>All seven models pass their own tests at roughly equal rates, but the tests differ by an order of magnitude. Luna ships ~7 tests that confirm the happy path. Sonnet 5 ships ~122 that probe edge cases — duplicate usernames, whitespace titles, missing bearer tokens, idempotent notifications. Both codebases "work." One has a much broader observed verification surface.</p>
+  <p>Six of the seven models pass their own executed tests at roughly equal rates, but the tests differ by an order of magnitude — and Claude Haiku 4.5 has zero executed tests, so its pass rate is unknown. Luna ships ~14 tests that confirm the happy path. Sonnet 5 ships ~138 that probe edge cases — duplicate usernames, whitespace titles, missing bearer tokens, idempotent notifications. Both codebases "work." One has a much broader observed verification surface.</p>
   <p>This is the durable-value gap. Correctness asks whether code passes the tests you have. Verification asks whether you have the tests that would catch the failures that matter. In this corpus, that safety net varies by vendor family, while price alone does not explain the difference.</p>
   <div class="hero-actions"><a href="evidence.html#story-models" class="cta-btn">Inspect the Verification Gap →</a></div>
 </div></section>
