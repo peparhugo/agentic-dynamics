@@ -35,7 +35,8 @@ Usage:
 
 Options:
   --base URL     serve this base instead of the built-in static server
-  --pages        comma-separated page files (default framework,question,evidence,methodology)
+  --pages        comma-separated page files
+                 (default framework,architecture,question,evidence,methodology)
   --viewport     "WxH" viewport for the primary pass (default 1440x900)
   --mobile       also run a narrow 390x844 pass
   --out DIR      report + screenshot directory (default /tmp/site_scan)
@@ -57,11 +58,17 @@ from playwright.async_api import async_playwright
 
 WEBSITE_DIR = Path(__file__).resolve().parent
 
-DEFAULT_PAGES = ["framework.html", "question.html", "evidence.html", "methodology.html"]
+DEFAULT_PAGES = [
+    "framework.html",
+    "architecture.html",
+    "question.html",
+    "evidence.html",
+    "methodology.html",
+]
 
-MIN_RENDER = 100.0          # gate: rendered box > 100px on both axes
-ASPECT_TOL = 0.08           # gate: |rendered - viewBox| ratio tolerance (8%)
-CONTRAST_MIN = 4.5          # gate: WCAG AA text fill vs background (every text)
+MIN_RENDER = 100.0  # gate: rendered box > 100px on both axes
+ASPECT_TOL = 0.08  # gate: |rendered - viewBox| ratio tolerance (8%)
+CONTRAST_MIN = 4.5  # gate: WCAG AA text fill vs background (every text)
 SHAPE_TAGS = ("path", "rect", "circle", "ellipse", "line", "polygon", "polyline")
 
 
@@ -311,8 +318,11 @@ PROBE = r"""
 
 def _evaluate(svg, viewport):
     flags, fails = [], []
-    name = f"svg#{svg['i']}" + (f":{svg['id']}" if svg["id"] else "") + (
-        f"({svg['cls']})" if svg["cls"] else "")
+    name = (
+        f"svg#{svg['i']}"
+        + (f":{svg['id']}" if svg["id"] else "")
+        + (f"({svg['cls']})" if svg["cls"] else "")
+    )
     w, h = svg["rect"]
 
     if w <= MIN_RENDER or h <= MIN_RENDER:
@@ -334,15 +344,15 @@ def _evaluate(svg, viewport):
                 if abs(r_ratio - vb_ratio) / vb_ratio > ASPECT_TOL:
                     fails.append(
                         f"ASPECT rendered {w}/{h}={r_ratio:.3f} vs viewBox "
-                        f"{vbw}/{vbh}={vb_ratio:.3f}")
+                        f"{vbw}/{vbh}={vb_ratio:.3f}"
+                    )
         except (ValueError, IndexError):
             flags.append("WARN viewBox unparsable")
 
     text, shapes = svg["textEls"], svg["shapes"]
     shape_markup = svg["shapeMarkupLen"]
     if shape_markup and text > 1.5 * shape_markup:
-        fails.append(
-            f"BALANCE label wall text={text} > 1.5x shape markup {shape_markup}")
+        fails.append(f"BALANCE label wall text={text} > 1.5x shape markup {shape_markup}")
     if text < 10 and shapes < 3:
         fails.append(f"BALANCE empty shell text={text} shapes={shapes}")
     elif shapes < 3 or text < 10:
@@ -354,8 +364,9 @@ def _evaluate(svg, viewport):
     if cfails:
         parts = []
         for f in cfails[:4]:
-            parts.append(f"{f['t'][:28]!r}@"
-                         + (f"{f['ratio']:.2f}:1" if f["ratio"] else "invisible"))
+            parts.append(
+                f"{f['t'][:28]!r}@" + (f"{f['ratio']:.2f}:1" if f["ratio"] else "invisible")
+            )
         fails.append("CONTRAST " + "; ".join(parts))
     elif contrast.get("min") is not None and contrast["min"] < CONTRAST_MIN:
         fails.append(f"CONTRAST min {contrast['min']:.2f}:1 < {CONTRAST_MIN:.1f}:1")
@@ -419,14 +430,15 @@ async def _run_pages(pw, pages, base, viewport, out, screenshots):
     results, page_errors = [], []
 
     async def _probe(browser, pg):
-        ctx = await browser.new_context(
-            viewport={"width": viewport[0], "height": viewport[1]})
+        ctx = await browser.new_context(viewport={"width": viewport[0], "height": viewport[1]})
         page = await ctx.new_page()
         page_errors = []
         console_errors = []
         page.on("pageerror", lambda e: page_errors.append(str(e)[:200]))
-        page.on("console", lambda m: console_errors.append(str(m.text)[:200])
-                if m.type == "error" else None)
+        page.on(
+            "console",
+            lambda m: console_errors.append(str(m.text)[:200]) if m.type == "error" else None,
+        )
         try:
             await page.goto(f"{base}/{pg}", wait_until="domcontentloaded", timeout=45000)
             await page.wait_for_function("document.readyState === 'complete'", timeout=45000)
@@ -440,7 +452,8 @@ async def _run_pages(pw, pages, base, viewport, out, screenshots):
                 safe = pg.replace(".html", "")
                 await page.screenshot(
                     path=str(out / f"revamp4_{safe}_{viewport[0]}x{viewport[1]}.png"),
-                    full_page=True)
+                    full_page=True,
+                )
             # CONSOLE gate: any console error or page exception fails the page.
             if page_errors:
                 rows.append(_console_row(pg, viewport, "pageerror", page_errors))
@@ -491,7 +504,8 @@ def _fmt_table(rows, pages):
             mark += " " + "; ".join(r["fails"])
         lines.append(
             f"| {r['page']} | {r['name']} | {vb} | {r['rect'][0]}x{r['rect'][1]} "
-            f"| {aspect} | {r['textLen']} | {r['shapeMarkupLen']} | {contrast} | {mark} |")
+            f"| {aspect} | {r['textLen']} | {r['shapeMarkupLen']} | {contrast} | {mark} |"
+        )
     return "\n".join(lines)
 
 
@@ -519,16 +533,20 @@ def _write_report(results, pages, viewports, report_path, json_path, base):
     md.append("")
     Path(report_path).write_text("\n".join(md), encoding="utf-8")
     with open(json_path, "w", encoding="utf-8") as fh:
-        json.dump({
-            "gate": "PASS" if not fails else "FAIL",
-            "pages": pages,
-            "viewports": viewports,
-            "total": total,
-            "passed": passed,
-            "skipped": len(skips),
-            "failed": len(fails),
-            "results": results,
-        }, fh, indent=1)
+        json.dump(
+            {
+                "gate": "PASS" if not fails else "FAIL",
+                "pages": pages,
+                "viewports": viewports,
+                "total": total,
+                "passed": passed,
+                "skipped": len(skips),
+                "failed": len(fails),
+                "results": results,
+            },
+            fh,
+            indent=1,
+        )
     return md, fails
 
 

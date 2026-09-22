@@ -2,8 +2,16 @@
 """Mechanical preservation-gate census checker for apps/website/.
 
 Re-counts the incumbent feature census on the CURRENT committed source and
-compares every headline count against the baseline artifact
-(experiments/results/cap_site_revamp3/incumbent_census.json).
+compares every headline count against the baseline artifact.
+
+Baseline resolution: the revamp4 baseline is a *contract* (operator-signed
+provenance), so its authoritative copy is tracked at
+``apps/website/verification/incumbent_census.json``. The legacy runtime copy
+``experiments/results/cap_site_revamp3/incumbent_census.json`` is used when it
+is present (the experiments/results data plane is gitignored, so it cannot be
+the durable home); otherwise the tracked copy is read. ``--baseline`` still
+overrides both. Resolution is reported so the run never hides which file it
+compared against.
 
 The counts follow the census method definitions verbatim:
   slider                 -> literal input[type=range]
@@ -19,6 +27,7 @@ The counts follow the census method definitions verbatim:
 
 Exit code 0 = preservation PASS on every headline axis; 1 = FAIL.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -27,11 +36,36 @@ import re
 import sys
 from pathlib import Path
 
-SITE_ROOT = Path(__file__).resolve().parents[1] / "apps" / "website"
-BASELINE = (
-    Path(__file__).resolve().parents[1]
-    / "experiments" / "results" / "cap_site_revamp3" / "incumbent_census.json"
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+SITE_ROOT = _REPO_ROOT / "apps" / "website"
+
+#: Candidate baseline locations, most-authoritative first. The tracked copy under
+#: ``apps/website/verification/`` is the durable contract (the experiments/results data
+#: plane is gitignored by the corpus migration and cannot carry it); the legacy data-plane
+#: copy is honored when present for backward compatibility with prior campaign runs.
+BASELINE_CANDIDATES = (
+    _REPO_ROOT / "apps" / "website" / "verification" / "incumbent_census.json",
+    _REPO_ROOT / "experiments" / "results" / "cap_site_revamp3" / "incumbent_census.json",
 )
+#: The documented legacy default path, kept for backward compatibility.
+BASELINE = BASELINE_CANDIDATES[1]
+
+
+def resolve_baseline(explicit: str | None) -> Path:
+    """Return the baseline path to read: an explicit override, else the first candidate present.
+
+    Raises ``FileNotFoundError`` listing every candidate when none exists, so a missing
+    baseline is loud rather than silently compared against an empty contract.
+    """
+    if explicit:
+        return Path(explicit)
+    for candidate in BASELINE_CANDIDATES:
+        if candidate.is_file():
+            return candidate
+    raise FileNotFoundError(
+        "no census baseline found; looked in: " + ", ".join(str(c) for c in BASELINE_CANDIDATES)
+    )
+
 
 HEADLINE_KEYS = [
     "sliders",
@@ -121,18 +155,18 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
         "--baseline",
-        default=str(BASELINE),
-        help="path to the incumbent census JSON baseline",
+        default=None,
+        help=(
+            "path to the incumbent census JSON baseline (default: the tracked "
+            "apps/website/verification copy, else the legacy experiments/results copy)"
+        ),
     )
-    ap.add_argument(
-        "--json", action="store_true", help="emit machine-readable PASS/FAIL JSON"
-    )
-    ap.add_argument(
-        "--label", default="", help="increment label for the log line"
-    )
+    ap.add_argument("--json", action="store_true", help="emit machine-readable PASS/FAIL JSON")
+    ap.add_argument("--label", default="", help="increment label for the log line")
     args = ap.parse_args()
 
-    baseline = json.loads(Path(args.baseline).read_text(encoding="utf-8"))
+    baseline_path = resolve_baseline(args.baseline)
+    baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
     current = count_site()
 
     rows = []
@@ -148,6 +182,7 @@ def main() -> int:
         payload = {
             "label": args.label or None,
             "pass": all_pass,
+            "baseline_path": str(baseline_path),
             "baseline_sha": baseline.get("scope", {}).get("current_checkout_sha"),
             "rows": rows,
         }
@@ -155,6 +190,7 @@ def main() -> int:
         return 0 if all_pass else 1
 
     print(f"site census check — {args.label or 'no label'}")
+    print(f"  baseline: {baseline_path}")
     for r in rows:
         mark = "PASS" if r["pass"] else "FAIL"
         print(

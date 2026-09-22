@@ -4,7 +4,12 @@
     "ignore": [
       "firebase.json",
       "**/.*",
-      "**/node_modules/**"
+      "**/node_modules/**",
+      "CONTEXT.md",
+      "verification/**",
+      "references/**",
+      "verify_svg_rendering.py",
+      "verify_svg_report.md"
     ],
     "headers": [
       {

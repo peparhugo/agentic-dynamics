@@ -42,6 +42,8 @@
 .finding .fn{font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--ac);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem}
 .finding h3{font-size:0.95rem;margin:0 0 0.3rem;color:var(--t)}
 .finding p{font-size:0.82rem;color:var(--t2);line-height:1.55;margin:0}
+.finding .fsource{margin-top:0.6rem;font-size:0.7rem;color:var(--t3)}
+.finding .fsource a{color:var(--ac)}
 .op-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0.8rem;margin:1rem 0}
 .op-card{background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:1rem;text-align:left}
 .op-card h4{font-size:0.78rem;color:var(--t);margin:0 0 0.4rem}
@@ -59,7 +61,7 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
 </head>
 <body class="home">
 
-<nav class="topbar"><a href="/" class="topbar-link" style="color:var(--ac)">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="question.html" class="topbar-link">Question</a><a href="https://github.com/peparhugo/agentic-dynamics" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link" style="color:var(--ac)" aria-current="page">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="architecture.html" class="topbar-link">Architecture</a><a href="story.html" class="topbar-link">Story</a><a href="question.html" class="topbar-link">Question</a><a href="https://github.com/peparhugo/agentic-dynamics" class="topbar-link" target="_blank">GitHub</a></nav>
 
 <section class="dossier-hero home-hero"><div class="hero-grid">
   <div>
@@ -89,7 +91,7 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
 
 <!-- The field -->
 <section class="dossier-section alt"><div class="dossier-inner">
-  <div class="section-kicker">What — the field</div>
+  <div class="section-kicker">Why — the field</div>
   <h2>A measurement question became Agentic Dynamics.</h2>
   <figure class="field-map">
     <img src="agentic-dynamics-field-map.png" alt="Field map of Agentic Dynamics: five disciplines — AI and agentic systems, FinOps and cloud economics, software engineering and architecture, systems and reliability engineering, and experimental science — surround a core that measures how context, complexity, and uncertainty shape agent decisions and propagate into reliability, cost, and value.">
@@ -132,7 +134,7 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
       </ul>
     </div>
   </div>
-  <p style="font-size:0.78rem;color:var(--t3);margin-top:0.5rem">207 stories across 3 codebases (CRUD API, static site generator, notification service) and 2 tiers, run against 7 models. Every measurement is provenance-tagged; a signal that was not captured is published as null with its coverage, never a fabricated zero. Collection creates one N x M burden; analysis creates a second across models, conditions, tasks, tiers, commits, and story positions. More sessions without analysis are volume, not information.</p>
+  <p style="font-size:0.78rem;color:var(--t3);margin-top:0.5rem"><span class="ev-badge c">[C]</span> <span data-stat="stories_total">207</span> stories across <span data-stat="architectures">3</span> codebases (CRUD API, static site generator, notification service) and 2 tiers, run against <span data-stat="variants">7</span> models. Every measurement is provenance-tagged; a signal that was not captured is published as null with its coverage, never a fabricated zero. Collection creates one N x M burden; analysis creates a second across models, conditions, tasks, tiers, commits, and story positions. More sessions without analysis are volume, not information.</p>
 </div></section>
 
 <!-- Section 3: The instrument -->
@@ -203,24 +205,28 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
   <h2>The unmeasured gap became visible.</h2>
   <p class="lead">The supporting corpus contains 1,027 instrumented story sessions. Four findings made the gap concrete.</p>
   <div class="finding">
-    <div class="fn">Finding 1</div>
+    <div class="fn">Finding 1 <span class="ev-badge m">[M]</span></div>
     <h3>Price and verification depth do not move together in this corpus.</h3>
     <p>OpenAI spans a 41× price range — Luna at $0.09 and Sol at $3.75 — and both write ~10 tests per story. Claude spans 2.9× — Haiku at $1.59 and Sonnet 5 at $4.58 — and both write ~120. All pass their tests. In these observed tasks, the 10× verification gap appears <em>between</em> vendors rather than between price tiers; the result describes this corpus, not a universal purchasing rule.</p>
+    <p class="fsource">Source: <a href="evidence.html">The Evidence</a> — measured story-session fields (`data.js` models, [M]); the price/verification split is a comparison within this corpus.</p>
   </div>
   <div class="finding">
-    <div class="fn">Finding 2</div>
+    <div class="fn">Finding 2 <span class="ev-badge m">[M]</span></div>
     <h3>Later sessions cost more across the five-session arc.</h3>
-    <p>The measured story cost roughly doubles from its greenfield session ($0.16) to its cross-cutting session ($0.34), while tokens grow from 18.7K to 34.9K. Every session inherits a larger codebase, so per-session cost understates the observed maintenance arc by ~2×. Generalizing that mechanism beyond the measured arc remains modeled.</p>
+    <p>The measured story cost roughly doubles from its greenfield session ($0.16) to its cross-cutting session ($0.34), while tokens grow from 18.7K to 34.9K. Every session inherits a larger codebase, so per-session cost understates the observed maintenance arc by ~2×. Generalizing that mechanism beyond the measured arc remains modeled [P].</p>
+    <p class="fsource">Source: <a href="evidence.html#story-models">The Evidence — story arc</a> [M]; the N² extrapolation is modeled, not measured.</p>
   </div>
   <div class="finding">
-    <div class="fn">Finding 3</div>
+    <div class="fn">Finding 3 <span class="ev-badge m">[M]</span></div>
     <h3>Cache behavior separates token volume from session cost.</h3>
     <p>The cheapest model (Flash) and the most expensive (Sol) both send ~47K tokens per session — Flash at $0.07, Sol at $3.75. Luna hits a 98% cache-hit rate and sends just 6.3K. Token volume, cache policy, and test thoroughness appear as three separate knobs in this corpus; their separation does not establish that any one predicts the other two.</p>
+    <p class="fsource">Source: <a href="evidence.html">The Evidence</a> — measured cache-read and token fields [M].</p>
   </div>
   <div class="finding">
-    <div class="fn">Finding 4</div>
+    <div class="fn">Finding 4 <span class="ev-badge m">[M]</span> <span class="ev-badge c">[C]</span></div>
     <h3>Degradation can leak across sessions, and recovery can be measured.</h3>
     <p>Corrupting the session-1 spec (<code>early_degrade</code>) lowers the success rate to 86% (versus 97% clean) and raises the cascade rate (1.5% &rarr; 2.5%). Degradation raises risk at the margin; it does not dominate the outcome. Cells labelled <code>bad_seed</code>/<code>early_degrade</code> that carried no instrumented test verdict received no actual perturbation and are counted as <code>clean</code> (<code>docs/data_integrity_findings.md</code> treatment rule 1), so the arms above are the corrected ones.</p>
+    <p class="fsource">Source: <a href="evidence.html">The Evidence</a> — independent test-executed verdicts [M] and computed rates [C]; the no-op relabel is a documented [P] treatment rule.</p>
   </div>
   <div class="hero-actions"><a href="evidence.html" class="cta-btn">Inspect the Evidence →</a></div>
 </div></section>
@@ -229,10 +235,11 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
 <section class="dossier-section"><div class="dossier-inner">
   <div class="section-kicker">What — the durable-value gap</div>
   <h2>Correctness is not verification.</h2>
-  <p class="lead">A model can pass every test it writes and still leave a system unverified. The gap is measured by test thoroughness:</p>
+  <p class="lead"><span class="ev-badge m">[M]</span> A model can pass every test it writes and still leave a system unverified. The gap is measured by test thoroughness:</p>
   <p style="font-family:'JetBrains Mono',monospace;color:var(--ac);font-size:0.85rem;line-height:2;text-align:center;padding:1rem;background:var(--bg3);border-radius:10px;border:1px solid var(--b)">
     Tests per story: Luna 7 &middot; Terra 9 &middot; Sol 13 &middot; Flash 34 &middot; Pro 34 &middot; Haiku 117 &middot; Sonnet 122
   </p>
+  <p class="fsource" style="text-align:center">Source: measured test counts per story in <a href="evidence.html">The Evidence</a> [M]; the comparison is within this corpus.</p>
   <p>All seven models pass their own tests at roughly equal rates, but the tests differ by an order of magnitude. Luna ships ~7 tests that confirm the happy path. Sonnet 5 ships ~122 that probe edge cases — duplicate usernames, whitespace titles, missing bearer tokens, idempotent notifications. Both codebases "work." One has a much broader observed verification surface.</p>
   <p>This is the durable-value gap. Correctness asks whether code passes the tests you have. Verification asks whether you have the tests that would catch the failures that matter. In this corpus, that safety net varies by vendor family, while price alone does not explain the difference.</p>
   <div class="hero-actions"><a href="evidence.html#story-models" class="cta-btn">Inspect the Verification Gap →</a></div>

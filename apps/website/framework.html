@@ -185,18 +185,100 @@
 @media(max-width:520px){.framework-page .hero-actions,.framework-page .calc-mode{display:grid}.framework-page .mode-entry-grid,.framework-page .scale-grid,.framework-page .architecture-text,.framework-page .cost-receipts.stats,.framework-page .policy-map{grid-template-columns:1fr}.framework-page .roi-out{grid-template-columns:1fr}.framework-page .cr{min-width:38rem}}
 @media(prefers-reduced-motion:reduce){.framework-page *{scroll-behavior:auto!important;transition:none!important}.framework-page .diagram-map .tracer{display:none;animation:none}}
 @media print{.framework-page .topbar,.framework-page .hero-actions,.framework-page .calc-mode,.framework-page .disclosure-button,.framework-page .campaign-strip .cta-btn{display:none!important}.framework-page .fsec{break-inside:auto}.framework-page .diagram-map{min-width:0}.framework-page .calc-results{position:static}.framework-page .rule-group-head{position:static}}
+.framework-page .fw-details{border:1px solid var(--fw-line);border-radius:14px;padding:0 1.25rem;margin-top:1.25rem;background:var(--fw-surface)}
+.framework-page .fw-details[open]{padding-bottom:1.25rem}
+.framework-page .fw-details>summary{cursor:pointer;list-style:none;padding:1rem 0;font-family:'JetBrains Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ac)}
+.framework-page .fw-details>summary::-webkit-details-marker{display:none}
+.framework-page .fw-details>summary::before{content:'\25B8  ';color:var(--t3)}
+.framework-page .fw-details[open]>summary::before{content:'\25BE  '}
 </style>
 <script src="data.js"></script>
 </head>
 <body class="framework-page">
 
-<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link" style="color:var(--ac)" aria-current="page">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="question.html" class="topbar-link">Question</a><a href="https://github.com/peparhugo/agentic-dynamics" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link" style="color:var(--ac)" aria-current="page">Framework</a><a href="architecture.html" class="topbar-link">Architecture</a><a href="story.html" class="topbar-link">Story</a><a href="question.html" class="topbar-link">Question</a><a href="https://github.com/peparhugo/agentic-dynamics" class="topbar-link" target="_blank">GitHub</a></nav>
 
 <!-- SECTION: Shared execution -->
+<!-- WHY (Golden Circle lead): no universal best practices, only measured levers.
+     ref: type-responsive-grid.html, card-details.html — the two-card contrast. -->
 <section class="fsec dossier-hero" id="why"><div class="inr wide">
   <div class="hero-grid">
     <div>
-      <div class="section-kicker">ONE ENGINE / TWO OPERATING MODES</div>
+      <div class="section-kicker">WHY — NO UNIVERSAL BEST PRACTICES</div>
+      <h1>There are no universal best practices.<br>Only measured levers.</h1>
+      <p class="thesis">A model, a price, and a prompt are only meaningful inside the system that runs them. Advice scoped to no system is a guess. An operational framework is therefore not a rulebook: it is the set of levers this instrument has actually measured, kept separate from the ones it can only control or model. Every figure on this page carries its provenance &mdash; [M] measured, [C] computed, [H] heuristic, [X] external, [P] policy.</p>
+      <div class="hero-actions">
+        <a href="#levers" class="cta-btn">See the measured levers &darr;</a>
+        <a href="evidence.html" class="cta-btn cta-secondary">Inspect the evidence &rarr;</a>
+      </div>
+    </div>
+    <div class="mode-ledger" aria-label="What the framework is and is not">
+      <article class="mode-card">
+        <span class="micro-label">WHAT IT IS</span>
+        <div class="mode-value">measured levers</div>
+        <strong>Fields the instrument produced.</strong>
+        <p>Cost, first-pass quality, Grit, cache behaviour, and verification depth come from the <span data-stat="story_sessions">1,027</span>-session story corpus [M].</p>
+      </article>
+      <article class="mode-card grid">
+        <span class="micro-label">WHAT IT IS NOT</span>
+        <div class="mode-value">a price sheet</div>
+        <strong>Universal purchasing advice.</strong>
+        <p>Routing risk and long-horizon value remain questions for controlled experiments &mdash; modeled [P], never concluded from a price list.</p>
+      </article>
+    </div>
+  </div>
+</div></section>
+
+<section class="fsec" id="levers"><div class="inr wide">
+<div class="section-kicker">WHY — ECONOMIC INPUTS / MEASURED AND MODELED</div>
+<h2>Separate what is measured,<br>controlled, and modeled.</h2>
+<p class="lead">Observed cost, outcome, and narration fields come from the 227-session precursor perturbation corpus [M] (distinct from the 1,027-session story corpus). Retry rate is a workload input until the attempt ledger measures it directly — it now IS measured (the attempt ledger emits attempt_count, retry_reason, first_pass, and accepted). Modeling parameters (&beta;, EPM) are calibrated to your codebase and provider-pricing horizon; EPM is the selection-time + budget-horizon risk factor, never a session lever. Separating observations, controls, and assumptions is the difference between deterministic budgeting and surprise overruns.</p>
+<div class="lever-console">
+  <article class="lever-lane">
+    <div class="lane-head"><h3>Augmented Workforce (Rules 1&ndash;5)</h3><span>human + AI / per session</span></div>
+    <p class="lead" style="font-size:0.85rem">These drive the human+AI cost model. Teams using AI coding assistants interact with these every session.</p>
+    <div class="params">
+      <div class="param"><div class="psym">C&#8320;</div><div class="pname"><strong>Which model you call.</strong> $0.005 to $1.01 per session. Your primary cost lever. Two-way door &ndash; switch per task type.</div><div class="lever-meta"><span>Observed</span><span>Two-way door</span></div></div>
+      <div class="param"><div class="psym">C&#8320; sub-lever</div><div class="pname"><strong>Cache Strategy.</strong> Cache write strategy: Store context at $3.75/Mtok (Anthropic). Cache read strategy: Retrieve existing context at $0.14/Mtok (DeepSeek default). Two-way door &mdash; measure your cache hit rate before committing. If &lt;50% reuse, switch to cache-read.</div><div class="lever-meta"><span>Controlled</span><span>Two-way door</span></div></div>
+      <div class="param"><div class="psym">P</div><div class="pname"><strong>Whether it produces working code.</strong> DeepSeek: 72% general pass rate with correct env. Pin frameworks to maximize this. Drives your retry overhead.</div><div class="lever-meta"><span>Observed</span><span>Verification gate</span></div></div>
+      <div class="param"><div class="psym">&epsilon;</div><div class="pname"><strong>How much it narrates.</strong> Measured flail rates: 8.4% (DeepSeek) to 50% (GPT-5.5). Narration penalty: 0.3% to 30%. Pay only when you need auditable reasoning.</div><div class="lever-meta"><span>Measured</span><span>Selection</span></div></div>
+      <div class="param measured"><div class="psym">&beta;</div><div class="pname"><strong>The snowball tax — context inflation + coordination overhead.</strong> Compounds quadratically (N&sup2;): the cost of keeping N concurrent units of work coherent. Two measured faces: the per-session context-inflation curves (the ledger's session tokens) and the COORDINATION TAX — the wrapper/merge/data-chain/review overhead of parallel work, measured from the machine's own campaigns (2b: 63% of spend was wrapper phases, not cells) and the concurrency ladder (1/2/4/8-wide runs → the overhead curve). The lived ceiling — fewer concurrent workflows as complexity grows — is the N&sup2; term's fingerprint. The countermeasure is small, properly scoped parallel units (the per-step scope model + the worker pools).</div><div class="lever-meta"><span>Measured [C]</span><span>Concurrency ceiling</span></div></div>
+      <div class="param modeled"><div class="psym">v</div><div class="pname"><strong>Code velocity per session.</strong> How much code you generate per session. Higher velocity accelerates the N&sup2; compounding.</div><div class="lever-meta"><span>Controlled</span><span>One-way effect</span></div></div>
+      <div class="param modeled"><div class="psym">EPM(t)</div><div class="pname"><strong>Provider pricing trajectory — a HIGH-LEVEL risk factor, not a session lever.</strong> Energy-market-shaped pricing has arrived in inference itself: DeepSeek moved to peak/off-peak pricing like an energy market. EPM is the horizon lens for PROVIDER SELECTION and WFM/budget planning — how much the pricing schedule may drift over quarters, never a per-session input. IEA baseline: 1.6%/yr. Hedge scenario: 2.5%/yr. The batch/scheduling rules (b) interact with the peak/off-peak windows — schedule batch work into off-peak.</div><div class="lever-meta"><span>Modeled</span><span>Horizon risk — provider selection + WFM/budget planning</span></div></div>
+    </div>
+  </article>
+  <article class="lever-lane autonomous">
+    <div class="lane-head"><h3>Autonomous Workloads (Rules 6&ndash;9)</h3><span>bounded autonomy / per job</span></div>
+    <p class="lead" style="font-size:0.85rem">These drive the bounded autonomous cost model. Routine jobs run inside the declared policy; failed verification, exhausted limits, and material uncertainty return to the human control plane above.</p>
+    <div class="params">
+      <div class="param autonomous"><div class="psym">C&#8320;</div><div class="pname"><strong>Baseline cost per job.</strong> Same model cost lever as augmented, applied to a single autonomous unit of work. $0.001 to $1.01 per job depending on model tier.</div><div class="lever-meta"><span>Observed</span><span>Two-way route</span></div></div>
+      <div class="param modeled"><div class="psym">b</div><div class="pname"><strong>Batch fraction.</strong> What % of jobs run in batch mode. Batch gives 50% discount: D(b) = 1 &minus; b&times;0.5. Trade-off: longer completion time.</div><div class="lever-meta"><span>Controlled</span><span>Autonomous door</span></div></div>
+      <div class="param modeled"><div class="psym">r</div><div class="pname"><strong>Retry rate.</strong> Fraction of jobs that fail first-pass and require another attempt or escalation. The calculator begins with an 11.5% scenario; replace it with your attempt-ledger rate before making a policy decision.</div><div class="lever-meta"><span>Scenario input</span><span>Escalation gate</span></div></div>
+      <div class="param modeled"><div class="psym">E&#8340;</div><div class="pname"><strong>Escalation cost multiplier.</strong> How many &times; more expensive the escalation tier is vs the base model. Price ratio: 28.2&times; (DeepSeek &rarr; GPT-5.6), 68.7&times; (DS &rarr; Claude). Design for &lt;1% escalation to human.</div><div class="lever-meta"><span>Modeled</span><span>Autonomous door</span></div></div>
+      <div class="param modeled"><div class="psym">W</div><div class="pname"><strong>Workload volume.</strong> Jobs per day processed autonomously. Throughput limit: T<sub>max</sub> = Budget / C<sub>job</sub>. Double the budget, double the capacity.</div><div class="lever-meta"><span>Controlled</span><span>Budget ceiling</span></div></div>
+      <div class="param autonomous"><div class="psym">EPM(t)</div><div class="pname"><strong>Provider pricing trajectory (horizon risk).</strong> Same multiplier as augmented — a selection-time + budget-horizon factor, not a per-session driver. The org's planning (WFM, budgets) is where it lands: the whole cost model reduces to the workforce-management calculus.</div><div class="lever-meta"><span>Modeled</span><span>Horizon risk — provider selection + WFM/budget planning</span></div></div>
+    </div>
+    <details class="wfm-panel">
+      <summary>Autonomous AI workforce management is call center WFM, reframed.</summary>
+      <p class="note">The equations are the same. The resource under management is the only difference.</p>
+      <div class="constraints">
+        <div class="cr head"><div class="nm">Agentic Dynamics Concept</div><div class="fl">Workforce Management Equivalent</div><div class="fl">Shared Principle</div></div>
+        <div class="cr"><div class="nm">Budget Ceiling: T<sub>max</sub> = Budget / C<sub>job</sub></div><div class="fl">Erlang staffing: throughput from headcount</div><div class="fl">Capacity is budget-constrained, not infra-constrained</div></div>
+        <div class="cr"><div class="nm">Cascade Rule: Flash → Sonnet → Opus → Human</div><div class="fl">Tiered support: L1 → L2 → L3 → supervisor</div><div class="fl">Escalate only what can't be resolved at current tier</div></div>
+        <div class="cr"><div class="nm">SLA Buffer: 72-hour batch horizon</div><div class="fl">AHT + service level targets</div><div class="fl">Queue depth × avg completion time = SLA window</div></div>
+        <div class="cr"><div class="nm">First-Pass Rule: WOC = 1/(1+r)</div><div class="fl">First-call resolution rate (FCR)</div><div class="fl">First-attempt success is the primary quality metric</div></div>
+        <div class="cr"><div class="nm">Batch Discount: 50% cheaper deferred</div><div class="fl">Back-office batch processing</div><div class="fl">Cost of immediacy: cheaper to wait</div></div>
+      </div>
+    </details>
+  </article>
+</div>
+</div></section>
+
+<!-- SECTION: The Cost Model -->
+<section class="fsec dossier-hero" id="engine"><div class="inr wide">
+  <div class="hero-grid">
+    <div>
+      <div class="section-kicker">HOW — ONE ENGINE / TWO OPERATING MODES</div>
       <h1>Run one workflow. Or evaluate it as a grid.</h1>
       <p class="thesis">A production workflow and an experiment use the same compiler, jobs, attempts, ledger, and policy controls. Fix the factors and the engine runs one cell. Vary them and it runs a controlled grid. Compare the cells, adapt one variable, and the grid becomes a campaign.</p>
       <div class="hero-actions">
@@ -228,7 +310,7 @@
   <dl>
     <dt>What is measured [M]</dt><dd>Observed cost, outcome, narration, and cache fields from the corpus (1,027 story sessions, 7 models).</dd>
     <dt>What is computed [C]</dt><dd>First-pass quality, Grit, cost per accepted outcome, WOC ratio — derived from the measured fields.</dd>
-    <dt>What is modeled [P]/[X]</dt><dd>β context inflation, EPM provider-pricing horizon, batch/cascade/SLA extensions — calibrated inputs and assumptions, not measured outcomes. β's coordination-tax side is now MEASURED [C] from the machine's own ledger (the wrapper-phase share, the concurrency ladder); EPM is a HIGH-LEVEL RISK FACTOR for provider selection and WFM/budget planning (DeepSeek's peak/off-peak pricing is the energy-market shape made literal) — never a per-session input; the per-session levers are C₀, P, ε, r. EPM is a HIGH-LEVEL RISK FACTOR for provider selection and WFM/budget planning (DeepSeek's peak/off-peak pricing is the energy-market shape made literal) — never a per-session input; the per-session levers are C₀, P, ε, r.</dd>
+    <dt>What is modeled [P]/[X]</dt><dd>β context inflation, EPM provider-pricing horizon, batch/cascade/SLA extensions — calibrated inputs and assumptions, not measured outcomes. β's coordination-tax side is now MEASURED [C] from the machine's own ledger (the wrapper-phase share, the concurrency ladder); EPM is a HIGH-LEVEL RISK FACTOR for provider selection and WFM/budget planning (DeepSeek's peak/off-peak pricing is the energy-market shape made literal) — never a per-session input; the per-session levers are C₀, P, ε, r.</dd>
     <dt>Limitation</dt><dd>A rule's premise being measured does not make the rule measured; rules not run as policy arms remain proposals. See <a href="evidence.html" style="color:var(--ac)">The Evidence</a> for verdicts.</dd>
   </dl>
 </aside>
@@ -237,7 +319,7 @@
 <section class="fsec architecture-section"><div class="inr wide">
   <div class="architecture-intro">
     <div>
-      <div class="section-kicker">WORKFLOW COMPILER / OPERATING MODES</div>
+      <div class="section-kicker">HOW — WORKFLOW COMPILER / OPERATING MODES</div>
       <h2>One execution engine,<br>from cell to campaign.</h2>
     </div>
     <p class="lead">A fixed assignment produces one workflow cell. Factor levels produce a grid of cells. Both compile into the same jobs and attempts; only the grid adds cross-arm comparison and adaptation.</p>
@@ -380,7 +462,7 @@
 <section class="fsec" id="field-map"><div class="inr wide">
   <div class="architecture-intro">
     <div>
-      <div class="section-kicker">FIELD MAP / EIGHT PLANES</div>
+      <div class="section-kicker">HOW — FIELD MAP / EIGHT PLANES</div>
       <h2>Eight planes, one dependency direction.</h2>
     </div>
     <p class="lead">The instrument is modular but not flat: the eight package planes form a dependency chain, and control consumes the information the lower planes produce. A plane's state is either instrumented (built and measured), proposed (designed but not run), or decided (a verdict binds it).</p>
@@ -492,7 +574,7 @@
 <section class="fsec"><div class="inr wide">
   <div class="architecture-intro">
     <div>
-      <div class="section-kicker">TWO MODES / ONE ENGINE</div>
+      <div class="section-kicker">HOW — TWO MODES / ONE ENGINE</div>
       <h2>One engine, two operating modes.</h2>
     </div>
     <p class="lead">A fixed factor assignment produces one cell; a factor cross-product produces G cells. Both converge on the same compile → jobs → attempts → ledger path; only the grid branches to compare and adapt.</p>
@@ -569,7 +651,7 @@
 <section class="fsec"><div class="inr wide">
   <div class="architecture-intro">
     <div>
-      <div class="section-kicker kicker-what">AUTONOMY / PROPOSED NOT RUN</div>
+      <div class="section-kicker kicker-what">HOW — AUTONOMY / PROPOSED NOT RUN</div>
       <h2>A bounded-autonomy envelope.</h2>
     </div>
     <p class="lead">The human policy boundary sits outside; inside it, declared constraints bound execution and independent verification. Exits are accept, reject/rework, or halt/escalate. Typed checkpoints remain proposed capability, not a run state.</p>
@@ -623,7 +705,7 @@
 <section class="fsec autonomy-section" id="autonomy"><div class="inr wide">
   <div class="architecture-intro">
     <div>
-      <div class="section-kicker kicker-what">AUTHORITY / HUMAN CONTROL POINTS</div>
+      <div class="section-kicker kicker-what">HOW — AUTHORITY / HUMAN CONTROL POINTS</div>
       <h2>Autonomy is bounded,<br>not human-free.</h2>
     </div>
     <p class="lead">The agent may operate the workflow, but people define its objective, information requirements, policy, budget, and intervention conditions. Exceptions cross the boundary; routine work does not.</p>
@@ -720,56 +802,10 @@
 </div></section>
 
 <!-- SECTION: The Levers -->
-<section class="fsec" id="levers"><div class="inr wide">
-<div class="section-kicker">ECONOMIC INPUTS / MEASURED AND MODELED</div>
-<h2>Separate what is measured,<br>controlled, and modeled.</h2>
-<p class="lead">Observed cost, outcome, and narration fields come from 227 historical experiment worktrees. Retry rate is a workload input until the attempt ledger measures it directly — it now IS measured (the attempt ledger emits attempt_count, retry_reason, first_pass, and accepted). Modeling parameters (&beta;, EPM) are calibrated to your codebase and provider-pricing horizon; EPM is the selection-time + budget-horizon risk factor, never a session lever. Separating observations, controls, and assumptions is the difference between deterministic budgeting and surprise overruns.</p>
-<div class="lever-console">
-  <article class="lever-lane">
-    <div class="lane-head"><h3>Augmented Workforce (Rules 1&ndash;5)</h3><span>human + AI / per session</span></div>
-    <p class="lead" style="font-size:0.85rem">These drive the human+AI cost model. Teams using AI coding assistants interact with these every session.</p>
-    <div class="params">
-      <div class="param"><div class="psym">C&#8320;</div><div class="pname"><strong>Which model you call.</strong> $0.005 to $1.01 per session. Your primary cost lever. Two-way door &ndash; switch per task type.</div><div class="lever-meta"><span>Observed</span><span>Two-way door</span></div></div>
-      <div class="param"><div class="psym">C&#8320; sub-lever</div><div class="pname"><strong>Cache Strategy.</strong> Cache write strategy: Store context at $3.75/Mtok (Anthropic). Cache read strategy: Retrieve existing context at $0.14/Mtok (DeepSeek default). Two-way door &mdash; measure your cache hit rate before committing. If &lt;50% reuse, switch to cache-read.</div><div class="lever-meta"><span>Controlled</span><span>Two-way door</span></div></div>
-      <div class="param"><div class="psym">P</div><div class="pname"><strong>Whether it produces working code.</strong> DeepSeek: 72% general pass rate with correct env. Pin frameworks to maximize this. Drives your retry overhead.</div><div class="lever-meta"><span>Observed</span><span>Verification gate</span></div></div>
-      <div class="param"><div class="psym">&epsilon;</div><div class="pname"><strong>How much it narrates.</strong> Measured flail rates: 8.4% (DeepSeek) to 50% (GPT-5.5). Narration penalty: 0.3% to 30%. Pay only when you need auditable reasoning.</div><div class="lever-meta"><span>Measured</span><span>Selection</span></div></div>
-      <div class="param measured"><div class="psym">&beta;</div><div class="pname"><strong>The snowball tax — context inflation + coordination overhead.</strong> Compounds quadratically (N&sup2;): the cost of keeping N concurrent units of work coherent. Two measured faces: the per-session context-inflation curves (the ledger's session tokens) and the COORDINATION TAX — the wrapper/merge/data-chain/review overhead of parallel work, measured from the machine's own campaigns (2b: 63% of spend was wrapper phases, not cells) and the concurrency ladder (1/2/4/8-wide runs → the overhead curve). The lived ceiling — fewer concurrent workflows as complexity grows — is the N&sup2; term's fingerprint. The countermeasure is small, properly scoped parallel units (the per-step scope model + the worker pools).</div><div class="lever-meta"><span>Measured [C]</span><span>Concurrency ceiling</span></div></div>
-      <div class="param modeled"><div class="psym">v</div><div class="pname"><strong>Code velocity per session.</strong> How much code you generate per session. Higher velocity accelerates the N&sup2; compounding.</div><div class="lever-meta"><span>Controlled</span><span>One-way effect</span></div></div>
-      <div class="param modeled"><div class="psym">EPM(t)</div><div class="pname"><strong>Provider pricing trajectory — a HIGH-LEVEL risk factor, not a session lever.</strong> Energy-market-shaped pricing has arrived in inference itself: DeepSeek moved to peak/off-peak pricing like an energy market. EPM is the horizon lens for PROVIDER SELECTION and WFM/budget planning — how much the pricing schedule may drift over quarters, never a per-session input. IEA baseline: 1.6%/yr. Hedge scenario: 2.5%/yr. The batch/scheduling rules (b) interact with the peak/off-peak windows — schedule batch work into off-peak.</div><div class="lever-meta"><span>Modeled</span><span>Horizon risk — provider selection + WFM/budget planning</span></div></div>
-    </div>
-  </article>
-  <article class="lever-lane autonomous">
-    <div class="lane-head"><h3>Autonomous Workloads (Rules 6&ndash;9)</h3><span>bounded autonomy / per job</span></div>
-    <p class="lead" style="font-size:0.85rem">These drive the bounded autonomous cost model. Routine jobs run inside the declared policy; failed verification, exhausted limits, and material uncertainty return to the human control plane above.</p>
-    <div class="params">
-      <div class="param autonomous"><div class="psym">C&#8320;</div><div class="pname"><strong>Baseline cost per job.</strong> Same model cost lever as augmented, applied to a single autonomous unit of work. $0.001 to $1.01 per job depending on model tier.</div><div class="lever-meta"><span>Observed</span><span>Two-way route</span></div></div>
-      <div class="param modeled"><div class="psym">b</div><div class="pname"><strong>Batch fraction.</strong> What % of jobs run in batch mode. Batch gives 50% discount: D(b) = 1 &minus; b&times;0.5. Trade-off: longer completion time.</div><div class="lever-meta"><span>Controlled</span><span>Autonomous door</span></div></div>
-      <div class="param modeled"><div class="psym">r</div><div class="pname"><strong>Retry rate.</strong> Fraction of jobs that fail first-pass and require another attempt or escalation. The calculator begins with an 11.5% scenario; replace it with your attempt-ledger rate before making a policy decision.</div><div class="lever-meta"><span>Scenario input</span><span>Escalation gate</span></div></div>
-      <div class="param modeled"><div class="psym">E&#8340;</div><div class="pname"><strong>Escalation cost multiplier.</strong> How many &times; more expensive the escalation tier is vs the base model. Price ratio: 28.2&times; (DeepSeek &rarr; GPT-5.6), 68.7&times; (DS &rarr; Claude). Design for &lt;1% escalation to human.</div><div class="lever-meta"><span>Modeled</span><span>Autonomous door</span></div></div>
-      <div class="param modeled"><div class="psym">W</div><div class="pname"><strong>Workload volume.</strong> Jobs per day processed autonomously. Throughput limit: T<sub>max</sub> = Budget / C<sub>job</sub>. Double the budget, double the capacity.</div><div class="lever-meta"><span>Controlled</span><span>Budget ceiling</span></div></div>
-      <div class="param autonomous"><div class="psym">EPM(t)</div><div class="pname"><strong>Provider pricing trajectory (horizon risk).</strong> Same multiplier as augmented — a selection-time + budget-horizon factor, not a per-session driver. The org's planning (WFM, budgets) is where it lands: the whole cost model reduces to the workforce-management calculus.</div><div class="lever-meta"><span>Modeled</span><span>Horizon risk — provider selection + WFM/budget planning</span></div></div>
-    </div>
-    <details class="wfm-panel">
-      <summary>Autonomous AI workforce management is call center WFM, reframed.</summary>
-      <p class="note">The equations are the same. The resource under management is the only difference.</p>
-      <div class="constraints">
-        <div class="cr head"><div class="nm">Agentic Dynamics Concept</div><div class="fl">Workforce Management Equivalent</div><div class="fl">Shared Principle</div></div>
-        <div class="cr"><div class="nm">Budget Ceiling: T<sub>max</sub> = Budget / C<sub>job</sub></div><div class="fl">Erlang staffing: throughput from headcount</div><div class="fl">Capacity is budget-constrained, not infra-constrained</div></div>
-        <div class="cr"><div class="nm">Cascade Rule: Flash → Sonnet → Opus → Human</div><div class="fl">Tiered support: L1 → L2 → L3 → supervisor</div><div class="fl">Escalate only what can't be resolved at current tier</div></div>
-        <div class="cr"><div class="nm">SLA Buffer: 72-hour batch horizon</div><div class="fl">AHT + service level targets</div><div class="fl">Queue depth × avg completion time = SLA window</div></div>
-        <div class="cr"><div class="nm">First-Pass Rule: WOC = 1/(1+r)</div><div class="fl">First-call resolution rate (FCR)</div><div class="fl">First-attempt success is the primary quality metric</div></div>
-        <div class="cr"><div class="nm">Batch Discount: 50% cheaper deferred</div><div class="fl">Back-office batch processing</div><div class="fl">Cost of immediacy: cheaper to wait</div></div>
-      </div>
-    </details>
-  </article>
-</div>
-</div></section>
-
-<!-- SECTION: The Cost Model -->
 <section class="fsec" id="cost-model"><div class="inr wide">
-<div class="section-kicker">ECONOMICS / COST MODEL</div>
+<div class="section-kicker">HOW — ECONOMICS / COST MODEL</div>
 <h2>One equation. Every cost driver.<br>Any scenario. Your numbers.</h2>
-<p class="lead" style="margin-bottom:1rem">Every rule derives from these equations. Cost parameters (C₀, P) are measured from 227 historical experiment worktrees. Modeling parameters (β, EPM) use IEA energy projections and your codebase growth rate. See methodology for provenance detail on each parameter.</p>
+<p class="lead" style="margin-bottom:1rem">Every rule derives from these equations. Cost parameters (C₀, P) are measured from the 227-session precursor perturbation corpus [M]. Modeling parameters (β, EPM) use IEA energy projections and your codebase growth rate. See methodology for provenance detail on each parameter.</p>
 <div class="cost-station">
   <div class="formula-rail">
     <article class="formula-plate"><strong>Augmented Workforce <span style="color:var(--t3);font-size:0.7em">(Rules 1–5)</span></strong>c(t) = C&#8320;&times;EPM(t)&times;(1+&beta;&middot;v&middot;t)<br>C(N,v) = C&#8320;&times;EPM(N)&times;[N+&beta;&middot;v&middot;N(N&minus;1)/2]<br>CostPerOutcome = C(K/P, v)/K<br>C<sub>mo</sub> = E&times;C&#8320;&times;EPM(N)&times;[N+&beta;&middot;v&middot;N(N&minus;1)/2]<span class="formula-controls">Controls: C&#8320; / P / &beta; / v / EPM</span></article>
@@ -798,7 +834,7 @@
 
 <!-- SECTION: Interactive Calculator -->
 <section class="fsec" id="calculator"><div class="inr wide">
-<div class="section-kicker">SCENARIO / INTERACTIVE WORKBENCH</div>
+<div class="section-kicker">HOW — SCENARIO / INTERACTIVE WORKBENCH</div>
 <h2>Turn the equation into<br>your quarterly budget.</h2>
 <p class="lead">Two modes: <strong style="color:var(--ac)">Augmented Workforce</strong> for teams using AI coding assistants, or <strong style="color:var(--am)">Autonomous Workloads</strong> for jobs operating inside declared policy limits. Every adjustment recalculates your projected spend in real time.</p>
 <div class="framework-workbench">
@@ -832,7 +868,7 @@
 
 <!-- SECTION: Decision Framework -->
 <section class="fsec" id="decisions"><div class="inr">
-<div class="section-kicker kicker-what">CONTROL / POLICY BOUNDARIES</div>
+<div class="section-kicker kicker-what">WHAT — CONTROL / POLICY BOUNDARIES</div>
 <h2>Test reversible choices.<br>Model durable commitments.</h2>
 <div class="doors">
 <article class="door-card tw"><div class="door-symbol" aria-hidden="true">&olarr;</div><h3>Two-Way Doors</h3><p>Decisions affecting <strong style="color:var(--ac)">C&#8320; alone</strong>. Reversible. Switch back anytime. <strong style="color:var(--ac)">Preserves your runway.</strong></p><ul><li>Switching models per task type</li><li>Toggling Silent Inference mode</li><li>Adjusting token limits or caching</li></ul><p class="door-footer">Experiment. Measure. Iterate.</p></article>
@@ -849,8 +885,8 @@
 <!-- FIELD LAYER: the ten rules as status cards — grouped by instrumented / proposed /
      decided. Never calls a rule "measured" if only its premise is measured. -->
 <section class="fsec" id="rule-cards"><div class="inr wide">
-  <div class="section-kicker kicker-what">POLICY / RULE STATUS</div>
-  <h2>Ten rules, three statuses.</h2>
+  <div class="section-kicker kicker-what">WHAT — POLICY / RULE STATUS</div>
+  <h2>Ten rules, three statuses.</h2><details class="fw-details"><summary>Open the ten rule cards and their source notes</summary>
   <p class="lead">Each rule is grouped by its current status: <strong style="color:var(--ev-m)">instrumented</strong> (its inputs and premise are measured), <strong style="color:var(--ev-c)">proposed</strong> (modeled or designed but not run as an arm), or <strong style="color:var(--ev-p)">decided</strong> (a verdict binds it). A rule's premise being measured does not make the rule measured — a policy becomes decided only when it is run as an arm and compared.</p>
   <!-- ref: card-details.html, card-tooltip-badge.html — status and source visible before
        expansion; details expose method and limits. -->
@@ -927,12 +963,12 @@
     </article>
   </div>
   <p class="note">Decided status is reserved for a rule whose verdict binds it (see the <a href="evidence.html" style="color:var(--ac)">2b decision on The Evidence</a>). No rule card above over-claims a measured rule when only its premise is measured.</p>
-</div></section>
+</details></div></section>
 
 <!-- SECTION: The Ten Rules -->
 <section class="fsec" id="rules"><div class="inr wide">
-  <div class="section-kicker kicker-what">POLICY / PROPOSED CONTROL RULES</div>
-  <h2>Turn observed patterns into<br>policy arms to test.</h2>
+  <div class="section-kicker kicker-what">WHAT — POLICY / PROPOSED CONTROL RULES</div>
+  <h2>Turn observed patterns into<br>policy arms to test.</h2><details class="fw-details"><summary>Open the proposed control rules (selection, economics, autonomous operations)</summary>
   <p class="lead">These are organized across three provenance tiers. <strong style="color:var(--ac)">Observed</strong> patterns are directly visible in the measurement corpus (227 historical single-session perturbation experiments + 1,027 multi-session story sessions). <strong style="color:var(--am)">Derived</strong> metrics compute operational quantities from those observations. <strong style="color:var(--t3)">Modeled</strong> extensions project beyond what the experiment directly measures.</p>
   <div class="rule-groups">
     <section class="rule-group" aria-labelledby="selection-rules">
@@ -962,12 +998,12 @@
     </section>
   </div>
   <p class="note">Observed from the experiment corpus (cost variation, outcome retention, recovery overhead). Derived metrics (Grit, WOC, cost per outcome). Modeling extensions (Snowball, EPM, batch, cascade, SLA, BVI) are modeled projections — not independently tested.</p>
-</div></section>
+</details></div></section>
 
 <!-- SECTION: Provider Playbook -->
 <section class="fsec" id="playbook"><div class="inr wide">
-<div class="section-kicker kicker-what">CONTROL / CANDIDATE POLICY ARMS</div>
-<h2>Map provider choices to<br>cost and verification hypotheses.</h2>
+<div class="section-kicker kicker-what">WHAT — CONTROL / CANDIDATE POLICY ARMS</div>
+<h2>Map provider choices to<br>cost and verification hypotheses.</h2><details class="fw-details"><summary>Open the provider cards, pricing tables, and escalation economics</summary>
 <p class="lead">Every playbook tactic below implements one or more of the 10 decision rules. Use this mapping to trace your cost savings back to the empirical evidence.</p>
 <div class="policy-map" aria-label="Policy tactics mapped to framework rules">
   <article class="policy-card"><span>RULES 1+2</span><strong>Three-layer caching</strong><p>Rule 1 (Grit) + Rule 2 (Explanation Tax)</p></article>
@@ -1046,14 +1082,14 @@
 </div>
 <div class="callout-box" style="margin-top:1rem"><strong>The takeaway:</strong> The cascade doesn't just save money — it buys verification where it matters. Route the happy path to Luna, the refactor-heavy work to DeepSeek, and reserve Sonnet for the safety-critical edge cases that would cost more to miss than to test.</div>
 </div>
-</div></section>
+</details></div></section>
 
 <!-- SECTION: Model Cards -->
 <section class="fsec evidence-handoff" id="model-cards"><div class="inr">
-  <div class="section-kicker kicker-what">EVIDENCE / MODEL CARDS</div>
+  <div class="section-kicker kicker-what">WHAT — EVIDENCE / MODEL CARDS</div>
   <h2>Narration flail rates 6–50% across models.<br>See detailed model profiles &rarr;</h2>
   <div class="callout-box" style="margin-top:1rem"><a href="evidence.html" class="cta-btn">View Detailed Model Profiles →</a></div>
-  <p class="note">All 7 models across 3 provider families produce structurally sound code (AST-verified). Test pass rates and token economics vary dramatically by provider — not by capability.</p>
+  <p class="note"><span class="ev-badge m">[M]</span> All 7 models across 3 provider families produce structurally sound code (AST-verified). Test pass rates and token economics vary dramatically by provider — not by capability. Source: <a href="evidence.html" style="color:var(--ac)">The Evidence</a> — measured per-model flail, token, and test fields.</p>
 </div></section>
 
 <!-- CAMPAIGN: Returning to the calculator closes the measure, compare, and adapt loop. -->
