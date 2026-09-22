@@ -74,8 +74,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -1370,6 +1373,97 @@ def _drop_ignored_staged_paths(workdir: Path) -> list[str]:
     return ignored
 
 
+def _candidate_without_ignored_paths(workdir: Path, candidate: str) -> str:
+    """The merge INPUT: the candidate's tree minus every ignored path (or the candidate).
+
+    The post-merge drop (``_drop_ignored_staged_paths``) cannot help when the MERGE itself
+    stops: main may DELETE the ignored paths (the tracked-paths-only convention) while the
+    candidate MODIFIES them — the 2026-09-22 L23 case, a modify/delete conflict raised before
+    any commit exists to clean. So the exclusion happens on the INPUT side, via plumbing that
+    never touches HEAD or the worktree:
+
+    * read the candidate's tree into a TEMPORARY index (``GIT_INDEX_FILE``),
+    * force-remove the ignored paths from that index (``update-index --force-remove``),
+    * write the reduced tree and mint a throwaway commit parented on the candidate
+      (``commit-tree``).
+
+    The promoted candidate sha (the ledger identity, the control row's binding) is unchanged;
+    only the merge sees the reduced tree. Returns the candidate itself when nothing is ignored.
+    """
+    paths = _git(workdir, "ls-tree", "-r", "--name-only", candidate).splitlines()
+    ignored = [p.strip() for p in paths if p.strip() and _git_check_ignore(workdir, p.strip())]
+    if not ignored:
+        return candidate
+    env = dict(os.environ)
+    tmp_dir = tempfile.mkdtemp(prefix="promote-index-")
+    env["GIT_INDEX_FILE"] = os.path.join(tmp_dir, "index")
+    try:
+        run = subprocess.run(
+            ["git", "read-tree", candidate],
+            cwd=workdir,
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=60,
+        )
+        if run.returncode != 0:
+            raise _PromoteRefusedError(
+                f"git read-tree {candidate[:12]} failed: {(run.stderr or '').strip()[:400]}"
+            )
+        run = subprocess.run(
+            ["git", "update-index", "--force-remove", "--", *ignored],
+            cwd=workdir,
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=60,
+        )
+        if run.returncode != 0:
+            raise _PromoteRefusedError(
+                f"git update-index --force-remove failed: {(run.stderr or '').strip()[:400]}"
+            )
+        tree = subprocess.run(
+            ["git", "write-tree"],
+            cwd=workdir,
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=60,
+        )
+        if tree.returncode != 0:
+            raise _PromoteRefusedError(
+                f"git write-tree failed: {(tree.stderr or '').strip()[:400]}"
+            )
+        commit = subprocess.run(
+            [
+                "git",
+                "commit-tree",
+                tree.stdout.strip(),
+                "-p",
+                candidate,
+                "-m",
+                "promote: merge input without ignored paths (throwaway)",
+            ],
+            cwd=workdir,
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=60,
+        )
+        if commit.returncode != 0:
+            raise _PromoteRefusedError(
+                f"git commit-tree failed: {(commit.stderr or '').strip()[:400]}"
+            )
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+    shown = ", ".join(ignored[:5]) + (" …" if len(ignored) > 5 else "")
+    print(
+        f"promote: merge input excludes {len(ignored)} ignored path(s) "
+        f"(tracked-paths-only convention): {shown}"
+    )
+    return commit.stdout.strip()
+
+
 def _push_squashed(workdir: Path, base: str, subject: str, candidate: str) -> str:
     """Squash the candidate onto the base and push it.
 
@@ -1389,9 +1483,13 @@ def _push_squashed(workdir: Path, base: str, subject: str, candidate: str) -> st
     """
     branch = f"promote-{candidate[:8]}"
     prior_head = _git(workdir, "rev-parse", "HEAD")
+    # The MERGE INPUT carries no ignored paths (see _candidate_without_ignored_paths): main
+    # may have DELETED them while the candidate modifies them, and a modify/delete conflict
+    # stops the merge before any staged drop could run (the 2026-09-22 L23 case).
+    merge_input = _candidate_without_ignored_paths(workdir, candidate)
     _git(workdir, "checkout", "-q", "-B", branch, base)
     try:
-        _git(workdir, "merge", "--squash", "--no-commit", candidate)
+        _git(workdir, "merge", "--squash", "--no-commit", merge_input)
         _drop_ignored_staged_paths(workdir)
         # ``--no-verify`` (L19): the squash is the PROMOTION commit, never a phase commit. Run
         # worktrees carry a commit-msg hook that rewrites subjects to the phase prefix — live,
