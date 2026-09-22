@@ -1101,3 +1101,138 @@ def test_promotion_commit_bypasses_a_run_worktrees_commit_msg_hook(tmp_path):
     _run_promotion(args, **em)
 
     assert _remote_subject(remote) == "[workflow] promote_test"  # NOT the hook's rewrite
+
+
+# ── promote rail repair (2026-09-22 live wedge): origin-resolved base + recorded-failure retry ──
+
+
+def test_require_branch_refreshes_a_stale_local_base(tmp_path):
+    """The base resolves from ORIGIN: a run clone's stale local base is fast-forwarded to
+    origin/<base> before the squash. The 2026-09-22 L20 promotion wedged exactly here — the
+    run clone's local base sat one promotion behind, so the squash described a base the push
+    could never fast-forward."""
+    from promote import _require_branch
+
+    hub = tmp_path / "hub"
+    subprocess.run(["git", "init", "-q", "--bare", str(hub)], check=True)
+    seed = tmp_path / "seed"
+    seed.mkdir()
+    for cmd in (
+        ["git", "init", "-q"],
+        ["git", "config", "user.email", "t@t"],
+        ["git", "config", "user.name", "t"],
+    ):
+        subprocess.run(cmd, cwd=seed, check=True)
+    (seed / "a.txt").write_text("one\n")
+    subprocess.run(["git", "add", "-A"], cwd=seed, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "one"], cwd=seed, check=True)
+    subprocess.run(["git", "branch", "-M", "main"], cwd=seed, check=True)
+    subprocess.run(["git", "remote", "add", "origin", str(hub)], cwd=seed, check=True)
+    subprocess.run(["git", "push", "-q", "origin", "main"], cwd=seed, check=True)
+
+    clone = tmp_path / "clone"
+    subprocess.run(["git", "clone", "-q", "-b", "main", str(hub), str(clone)], check=True)
+
+    # The origin base advances AFTER the clone was made.
+    (seed / "b.txt").write_text("two\n")
+    subprocess.run(["git", "add", "-A"], cwd=seed, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "two"], cwd=seed, check=True)
+    subprocess.run(["git", "push", "-q", "origin", "main"], cwd=seed, check=True)
+
+    def head(ref):
+        return subprocess.run(
+            ["git", "rev-parse", ref], cwd=clone, capture_output=True, text=True, check=True
+        ).stdout.strip()
+
+    stale = head("main")
+    _require_branch(clone, "main")
+    assert head("main") == head("origin/main")
+    assert head("main") != stale, "the stale local base must be fast-forwarded to origin"
+
+    # A DIVERGED local base is left untouched (never a force-update): the push guard names it.
+    (clone / "local.txt").write_text("local\n")
+    subprocess.run(["git", "add", "-A"], cwd=clone, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "local-only"], cwd=clone, check=True)
+    diverged = head("main")
+    _require_branch(clone, "main")
+    assert head("main") == diverged
+
+
+def test_promote_retries_after_a_recorded_failed_attempt(tmp_path):
+    """The pre-push failure class must not wedge the run: a failed attempt records a FAILED
+    command and leaves the row ``promoting``; a retry (same candidate, the failed row on the
+    journal) re-enters the claim, lands the push, and closes the row to ``merged``."""
+    from agentic_dynamics.control.control_db import ControlDB, RunState
+
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    path, db_path, run_id = _seed_bound_run(tmp_path, wt)
+
+    def refuse_push(*_a, **_k):
+        raise RuntimeError("squash failed: add/add conflict in notes/plan.md")
+
+    args = _promote_args(tmp_path, wt, path, dry_run=False, db=str(db_path))
+    with pytest.raises(RuntimeError, match="squash failed"):
+        _run_promotion(
+            args,
+            push=refuse_push,
+            emit_decision=lambda d: {"observation_id": "obs-retry"},
+            emit_act=lambda d, causes: None,
+            record_decision=lambda d: None,
+        )
+
+    with ControlDB.open_read_only(db_path) as db:
+        # The wedged state is PINNED as evidence: only a recorded-failure retry may leave it.
+        assert db.get_run(run_id).state == RunState.PROMOTING
+        assert [c.state for c in db.commands(run_id=run_id)] == ["failed"]
+
+    retry_args = _promote_args(tmp_path, wt, path, dry_run=False, db=str(db_path))
+    _run_promotion(
+        retry_args,
+        push=lambda workdir, base, subject, candidate: _PUSHED,
+        emit_decision=lambda d: {"observation_id": "obs-retry"},
+        emit_act=lambda d, causes: None,
+        record_decision=lambda d: None,
+    )
+    with ControlDB.open_read_only(db_path) as db:
+        assert db.get_run(run_id).state == RunState.MERGED
+        assert [c.state for c in db.commands(run_id=run_id)] == ["failed", "completed"]
+
+
+def test_promoting_row_without_a_recorded_failure_still_refuses(tmp_path):
+    """The exclusivity primitive survives: a ``promoting`` row whose journal carries no
+    failure (a live claim elsewhere) refuses the re-entry and never reaches a push."""
+    from agentic_dynamics.control.control_db import ControlDB, RunState
+
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    path, db_path, run_id = _seed_bound_run(tmp_path, wt)
+    sha = _candidate_sha(wt)
+    with ControlDB.open(db_path) as db:
+        db.transition_run(run_id, RunState.PROMOTING, actor="promote", reason="test claim")
+        db.record_command_intent(
+            "promote",
+            actor="another-promoter",
+            rationale="in-flight claim",
+            run_id=run_id,
+            candidate_sha=sha,
+            target_kind="run",
+            target_id=run_id,
+            idempotency_key=f"promote:promote_test:{sha[:12]}",
+            detail={},
+        )
+
+    pushed = []
+
+    def boom_push(*a, **k):
+        pushed.append(True)
+        raise AssertionError("an unrecorded-failure promoting row must never be pushed")
+
+    args = _promote_args(tmp_path, wt, path, dry_run=False, db=str(db_path))
+    with pytest.raises(_PromoteRefusedError, match="already promoting"):
+        _run_promotion(
+            args,
+            push=boom_push,
+            emit_decision=lambda d: {"observation_id": "obs-x"},
+            emit_act=lambda d, causes: None,
+            record_decision=lambda d: None,
+        )
+    assert pushed == []
