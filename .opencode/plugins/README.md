@@ -37,8 +37,21 @@ it serves) for `agentic-dynamics session cache-report`.
 
 **Enforcement status.** The plugin's `tool.execute.before` refusal is a convenience and an
 early warning only — it is not the safety property. The REQUIRED enforcement — refusing an
-unbound consequential submit at the backend itself (submit contract, admission, promote
-gate), with or without the plugin loaded) — is **Unit D behavior and is NOT implemented yet**.
-An absent or failed plugin degrades to thinner context, and there is NO backend binding
-refusal to fall back on. Do not describe the plugin as authority, and do not claim
-enforcement that is not present.
+unbound consequential submit at the backend itself, with or without the plugin loaded — is
+**implemented (Unit D) and live**: the submit contract
+(`scripts/fleet/spawn_wrapper.py`'s `_validate_aio_binding`, invoked by `validate-submit`) is
+re-run STRICTLY by the host launch broker before the launch effect, and it resolves the binding
+from the durable store **by native session id** — a claimed `binding_id` is never proof: the
+resolved agent, the authorization identity, the task revision, and the binding's project must
+all match the store, or the submit is refused by name. Conversation capacity is attached as an
+ADVISORY verdict only (2026-09-16 policy) — never an authorization field.
+
+Live-proven 2026-09-22 (both directions, against the real store):
+
+* a forged `binding_id` → `validate-submit` refuses: *"aio.binding_id 000000000000… does not
+  match the binding's authorization identity c5d2c2031cf4… — a claimed id is not proof of
+  binding"*;
+* the genuine binding → `ok: true`, with `aio_capacity: {verdict: OK, advisory: true}`.
+
+An absent or failed plugin still degrades to thinner context — and now the backend refusal
+stands on its own, which is what makes the binding an authorization rather than a convention.
