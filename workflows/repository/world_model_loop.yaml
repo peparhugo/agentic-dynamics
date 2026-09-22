@@ -72,8 +72,11 @@ workflow:
         prompt: |
           You are the EXECUTE phase. Implement the task ({goal}) FOLLOWING `notes/plan.md`.
 
-          Where reality differs from the plan or the world model, do not silently adapt: record
-          it in `notes/deviations.md` (what the plan said, what was true, what you did instead).
+          ALWAYS write `notes/deviations.md` — unconditionally. Where reality differs from the
+          plan or the world model, do not silently adapt: record it there (what the plan said,
+          what was true, what you did instead). When nothing deviated, still write the file with
+          the explicit-empty record `no deviations`. Never skip the write: a stale note left in
+          the slot from a prior run is worse than no note.
           Create the tests the plan names; run the local verification commands it lists.
           Commit your work.
       - name: g_test_gate
@@ -92,9 +95,14 @@ workflow:
         kind: agent
         scope: proposal_write
         timeout: 1800
-        requires_files: [notes/world_model.md, notes/plan.md]
+        requires_files: [notes/world_model.md, notes/plan.md, notes/deviations.md]
         prompt: |
           You are the POSTERIOR phase of the world-model loop. The task was: {goal}
+
+          Before trusting any inherited note, check its provenance: run
+          `git log -1 -- notes/<file>` for each note you read. A note whose last commit is not
+          a commit of THIS run is stale and describes a different task — name it as an unknown,
+          never treat it as this run's reality.
 
           Read `notes/world_model.md`, `notes/plan.md`, `notes/deviations.md`, and the run's
           commits (`git log`, `git diff`). Do NOT change code. WRITE `notes/posterior.md`:

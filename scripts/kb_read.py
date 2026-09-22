@@ -10,7 +10,11 @@ engine:
   legs) with the scope's exact filters, printing what a step would retrieve;
 * ``--contains PHRASE``: a deterministic, service-free substring scan over the durable
   artifacts (``experiments/results/kb/<id>.json`` selected via ``registry_index.jsonl``);
-  the ranked path falls back to it automatically when the services are unreachable.
+  the ranked path falls back to it automatically when the services are unreachable;
+* when BOTH paths are unavailable (the ranked pipeline is down AND the durable registry is
+  absent), the verb reports mode ``unavailable`` rather than crashing — the reader records
+  which mode answered, and an unreadable KB is never rendered as "no matches"
+  (kb-read-degradation-crash).
 
 Scope semantics (the cell rule): ``--scope`` defaults to ``self-<cwd name>`` (FINOPS_CELL_ID
 overrides the name); a non-empty explicit ``--scope`` is the SHARED-scope override; ``--acl``
@@ -90,13 +94,36 @@ def _ranked(args: argparse.Namespace) -> list[dict] | None:
     return out[: args.limit]
 
 
+def registry_present() -> bool:
+    """Whether the durable registry index exists in this checkout.
+
+    The ranked path's availability is environment-dependent; so is the ``--contains``
+    fallback's. An ABSENT registry is a degraded read mode (report it as unavailable), never a
+    traceback and never "no matches" — the two are different facts (kb-read-degradation-crash).
+    """
+    return REGISTRY.is_file()
+
+
 def _contains(args: argparse.Namespace) -> list[dict]:
-    """Deterministic substring scan over the durable artifacts (no services required)."""
+    """Deterministic substring scan over the durable artifacts (no services required).
+
+    Degrades to ZERO hits when the registry is absent or unreadable — the function is called
+    both by the fallback path and directly by tests, so it must never raise for a missing
+    artifact store (kb-read-degradation-crash). The CALLER distinguishes an empty result from
+    an unavailable store via :func:`registry_present`.
+    """
+    if not registry_present():
+        return []
     needle = args.query.casefold()
     out: list[dict] = []
     # Newest-first: the registry is append-only chronological, and a reader usually wants
     # recent knowledge — this also keeps a common read cheap on a large corpus.
-    lines = REGISTRY.read_text(encoding="utf-8").splitlines()
+    try:
+        lines = REGISTRY.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        # A present-but-unreadable registry (permissions, IO) is still not a crash for a
+        # reader; the caller reports the unavailable mode on top of the empty result.
+        return []
     for line in reversed(lines):
         try:
             row = json.loads(line)
@@ -161,11 +188,18 @@ def main() -> int:
     args.scope = args.scope or _default_scope()
     args.acl = args.acl or args.scope
 
-    hits = None if args.contains else _ranked(args)
-    if hits is None:
+    # Three read modes, and the mode that ANSWERED is always recorded (kb-read-degradation-crash):
+    #   ranked      — the ranked pipeline answered (rows or a legitimate zero);
+    #   contains    — the fallback scan answered because the ranked path was unavailable;
+    #   unavailable — BOTH paths failed: the durable registry is absent (or unreadable), so the
+    #                 reader cannot distinguish "empty KB" from "unreadable KB" — report the
+    #                 degraded mode, never a traceback and never a silent "no matches".
+    ranked = None if args.contains else _ranked(args)
+    if ranked is None:
         hits = _contains(args)
-        mode = "contains"
+        mode = "contains" if registry_present() else "unavailable"
     else:
+        hits = ranked
         mode = "ranked"
 
     if args.json:
@@ -189,7 +223,12 @@ def main() -> int:
         for h in hits:
             print(f"  {str(h['id'])[:16]} | {h['source_type']} | {h['authority']} | {h['locator']}")
             print(f"      {h['text'][:220]}")
-        if not hits:
+        if mode == "unavailable":
+            print(
+                f"  (KB read UNAVAILABLE — neither ranked retrieval nor the deterministic scan "
+                f"could answer: registry absent at {REGISTRY}. This is NOT 'no matches'.)"
+            )
+        elif not hits:
             print(
                 "  (zero hits — check the scope: the scope pre-filter is an exact match, so a "
                 "mismatched scope returns nothing. See docs/reviews/retrieval_audit.md)"

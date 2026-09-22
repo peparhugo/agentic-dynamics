@@ -191,6 +191,24 @@ not a hard prerequisite the script itself checks for.
   gate, candidate, spec, and phase (prepare it with `scripts/approve_workflow.py`; a foreign
   or stale binding refuses with zero dispatch).
 
+### Run notes in world-model loops (fixed-path notes)
+
+The world-model loop's phases communicate through FIXED-PATH notes (`notes/world_model.md`,
+`notes/plan.md`, `notes/deviations.md`). Two conventions make those paths safe to trust:
+
+- **Always write the conditional note; explicit-empty when the condition is false.** The execute
+  phase orders `notes/deviations.md`, and a run with no deviations must still write the file
+  with an explicit-empty `no deviations` record — a stale file left in the slot from a prior run
+  is worse than no file. The read side is ENFORCED by the spec, not merely asked for: the
+  posterior's `requires_files` includes `notes/deviations.md`, so `_missing_required_files`
+  (`src/agentic_dynamics/runtime/workflow_runner.py`) REFUSES before spend when execute skipped
+  it, instead of letting the posterior trust a prior task's document.
+- **Check a note's provenance before trusting it.** Run `git log -1 -- notes/<file>` for every
+  inherited note. A note whose last commit is not a commit of THIS run is stale and describes a
+  different task — name it as an unknown, never treat it as this run's reality. The loop's
+  posterior prompt carries this check; it travels with the skill so it is not mistaken for a
+  spec-only detail.
+
 ### Ordering
 
 1. (Optional, fast-fail) Run the `compile_experiment` `validate` snippet against the spec. Fix

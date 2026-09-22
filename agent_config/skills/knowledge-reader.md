@@ -39,6 +39,20 @@ scope", not "empty KB". `acl_scope` defaults to the scope value.
 3. **Control Room** (read-only HTTP, when the portal runs): `GET /api/registry`,
    `GET /api/registry/<entity_id>`.
 
+### Read modes — always record which one answered
+
+The reader verb has three modes, and reports the one that produced (or failed to produce) the
+rows — in the human line and in the `--json` `mode` field:
+
+- `ranked` — the ranked retrieval pipeline answered (rows, or a legitimate zero);
+- `contains` — the services were unreachable (or `--contains` was passed) and the deterministic
+  artifact scan over `registry_index.jsonl` answered;
+- `unavailable` — NEITHER path could answer, e.g. the durable registry is absent in this
+  checkout. This is reported explicitly, never as a traceback and never as "no matches": an
+  **empty KB** and an **unreadable KB** are different facts, and a reader that cannot tell them
+  apart will mis-cite absence as evidence of no matches (kb-read-degradation-crash). When a run
+  cannot answer, record the degraded mode in its notes, not a silent zero.
+
 ## Reader etiquette
 
 - Read `current` lifecycle rows by default; cite `knowledge_id`s exactly.
