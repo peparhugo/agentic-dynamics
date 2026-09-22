@@ -5,14 +5,12 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import pytest
-
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from agentic_dynamics.control.control_db import ControlDB, RunState  # noqa: E402
-
 import abandon_run as ar  # noqa: E402
+
+from agentic_dynamics.control.control_db import ControlDB, RunState  # noqa: E402
 
 
 def _db(tmp_path: Path) -> ControlDB:
