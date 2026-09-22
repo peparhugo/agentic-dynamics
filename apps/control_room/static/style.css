@@ -3084,6 +3084,48 @@ textarea:focus {
   color: var(--text-faint);
 }
 
+/* Each documented operator state remains visible at rest.  Cards use the payload's named
+   availability state, so an unavailable read cannot collapse into the same visual as an empty
+   but successfully recorded state. */
+.state-screen-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--cr-space-2);
+}
+
+.state-screen {
+  min-width: 0;
+  padding: var(--cr-space-2);
+  border: 1px solid var(--cr-line-subtle);
+  border-radius: var(--cr-radius-sm);
+  background: var(--cr-surface-inset);
+}
+
+.state-screen h4 {
+  margin: 0;
+  font-size: var(--fs-eyebrow);
+  letter-spacing: 0.08em;
+}
+
+.state-screen[data-state="unavailable"] h4 {
+  color: var(--status-unknown);
+}
+
+.state-screen-run {
+  display: block;
+  max-width: 100%;
+  margin-top: var(--cr-space-1);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--cr-accent);
+  font-family: var(--font-mono);
+  font-size: var(--fs-eyebrow);
+  overflow-wrap: anywhere;
+  text-align: left;
+  cursor: pointer;
+}
+
 /* ── 13b. The truth strip — source + age provenance, or a labelled unknown ──────────────────── */
 .truth-strip {
   display: flex;

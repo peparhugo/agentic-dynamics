@@ -116,12 +116,29 @@ def test_operations_board_renders_the_packet_fields_it_claims():
         "data.source",
         "active_runs",
         "promotable_runs",
+        "run_rows",
+        "state_screens",
+        "started.age",
         "data.attention",
         "data.degraded",
         "projection_lag",
         "unhealthy_workers",
     ):
         assert anchor in app, f"the restored Operations renderer does not read {anchor}"
+
+
+def test_operations_board_does_not_rederive_attention_order_or_age():
+    """Urgency and age are server read-model fields, not browser-clock calculations."""
+    app = (STATIC / "app.js").read_text(encoding="utf-8")
+    roster = app[app.index("function runLeads") : app.index("function runRoster")]
+    assert 'entry["attention.rank"]' in roster
+    assert "Date.now()" not in roster
+    assert (
+        "runs.sort"
+        not in app[
+            app.index("function renderOperations") : app.index("async function openRunDetail")
+        ]
+    )
 
 
 def test_non_home_boards_start_hidden_so_one_board_shows_at_rest():
@@ -218,7 +235,7 @@ def test_run_drawer_renders_the_run_inspection_blocks():
         "dataset.deliveredPhase",
         "dataset.preparedStepPath",
         "selected — use not established",
-        'tr.dataset.state',
+        "tr.dataset.state",
     ):
         assert anchor in app, anchor
 

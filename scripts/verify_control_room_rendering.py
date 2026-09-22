@@ -2483,6 +2483,10 @@ BOARDS_PROBE_JS = r"""
     operationsLoaded: (() => { const el = document.getElementById('operations-content');
       return el ? el.dataset.loaded : null; })(),
     operationsText: text('#operations-content'),
+    stateScreens: Array.from(document.querySelectorAll('#operations-content [data-state-screen]'))
+      .map((node) => ({name: node.getAttribute('data-state-screen') || '',
+        state: node.getAttribute('data-state') || '',
+        text: (node.innerText || node.textContent || '').trim()})),
     surfacesLoaded: (() => { const el = document.getElementById('surfaces-content');
       return el ? el.dataset.loaded : null; })(),
     surfacePanels: surfacePanels,
@@ -2517,6 +2521,8 @@ DRAWER_PROBE_JS = r"""
   const logState = content.querySelector('[data-log-state]');
   const logEntries = content.querySelectorAll('[data-log-entry]');
   const logFollow = content.querySelector('[data-log-follow]');
+  const started = Array.from(content.querySelectorAll('.metric-card')).find((card) =>
+    (card.querySelector('.metric-label')?.textContent || '').trim() === 'Started');
   return {
     present: true,
     text: text,
@@ -2525,6 +2531,7 @@ DRAWER_PROBE_JS = r"""
     deliveredPhase: delivered ? delivered.dataset.deliveredPhase : null,
     deliveredText: deliveredText,
     preparedPath: prepared ? prepared.dataset.preparedStepPath : null,
+    startedText: started ? (started.querySelector('.metric-value')?.textContent || '').trim() : null,
     hasUnknownTiming: Boolean(unknownTiming),
     logState: logState ? logState.dataset.logState : null,
     logEntryCount: logEntries.length,
@@ -2568,6 +2575,28 @@ def build_operations_payload(degraded: bool = False) -> dict[str, Any]:
         runs.append(row)
     payload["active_runs"] = runs[:active_count]
     payload["promotable_runs"] = runs[active_count:]
+    # The real service emits these row facets after joining the packet reference to its recorded
+    # detail.  Apply the same deterministic fixture join so the acceptance page exercises the
+    # server-owned attention/order contract rather than asking app.js to reconstruct it.
+    attention_by_run = {
+        str(item.get("run_id")): item for item in payload.get("attention", []) if item.get("run_id")
+    }
+    screen_by_run = {
+        str(run_id): screen.get("name")
+        for screen in payload.get("state_screens", [])
+        for run_id in screen.get("run_ids", [])
+    }
+    for row in runs + list(payload.get("failed_runs", [])):
+        attention = attention_by_run.get(row.get("run_id"))
+        screen = screen_by_run.get(row.get("run_id"))
+        row["attention.state"] = "active" if attention else row.get("attention.state", "none")
+        row["attention.kind"] = (attention or {}).get("kind", row.get("attention.kind", "none"))
+        row["attention.rank"] = 0 if attention or screen in {"blocked", "stalled", "failed"} else 1
+        row["state.screen"] = screen or row.get("state.screen", "running")
+    payload["run_rows"] = sorted(
+        runs + list(payload.get("failed_runs", [])),
+        key=lambda row: (int(row.get("attention.rank", 1)), str(row.get("run_id") or "")),
+    )
     return payload
 
 
@@ -2611,6 +2640,9 @@ def check_boards_fixtures() -> list[str]:
     ):
         if key not in detail:
             problems.append(f"boards fixture: run_detail missing derived block {key!r}")
+    display = detail.get("display") or {}
+    if display.get("started_age") != "4d ago" or display.get("started_age_seconds") != 345600:
+        problems.append("boards fixture: run_detail must carry the server-measured started age")
     cost = detail.get("cost") or {}
     if cost.get("provenance") != "$0.0000 \u00b7 metered":
         problems.append(
@@ -2652,6 +2684,26 @@ def check_boards_fixtures() -> list[str]:
             problems.append(
                 f"boards fixture: attention references unknown run {item.get('run_id')!r}"
             )
+    screens = normal.get("state_screens") or []
+    if [screen.get("name") for screen in screens] != [
+        "running",
+        "blocked",
+        "stalled",
+        "failed",
+        "escalated",
+        "done",
+    ]:
+        problems.append("boards fixture: state_screens must name all six operator states in order")
+    for screen in screens:
+        if screen.get("state") != "recorded":
+            problems.append(f"boards fixture: state screen {screen.get('name')!r} is not recorded")
+        if not screen.get("reason"):
+            problems.append(f"boards fixture: state screen {screen.get('name')!r} has no reason")
+    enriched = {row.get("run_id"): row for row in rows + normal.get("failed_runs", [])}
+    for row in enriched.values():
+        for field in ("attention.state", "attention.rank", "started.age", "state.screen"):
+            if row.get(field) in (None, ""):
+                problems.append(f"boards fixture: run {row.get('run_id')!r} missing {field}")
     degraded = build_operations_payload(True)
     if not degraded.get("degraded"):
         problems.append("boards fixture: the degraded variant carries no degraded surfaces")
@@ -2982,6 +3034,26 @@ def _check_board_loading(
         probe = page.evaluate(BOARDS_PROBE_JS)
         if board == "operations" and not probe["operationsText"]:
             _row(errors, label, "loading", board, "the operations board rendered no content")
+        if board == "operations":
+            expected_states = ["running", "blocked", "stalled", "failed", "escalated", "done"]
+            names = [screen["name"] for screen in probe["stateScreens"]]
+            if names != expected_states:
+                _row(
+                    errors,
+                    label,
+                    "loading",
+                    "operations-state-screens",
+                    f"state screens {names!r} want {expected_states!r}",
+                )
+            for state in expected_states:
+                if state.upper() not in probe["operationsText"]:
+                    _row(
+                        errors,
+                        label,
+                        "loading",
+                        "operations-state-screen",
+                        f"the Operations board did not render the {state} screen",
+                    )
         if board == "surfaces" and not probe["surfacePanels"]:
             _row(errors, label, "loading", board, "the surfaces board rendered no panels")
         if board == "routing":
@@ -3157,6 +3229,17 @@ def _check_board_degraded(
             "degraded",
             "operations-attention",
             "the attention/runs sections must say the database could not be read",
+        )
+    unavailable_screens = [
+        screen for screen in probe["stateScreens"] if screen["state"] == "unavailable"
+    ]
+    if len(unavailable_screens) != 6:
+        _row(
+            errors,
+            label,
+            "degraded",
+            "operations-state-screens",
+            f"degraded Operations must name all six unavailable state screens, got {unavailable_screens!r}",
         )
     if screenshots:
         shot = out / "boards_degraded_operations_desktop_dark_1440x900.png"
@@ -3651,6 +3734,14 @@ def _check_board_keyboard(
                         "drawer-prepared",
                         "the drawer must show the prepared-step reference",
                     )
+                if drawer.get("startedText") != "4d ago":
+                    _row(
+                        errors,
+                        label,
+                        "keyboard",
+                        "drawer-age",
+                        f"the drawer must render the server-measured age, got {drawer.get('startedText')!r}",
+                    )
                 if not drawer.get("hasUnknownTiming"):
                     _row(
                         errors,
@@ -3801,7 +3892,8 @@ def boards_coverage(*, legacy_ran: bool = False) -> dict[str, list[str]]:
         "horizontal overflow, every board captured (desktop dark+light, narrow dark)",
         "loading: first visit and reload for Operations/Surfaces/Routing; each endpoint "
         "requested exactly once; rendered fixture values asserted; delayed and failed routing "
-        "responses settle (loading state refused by the readiness predicate)",
+        "responses settle (loading state refused by the readiness predicate); Operations renders "
+        "all six named state screens",
         "degraded: an unreadable control db reads 'unavailable', never 0; a failed read model "
         "names its reason and URL while its siblings render",
         "scrolling: real wheel input reaches the last below-fold run row; an overflow-y:hidden "
@@ -3809,8 +3901,8 @@ def boards_coverage(*, legacy_ran: bool = False) -> dict[str, list[str]]:
         "keyboard: Enter opens the run drawer with focus on its close control; Escape closes it "
         "and returns focus to the originating row; the loaded drawer renders the run-inspection "
         "blocks (measured-zero and unknown cost provenance, independent verification separate "
-        "from the agent's claim, delivered-knowledge ids, the prepared-step reference, an "
-        "unknown-state timing), and a 200 error envelope renders by name",
+        "from the agent's claim, delivered-knowledge ids, the prepared-step reference, the "
+        "server-measured age, an unknown-state timing), and a 200 error envelope renders by name",
     ]
     omitted: list[str] = []
     if legacy_ran:

@@ -106,6 +106,23 @@ def test_attention_is_a_projection_of_the_packet(tmp_path):
     assert snapshot["active_runs"] == list(packet["active_runs"])
     assert snapshot["projection_lag"] == packet["projection_lag"]
 
+    # The additive board projection carries the same packet rows plus server-owned urgency,
+    # state-screen, and age facets.  The browser must consume these fields rather than calculate
+    # its own order or wall-clock age.
+    views = {row["run_id"]: row for row in snapshot["run_rows"]}
+    assert views[awaiting_id]["attention.state"] == "active"
+    assert views[awaiting_id]["attention.rank"] == 0
+    assert views[awaiting_id]["state.screen"] == "blocked"
+    assert views[awaiting_id]["started.age"].endswith(" ago")
+    assert [screen["name"] for screen in snapshot["state_screens"]] == [
+        "running",
+        "blocked",
+        "stalled",
+        "failed",
+        "escalated",
+        "done",
+    ]
+
 
 def test_absent_data_stays_absent_and_degraded_is_named(tmp_path):
     with _db(tmp_path) as db:
@@ -592,5 +609,3 @@ def test_read_run_logs_matches_an_inflight_job_by_spec_and_time():
         redis, "run-inflight", spec_name="other", started_at="1970-01-01T00:33:30Z"
     )
     assert other["state"] == "unbound"
-
-

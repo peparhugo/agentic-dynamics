@@ -155,6 +155,11 @@ class ControlRoomServices:
                 "attention": [],
                 "active_runs": [],
                 "promotable_runs": [],
+                "failed_runs": [],
+                "run_rows": [],
+                "state_screens": ops._state_screens(
+                    [], unavailable_reason=f"{type(exc).__name__}: {exc}"
+                ),
                 "unhealthy_workers": [],
                 "projection_lag": {},
                 "safe_actions": [],

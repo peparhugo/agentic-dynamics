@@ -12,7 +12,30 @@
       "phases_total": 2,
       "model": "deepseek/deepseek-v4-flash",
       "candidate_sha": "bc2c728633273947d278f285c2e8929946aaa082",
-      "started_at": "2026-09-18T19:18:09Z"
+      "started_at": "2026-09-18T19:18:09Z",
+      "session.identity": "run-fixture-seed",
+      "spec.cell": "unknown",
+      "terminal.target": "unknown",
+      "command.current": "control_room_followups",
+      "model.provider": "deepseek/deepseek-v4-flash",
+      "attempt.number": "unknown",
+      "phase.progress": "2/2",
+      "lifecycle.state": "running",
+      "run.live": "live",
+      "source.commit": "bc2c72863327",
+      "cost.provenance": "unknown",
+      "attention.state": "none",
+      "attention.kind": "none",
+      "attention.rank": 1,
+      "evidence.advisory": "narration unknown",
+      "evidence.measured": "test result unknown",
+      "evidence.source": "commit bc2c72863327",
+      "decision.eligibility": "inspect",
+      "decision.receipt": "missing",
+      "started.age": "8m ago",
+      "started_age_seconds": 480,
+      "state.screen": "running",
+      "state.reason": "the run is in the execution path"
     },
     "active_count": 6,
     "promotable_count": 12,
@@ -45,6 +68,33 @@
         "session_id": "ses_fixture_stale",
         "age_seconds": 845
       }
+    ],
+    "failed_runs": [
+      {
+        "run_id": "run-fixture-0008",
+        "spec_name": "control_room_followups",
+        "state": "failed",
+        "candidate_sha": "bc2c728633273947d278f285c2e8929946aaa082",
+        "model": "deepseek/deepseek-v4-flash",
+        "started_at": "2026-09-18T19:18:09Z",
+        "phases_completed": 1,
+        "phases_total": 2,
+        "state.screen": "failed",
+        "state.reason": "the run reached a terminal failure",
+        "attention.state": "active",
+        "attention.kind": "failed",
+        "attention.rank": 0,
+        "started.age": "4d ago",
+        "started_age_seconds": 345600
+      }
+    ],
+    "state_screens": [
+      {"name": "running", "state": "recorded", "reason": "the run is in the execution path", "run_ids": ["run-fixture-0002"]},
+      {"name": "blocked", "state": "recorded", "reason": "the run is paused for an operator decision", "run_ids": ["run-fixture-0007"]},
+      {"name": "stalled", "state": "recorded", "reason": "the supervisor marked the run stalled", "run_ids": ["run-fixture-0003"]},
+      {"name": "failed", "state": "recorded", "reason": "the run reached a terminal failure", "run_ids": ["run-fixture-0008"]},
+      {"name": "escalated", "state": "recorded", "reason": "an escalation tier change is recorded", "run_ids": ["run-fixture-0004"]},
+      {"name": "done", "state": "recorded", "reason": "the run reached the permanence or publication path", "run_ids": ["run-fixture-0001"]}
     ]
   },
   "operations_degraded": {
@@ -62,7 +112,16 @@
       }
     ],
     "projection_lag": {},
-    "unhealthy_workers": []
+    "unhealthy_workers": [],
+    "failed_runs": [],
+    "state_screens": [
+      {"name": "running", "state": "unavailable", "reason": "control database not found", "run_ids": []},
+      {"name": "blocked", "state": "unavailable", "reason": "control database not found", "run_ids": []},
+      {"name": "stalled", "state": "unavailable", "reason": "control database not found", "run_ids": []},
+      {"name": "failed", "state": "unavailable", "reason": "control database not found", "run_ids": []},
+      {"name": "escalated", "state": "unavailable", "reason": "control database not found", "run_ids": []},
+      {"name": "done", "state": "unavailable", "reason": "control database not found", "run_ids": []}
+    ]
   },
   "run_detail": {
     "schema": "control-room-run-detail/v1",
@@ -80,6 +139,10 @@
       "result_digest": "",
       "parent_run_id": "",
       "family_id": ""
+    },
+    "display": {
+      "started_age": "4d ago",
+      "started_age_seconds": 345600
     },
     "attempts": [
       {
@@ -289,6 +352,10 @@
       "result_digest": "",
       "parent_run_id": "",
       "family_id": ""
+    },
+    "display": {
+      "started_age": "age unknown",
+      "started_age_seconds": null
     },
     "attempts": [],
     "gates": [],

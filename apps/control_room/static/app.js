@@ -3111,11 +3111,9 @@
   }
 
   /**
-   * The attention facet: `active` when the packet's attention (decisions-owed) block lists this
-   * run, else `none`. The block is the emitted evidence; the kind it carries is the chip word,
-   * and the attention axis is the SHIPPED `flag-status-*` vocabulary — never the lifecycle's
-   * (`board-fleet.js` keeps the two axes apart on purpose). No `unknown` attention member is
-   * invented: `active`/`none` is the packet's whole domain.
+   * The attention facet is emitted on each Operations row by the server-owned read model. The
+   * packet attention table remains the detailed source, but this row value is what prevents the
+   * board from re-deriving urgency and then disagreeing with its own ordering.
    */
   function runAttentionValue(entry) {
     if (!entry) {
@@ -3137,13 +3135,13 @@
   }
 
   /** True when the packet puts the run in decisions-owed, or its emitted state needs a human. */
-  function runLeads(entry, attentionEntry) {
-    if (attentionEntry) return true
-    return entry.state === "awaiting_approval" || entry.state === "failed"
+  function runLeads(entry) {
+    if (entry["attention.rank"] === 0) return true
+    return ["blocked", "stalled", "failed"].includes(entry["state.screen"])
   }
 
-  /** Build one E10 field's value node from the packet row. Never re-derives a packet value. */
-  function runFieldValue(field, entry, attentionByRun) {
+  /** Build one E10 field's value node from the server-enriched Operations row. */
+  function runFieldValue(field, entry) {
     switch (field) {
       case "session.identity":
         return runValue(entry.run_id || "unknown", { identifier: true })
@@ -3167,17 +3165,22 @@
           : runUnknown("no candidate_sha emitted")
       }
       case "attention.state":
-        return runAttentionValue(attentionByRun.get(entry.run_id) || null)
+        return entry["attention.state"] === "active"
+          ? runAttentionValue({
+              kind: entry["attention.kind"] || "attention",
+              reason: entry["state.reason"] || "attention emitted by the read model",
+            })
+          : runAttentionValue(null)
       case "started.age":
-        return entry.started_at
-          ? runValue(formatAge(entry.started_at))
-          : runUnknown("no started_at emitted")
+        return entry["started.age"]
+          ? runValue(entry["started.age"])
+          : runUnknown("the server did not emit a measured age")
       default:
-        // run.live / terminal.target / attempt.number / cost.provenance / decision.eligibility /
-        // decision.receipt / evidence.advisory: facets the served /api/operations row does not
-        // carry. A labelled unknown is the honest render; the escalation to bind /api/glance is
-        // recorded in the run's decision record, not adopted silently here.
-        return runUnknown()
+        // These facets are part of the server's additive row projection.  A missing key remains a
+        // labelled unknown for compatibility with a degraded or older payload.
+        return entry[field] === null || entry[field] === undefined || entry[field] === ""
+          ? runUnknown()
+          : runValue(entry[field])
     }
   }
 
@@ -3188,24 +3191,23 @@
    * scrolling and keyboard classes depend on all four); the layout inside the single cell is a
    * responsive field grid so nothing is clipped and the page never overflows horizontally.
    */
-  function runRoster(captionText, runs, attentionByRun) {
+  function runRoster(captionText, runs) {
     const wrap = element("div", "run-roster")
     const table = element("table", "run-table")
     table.appendChild(element("caption", "sr-only", captionText))
     const body = element("tbody")
     ;(runs || []).forEach((entry) => {
-      const attentionEntry = attentionByRun.get(entry.run_id) || null
       const tr = element("tr", "run-row")
       tr.dataset.runId = entry.run_id
       tr.tabIndex = 0
       tr.setAttribute("role", "button")
       tr.setAttribute("aria-label", `Open run ${entry.run_id} detail`)
-      if (runLeads(entry, attentionEntry)) tr.classList.add("run-row-leads")
+      if (runLeads(entry)) tr.classList.add("run-row-leads")
       const cell = element("td", "run-row-cell")
       cell.colSpan = RUN_HEADERS.length
       const fields = element("div", "run-fields")
       RUN_FIELDS.forEach(([field, label]) => {
-        fields.appendChild(runField(field, label, runFieldValue(field, entry, attentionByRun)))
+        fields.appendChild(runField(field, label, runFieldValue(field, entry)))
       })
       cell.appendChild(fields)
       tr.appendChild(cell)
@@ -3287,16 +3289,10 @@
     const source = data.source || {}
     const active = data.active_runs || []
     const promotable = data.promotable_runs || []
+    const failed = data.failed_runs || []
     const attention = data.attention || []
     const degraded = data.degraded || []
     const lag = data.projection_lag || {}
-    // The packet's own decisions-owed block, keyed by run, so each roster row can render its
-    // attention facet (the emitted evidence) instead of inventing one.
-    const attentionByRun = new Map()
-    attention.forEach((entry) => {
-      if (entry.run_id && !attentionByRun.has(entry.run_id)) attentionByRun.set(entry.run_id, entry)
-    })
-
     // A degraded control DB means every count derived from it reads "unavailable", never 0
     // (the payload is a legitimate HTTP 200 with empty arrays plus a named degradation).
     const dbDegraded = degraded.some((entry) => entry.surface === "control_db")
@@ -3358,28 +3354,62 @@
     children.push(attentionBlock)
 
     const runsBlock = element("section", "surface-block")
-    runsBlock.appendChild(element("h3", "", "Active + promotable runs"))
-    const runs = active.concat(promotable)
+    runsBlock.appendChild(element("h3", "", "Active + promotable + failed runs"))
+    const runs = Array.isArray(data.run_rows) ? data.run_rows.slice() : active.concat(promotable, failed)
     if (dbDegraded) {
       runsBlock.appendChild(
-        paragraph("Active and promotable runs unavailable — the control database could not be read."),
+        paragraph("Active, promotable, and failed runs unavailable — the control database could not be read."),
       )
     } else if (runs.length === 0) {
-      runsBlock.appendChild(paragraph("No active or promotable runs."))
+      runsBlock.appendChild(paragraph("No active, promotable, or failed runs."))
     } else {
-      // Blocked/failed runs lead (state screens §1: they are what needs the operator next).
-      // `Array.sort` is stable, so runs the packet does not flag keep the packet's own order.
-      const rank = (entry) => (runLeads(entry, attentionByRun.get(entry.run_id) || null) ? 0 : 1)
-      runs.sort((left, right) => rank(left) - rank(right))
+      // The service has already ordered these rows by its emitted attention rank.  Do not sort
+      // here: a second urgency opinion was the source of the old attention/order drift.
       runsBlock.appendChild(
         runRoster(
-          `Active and promotable runs — E10 fields: ${RUN_HEADERS.join(", ")}`,
+          `Active, promotable, and failed runs — E10 fields: ${RUN_HEADERS.join(", ")}`,
           runs,
-          attentionByRun,
         ),
       )
     }
     children.push(runsBlock)
+
+    const stateBlock = element("section", "surface-block state-screens")
+    stateBlock.appendChild(element("h3", "", "State screens"))
+    const screens = Array.isArray(data.state_screens) ? data.state_screens : []
+    if (!screens.length) {
+      stateBlock.appendChild(paragraph("State screens unavailable — the read model emitted none."))
+    } else {
+      const grid = element("div", "state-screen-grid")
+      screens.forEach((screen) => {
+        const card = element("article", "state-screen")
+        card.dataset.stateScreen = screen.name || "unknown"
+        card.appendChild(element("h4", "", String(screen.name || "unknown").toUpperCase()))
+        const state = String(screen.state || "unknown")
+        card.dataset.state = state
+        card.appendChild(
+          element(
+            "p",
+            "pane-note",
+            state === "recorded"
+              ? (screen.run_ids?.length ? `${screen.run_ids.length} run(s)` : screen.reason || "no runs")
+              : `${state} — ${screen.reason || "reason not recorded"}`,
+          ),
+        )
+        if (state === "recorded" && Array.isArray(screen.run_ids)) {
+          screen.run_ids.forEach((runId) => {
+            const link = element("button", "state-screen-run", String(runId))
+            link.type = "button"
+            link.dataset.runId = String(runId)
+            link.setAttribute("aria-label", `Open ${screen.name} run ${runId} detail`)
+            card.appendChild(link)
+          })
+        }
+        grid.appendChild(card)
+      })
+      stateBlock.appendChild(grid)
+    }
+    children.push(stateBlock)
 
     const lagBlock = element("section", "surface-block")
     lagBlock.appendChild(element("h3", "", "Projection lag"))
@@ -3463,7 +3493,7 @@
       ["State", run.state || "—"],
       ["Model", run.model || "—"],
       ["Candidate", run.candidate_sha ? String(run.candidate_sha).slice(0, 12) : "—"],
-      ["Started", run.started_at ? formatAge(run.started_at) : "—"],
+      ["Started", data.display?.started_age || "age unknown"],
       // The identity card shows the cost's PROVENANCE, never a bare number: an absent cost is
       // "unavailable" and a measured zero is the server's own "$0.0000 · metered" label.
       ["Cost", cost.provenance || "unavailable"],
@@ -4089,15 +4119,15 @@
   function bindSurfaceViews() {
     $("#operations-refresh").addEventListener("click", () => loadOperations(true))
     $("#operations-content").addEventListener("click", (event) => {
-      const row = event.target.closest("tr[data-run-id]")
-      if (row) openRunDetail(row.dataset.runId)
+      const target = event.target.closest("[data-run-id]")
+      if (target) openRunDetail(target.dataset.runId)
     })
     $("#operations-content").addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return
-      const row = event.target.closest("tr[data-run-id]")
-      if (!row) return
+      const target = event.target.closest("[data-run-id]")
+      if (!target) return
       event.preventDefault()
-      openRunDetail(row.dataset.runId)
+      openRunDetail(target.dataset.runId)
     })
     $("#run-detail-close").addEventListener("click", closeRunDetail)
     $("#run-detail-drawer").addEventListener("keydown", (event) => {
