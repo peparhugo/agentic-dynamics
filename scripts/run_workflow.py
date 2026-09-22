@@ -550,6 +550,15 @@ def main() -> None:
     ap.add_argument("--workdir", required=True, help="git worktree to run in")
     ap.add_argument("--backend", default=None, help="opencode | claude_cli (default: auto)")
     ap.add_argument("--thinking-effort", default="high")
+    ap.add_argument(
+        "--agent",
+        default="",
+        help=(
+            "the AGENT ROLE ordinary phases run as (L29; a roster name from "
+            "agent_config/agents/). Resolution: phase run_agent > workflow params.agent > "
+            "this default. Empty keeps the adapter's worker pin."
+        ),
+    )
     ap.add_argument("--thinking-budget-tokens", type=int, default=0)
     ap.add_argument("--output-token-limit", type=int, default=0)
     ap.add_argument("--timeout", type=int, default=1800, help="per-phase timeout (s)")
@@ -1065,6 +1074,7 @@ def _run_workflow_cli(
             thinking_budget_tokens=args.thinking_budget_tokens,
             output_token_limit=args.output_token_limit,
             timeout=args.timeout,
+            agent_default=args.agent,
             commit=not args.no_commit,
             resume=args.resume,
             resume_state=resume_state,
