@@ -50,6 +50,9 @@ def logs_block(
     raw_events: list[str] | None = None,
     total: int = 0,
     match: str = "",
+    job_id: str = "",
+    live_cell_id: str = "",
+    stream_match: str = "",
 ) -> dict[str, Any]:
     """The run's job-log block: a NAMED state, a bounded parsed tail, no fabricated values.
 
@@ -85,7 +88,73 @@ def logs_block(
         "count": int(total or 0),
         "history_capped": int(total or 0) >= EVENT_LOG_MAX,
         "match": match,
+        # The in-flight binding (2026-09-22): the run's FLEET JOB stream carries only the
+        # orchestrator's milestones; the sibling phase cells publish the agent's own events
+        # under ``events_log:<spec>:<phase>``. When a live phase stream is bound, ``cell_id``
+        # is that stream (what the drawer reads and Follow-live subscribes to) and
+        # ``job_id`` keeps the fleet identity named; ``stream_match`` names the basis.
+        "job_id": job_id,
+        "live_cell_id": live_cell_id,
+        "stream_match": stream_match,
     }
+
+
+def _event_epoch(value: Any) -> float | None:
+    """A tolerant event timestamp read in SECONDS (live events stamp milliseconds)."""
+    ts = _epoch(value)
+    if ts is None:
+        return None
+    return ts / 1000.0 if ts > 1e11 else ts
+
+
+def _live_phase_cell(redis_client: Any, spec_name: str, started_at: str) -> str:
+    """The phase-cell stream currently carrying this run's agent output (in-flight binding).
+
+    The fleet job's own stream carries only orchestrator milestones ("phase prior ok"); the
+    sibling cells publish their agent events under ``events_log:<spec>:<phase>``
+    (``FINOPS_CELL_ID``). For an IN-FLIGHT run the drawer should read and follow the newest
+    phase stream qualified by the run's own start, so "Follow live" shows the agent's output
+    and steps rather than the orchestrator's summary — the miss the 2026-09-22 review found
+    (the drawer followed the JOB stream and showed two events while the agent streamed
+    hundreds).
+
+    Best-effort and honest: an absent scan surface, an unreadable store, or no stream whose
+    newest event lands at/after the run's start returns ``""`` and the caller keeps the
+    job-stream binding (never a guessed neighbour).
+    """
+    if not spec_name:
+        return ""
+    started = _epoch(started_at) or 0.0
+    try:
+        keys = list(redis_client.scan_iter(match=f"{EVENT_LOG_PREFIX}{spec_name}:*", count=200))
+    except Exception:  # noqa: BLE001 — a store without the scan surface degrades to the job tail
+        return ""
+    best: tuple[float, str] | None = None
+    for key in keys:
+        try:
+            newest = redis_client.lindex(key, 0)
+        except Exception:  # noqa: BLE001
+            continue
+        if not newest:
+            continue
+        try:
+            event = json.loads(newest)
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(event, Mapping):
+            continue
+        part = event.get("part") if isinstance(event.get("part"), Mapping) else {}
+        ts = None
+        for candidate in (event.get("timestamp"), event.get("time"), part.get("time")):
+            ts = _event_epoch(candidate)
+            if ts:
+                break
+        if ts is None or ts + 1.0 < started:
+            continue
+        name = str(key)[len(EVENT_LOG_PREFIX):]
+        if best is None or ts > best[0]:
+            best = (ts, name)
+    return best[1] if best else ""
 
 
 def read_run_logs(
@@ -137,19 +206,30 @@ def read_run_logs(
             state="unbound",
             reason="no fleet job on the board references this run",
         )
+    # IN-FLIGHT (a job entry without a run_id — ``by_spec_time``): the job's own stream holds
+    # only orchestrator milestones, so bind the newest live PHASE stream — the agent's output
+    # and steps — for both the retained tail and Follow-live. Finished runs (``by_run_id``)
+    # keep the job tail: it carries every phase's milestone.
+    stream_cell = ""
+    if match == "by_spec_time":
+        stream_cell = _live_phase_cell(redis_client, spec_name, started_at)
+    read_cell = stream_cell or cell_id
     try:
-        raw = redis_client.lrange(f"{EVENT_LOG_PREFIX}{cell_id}", 0, limit - 1)
-        total = int(redis_client.llen(f"{EVENT_LOG_PREFIX}{cell_id}") or 0)
+        raw = redis_client.lrange(f"{EVENT_LOG_PREFIX}{read_cell}", 0, limit - 1)
+        total = int(redis_client.llen(f"{EVENT_LOG_PREFIX}{read_cell}") or 0)
     except Exception as exc:  # noqa: BLE001
         return logs_block(
-            cell_id=cell_id, state="unavailable", reason=f"{type(exc).__name__}: {exc}"
+            cell_id=read_cell, state="unavailable", reason=f"{type(exc).__name__}: {exc}"
         )
     return logs_block(
-        cell_id=cell_id,
+        cell_id=read_cell,
+        job_id=cell_id,
+        live_cell_id=stream_cell,
         state="recorded",
         raw_events=list(reversed(list(raw or []))),
         total=total,
         match=match,
+        stream_match="by_phase_time" if stream_cell else "",
     )
 
 

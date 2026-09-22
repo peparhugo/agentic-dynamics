@@ -3688,12 +3688,17 @@
   }
 
   /**
-   * The Logs block: the run's fleet-job event tail as the service resolved it.
+   * The Logs block: the run's event tail as the service resolved it.
    *
    * The service's own state is rendered verbatim: `recorded` renders the bounded tail and
    * offers the live follow; `unbound` / `unavailable` are NAMED with the service's reason —
    * never an empty success. The follow subscribes to the SAME `/api/events/<cell>` stream the
    * transcript panel uses (replay + live), so the drawer and the panel can never disagree.
+   *
+   * In-flight runs bind the newest live PHASE stream (the agent's own output and steps,
+   * `events_log:<spec>:<phase>`) and keep the fleet job named; finished runs show the job
+   * tail (every phase's milestone). The service names both (`job_id` / `cell_id` /
+   * `stream_match`) — the label below states which stream this is.
    */
   function renderRunLogs(logs) {
     const block = element("section", "surface-block")
@@ -3709,9 +3714,15 @@
       block.appendChild(note)
       return block
     }
+    const jobId = String(logs.job_id || "")
+    const cell = String(logs.cell_id || "")
+    const stream =
+      jobId && jobId !== cell
+        ? `stream ${cell} · ${logs.count} event(s) retained · job ${jobId}`
+        : `job ${cell} · ${logs.count} event(s) retained`
     note.textContent = logs.history_capped
-      ? `job ${logs.cell_id} · ${logs.count} event(s) retained (bounded window — older events evicted)`
-      : `job ${logs.cell_id} · ${logs.count} event(s) retained`
+      ? `${stream} (bounded window — older events evicted)`
+      : stream
     block.appendChild(note)
     const feed = element("ul", "run-log")
     feed.dataset.logFeed = logs.cell_id || ""
