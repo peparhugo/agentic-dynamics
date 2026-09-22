@@ -1197,6 +1197,28 @@ def _validate_aio_binding(
             f"submitted project ({sorted(agreed) or 'unresolvable'}) — a binding may only "
             "ride work from its own project"
         )
+    # CAPABILITY VECTOR (L29 step 3): the binding carries the verbs its ROLE was granted at
+    # bind time (session_ingestion.ROLE_CAPABILITIES); a submit exercises ``run_workflow``.
+    # A record that DECLARES a vector must include the verb — a capability-poorer binding is
+    # refused by name. A legacy record (no vector) is allowed with the absence NAMED on
+    # stderr: the check never grants a capability by accident, and it never silently skips one.
+    required_verb = "run_workflow"
+    capabilities = binding.get("capabilities")
+    if isinstance(capabilities, dict):
+        granted = [str(verb).strip() for verb in (capabilities.get("verbs") or [])]
+        if required_verb not in granted:
+            errors.append(
+                "submit: the binding's capability vector (role "
+                f"{capabilities.get('role')!r}: {granted or 'no verbs'}) does not include "
+                f"{required_verb!r} — the session's role was not granted the verb this "
+                "submit exercises"
+            )
+    else:
+        print(
+            "submit: aio binding carries no capability vector (legacy record) — "
+            f"the {required_verb!r} verb was not checked",
+            file=sys.stderr,
+        )
     # Conversation capacity is deliberately NOT consulted here (2026-09-16 policy): the
     # verdict — even an unavailable one — is a diagnostic about the coordinator's own chat
     # session, never an authorization for the submit. The report is measured separately

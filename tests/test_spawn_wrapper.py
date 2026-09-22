@@ -1936,7 +1936,7 @@ def _aio_block(**overrides) -> dict:
     return block
 
 
-def _bound_store(store, *, project: str = "") -> str:
+def _bound_store(store, *, project: str = "", capabilities: dict | None = None) -> str:
     """A tmp binding store with ONE real binding; returns its AUTHORIZATION identity.
 
     The exec gate checks the binding's authorization identity (round-9): stable across
@@ -1952,6 +1952,7 @@ def _bound_store(store, *, project: str = "") -> str:
             "task_identity": "unit-d",
             "original_request": "enforce the binding at the exec boundary",
             "project": project,
+            **({"capabilities": capabilities} if capabilities is not None else {}),
         },
         artifact_dir=store,
         publish=False,
@@ -3291,3 +3292,32 @@ def test_the_shared_identity_rule_covers_the_verdict_channels(tmp_path):
     assert bc.identity_verdict(canonical, chain)[0] == "unknown"
     subprocess.run(["git", "-C", str(chain), "remote", "remove", "origin"], check=True)
     assert bc.identity_verdict(canonical, chain)[0] == "unknown"
+
+
+def test_a_binding_lacking_the_run_workflow_capability_is_refused(aio_env):
+    """L29 step 3: a DECLARED capability vector must include the verb the submit exercises —
+    a capability-poorer binding refuses by name (the vector is data, never inferred)."""
+    from agentic_dynamics.knowledge import session_ingestion as si
+
+    binding_id = _bound_store(
+        aio_env, capabilities=si.mint_capabilities("not-a-granted-role")
+    )
+    errors = validate_submit_request(_aio_request(aio=_aio_block(binding_id=binding_id)))
+    assert any("capability vector" in e and "run_workflow" in e for e in errors), errors
+
+
+def test_a_binding_granted_the_verb_passes_the_capability_check(aio_env):
+    from agentic_dynamics.knowledge import session_ingestion as si
+
+    binding_id = _bound_store(aio_env, capabilities=si.mint_capabilities("aio-control"))
+    errors = validate_submit_request(_aio_request(aio=_aio_block(binding_id=binding_id)))
+    assert errors == []
+
+
+def test_a_legacy_binding_names_the_absence_and_is_not_granted(aio_env, capsys):
+    """A record minted before vectors existed passes the shape checks (migration safety) but
+    the absence is NAMED on stderr — the check never pretends it verified a capability."""
+    binding_id = _bound_store(aio_env)  # no capabilities → legacy
+    errors = validate_submit_request(_aio_request(aio=_aio_block(binding_id=binding_id)))
+    assert errors == []
+    assert "no capability vector (legacy record)" in capsys.readouterr().err
