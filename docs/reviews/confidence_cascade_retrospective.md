@@ -51,7 +51,8 @@ wc -l /app/experiments/results/registry_index.jsonl
 ls /app/experiments/results/kb/*.json | wc -l
 
 # 1. The whole retrospective (queries Q1-Q6) + the machine artifact it cites
-cd /app && python3 experiments/results/confidence_cascade/retrospective_analysis.py
+#    (TRACKED since 2026-09-22 — register L28: the script was born under a gitignored path)
+python3 scripts/confidence_cascade_retrospective.py      # or: agentic-dynamics analyze confidence-cascade-retrospective
 #   writes experiments/results/confidence_cascade/retrospective.json
 #   (schema confidence_cascade_retrospective/v1; carries the raw per-attempt rows so any
 #    aggregate below can be recomputed independently)
@@ -461,7 +462,7 @@ respects the load-bearing ordering.
 
 **Machine artifact:** `experiments/results/confidence_cascade/retrospective.json`
 (schema `confidence_cascade_retrospective/v1`, produced by
-`experiments/results/confidence_cascade/retrospective_analysis.py`). It carries the pinned
+`scripts/confidence_cascade_retrospective.py`, tracked 2026-09-22). It carries the pinned
 snapshot, Q1–Q6 blocks, and the **raw per-attempt rows** (`per_attempt`, n=1,345) so any
 aggregate in this document can be recomputed independently.
 

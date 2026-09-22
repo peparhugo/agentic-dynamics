@@ -71,6 +71,7 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     (("analyze", "stories"), "analyze_stories.py", ()),
     (("analyze", "session-routing"), "retro_session_routing.py", ()),
     (("analyze", "workflow-metrics"), "aggregate_workflow_metrics.py", ()),
+    (("analyze", "confidence-cascade-retrospective"), "confidence_cascade_retrospective.py", ()),
     # data
     (("data", "build"), "build_data.py", ()),
     (("data", "sync"), "sync_data.py", ()),

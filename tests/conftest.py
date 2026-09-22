@@ -294,3 +294,23 @@ requires_full_corpus = pytest.mark.skipif(
     not _full_corpus_present(),
     reason="full canonical corpus (payloads for recompute) not present — runs locally where the data root lives",
 )
+
+
+def wall_clock_tolerance() -> float:
+    """Headroom for wall-clock assertions under CI's parallel shards (L32, 2026-09-22).
+
+    The shards run four xdist workers at once; scheduler latency there is orders of magnitude
+    above a quiet host's. The tests that assert *deadline behaviour* (bounded wait, no
+    accumulation) still must — what they must not pin is the scheduler's latency. The bound
+    scales here (x4 under CI, overridable via ``FINOPS_TEST_LOAD_TOLERANCE``); the mechanism
+    assertions stay exact.
+    """
+    import os
+
+    raw = os.environ.get("FINOPS_TEST_LOAD_TOLERANCE", "")
+    if raw:
+        try:
+            return max(1.0, float(raw))
+        except ValueError:
+            pass
+    return 4.0 if os.environ.get("CI") else 1.0

@@ -38,9 +38,10 @@ workflow:
         measured — `confidence` lands per attempt (AgenticResult.confidence), alongside
         `perturbation_strength` + `test_executed_success` (run-story / run.py paths; see
         src/agentic_dynamics/knowledge/ledger_ingestion.py). The evidence to interrogate:
-        `experiments/results/registry_index.jsonl` (ledger_attempt records — json-load it and
-        filter source_type == 'ledger_attempt'), the story/session parquet
-        (`python3 scripts/sync_data.py check` / `mode=query` for SQL), and the run ledgers under
+        the FACT PLANE (`fact://attempt/...` — the `attempt_facts` rows carry `attempt_confidence`
+        + the phase outcome; the registry index carries NO `ledger_attempt` rows — that pointer
+        was a live null, corrected 2026-09-22 from the Phase-A retrospective), the story/session parquet
+        (`python3 scripts/sync_data.py --check` for parity / `--query` for SQL — a bare positional `check` SYNCS, so the flag form is written out), and the run ledgers under
         `experiments/results/workflows/`. The compiler design is
         docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md; the spec
         lifecycle index is experiments/specs/STATUS.md (read FIRST before authoring anything

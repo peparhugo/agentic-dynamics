@@ -138,9 +138,7 @@ def parse_child_envelope(stdout: str) -> dict[str, Any] | None:
     return None
 
 
-def classify_child_outcome(
-    returncode: int | None, stdout: str
-) -> dict[str, Any]:
+def classify_child_outcome(returncode: int | None, stdout: str) -> dict[str, Any]:
     """Classify a spawned sibling's outcome: the P0-1 fail-closed decision.
 
     Precedence, fail-closed on conflict:
@@ -165,7 +163,6 @@ def classify_child_outcome(
     return {"state": "ok", "envelope": envelope}
 
 
-
 def _spec_declares_routing(spec: ExperimentSpec) -> bool:
     """True when the spec activates per-step routing (mirrors ``validate_workflow_routing``).
 
@@ -178,9 +175,7 @@ def _spec_declares_routing(spec: ExperimentSpec) -> bool:
         return True
     if params.get("preferences"):
         return True
-    return any(
-        "model" in p or "allowed_models" in p for p in (params.get("phases") or [])
-    )
+    return any("model" in p or "allowed_models" in p for p in (params.get("phases") or []))
 
 
 def _load_signals(path: str) -> dict[str, ModelSignals]:
@@ -328,13 +323,9 @@ def _build_phase_admission(spec: ExperimentSpec, args: argparse.Namespace):
             _record_cap_decision(_cap_change_decision(spec.name, "budget", previous, applied))
     if args.campaign_concurrency is not None:
         previous = registry.get_cap(LeaseKind.CONCURRENCY, scope)
-        applied = registry.set_cap(
-            LeaseKind.CONCURRENCY, scope, float(args.campaign_concurrency)
-        )
+        applied = registry.set_cap(LeaseKind.CONCURRENCY, scope, float(args.campaign_concurrency))
         if previous != applied:
-            _record_cap_decision(
-                _cap_change_decision(spec.name, "concurrency", previous, applied)
-            )
+            _record_cap_decision(_cap_change_decision(spec.name, "concurrency", previous, applied))
 
     print(
         f"admission: ARMED — campaign scope {scope} "
@@ -416,7 +407,9 @@ def _resolve_workdir_head(workdir: str | Path) -> str | None:
     try:
         proc = subprocess.run(
             ["git", "-C", str(workdir), "rev-parse", "HEAD"],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
     except Exception:  # noqa: BLE001 — a missing/broken git is a fallback, not a crash
         return None
@@ -430,7 +423,9 @@ def _git_query(workdir: str | Path, *args: str) -> tuple[int, str]:
     try:
         proc = subprocess.run(  # noqa: S603 — the composition root's probe
             ["git", "-C", str(workdir), *args],
-            capture_output=True, text=True, timeout=15,
+            capture_output=True,
+            text=True,
+            timeout=15,
         )
     except Exception as exc:  # noqa: BLE001 — a missing/broken git is a named refusal here
         return 127, f"git unavailable ({type(exc).__name__}: {exc})"
@@ -511,8 +506,10 @@ def _build_orchestrator_executors(
     workdir_path = Path(args.workdir)
     clone_source = workdir_path if (workdir_path / ".git").exists() else None
     clone = create_run_clone(
-        run_id, base_sha=_resolve_workdir_head(args.workdir),
-        source_repo=clone_source, path_config=path_config,
+        run_id,
+        base_sha=_resolve_workdir_head(args.workdir),
+        source_repo=clone_source,
+        path_config=path_config,
     )
     run_clone = str(clone.path)
 
@@ -556,118 +553,180 @@ def main() -> None:
     ap.add_argument("--thinking-budget-tokens", type=int, default=0)
     ap.add_argument("--output-token-limit", type=int, default=0)
     ap.add_argument("--timeout", type=int, default=1800, help="per-phase timeout (s)")
-    ap.add_argument("--phase-watchdog-min", type=float, default=None, metavar="MIN",
-                    help="phase watchdog threshold in minutes (cap_runner_hardening p1): an "
-                         "agent phase whose session transcript shows no new step for this long "
-                         "is SIGTERM'd and fails with STALLED + evidence. Default "
-                         "FINOPS_PHASE_WATCHDOG_MIN env, else 20; 0 disables the watchdog.")
+    ap.add_argument(
+        "--phase-watchdog-min",
+        type=float,
+        default=None,
+        metavar="MIN",
+        help="phase watchdog threshold in minutes (cap_runner_hardening p1): an "
+        "agent phase whose session transcript shows no new step for this long "
+        "is SIGTERM'd and fails with STALLED + evidence. Default "
+        "FINOPS_PHASE_WATCHDOG_MIN env, else 20; 0 disables the watchdog.",
+    )
     ap.add_argument("--no-commit", action="store_true", help="do not commit after phases")
-    ap.add_argument("--resume", action="store_true",
-                    help="skip phases that already have a [workflow] <phase> commit; when the "
-                         "worktree has no such commits, fall back to the phases the derived "
-                         "spec index (experiments/specs/index.json) shows as ok for this goal")
-    ap.add_argument("--parent-run-id", default="",
-                    help="the run a --resume CONTINUES (Wave B1: the explicit family link — "
-                         "never a recency guess). Validated: known run, same spec, in a "
-                         "continuable state (failed/cancelled/awaiting-approval); a bad id "
-                         "refuses the run. Without it, a resume links only a single "
-                         "unambiguous continuable candidate and refuses to guess among many.")
-    ap.add_argument("--signals", default=None,
-                    help="path to a JSON file mapping model id -> measured signals "
-                         "(overrides the auto-built signal store)")
-    ap.add_argument("--cap-snapshot", action="store_true",
-                    help="CAP I4 (design §9): compile + best-effort record a route_next_job/v1 "
-                         "ControlContext snapshot beside every routing decision. Read-only "
-                         "measurement — nothing consumes the snapshot yet, and a snapshot "
-                         "failure never affects the run. OFF by default: this is the first CAP "
-                         "hook to touch a real production run + a real Redis connection.")
-    ap.add_argument("--cap-shadow", action="store_true",
-                    help="CAP I6 (design §9): everything --cap-snapshot does, PLUS runs the "
-                         "fact-based route_next_job_v1 rule beside route_step, validates its "
-                         "proposal (C1-C10), and records it as a shadow decision artifact — "
-                         "never applied, never arms actuation. The actual route is always "
-                         "route_step's, unchanged. Implies --cap-snapshot. OFF by default.")
-    ap.add_argument("--no-fact-emit", action="store_true",
-                    help="disable the CAP fact auto-emit hook (docs/architecture/current/"
-                         "cap_fact_auto_emit_design.md) for THIS invocation only. The hook is "
-                         "default-ON — every completed run derives its own attempt/job/policy/"
-                         "workflow facts and emits them, best-effort, scoped to this run's own "
-                         "repository_id (cell_scope). Also controlled by the "
-                         f"{FACT_AUTO_EMIT_ENV}=0 environment variable (a per-process override, "
-                         "e.g. for a worker that must never write to the KB); this CLI flag "
-                         "always wins when both are set.")
-    ap.add_argument("--change-analysis", action="store_true",
-                    help="evidence-integrity e6 seam (design §5.7, review F3): inject the "
-                         "concrete EvidenceChangeAnalyzer at the composition root so every "
-                         "committed phase ALSO hands its typed delta to the phase-boundary "
-                         "evidence loop — code_change_facts/v2 facts + ACL-scoped executor "
-                         "neighborhood recorded on the phase result. Best-effort — a failed "
-                         "analysis never affects the phase. OFF by default (opt-in). Without "
-                         "this flag the seam is byte-identical inert, even when "
-                         "--change-analysis-graph or the FINOPS_NEO4J_* env vars are set.")
-    ap.add_argument("--change-analysis-graph", default=None, metavar="URI",
-                    help="cap_2a p1 (design §5.7): versioned-graph client URI for the "
-                         "phase-boundary evidence loop (bolt://host:port). Resolved CLI > "
-                         "FINOPS_NEO4J_URI > FINOPS_NEO4J_URL; credentials (when set) from "
-                         "FINOPS_NEO4J_USER / FINOPS_NEO4J_PASSWORD, otherwise the client's "
-                         "own constructor defaults. Only consulted when --change-analysis is "
-                         "also passed; a missing optional dep / unparseable URI / unreachable "
-                         "graph degrades to delta-only facts with an explicit graph_status "
-                         "(unavailable) — never a CLI crash.")
-    ap.add_argument("--no-admission", action="store_true",
-                    help="admission_leases p2: do NOT inject the per-phase spend gate for THIS "
-                         "invocation. The gate itself is armed by the operator's "
-                         "FINOPS_ADMISSION_REQUIRED=1 environment (default: disarmed, and then "
-                         "this flag changes nothing) — this flag is the per-invocation escape "
-                         "for a run that must execute outside the campaign's lease accounting "
-                         "(a repair run, a replay). It is deliberately a CLI flag and not an "
-                         "env var: skipping the gate should appear in the shell history of "
-                         "whoever skipped it.")
-    ap.add_argument("--campaign-budget-usd", type=float, default=None, metavar="USD",
-                    help="admission_leases p2: the dollar ceiling installed on this workflow's "
-                         "campaign budget scope before the run (per-token models only; "
-                         "subscription models have no dollar cap by construction). Without it "
-                         "the scope's already-installed cap applies, and an uncapped scope "
-                         "admits nothing — unconfigured never means unlimited.")
-    ap.add_argument("--campaign-concurrency", type=int, default=None, metavar="N",
-                    help="admission_leases p2: the slot ceiling installed on this workflow's "
-                         "campaign concurrency scope before the run. Size it with "
-                         "control.lease_registry.recommended_concurrency() (the measured "
-                         "beta_tokens=0.80 puts the knee at 6): the coordination tax is paid "
-                         "in throughput, not dollars.")
-    ap.add_argument("--orchestrator", action="store_true",
-                    help="slice 2 (D-3/D-14/D-16, b3_launch_broker): run each agent phase as a "
-                         "SIBLING cell container with its scope config (via "
-                         "scripts/fleet/spawn_wrapper.py + the host-side launch broker) instead "
-                         "of in-process. OPT-IN — the default path is unchanged. The wrapper "
-                         "validates a typed launch request and the broker (the ONLY Docker API "
-                         "caller — its two documented exceptions: the game board's read-only "
-                         "docker ps, scripts/system_snapshot.py, fb3 f4, and the archived "
-                         "one-time sonar-scanner docker run, scripts/archive/backfill_sonar.py, "
-                         "ws3_stragglers) executes it; a phase "
-                         "whose scope fails validation refuses BEFORE the broker is reached.")
-    ap.add_argument("--fork-checkpoint", default=None, metavar="REF",
-                    help="pinned checkpoint id '<workflow>/<attempt_id>' (or a 'latest:<workflow>' "
-                         "alias resolved once at submit time): phases that declare 'fork: true' "
-                         "fork this exact parent; a fork phase without it refuses")
-    ap.add_argument("--prepared-step", default=None, metavar="PATH",
-                    help="path to a prepared-step/v1 transport file (step 3): the child "
-                         "executes the parent's exact step — prompt + hash verified — instead "
-                         "of re-deriving the phase from the spec (sibling-cell path)")
-    ap.add_argument("--only-phase", default=None, metavar="NAME",
-                    help="run a SINGLE phase (name) only — the sibling-cell entrypoint the "
-                         "--orchestrator mode spawns for each phase. When set, the spec's phase "
-                         "list is filtered to this name before the run.")
-    ap.add_argument("--cell-image", default=None, metavar="IMAGE",
-                    help="p3_base_image_caching: the image each PHASE cell runs under "
-                         "--orchestrator mode (default: scripts/fleet/spawn_wrapper.CELL_IMAGE, "
-                         "fleet/base). A per-job image built FROM fleet/base — see "
-                         "scripts/fleet/build.sh job <name> — is named fleet/job-<name> and is "
-                         "the only namespace the submit contract's `image` field accepts "
-                         "(scripts/fleet/spawn_wrapper.py:JOB_IMAGE_PATTERN). Never changes the "
-                         "orchestrator/workflow-runner container's OWN image (fleet/orchestrator "
-                         "— validated against the broker's closed image namespace; a phase-cell "
-                         "image override never reaches the broker unless it is in the namespace).")
+    ap.add_argument(
+        "--resume",
+        action="store_true",
+        help="skip phases that already have a [workflow] <phase> commit; when the "
+        "worktree has no such commits, fall back to the phases the derived "
+        "spec index (experiments/specs/index.json) shows as ok for this goal",
+    )
+    ap.add_argument(
+        "--parent-run-id",
+        default="",
+        help="the run a --resume CONTINUES (Wave B1: the explicit family link — "
+        "never a recency guess). Validated: known run, same spec, in a "
+        "continuable state (failed/cancelled/awaiting-approval); a bad id "
+        "refuses the run. Without it, a resume links only a single "
+        "unambiguous continuable candidate and refuses to guess among many.",
+    )
+    ap.add_argument(
+        "--signals",
+        default=None,
+        help="path to a JSON file mapping model id -> measured signals "
+        "(overrides the auto-built signal store)",
+    )
+    ap.add_argument(
+        "--cap-snapshot",
+        action="store_true",
+        help="CAP I4 (design §9): compile + best-effort record a route_next_job/v1 "
+        "ControlContext snapshot beside every routing decision. Read-only "
+        "measurement — nothing consumes the snapshot yet, and a snapshot "
+        "failure never affects the run. OFF by default: this is the first CAP "
+        "hook to touch a real production run + a real Redis connection.",
+    )
+    ap.add_argument(
+        "--cap-shadow",
+        action="store_true",
+        help="CAP I6 (design §9): everything --cap-snapshot does, PLUS runs the "
+        "fact-based route_next_job_v1 rule beside route_step, validates its "
+        "proposal (C1-C10), and records it as a shadow decision artifact — "
+        "never applied, never arms actuation. The actual route is always "
+        "route_step's, unchanged. Implies --cap-snapshot. OFF by default.",
+    )
+    ap.add_argument(
+        "--no-fact-emit",
+        action="store_true",
+        help="disable the CAP fact auto-emit hook (docs/architecture/current/"
+        "cap_fact_auto_emit_design.md) for THIS invocation only. The hook is "
+        "default-ON — every completed run derives its own attempt/job/policy/"
+        "workflow facts and emits them, best-effort, scoped to this run's own "
+        "repository_id (cell_scope). Also controlled by the "
+        f"{FACT_AUTO_EMIT_ENV}=0 environment variable (a per-process override, "
+        "e.g. for a worker that must never write to the KB); this CLI flag "
+        "always wins when both are set.",
+    )
+    ap.add_argument(
+        "--change-analysis",
+        action="store_true",
+        help="evidence-integrity e6 seam (design §5.7, review F3): inject the "
+        "concrete EvidenceChangeAnalyzer at the composition root so every "
+        "committed phase ALSO hands its typed delta to the phase-boundary "
+        "evidence loop — code_change_facts/v2 facts + ACL-scoped executor "
+        "neighborhood recorded on the phase result. Best-effort — a failed "
+        "analysis never affects the phase. OFF by default (opt-in). Without "
+        "this flag the seam is byte-identical inert, even when "
+        "--change-analysis-graph or the FINOPS_NEO4J_* env vars are set.",
+    )
+    ap.add_argument(
+        "--change-analysis-graph",
+        default=None,
+        metavar="URI",
+        help="cap_2a p1 (design §5.7): versioned-graph client URI for the "
+        "phase-boundary evidence loop (bolt://host:port). Resolved CLI > "
+        "FINOPS_NEO4J_URI > FINOPS_NEO4J_URL; credentials (when set) from "
+        "FINOPS_NEO4J_USER / FINOPS_NEO4J_PASSWORD, otherwise the client's "
+        "own constructor defaults. Only consulted when --change-analysis is "
+        "also passed; a missing optional dep / unparseable URI / unreachable "
+        "graph degrades to delta-only facts with an explicit graph_status "
+        "(unavailable) — never a CLI crash.",
+    )
+    ap.add_argument(
+        "--no-admission",
+        action="store_true",
+        help="admission_leases p2: do NOT inject the per-phase spend gate for THIS "
+        "invocation. The gate itself is armed by the operator's "
+        "FINOPS_ADMISSION_REQUIRED=1 environment (default: disarmed, and then "
+        "this flag changes nothing) — this flag is the per-invocation escape "
+        "for a run that must execute outside the campaign's lease accounting "
+        "(a repair run, a replay). It is deliberately a CLI flag and not an "
+        "env var: skipping the gate should appear in the shell history of "
+        "whoever skipped it.",
+    )
+    ap.add_argument(
+        "--campaign-budget-usd",
+        type=float,
+        default=None,
+        metavar="USD",
+        help="admission_leases p2: the dollar ceiling installed on this workflow's "
+        "campaign budget scope before the run (per-token models only; "
+        "subscription models have no dollar cap by construction). Without it "
+        "the scope's already-installed cap applies, and an uncapped scope "
+        "admits nothing — unconfigured never means unlimited.",
+    )
+    ap.add_argument(
+        "--campaign-concurrency",
+        type=int,
+        default=None,
+        metavar="N",
+        help="admission_leases p2: the slot ceiling installed on this workflow's "
+        "campaign concurrency scope before the run. Size it with "
+        "control.lease_registry.recommended_concurrency() (the measured "
+        "beta_tokens=0.80 puts the knee at 6): the coordination tax is paid "
+        "in throughput, not dollars.",
+    )
+    ap.add_argument(
+        "--orchestrator",
+        action="store_true",
+        help="slice 2 (D-3/D-14/D-16, b3_launch_broker): run each agent phase as a "
+        "SIBLING cell container with its scope config (via "
+        "scripts/fleet/spawn_wrapper.py + the host-side launch broker) instead "
+        "of in-process. OPT-IN — the default path is unchanged. The wrapper "
+        "validates a typed launch request and the broker (the ONLY Docker API "
+        "caller — its two documented exceptions: the game board's read-only "
+        "docker ps, scripts/system_snapshot.py, fb3 f4, and the archived "
+        "one-time sonar-scanner docker run, scripts/archive/backfill_sonar.py, "
+        "ws3_stragglers) executes it; a phase "
+        "whose scope fails validation refuses BEFORE the broker is reached.",
+    )
+    ap.add_argument(
+        "--fork-checkpoint",
+        default=None,
+        metavar="REF",
+        help="pinned checkpoint id '<workflow>/<attempt_id>' (or a 'latest:<workflow>' "
+        "alias resolved once at submit time): phases that declare 'fork: true' "
+        "fork this exact parent; a fork phase without it refuses",
+    )
+    ap.add_argument(
+        "--prepared-step",
+        default=None,
+        metavar="PATH",
+        help="path to a prepared-step/v1 transport file (step 3): the child "
+        "executes the parent's exact step — prompt + hash verified — instead "
+        "of re-deriving the phase from the spec (sibling-cell path)",
+    )
+    ap.add_argument(
+        "--only-phase",
+        default=None,
+        metavar="NAME",
+        help="run a SINGLE phase (name) only — the sibling-cell entrypoint the "
+        "--orchestrator mode spawns for each phase. When set, the spec's phase "
+        "list is filtered to this name before the run.",
+    )
+    ap.add_argument(
+        "--cell-image",
+        default=None,
+        metavar="IMAGE",
+        help="p3_base_image_caching: the image each PHASE cell runs under "
+        "--orchestrator mode (default: scripts/fleet/spawn_wrapper.CELL_IMAGE, "
+        "fleet/base). A per-job image built FROM fleet/base — see "
+        "scripts/fleet/build.sh job <name> — is named fleet/job-<name> and is "
+        "the only namespace the submit contract's `image` field accepts "
+        "(scripts/fleet/spawn_wrapper.py:JOB_IMAGE_PATTERN). Never changes the "
+        "orchestrator/workflow-runner container's OWN image (fleet/orchestrator "
+        "— validated against the broker's closed image namespace; a phase-cell "
+        "image override never reaches the broker unless it is in the namespace).",
+    )
     args = ap.parse_args()
 
     # Either document kind compiles to the engine's spec (step 1, authoring -> execution):
@@ -755,9 +814,7 @@ def _run_workflow_cli(
             phases = spec.workflow.params.get("phases") or []
             names = [str(p.get("name", "")) for p in phases]
             if args.only_phase not in names:
-                raise SystemExit(
-                    f"--only-phase {args.only_phase!r}: no such phase (have {names})"
-                )
+                raise SystemExit(f"--only-phase {args.only_phase!r}: no such phase (have {names})")
             only_phase_index = names.index(args.only_phase)
             only_phase_total = len(phases)
             phase = dict(phases[only_phase_index])
@@ -867,11 +924,7 @@ def _run_workflow_cli(
     # DockerAgentExecutor and DockerVerifierExecutor (their env read is the fallback, not the
     # primary). Child mode (--only-phase) never composes executors: the parent orchestrator owns
     # the clone; a sibling runs inside the already-mounted clone.
-    if (
-        getattr(args, "orchestrator", False)
-        and step_executor is None
-        and verifier_executor is None
-    ):
+    if getattr(args, "orchestrator", False) and step_executor is None and verifier_executor is None:
         if control_run_id is None:
             # No run row minted (control db down). The clone is keyed by the run id, so there is
             # nothing to key it on — a containerized orchestrator without its run row cannot
@@ -881,7 +934,9 @@ def _run_workflow_cli(
                 "the per-run clone cannot be created; refusing the containerized path"
             )
         step_executor, verifier_executor = _build_orchestrator_executors(
-            spec, args, run_id=control_run_id,
+            spec,
+            args,
+            run_id=control_run_id,
         )
 
     # g1 (engine_gaps_followups, F5): capture this run's family identity from the run row the
@@ -929,7 +984,8 @@ def _run_workflow_cli(
                 if control_db is not None and control_run_id is not None:
                     with contextlib.suppress(Exception):
                         control_db.transition_run(
-                            control_run_id, RunState.CANCELLED,
+                            control_run_id,
+                            RunState.CANCELLED,
                             reason=f"resume parent snapshot unavailable: {exc}",
                         )
                     with contextlib.suppress(Exception):
@@ -967,7 +1023,8 @@ def _run_workflow_cli(
             if control_db is not None and control_run_id is not None:
                 with contextlib.suppress(Exception):
                     control_db.transition_run(
-                        control_run_id, RunState.CANCELLED,
+                        control_run_id,
+                        RunState.CANCELLED,
                         reason=f"resume candidate unavailable: {candidate_errors[0]}",
                     )
                 with contextlib.suppress(Exception):
@@ -1094,8 +1151,6 @@ def _run_workflow_cli(
     # handshake, not a universal success signal.
     if args.only_phase:
         raise SystemExit(exit_code_for_result(result))
-
-
 
 
 def _fact_auto_emit_enabled(args: argparse.Namespace) -> bool:
@@ -1350,9 +1405,7 @@ def _belief_update_payloads(
             ob.knowledge_payload(
                 updated,
                 bu.update_event(updated, reason=reason),
-                registry_lines=ob.registry_lines_for(
-                    updated, operation="supersede", reason=reason
-                ),
+                registry_lines=ob.registry_lines_for(updated, operation="supersede", reason=reason),
             )
         )
     return payloads
@@ -1369,8 +1422,10 @@ def _control_db() -> ControlDB | None:
     try:
         return ControlDB.open()
     except (ControlDBError, OSError) as exc:
-        print(f"warning: control db unavailable ({exc}) — control-plane record skipped",
-              file=sys.stderr)
+        print(
+            f"warning: control db unavailable ({exc}) — control-plane record skipped",
+            file=sys.stderr,
+        )
         return None
 
 
@@ -1477,7 +1532,7 @@ def _carries_run_identity(stem: str, run_id: str) -> bool:
     idx = stem.rfind(marker)
     if idx < 0:
         return False
-    tail = stem[idx + len(marker):]
+    tail = stem[idx + len(marker) :]
     return tail == "" or (tail.startswith(".") and tail[1:].isdigit())
 
 
@@ -1502,10 +1557,15 @@ def _load_resume_state(spec_name: str, parent_run_id: str) -> ResumeState:
     to "not completed".
     """
     ledger_dir = ROOT / "experiments" / "results" / "workflows" / spec_name
-    matches = [
-        path for path in ledger_dir.glob("*.json")
-        if _carries_run_identity(path.stem, parent_run_id)
-    ] if ledger_dir.is_dir() else []
+    matches = (
+        [
+            path
+            for path in ledger_dir.glob("*.json")
+            if _carries_run_identity(path.stem, parent_run_id)
+        ]
+        if ledger_dir.is_dir()
+        else []
+    )
     if not matches:
         raise ParentRunRefused(
             f"--resume parent {parent_run_id!r} has no ledger under {ledger_dir} — "
@@ -1515,20 +1575,17 @@ def _load_resume_state(spec_name: str, parent_run_id: str) -> ResumeState:
     try:
         payload = json.loads(path.read_text())
     except (OSError, ValueError) as exc:
-        raise ParentRunRefused(
-            f"--resume parent ledger {path.name} is unreadable ({exc})"
-        ) from exc
+        raise ParentRunRefused(f"--resume parent ledger {path.name} is unreadable ({exc})") from exc
     if not isinstance(payload, dict):
         raise ParentRunRefused(f"--resume parent ledger {path.name} is not a run ledger")
     recorded = str(payload.get("run_id") or "")
     if recorded and recorded != parent_run_id:
         raise ParentRunRefused(
-            f"--resume parent ledger {path.name} records run_id {recorded!r}, "
-            f"not {parent_run_id!r}"
+            f"--resume parent ledger {path.name} records run_id {recorded!r}, not {parent_run_id!r}"
         )
     completed: set[str] = set()
     reached: set[str] = set()
-    for phase in (payload.get("phases") or []):
+    for phase in payload.get("phases") or []:
         if not (isinstance(phase, dict) and phase.get("phase")):
             continue
         name = str(phase["phase"])
@@ -1540,7 +1597,7 @@ def _load_resume_state(spec_name: str, parent_run_id: str) -> ResumeState:
             # carried as REACHED — separately, so an approval is validated before skipping.
             reached.add(name)
     inherited: list[dict[str, str]] = []
-    for entry in (payload.get("inherited_phases") or []):
+    for entry in payload.get("inherited_phases") or []:
         if not isinstance(entry, dict):
             raise ParentRunRefused(
                 f"--resume parent ledger {path.name} carries a malformed inherited "
@@ -1555,15 +1612,17 @@ def _load_resume_state(spec_name: str, parent_run_id: str) -> ResumeState:
                 f"without a phase/from_run_id/known status ({entry!r}) — refusing to guess "
                 f"the lineage"
             )
-        inherited.append({
-            "phase": name,
-            "from_run_id": origin,
-            "gate_id": str(entry.get("gate_id") or ""),
-            "ledger_path": str(entry.get("ledger_path") or ""),
-            "status": status,
-        })
+        inherited.append(
+            {
+                "phase": name,
+                "from_run_id": origin,
+                "gate_id": str(entry.get("gate_id") or ""),
+                "ledger_path": str(entry.get("ledger_path") or ""),
+                "status": status,
+            }
+        )
         completed.add(name)
-    for entry in (payload.get("unresolved_checkpoints") or []):
+    for entry in payload.get("unresolved_checkpoints") or []:
         if not isinstance(entry, dict) or not entry.get("phase"):
             raise ParentRunRefused(
                 f"--resume parent ledger {path.name} carries an unresolved checkpoint entry "
@@ -1584,7 +1643,9 @@ def _load_resume_state(spec_name: str, parent_run_id: str) -> ResumeState:
     )
 
 
-def _control_open_run(spec: ExperimentSpec, args: argparse.Namespace) -> tuple[str | None, ControlDB | None]:
+def _control_open_run(
+    spec: ExperimentSpec, args: argparse.Namespace
+) -> tuple[str | None, ControlDB | None]:
     """Record this run in the control database as ``running``; return ``(run_id, db)``.
 
     Returns ``(None, None)`` — and records nothing — in CHILD mode. That is the P0-2 contract held
@@ -1636,7 +1697,11 @@ def _control_open_run(spec: ExperimentSpec, args: argparse.Namespace) -> tuple[s
         )
         print(
             f"control: run {run.run_id} ({run.state.value})"
-            + (f" child of {run.parent_run_id} (family {run.family_id})" if run.parent_run_id else ""),
+            + (
+                f" child of {run.parent_run_id} (family {run.family_id})"
+                if run.parent_run_id
+                else ""
+            ),
             file=sys.stderr,
         )
         return run.run_id, db
@@ -1648,8 +1713,10 @@ def _control_open_run(spec: ExperimentSpec, args: argparse.Namespace) -> tuple[s
         db.close()
         raise SystemExit(2) from exc
     except (ControlDBError, OSError) as exc:
-        print(f"warning: control db run creation failed ({exc}) — run itself unaffected",
-              file=sys.stderr)
+        print(
+            f"warning: control db run creation failed ({exc}) — run itself unaffected",
+            file=sys.stderr,
+        )
         db.close()
         return None, None
 
@@ -1691,8 +1758,9 @@ def _derived(label: str, derive) -> list[dict]:
     try:
         produced = derive()
     except Exception as exc:  # noqa: BLE001 — one producer's failure, not the run's
-        print(f"warning: {label} derivation failed ({exc}) — run itself unaffected",
-              file=sys.stderr)
+        print(
+            f"warning: {label} derivation failed ({exc}) — run itself unaffected", file=sys.stderr
+        )
         return []
     if produced is None:
         print(f"{label}: nothing to emit (unchanged or not indexed)", file=sys.stderr)
@@ -1717,6 +1785,40 @@ def _ledger_digest(ledger_path: Path) -> str:
             file=sys.stderr,
         )
         return ""
+
+
+def _verified_candidate_sha(git_sha: str, workdir: str) -> str:
+    """The candidate recorded on the terminal row, VERIFIED to resolve in the run's own repo.
+
+    A run whose end sha does not resolve to a commit in its workdir must not record a
+    placeholder: 8 rows carried the same unresolvable ``2e6ace3`` (the 2026-09-22 triage) and
+    the packet then advertised promote actions no filesystem could fulfil. A sha that does not
+    resolve is recorded EMPTY — honest absence, which the promote path reads as "no candidate
+    binding" rather than a false identity. Best-effort like the ledger digest: a git problem
+    must never fail a finished run's terminal write.
+    """
+    sha = str(git_sha or "").strip()
+    if not sha or not workdir:
+        return ""
+    try:
+        run = subprocess.run(
+            ["git", "rev-parse", "--verify", "--quiet", f"{sha}^{{commit}}"],
+            cwd=workdir,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        print(f"warning: could not verify candidate {sha[:12]} ({exc})", file=sys.stderr)
+        return ""
+    if run.returncode != 0:
+        print(
+            f"warning: candidate {sha[:12]} does not resolve in the run workdir — "
+            "recorded as empty (never a placeholder identity)",
+            file=sys.stderr,
+        )
+        return ""
+    return sha
 
 
 def _control_terminal_write(
@@ -1810,9 +1912,7 @@ def _control_terminal_write(
                 )
             )
         if _fact_auto_emit_enabled(args):
-            payloads.extend(
-                _derived("workflow facts", lambda: _fact_payloads(spec, args, result))
-            )
+            payloads.extend(_derived("workflow facts", lambda: _fact_payloads(spec, args, result)))
 
         write = ob.record_terminal_run(
             db,
@@ -1826,12 +1926,13 @@ def _control_terminal_write(
             # ledger file this outcome describes, stamped in the SAME atomic transaction.
             # Consumers (promote) recompute and refuse a mismatch.
             result_digest=_ledger_digest(ledger_path) if ledger_path else "",
-            candidate_sha=result.git_sha,
+            candidate_sha=_verified_candidate_sha(
+                result.git_sha, str(getattr(args, "workdir", "") or "")
+            ),
             ended_at=result.ended_at or None,
         )
         print(
-            f"control: run {run_id} -> {write.run.state.value}  "
-            f"outbox queued {len(write.events)}",
+            f"control: run {run_id} -> {write.run.state.value}  outbox queued {len(write.events)}",
             file=sys.stderr,
         )
 
@@ -1849,8 +1950,10 @@ def _control_terminal_write(
         else:
             print(f"outbox: {json.dumps(report.to_dict())}", file=sys.stderr)
     except Exception as exc:  # noqa: BLE001 — a finished run's outcome never depends on this
-        print(f"warning: control-plane terminal write failed ({exc}) — run itself unaffected",
-              file=sys.stderr)
+        print(
+            f"warning: control-plane terminal write failed ({exc}) — run itself unaffected",
+            file=sys.stderr,
+        )
     finally:
         db.close()
 
