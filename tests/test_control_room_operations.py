@@ -12,9 +12,10 @@ The properties pinned here are the Phase-0 truth rules:
 from __future__ import annotations
 
 import json
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 for _path in (_REPO_ROOT, _REPO_ROOT / "src"):
@@ -539,9 +540,7 @@ def test_run_detail_route_reads_the_job_logs_through_the_live_context(monkeypatc
     monkeypatch.setattr(
         server,
         "_redis",
-        lambda: _FakeRedis(
-            board=_board(run.run_id, "job-cc"), logs={"events_log:job-cc": raw}
-        ),
+        lambda: _FakeRedis(board=_board(run.run_id, "job-cc"), logs={"events_log:job-cc": raw}),
     )
 
     response = server.app.test_client().get(f"/api/runs/{run.run_id}")
