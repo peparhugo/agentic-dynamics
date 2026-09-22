@@ -928,7 +928,16 @@ def binding_authorization_id(payload: dict[str, Any]) -> str:
             # The auth values are hashed as CANONICAL JSON (round-10): nested structures
             # (acceptance / predecessor) are key-order-insensitive and default-insensitive,
             # so re-sending the same effective values never reads as a change.
-            **{field: payload.get(field) for field in AUTHORIZATION_FIELDS},
+            #
+            # The added-field migration rule (L29 step 3, live-caught 2026-09-22): an ABSENT
+            # optional authorization field must hash as it did before the field existed —
+            # otherwise adding `capabilities` to AUTHORIZATION_FIELDS invalidates every
+            # binding minted earlier and refuses commands already queued against them.
+            **{
+                field: payload.get(field)
+                for field in AUTHORIZATION_FIELDS
+                if not (field == "capabilities" and payload.get(field) is None)
+            },
         },
         sort_keys=True,
         separators=(",", ":"),

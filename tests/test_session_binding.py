@@ -839,3 +839,15 @@ def test_a_capability_change_mints_a_new_authorization_identity():
     assert legacy["capabilities"] is None
     assert si.binding_authorization_id(full) != si.binding_authorization_id(narrowed)
     assert si.binding_authorization_id(full) != si.binding_authorization_id(legacy)
+
+def test_a_legacy_binding_keeps_its_authorization_identity():
+    """The added-field migration rule (live-caught): the capability field was ADDED to
+    AUTHORIZATION_FIELDS, and an absent vector must hash as it did before the field existed —
+    this pinned value is the legacy identity (24df4455…), so a schema addition can never
+    invalidate commands already queued against a pre-vector binding."""
+    legacy = si.binding_payload(_binding())
+    assert legacy["capabilities"] is None
+    assert (
+        si.binding_authorization_id(legacy)
+        == "24df445592e37b0fcf1f47a4dc748acfeaa3f295bfdc4bb19868f6d60739b559"
+    )
