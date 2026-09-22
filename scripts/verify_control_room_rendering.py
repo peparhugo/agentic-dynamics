@@ -3275,9 +3275,21 @@ SCROLL_PROBE_JS = r"""
 
 
 def _expected_last_run_id() -> str:
-    """The positional id of the fixture's last run row (build_operations_payload's scheme)."""
+    """The positional id of the PAGE's last run row (live-first order, 2026-09-22).
+
+    The Operations board renders the run roster BEFORE the attention table, so when the
+    fixture carries attention rows the page's last ``tr[data-run-id]`` is the attention
+    table's last row; with no attention rows it is the roster's last row
+    (``build_operations_payload``'s positional scheme). The check stays meaningful: the
+    wheel must reach exactly the row the page truly renders last.
+    """
     fixture = load_boards_fixture()
     seed = fixture["operations"]
+    attention = seed.get("attention") or []
+    if attention:
+        last_id = str((attention[-1] or {}).get("run_id") or "")
+        if last_id:
+            return last_id
     total = int(seed.get("active_count", 0)) + int(seed.get("promotable_count", 0))
     return f"run-fixture-{total:04d}"
 
