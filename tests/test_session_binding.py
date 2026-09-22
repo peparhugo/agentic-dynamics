@@ -807,3 +807,35 @@ class TestConstraintPreservation:
         assert capsule["next_action"]["text"] == "observe job abc123"
         assert "activate PR #77" not in capsule["next_action"]["text"]
         assert "activate PR #77" not in capsule["text"]
+
+
+def test_capability_vectors_are_granted_by_role_at_bind_time():
+    """L29 step 3: the grant is data — the role's verbs from the table, empty (never a
+    wildcard) for a role the table does not know."""
+    granted = si.mint_capabilities("aio-control", granted_at="2026-09-22T17:00:00Z")
+    assert granted["verbs"] == ["run_workflow", "promote", "abandon"]
+    assert granted["role"] == "aio-control"
+    assert granted["granted_at"] == "2026-09-22T17:00:00Z"
+
+    unknown = si.mint_capabilities("control-room-dev")
+    assert unknown["verbs"] == []
+    assert unknown["role"] == "control-room-dev"
+
+
+def test_a_capability_change_mints_a_new_authorization_identity():
+    """The vector rides AUTHORIZATION_FIELDS: two bindings differing ONLY in their granted
+    verbs hash to different authorization ids (so a command minted against the old grant
+    refuses), and a legacy record with no vector differs from both."""
+    full = si.binding_payload(
+        _binding(capabilities=si.mint_capabilities("aio-control"))
+    )
+    narrowed = si.binding_payload(
+        _binding(
+            capabilities={**si.mint_capabilities("aio-control"), "verbs": ["run_workflow"]}
+        )
+    )
+    legacy = si.binding_payload(_binding())
+    assert full["capabilities"]["verbs"] == ["run_workflow", "promote", "abandon"]
+    assert legacy["capabilities"] is None
+    assert si.binding_authorization_id(full) != si.binding_authorization_id(narrowed)
+    assert si.binding_authorization_id(full) != si.binding_authorization_id(legacy)

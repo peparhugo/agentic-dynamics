@@ -867,7 +867,48 @@ BINDING_CONTEXT_HISTORY = 10
 #: OPERATIONAL PROGRESS: routine recording must never invalidate pending work (round-9
 #: review — one version represented both, so recording a submission's own ``next_action``
 #: invalidated the submission's queued command at its binding-id and revision checks).
-AUTHORIZATION_FIELDS = ("acceptance", "predecessor", "work_unit", "project", "source_revision")
+AUTHORIZATION_FIELDS = (
+    "acceptance",
+    "predecessor",
+    "work_unit",
+    "project",
+    "source_revision",
+    # L29 step 3: the CAPABILITY VECTOR is authorization-relevant — changing a session's
+    # granted verbs is a capability change, so it advances the authorization epoch exactly
+    # like a task-definition change does.
+    "capabilities",
+)
+
+#: The verbs each agent ROLE is granted, at bind time (L29 step 3). Capabilities are data,
+#: GRANTED here and CHECKED at the exec boundary — never inferred from what a session is
+#: doing. ``aio-control`` is the controller's delegated actor: it may submit runs, promote
+#: candidates, and abandon stale ones. Every other roster role acts WITHIN a run and holds no
+#: submit-boundary verb. Publishing stays the operator's — no session verb exists for it.
+ROLE_CAPABILITIES: dict[str, tuple[str, ...]] = {
+    "aio-control": ("run_workflow", "promote", "abandon"),
+}
+
+#: The verbs a session of an unrecognized role holds: none. A new role granted verbs must say
+#: so here in the same change that mints it.
+DEFAULT_CAPABILITIES: tuple[str, ...] = ()
+
+
+def mint_capabilities(resolved_agent: str, *, granted_at: str = "") -> dict[str, Any]:
+    """The session's capability vector, GRANTED at bind time from its resolved role.
+
+    Shape: ``{version, role, verbs, granted_at}``. The role is the resolved agent the binding
+    already carries; the verbs are the role's grant from :data:`ROLE_CAPABILITIES` (empty for
+    an unknown role — never a wildcard). Content-addressed into the binding's AUTHORIZATION
+    identity via :data:`AUTHORIZATION_FIELDS`, so a verb change mints a new authorization id
+    and refuses commands minted against the old one.
+    """
+    role = _binding_text(resolved_agent)
+    return {
+        "version": 1,
+        "role": role,
+        "verbs": list(ROLE_CAPABILITIES.get(role, DEFAULT_CAPABILITIES)),
+        "granted_at": _binding_text(granted_at),
+    }
 
 
 def binding_authorization_id(payload: dict[str, Any]) -> str:
@@ -994,6 +1035,19 @@ def binding_payload(
         if isinstance(entry, dict):
             history.append({str(k): v for k, v in entry.items()})
 
+    raw_capabilities = binding.get("capabilities")
+    capabilities: dict[str, Any] | None = None
+    if isinstance(raw_capabilities, dict):
+        raw_verbs = raw_capabilities.get("verbs") or []
+        if isinstance(raw_verbs, str):
+            raw_verbs = [raw_verbs]
+        capabilities = {
+            "version": int(raw_capabilities.get("version") or 1),
+            "role": _binding_text(raw_capabilities.get("role")),
+            "verbs": [str(v).strip() for v in raw_verbs if str(v).strip()],
+            "granted_at": _binding_text(raw_capabilities.get("granted_at")),
+        }
+
     payload: dict[str, Any] = {
         "native_session_id": native_session_id,
         "resolved_agent": resolved_agent,
@@ -1007,6 +1061,9 @@ def binding_payload(
         "source_revision": _binding_text(binding.get("source_revision")),
         "acceptance": acceptance,
         "predecessor": predecessor,
+        # L29 step 3: the capability vector (None on legacy records — the exec boundary names
+        # the absence rather than inventing a grant).
+        "capabilities": capabilities,
         # Capsule inputs (optional): the current work unit and the one next action / known
         # blocker the capsule renders. They ride on the binding so every capsule request reads
         # them from the durable record rather than from whichever message is in flight.

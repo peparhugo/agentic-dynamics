@@ -805,6 +805,11 @@ def _binding_from_args(args: argparse.Namespace, artifact_dir: Path) -> dict:
         "next_action": args.next_action,
         "blocker": args.blocker,
         "context_version": int(args.context_version or 1),
+        # L29 step 3: the capability vector is GRANTED at bind time from the resolved role
+        # (session_ingestion.ROLE_CAPABILITIES) and rides the authorization identity.
+        "capabilities": si.mint_capabilities(
+            args.agent, granted_at=datetime.now(timezone.utc).isoformat()
+        ),
     }
 
 
