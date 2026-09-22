@@ -58,7 +58,9 @@ workflow:
           `## Gaps`, `## Sources`) and `notes/plan.md` (`## Files`, `## Tests`,
           `## Acceptance`, `## Risks`): for EACH value the room currently derives or hides,
           say which service should own it, which fixture the gate will assert, and which
-          capture shows it. Write `notes/sources.jsonl`. Commit.
+          capture shows it. Write `notes/sources.jsonl`. Commit — `notes/` is gitignored, so
+          stage the notes explicitly (`git add -f notes/`) before committing; a plain
+          `git add` refuses ignored paths and the phase then records no commit.
       - name: execute
         kind: agent
         scope: implementation
@@ -76,9 +78,18 @@ workflow:
         scope: implementation
         timeout: 1800
         requires_files: [notes/plan.md]
-        tests_from_plan: notes/plan.md
+        # The DECLARED room-suite targets (deterministic): a plan-driven resolution ran the
+        # 2026-09-22 L33 run's gate into a zero-target SKIP (the plan's `## Tests` was prose),
+        # which promotes as a forbidden phase (test_executed_success=None). The declared list
+        # is the acceptance contract the spec's own prompt names.
+        tests:
+          - tests/test_control_room_operations.py
+          - tests/test_control_room_glance_integrity.py
+          - tests/test_control_room_build_contract.py
+          - tests/test_control_room_static_views.py
+          - tests/test_control_room_paths.py
         prompt: |
-          The independent runner verifies the worktree against the plan's targets.
+          The independent runner verifies the worktree against the declared room-suite targets.
       - name: posterior
         kind: agent
         scope: proposal_write
@@ -88,7 +99,8 @@ workflow:
           Diff the plan against what landed. WRITE `notes/posterior.md` (`## Violations`,
           `## Unknowns`, `## UPDATES`): which values moved server-side (with the fixture +
           capture that prove it), what remains client-side and why, and the gate evidence
-          (capture paths). Commit.
+          (capture paths). Commit — `notes/` is gitignored, so stage it explicitly
+          (`git add -f notes/posterior.md`) before committing.
       - name: g_adversarial
         kind: agent
         scope: proposal_write
@@ -100,4 +112,6 @@ workflow:
           do the fixtures assert the REAL server shape or a hand-written twin? does an omitted
           value now render as a fabricated zero anywhere? Name at least one falsifier per
           major claim. Write `notes/adversarial_review.md` with a final `## FINDING` paragraph
-          and commit it.
+          and commit it — `notes/` is gitignored, so stage the review explicitly
+          (`git add -f notes/adversarial_review.md`) before committing; the phase must record
+          a commit (a silently uncommitted review fails the promotion gate).
