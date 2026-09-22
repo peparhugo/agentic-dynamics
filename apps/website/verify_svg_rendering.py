@@ -109,7 +109,7 @@ PROBE = r"""
     if (!str || str === 'none') return null;
     if (str === 'transparent') return [0, 0, 0, 0];
     let m;
-    if ((m = str.match(/^rgba?\\(\\s*([\\d.]+)[,\\s]+([\\d.]+)[,\\s]+([\\d.]+)(?:[,\\s/]+([\\d.]+))?\\s*\\)$/))) {
+    if ((m = str.match(/^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+))?\s*\)$/))) {
       return [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : Math.min(1, +m[4])];
     }
     if ((m = str.match(/^#([0-9a-f]{6})$/))) {
@@ -148,7 +148,7 @@ PROBE = r"""
         const c = parseColor(cs.color);
         return c ? { colors: [c.slice(0, 3)], alphas: [alpha * (c[3] || 1)] } : null;
       }
-      const m = fill.match(/url\\(\\s*["']?#([^)"']+)/);
+      const m = fill.match(/url\(\s*["']?#([^)"']+)/);
       if (m) {
         const ref = document.getElementById(m[1]);
         if (ref) {
@@ -204,7 +204,7 @@ PROBE = r"""
     // paint-order stroke halo: the glyphs sit on the halo colour
     const cs = getComputedStyle(text);
     const po = (cs.paintOrder || '');
-    if (po.split(/\\s+/)[0] === 'stroke' && cs.stroke && cs.stroke !== 'none') {
+    if (po.split(/\s+/)[0] === 'stroke' && cs.stroke && cs.stroke !== 'none') {
       const sw = parseFloat(cs.strokeWidth || '0');
       const sc = parseColor(cs.stroke);
       if (sc && sw > 0) return { paint: { colors: [sc], alpha: 1 } };
@@ -249,7 +249,7 @@ PROBE = r"""
     const extra = Array.from(svg.querySelectorAll('tspan')).filter(s => {
       const a = (s.getAttribute('fill') || '');
       const st = (s.getAttribute('style') || '');
-      return a || /fill\\s*:/.test(st);
+      return a || /fill\s*:/.test(st);
     });
     texts.concat(extra).forEach(t => {
       const label = t.textContent.trim().slice(0, 32) || '(empty)';
@@ -514,13 +514,27 @@ def _write_report(results, pages, viewports, report_path, json_path, base):
     skips = [r for r in results if r["verdict"] == "SKIP"]
     total = len(results)
     passed = total - len(fails) - len(skips)
+    # A scan that checked ZERO diagrams is VACUOUS, never a PASS (2026-09-22: a broken
+    # extractor regex made every page yield no SVGs and the gate reported PASS — an
+    # acceptance tool must fail loud when its own extraction finds nothing to check).
+    if total == 0:
+        fails.append(
+            {
+                "page": "(scan)",
+                "name": "vacuous",
+                "fails": [
+                    "the scan checked ZERO diagrams — the extractor or the page list is "
+                    "broken; a vacuous scan is a FAIL, never a pass"
+                ],
+            }
+        )
     md = [
         f"# SVG rendering gate — {base}",
         "",
         f"Pages: {', '.join(pages)} · viewports: {', '.join(f'{v[0]}x{v[1]}' for v in viewports)}",
         f"SVGs checked: {total} · PASS: {passed} · SKIP (hidden): {len(skips)} · FAIL: {len(fails)}",
         "",
-        f"## Result: **{'PASS' if not fails else 'FAIL'}**",
+        f"## Result: **{'FAIL' if fails else 'PASS'}**",
         "",
     ]
     if fails:

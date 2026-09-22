@@ -13,6 +13,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from scripts.verify_control_room_rendering import write_report
 
 
@@ -371,3 +373,28 @@ def test_refresh_action_passes_on_a_working_control():
     results, errors = _exercise_refresh_action(_FakeRefreshPage(), "dark")
     assert errors == []
     assert [r["check"] for r in results] == ["governed-action-refresh"]
+
+
+def test_site_gate_fails_a_vacuous_zero_svg_scan(tmp_path: Path):
+    """The SITE gate must fail loud when its own extraction finds nothing to check.
+
+    2026-09-22: four doubled regex escapes in the gate's raw ``PROBE`` string made every page
+    yield zero SVGs and the gate reported PASS — the L24 run's browser evidence was therefore
+    unproven, and the controller's acceptance could not distinguish "all diagrams render" from
+    "nothing was checked". A vacuous scan is a FAIL, structurally (the Control Room gate's
+    zero-captures rule, applied to the site)."""
+    pytest.importorskip("playwright")  # the gate module imports playwright at module level
+    from apps.website.verify_svg_rendering import _write_report
+
+    md, fails = _write_report(
+        [],
+        ["framework.html"],
+        [(1440, 900)],
+        tmp_path / "svg_render_report.md",
+        tmp_path / "svg_render_report.json",
+        "http://127.0.0.1:0",
+    )
+    joined = "\n".join(md)
+    assert fails, "a zero-SVG scan must produce a failure row"
+    assert any("ZERO diagrams" in str(row.get("fails")) for row in fails)
+    assert "**FAIL**" in joined
