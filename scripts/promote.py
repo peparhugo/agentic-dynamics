@@ -1327,26 +1327,85 @@ def _stale_candidate_refusal(workdir: Path, base: str, candidate: str) -> str | 
     )
 
 
+def _git_check_ignore(workdir: Path, path: str) -> bool:
+    """True when the repo's ignore RULES exclude ``path`` (rules only, never the index).
+
+    ``--no-index`` is load-bearing: the promotion's candidate paths are STAGED, and the
+    default ``check-ignore`` treats any indexed path as unignored — exactly backwards for
+    deciding what the promotion may carry.
+    """
+    run = subprocess.run(
+        ["git", "check-ignore", "-q", "--no-index", "--", path],
+        cwd=workdir,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    return run.returncode == 0
+
+
+def _drop_ignored_staged_paths(workdir: Path) -> list[str]:
+    """Drop staged paths the repo's ignore rules exclude; return what was dropped.
+
+    The promotion carries TRACKED paths only. A run can force-add an ignored path into its
+    candidate (the ``notes/`` class: process records the convention keeps out of history),
+    and two candidates force-adding the same ignored paths collide add/add at the squash —
+    the 2026-09-22 L20 wedge. Enforcing the convention at the ONE promotion boundary makes
+    that class of collision structurally impossible while the candidate's branch keeps its
+    copy and the phase reports carry the record.
+    """
+    staged = _git(workdir, "diff", "--cached", "--name-only")
+    ignored = [
+        path.strip()
+        for path in staged.splitlines()
+        if path.strip() and _git_check_ignore(workdir, path.strip())
+    ]
+    if ignored:
+        shown = ", ".join(ignored[:5]) + (" …" if len(ignored) > 5 else "")
+        print(
+            f"promote: dropping {len(ignored)} ignored path(s) from the promotion "
+            f"(tracked-paths-only convention): {shown}"
+        )
+        _git(workdir, "rm", "-q", "--cached", "--ignore-unmatch", "--", *ignored)
+    return ignored
+
+
 def _push_squashed(workdir: Path, base: str, subject: str, candidate: str) -> str:
     """Squash the candidate onto the base and push it.
 
     Non-LLM and mechanical: a temporary promotion branch is created at the base, the
-    candidate's diff is squash-merged onto it, and the single commit (canonical subject)
-    is pushed to the base. ``git push`` is the ONLY write to the remote, and this is the
-    sole place in the repo that performs it for promotion. The candidate's own history is
-    NEVER rewritten — it becomes one squash commit on the base.
+    candidate's diff is squash-merged onto it, the squash drops any IGNORED paths the
+    candidate force-added (the tracked-paths-only convention — see
+    ``_drop_ignored_staged_paths``), and the single commit (canonical subject) is pushed to
+    the base. ``git push`` is the ONLY write to the remote, and this is the sole place in
+    the repo that performs it for promotion. The candidate's own history is NEVER rewritten
+    — it becomes one squash commit on the base.
+
+    A failed attempt must not wedge the NEXT one (the 2026-09-22 L20 wedge left the workdir
+    on the temp branch with a conflicted index, and a retry then failed with "candidate
+    rewritten"): the branch creation is retry-safe (``-B``) and any failure restores the
+    candidate head and deletes the temp branch, so a retry starts from the same clean state
+    the first attempt did.
     """
     branch = f"promote-{candidate[:8]}"
-    _git(workdir, "checkout", "-q", "-b", branch, base)
-    _git(workdir, "merge", "--squash", "--no-commit", candidate)
-    # ``--no-verify`` (L19): the squash is the PROMOTION commit, never a phase commit. Run
-    # worktrees carry a commit-msg hook that rewrites subjects to the phase prefix — live,
-    # the first promoted candidate landed on main as '[workflow] g_adversarial — …' instead
-    # of the canonical '[workflow] <spec>' (2026-09-21). The promotion bypasses hooks so the
-    # canonical subject lands verbatim.
-    _git(workdir, "commit", "-q", "--no-verify", "-m", subject)
-    pushed = _git(workdir, "rev-parse", "HEAD")
-    _git(workdir, "push", "-q", "origin", f"{branch}:{base}")
+    prior_head = _git(workdir, "rev-parse", "HEAD")
+    _git(workdir, "checkout", "-q", "-B", branch, base)
+    try:
+        _git(workdir, "merge", "--squash", "--no-commit", candidate)
+        _drop_ignored_staged_paths(workdir)
+        # ``--no-verify`` (L19): the squash is the PROMOTION commit, never a phase commit. Run
+        # worktrees carry a commit-msg hook that rewrites subjects to the phase prefix — live,
+        # the first promoted candidate landed on main as '[workflow] g_adversarial — …' instead
+        # of the canonical '[workflow] <spec>' (2026-09-21). The promotion bypasses hooks so the
+        # canonical subject lands verbatim.
+        _git(workdir, "commit", "-q", "--no-verify", "-m", subject)
+        pushed = _git(workdir, "rev-parse", "HEAD")
+        _git(workdir, "push", "-q", "origin", f"{branch}:{base}")
+    except Exception:
+        _git(workdir, "reset", "-q", "--hard", check=False)
+        _git(workdir, "checkout", "-q", "--force", prior_head, check=False)
+        _git(workdir, "branch", "-D", branch, check=False)
+        raise
     return pushed
 
 

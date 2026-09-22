@@ -1236,3 +1236,66 @@ def test_promoting_row_without_a_recorded_failure_still_refuses(tmp_path):
             record_decision=lambda d: None,
         )
     assert pushed == []
+
+
+# ── A1 (2026-09-22): ignored paths never ride a promotion; a failed squash is retry-clean ────
+
+
+def _force_add_an_ignored_note(wt: Path) -> None:
+    """The run-candidate shape: a .gitignore excluding notes/, plus a FORCE-ADDED note."""
+    (wt / ".gitignore").write_text("notes/\n")
+    (wt / "notes").mkdir(exist_ok=True)
+    (wt / "notes" / "plan.md").write_text("process record\n")
+    subprocess.run(["git", "add", ".gitignore"], cwd=wt, check=True)
+    subprocess.run(["git", "add", "-f", "notes/plan.md"], cwd=wt, check=True)
+    subprocess.run(
+        ["git", "commit", "-q", "-m", "[workflow] scope — force-added note"], cwd=wt, check=True
+    )
+
+
+def test_squash_excludes_force_added_ignored_paths(tmp_path):
+    """The promotion carries TRACKED paths only: a candidate that force-added an ignored path
+    (the ``notes/`` class) promotes WITHOUT it, so two candidates can never collide add/add on
+    ignored paths — the 2026-09-22 L20 wedge class, made structurally impossible."""
+    from promote import _push_squashed
+
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    _force_add_an_ignored_note(wt)
+    sha = _candidate_sha(wt)
+    remote = _bare_origin(tmp_path, wt)
+
+    _push_squashed(wt, "main", "[workflow] promote_test", sha)
+
+    listing = subprocess.run(
+        ["git", "-C", str(remote), "ls-tree", "-r", "--name-only", "main"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split()
+    assert "notes/plan.md" not in listing, "an ignored path must never ride a promotion"
+    assert ".gitignore" in listing, "tracked paths still ride"
+    assert "calc.py" in listing, "the candidate's real change still rides"
+
+
+def test_failed_squash_restores_the_workdir_for_a_retry(tmp_path):
+    """A failed attempt must not wedge the retry: on any squash/push failure the workdir is
+    restored to the candidate head and the temp branch is dropped (the L20 wedge left the
+    clone on the temp branch with a conflicted index, and the retry then refused with
+    "candidate rewritten")."""
+    from promote import _push_squashed
+
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    sha = _candidate_sha(wt)
+    # No remote at all: the push is the failure point, after the squash committed locally.
+    with pytest.raises(_PromoteRefusedError):
+        _push_squashed(wt, "main", "[workflow] promote_test", sha)
+
+    assert _candidate_sha(wt) == sha, "the workdir must be restored to the candidate"
+    branches = subprocess.run(
+        ["git", "branch", "--list", "promote-*"], cwd=wt, capture_output=True, text=True
+    ).stdout.strip()
+    assert branches == "", f"the temp branch must be dropped, found: {branches!r}"
+    dirty = subprocess.run(
+        ["git", "status", "--porcelain"], cwd=wt, capture_output=True, text=True
+    ).stdout.strip()
+    assert dirty == "", f"the workdir must be clean for the retry, found: {dirty!r}"
