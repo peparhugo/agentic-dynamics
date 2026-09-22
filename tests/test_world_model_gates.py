@@ -10,6 +10,7 @@ Covers the two runner additions of 2026-09-21:
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -614,3 +615,237 @@ def test_loop_run_notes_are_ignored_not_tracked():
     merge time (the #109 conflict)."""
     gitignore = (Path(wr.__file__).resolve().parents[3] / ".gitignore").read_text(encoding="utf-8")
     assert "\nnotes/" in gitignore
+
+
+# ── The loop's open extension: execute as a plan-expanded workflow of bounded sub-phases ──────
+#
+# A phase declaring ``expand_from_plan`` is replaced at run time by one bounded agent slice per
+# plan unit plus one independent ``kind: test`` gate per unit — so a plan with N workstreams
+# becomes N sub-phases in ONE run, each with its own commit and its own gate. These tests are
+# the conformance suite the execute prompt names.
+
+EXPAND_SPEC = """name: t_wml_expand
+question: q
+version: "0.1"
+artifact_kind: workflow
+intent: measure
+side_effects: {repository: true, external_services: false}
+repeatable: true
+factors: [{name: model, levels: [m]}]
+design: factorial
+rules: []
+metrics: []
+comparison: null
+writeup: {format: lab_book, sections: [question]}
+stop: {budget_usd: 1.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_uncertainty}
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: false
+    rag: {emit_self: false, emit_report: false}
+    context:
+      domain_context: TEST
+    phases:
+      - name: prior
+        kind: agent
+        timeout: 60
+        prompt: |
+          prior {goal}
+      - name: execute
+        kind: agent
+        scope: implementation
+        timeout: 60
+        requires_files: [notes/plan.units.json]
+        expand_from_plan: notes/plan.units.json
+        prompt: |
+          execute unit {unit_id} | goal={unit_goal} | files={unit_files} |
+          acceptance={unit_acceptance} | task {goal}
+      - name: posterior
+        kind: agent
+        timeout: 60
+        requires_files: [notes/plan.units.json]
+        prompt: |
+          posterior {goal}
+"""
+
+
+def _write_expand_spec(tmp_path) -> Path:
+    path = tmp_path / "expand_spec.yaml"
+    path.write_text(EXPAND_SPEC, encoding="utf-8")
+    return path
+
+
+def _units(*entries) -> str:
+    return json.dumps({"units": list(entries)})
+
+
+def _two_units(*, dependent_first: bool = True) -> str:
+    """Two units; by default the dependent one is DECLARED first (proves topo order)."""
+    u1 = {
+        "id": "u1",
+        "goal": "one",
+        "files": ["a.py"],
+        "tests": [],
+        "acceptance": "A",
+        "budget_usd": 0.1,
+        "depends_on": [],
+    }
+    u2 = {
+        "id": "u2",
+        "goal": "two",
+        "files": ["b.py"],
+        "tests": [],
+        "acceptance": "B",
+        "budget_usd": 0.1,
+        "depends_on": ["u1"],
+    }
+    return _units(*([u2, u1] if dependent_first else [u1, u2]))
+
+
+def test_expand_from_plan_replaces_one_phase_with_unit_slices_and_gates(tmp_path):
+    """A 2-unit plan yields exactly 2 slices + 2 gates, in dependency order, in ONE run."""
+    _init_repo(tmp_path)
+    (tmp_path / "notes").mkdir()
+    (tmp_path / "notes" / "plan.units.json").write_text(_two_units(), encoding="utf-8")
+    spec = load_spec(_write_expand_spec(tmp_path))
+    counter = {"n": 0}
+
+    def fake(prompt, **kwargs):
+        counter["n"] += 1
+        (tmp_path / f"work_{counter['n']}.txt").write_text("work")
+        return _R()
+
+    result = wr.run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=fake)
+    assert [p.phase for p in result.phases] == [
+        "prior",
+        "execute__u1",
+        "g_u1_test_gate",
+        "execute__u2",
+        "g_u2_test_gate",
+        "posterior",
+    ]
+    expansion = result.plan_expansion
+    assert expansion is not None
+    assert expansion["units"] == 2
+    assert expansion["base_phase"] == "execute"
+    assert expansion["phases"] == [
+        "execute__u1",
+        "g_u1_test_gate",
+        "execute__u2",
+        "g_u2_test_gate",
+    ]
+    # The expansion record is additive on the serialized ledger (old ledgers lack it).
+    assert result.to_dict()["plan_expansion"]["units"] == 2
+
+
+def test_each_unit_slice_commits_independently_in_one_run(tmp_path):
+    """2 units → 2 distinct slice commits inside ONE WorkflowRunResult (same run/ledger)."""
+    _init_repo(tmp_path)
+    (tmp_path / "notes").mkdir()
+    (tmp_path / "notes" / "plan.units.json").write_text(_two_units(), encoding="utf-8")
+    spec = load_spec(_write_expand_spec(tmp_path))
+    counter = {"n": 0}
+
+    def fake(prompt, **kwargs):
+        counter["n"] += 1
+        (tmp_path / f"work_{counter['n']}.txt").write_text("work")
+        return _R()
+
+    result = wr.run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=fake)
+    by_phase = {p.phase: p for p in result.phases}
+    u1_commit = by_phase["execute__u1"].commit_hash
+    u2_commit = by_phase["execute__u2"].commit_hash
+    assert u1_commit and u2_commit
+    assert u1_commit != u2_commit  # each bounded sub-phase owns its own commit
+    assert len(result.phases) == 6
+    assert result.ok
+
+
+def test_unit_gate_skips_explicitly_when_the_unit_names_no_tests(tmp_path):
+    """An analysis-only unit's gate SKIPS explicitly — no fabricated verdict, never the tree."""
+    _init_repo(tmp_path)
+    (tmp_path / "notes").mkdir()
+    (tmp_path / "notes" / "plan.units.json").write_text(_two_units(), encoding="utf-8")
+    spec = load_spec(_write_expand_spec(tmp_path))
+    counter = {"n": 0}
+
+    def fake(prompt, **kwargs):
+        counter["n"] += 1
+        (tmp_path / f"work_{counter['n']}.txt").write_text("work")
+        return _R()
+
+    result = wr.run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=fake)
+    by_phase = {p.phase: p for p in result.phases}
+    for gate_name in ("g_u1_test_gate", "g_u2_test_gate"):
+        gate = by_phase[gate_name]
+        assert gate.status == "ok"
+        assert "SKIPPED" in gate.test_gate_note
+        assert "no test targets" in gate.test_gate_note
+        assert gate.test_executed_success is None  # never ran — never a fabricated verdict
+
+
+@pytest.mark.parametrize(
+    "units, fragment",
+    [
+        # a dependency cycle
+        (
+            [
+                {"id": "u1", "goal": "one", "budget_usd": 0.1, "depends_on": ["u2"]},
+                {"id": "u2", "goal": "two", "budget_usd": 0.1, "depends_on": ["u1"]},
+            ],
+            "cycle",
+        ),
+        # an unknown dependency
+        (
+            [{"id": "u1", "goal": "one", "budget_usd": 0.1, "depends_on": ["ghost"]}],
+            "unknown unit",
+        ),
+        # unit budgets that sum above the run budget (spec.stop.budget_usd = 1.0)
+        (
+            [
+                {"id": "u1", "goal": "one", "budget_usd": 0.6, "depends_on": []},
+                {"id": "u2", "goal": "two", "budget_usd": 0.6, "depends_on": []},
+            ],
+            "above the run budget",
+        ),
+    ],
+)
+def test_expansion_refuses_before_spend_on_a_bad_plan(tmp_path, units, fragment):
+    """A bad plan FAILS the declaring phase with PLAN_EXPANSION and ZERO agent invocations."""
+    _init_repo(tmp_path)
+    (tmp_path / "notes").mkdir()
+    (tmp_path / "notes" / "plan.units.json").write_text(_units(*units), encoding="utf-8")
+    spec = load_spec(_write_expand_spec(tmp_path))
+    calls = []
+
+    def fake(prompt, **kwargs):
+        calls.append(prompt)
+        return _R()
+
+    result = wr.run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=fake)
+    by_phase = {p.phase: p for p in result.phases}
+    assert by_phase["execute"].status == "failed"
+    assert "PLAN_EXPANSION" in by_phase["execute"].error
+    assert fragment in by_phase["execute"].error
+    assert len(calls) == 1  # only the prior phase ran — refused before the execute spend
+
+
+def test_spec_without_expand_from_plan_is_unchanged(tmp_path):
+    """Backward compatibility: no key → no expansion, the declared phase list is untouched."""
+    _init_repo(tmp_path)
+    spec = load_spec(_write_spec(tmp_path))
+    calls = []
+
+    def fake(prompt, **kwargs):
+        calls.append(prompt)
+        (tmp_path / "notes").mkdir(exist_ok=True)
+        (tmp_path / "notes" / "plan.md").write_text("the plan")
+        return _R()
+
+    result = wr.run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=fake)
+    assert result.plan_expansion is None
+    assert [p.phase for p in result.phases] == ["prior", "execute"]
+    assert result.to_dict()["plan_expansion"] is None

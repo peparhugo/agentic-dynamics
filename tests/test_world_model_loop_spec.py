@@ -54,3 +54,21 @@ def test_posterior_prompt_requires_note_provenance():
     """The posterior must check a note's last commit before trusting it."""
     prompt = str(_phases(load_spec(SPEC_PATH))["posterior"].get("prompt", ""))
     assert "git log -1 -- notes/" in prompt
+
+
+def test_execute_declares_expand_from_plan():
+    """The loop ADOPTS the open extension: execute expands from the machine-readable plan.
+
+    Pinned so a later edit cannot silently drop the bridge and regress a large plan back to a
+    single unbounded execute turn.
+    """
+    execute = _phases(load_spec(SPEC_PATH))["execute"]
+    assert execute.get("expand_from_plan") == "notes/plan.units.json"
+    assert "notes/plan.units.json" in (execute.get("requires_files") or [])
+
+
+def test_prior_orders_the_machine_readable_units_artifact():
+    """The prior writes the plan→phases bridge the execute expansion consumes."""
+    prompt = str(_phases(load_spec(SPEC_PATH))["prior"].get("prompt", ""))
+    assert "notes/plan.units.json" in prompt
+    assert "## Workstreams" in prompt

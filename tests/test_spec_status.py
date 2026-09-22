@@ -899,6 +899,53 @@ def test_legacy_run_without_a_digest_predating_a_gate_does_not_certify(tmp_path:
     assert derive_status(load_spec(path), [legacy]) == "runnable"
 
 
+def test_expanded_run_certifies_the_declared_revision(tmp_path: Path):
+    """The loop's open extension: an expanded execute must not read as a definition change.
+
+    A plan→phases run records generated unit slices + gates instead of the declared ``execute``
+    phase. The revision-coverage check folds a FULLY-executed expansion back to its base phase,
+    so the green run certifies the current definition instead of falsely reading "the runs
+    predate the spec" — and a genuinely REMOVED phase still reads as an edit (the control).
+    """
+    from agentic_dynamics.experiment.experiment_spec import load_spec
+    from agentic_dynamics.experiment.spec_status import derive_status
+
+    specs = tmp_path / "workflows" / "repository"
+    specs.mkdir(parents=True)
+    path = specs / "loop.yaml"
+    path.write_text(_phase_spec_yaml("loop", phases=["prior", "execute", "posterior"]))
+    spec = load_spec(path)
+    expanded = ["execute__u1", "g_u1_test_gate", "execute__u2", "g_u2_test_gate"]
+
+    run = RunSummary(
+        path="experiments/results/workflows/loop/20260902T000000Z.json",
+        timestamp="2026-09-02T00:00:00+00:00",
+        ok=True,
+        executed_phases=frozenset(["prior", *expanded, "posterior"]),
+        plan_expansion={"base_phase": "execute", "phases": expanded, "units": 2},
+    )
+    assert derive_status(spec, [run]) == "completed"
+
+    # A partial expansion never folds — it cannot certify the declared phase.
+    partial = RunSummary(
+        path="experiments/results/workflows/loop/20260902T000001Z.json",
+        timestamp="2026-09-02T00:00:01+00:00",
+        ok=True,
+        executed_phases=frozenset(["prior", "execute__u1", "posterior"]),
+        plan_expansion={"base_phase": "execute", "phases": expanded, "units": 2},
+    )
+    assert derive_status(spec, [partial]) != "completed"
+
+    # Control: a genuinely removed phase still reads as an edited definition.
+    removed = RunSummary(
+        path="experiments/results/workflows/loop/20260902T000002Z.json",
+        timestamp="2026-09-02T00:00:02+00:00",
+        ok=True,
+        executed_phases=frozenset(["prior", "old_execute", "posterior"]),
+    )
+    assert derive_status(spec, [removed]) == "runnable"
+
+
 def test_no_authored_status_and_no_runs_returns_never_run(tmp_path: Path):
     """VERIFY (c): unchanged semantics for the no-revision case."""
     from agentic_dynamics.experiment.spec_status import derive_status

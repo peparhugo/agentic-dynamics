@@ -54,31 +54,60 @@ workflow:
              `## Problem`, `## What Exists`, `## Gaps`, `## Sources` — SOURCES lists every KB
              record id, file, and fetched URL (+sha256) you actually used.
           3. WRITE `notes/plan.md` with these SECTIONS (the execute gate checks them):
-             `## Files`, `## Tests`, `## Acceptance`, `## Risks`.
-          4. WRITE `notes/sources.jsonl` — one JSON line per source you ACTUALLY used
+             `## Files`, `## Tests`, `## Acceptance`, `## Risks`, `## Workstreams`.
+             `## Workstreams` decomposes the plan into the units step 4 encodes.
+          4. WRITE `notes/plan.units.json` — the MACHINE-READABLE plan the execute phase EXPANDS
+             into bounded sub-phases (one per unit, each with its own commit and its own test
+             gate). Its shape:
+             `{"units": [{"id": "u1", "goal": "...", "files": ["src/..."],
+             "tests": ["tests/test_x.py"], "acceptance": "...", "budget_usd": 0.5,
+             "depends_on": []}]}`.
+             One unit per workstream; `id` a stable token (letters/digits, then `._-`);
+             `depends_on` names other unit ids; `tests` the `tests/` paths that verify THAT
+             unit (empty for an analysis-only unit); `budget_usd` your estimate — the units'
+             budgets must not sum above the run's budget. Scale the count to the work: a small
+             plan is ONE unit; a large plan is several bounded ones, never one unbounded turn.
+          5. WRITE `notes/sources.jsonl` — one JSON line per source you ACTUALLY used
              (`{"kind": "kb"|"file"|"url", "ref": "<id|path|url>", "sha256": "<hex>"}`; a
              fetched URL carries the sha256 `research_fetch` returned). When no external fact
              was needed, write exactly one line `{"none": true, "reason": "..."}`. The
              `## Sources` section above and this file must agree.
 
-          Do NOT implement — the plan gates the execute phase. Commit all three files.
+          Do NOT implement — the plan gates the execute phase. Commit all four files.
       - name: execute
         kind: agent
         scope: implementation
         timeout: 3600
-        requires_files: [notes/plan.md, notes/sources.jsonl]
+        requires_files: [notes/plan.md, notes/sources.jsonl, notes/plan.units.json]
         requires_content:
           notes/plan.md: ["## Files", "## Tests", "## Acceptance"]
+        # The loop's open extension (2026-09-21): the runner EXPANDS this one phase into one
+        # bounded agent slice per unit in `notes/plan.units.json` plus one independent
+        # `kind: test` gate per unit — so a plan with N workstreams becomes N sub-phases, each
+        # with its own commit and its own gate, in ONE run. The prompt below is the per-unit
+        # template the runner renders (`{unit_id}` / `{unit_goal}` / `{unit_files}` /
+        # `{unit_acceptance}`). A malformed plan FAILS this phase with `PLAN_EXPANSION` before
+        # any spend.
+        expand_from_plan: notes/plan.units.json
         prompt: |
-          You are the EXECUTE phase. Implement the task ({goal}) FOLLOWING `notes/plan.md`.
+          You are the EXECUTE phase for ONE workstream of a plan ({goal}). The runner has
+          expanded this phase into one bounded slice per unit in `notes/plan.units.json`; this
+          slice is unit `{unit_id}`.
 
-          ALWAYS write `notes/deviations.md` — unconditionally. Where reality differs from the
-          plan or the world model, do not silently adapt: record it there (what the plan said,
-          what was true, what you did instead). When nothing deviated, still write the file with
-          the explicit-empty record `no deviations`. Never skip the write: a stale note left in
-          the slot from a prior run is worse than no note.
-          Create the tests the plan names; run the local verification commands it lists.
-          Commit your work.
+          THIS UNIT'S GOAL: {unit_goal}
+          FILES: {unit_files}
+          ACCEPTANCE: {unit_acceptance}
+
+          Implement ONLY this unit, against `notes/plan.md` and `notes/world_model.md`. Do not
+          attempt a sibling unit's work — another slice owns it.
+
+          ALWAYS record deviations: APPEND to `notes/deviations.md` — unconditionally. Where
+          reality differs from the plan or the world model, do not silently adapt: record it
+          (what the plan said, what was true, what you did instead). When this unit deviated in
+          nothing, append the explicit-empty record `no deviations`. Never skip the write: a
+          stale note left in the slot from a prior run is worse than no note.
+          Create the tests the unit names; run the local verification commands it lists.
+          Commit your unit's work.
       - name: g_test_gate
         kind: test
         scope: implementation

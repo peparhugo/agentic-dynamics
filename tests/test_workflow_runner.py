@@ -9,6 +9,8 @@ from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from agentic_dynamics.experiment import spec_status
 from agentic_dynamics.experiment.experiment_spec import (
     ExperimentSpec,
@@ -21,9 +23,14 @@ from agentic_dynamics.experiment.spec_status import SpecStatusEntry
 from agentic_dynamics.knowledge.augment import default_retrieve_fn
 from agentic_dynamics.runtime import workflow_runner
 from agentic_dynamics.runtime.workflow_runner import (
+    PLAN_UNIT_CAP_DEFAULT,
     ResumeState,
     _build_phase_prompt,
     _completed_phases_from_index,
+    _expand_plan_phases,
+    _load_plan_units,
+    _order_plan_units,
+    _resolve_test_targets,
     cell_scope,
     run_workflow,
 )
@@ -63,6 +70,145 @@ def test_phase_prompt_templating():
     assert "the portal" in out
     assert "scope (ok)" in out
     assert "{goal}" not in out
+
+
+# ── The plan→phases bridge helpers (the loop's open extension) ────────────────────────────────
+
+
+def _write_units(tmp_path, payload):
+    (tmp_path / "notes").mkdir(exist_ok=True)
+    path = tmp_path / "notes" / "plan.units.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def _unit(uid, *, depends_on=None, goal="do it", tests=None, budget=0.1):
+    return {
+        "id": uid,
+        "goal": goal,
+        "files": [f"{uid}.py"],
+        "tests": tests or [],
+        "acceptance": f"{uid} accepted",
+        "budget_usd": budget,
+        "depends_on": depends_on or [],
+    }
+
+
+def test_load_plan_units_returns_declaration_order(tmp_path):
+    _write_units(tmp_path, {"units": [_unit("b"), _unit("a")]})
+    units = _load_plan_units("notes/plan.units.json", tmp_path)
+    assert [u["id"] for u in units] == ["b", "a"]
+
+
+def test_order_plan_units_is_topological_by_dependency(tmp_path):
+    # 'second' is DECLARED first but depends on 'first' — order must flip.
+    _write_units(tmp_path, {"units": [_unit("second", depends_on=["first"]), _unit("first")]})
+    units = _load_plan_units("notes/plan.units.json", tmp_path)
+    assert [u["id"] for u in _order_plan_units(units)] == ["first", "second"]
+
+
+def test_load_plan_units_refuses_a_duplicate_id(tmp_path):
+    _write_units(tmp_path, {"units": [_unit("u1"), _unit("u1")]})
+    with pytest.raises(ValueError, match="duplicate plan unit id"):
+        _load_plan_units("notes/plan.units.json", tmp_path)
+
+
+def test_load_plan_units_refuses_an_unknown_dependency(tmp_path):
+    _write_units(tmp_path, {"units": [_unit("u1", depends_on=["ghost"])]})
+    with pytest.raises(ValueError, match="unknown unit"):
+        _load_plan_units("notes/plan.units.json", tmp_path)
+
+
+def test_load_plan_units_refuses_a_missing_artifact(tmp_path):
+    with pytest.raises(ValueError, match="not found"):
+        _load_plan_units("notes/plan.units.json", tmp_path)
+
+
+def test_order_plan_units_refuses_a_cycle(tmp_path):
+    _write_units(tmp_path, {"units": [_unit("a", depends_on=["b"]), _unit("b", depends_on=["a"])]})
+    units = _load_plan_units("notes/plan.units.json", tmp_path)
+    with pytest.raises(ValueError, match="cycle"):
+        _order_plan_units(units)
+
+
+def test_expand_plan_phases_renders_unit_placeholders_and_splices_gates(tmp_path):
+    _write_units(tmp_path, {"units": [_unit("u1", goal="build the thing")]})
+    phases = [
+        {"name": "prior", "kind": "agent", "prompt": "p"},
+        {
+            "name": "execute",
+            "kind": "agent",
+            "scope": "implementation",
+            "timeout": 90,
+            "requires_files": ["notes/plan.units.json"],
+            "expand_from_plan": "notes/plan.units.json",
+            "prompt": "unit {unit_id} goal {unit_goal} files {unit_files} acc {unit_acceptance}",
+        },
+        {"name": "posterior", "kind": "agent", "prompt": "post"},
+    ]
+    expanded, record = _expand_plan_phases(phases, tmp_path, run_budget_usd=1.0)
+    assert [p["name"] for p in expanded] == [
+        "prior",
+        "execute__u1",
+        "g_u1_test_gate",
+        "posterior",
+    ]
+    slice_def = expanded[1]
+    assert slice_def["prompt"] == "unit u1 goal build the thing files u1.py acc u1 accepted"
+    assert slice_def["requires_deliverable"] is True
+    assert slice_def["scope"] == "implementation"
+    assert slice_def["timeout"] == 90
+    assert slice_def["requires_files"] == ["notes/plan.units.json"]
+    gate_def = expanded[2]
+    assert gate_def["kind"] == "test"
+    assert gate_def["tests"] == []
+    assert record is not None and record["units"] == 1
+    # The original list is not mutated in place.
+    assert phases[1]["name"] == "execute"
+
+
+def test_expand_plan_phases_refuses_above_the_unit_cap(tmp_path):
+    _write_units(tmp_path, {"units": [_unit("u1"), _unit("u2")]})
+    phases = [
+        {
+            "name": "execute",
+            "kind": "agent",
+            "expand_from_plan": "notes/plan.units.json",
+            "prompt": "x",
+        }
+    ]
+    with pytest.raises(ValueError, match="unit cap"):
+        _expand_plan_phases(phases, tmp_path, unit_cap=1)
+    # the default cap is a real bound
+    assert PLAN_UNIT_CAP_DEFAULT > 1
+
+
+def test_expand_plan_phases_is_a_noop_without_the_key():
+    phases = [{"name": "p1", "kind": "agent", "prompt": "x"}]
+    expanded, record = _expand_plan_phases(phases, Path("/nonexistent"))
+    assert expanded is phases  # byte-identical path: the SAME list object
+    assert record is None
+
+
+def test_expand_plan_phases_refuses_two_declaring_phases(tmp_path):
+    _write_units(tmp_path, {"units": [_unit("u1")]})
+    phases = [
+        {"name": "a", "kind": "agent", "expand_from_plan": "notes/plan.units.json", "prompt": "x"},
+        {"name": "b", "kind": "agent", "expand_from_plan": "notes/plan.units.json", "prompt": "x"},
+    ]
+    with pytest.raises(ValueError, match="only one phase"):
+        _expand_plan_phases(phases, tmp_path)
+
+
+def test_resolve_test_targets_explicit_empty_list_is_an_explicit_skip(tmp_path):
+    # The expansion emits ``tests: []`` for a unit that names no tests — an explicit skip.
+    assert _resolve_test_targets({"kind": "test", "tests": []}, tmp_path) == (None, True)
+    # Absent keeps the historical whole-tree default; a declared list is targeted exactly.
+    assert _resolve_test_targets({"kind": "test"}, tmp_path) == (None, False)
+    declared, skipped = _resolve_test_targets(
+        {"kind": "test", "tests": ["tests/test_x.py"]}, tmp_path
+    )
+    assert declared == ["tests/test_x.py"] and skipped is False
 
 
 def test_run_workflow_phases_in_order(tmp_path):

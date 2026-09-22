@@ -1159,6 +1159,46 @@ def validate_spec(
                     f"integer (got {value!r})"
                 )
 
+    # ── Phase-level gate: ``expand_from_plan`` (the loop's open extension) ─────
+    # A phase declaring ``expand_from_plan: <path>`` is replaced at run time by one agent slice
+    # per workstream in that plan plus one independent ``kind: test`` gate per unit. Type-safety
+    # + supported-combination only — the plan itself is a RUN-time artifact the validator never
+    # sees (the runner validates it, and a bad plan fails the declaring phase with
+    # ``PLAN_EXPANSION`` before any spend). The value must be a non-empty string, and the phase
+    # must be an AGENT phase: a ``kind: test`` phase expands into no work and would emit gates
+    # with nothing for them to verify, so it is refused (mirroring checkpoint-on-test).
+    for ph in spec.workflow.params.get("phases") or []:
+        if not isinstance(ph, dict):
+            continue
+        if "expand_from_plan" in ph:
+            value = ph.get("expand_from_plan")
+            if not isinstance(value, str) or not value.strip():
+                errors.append(
+                    f'phase "{ph.get("name", "?")}": expand_from_plan must be a non-empty '
+                    f"string path (got {value!r})"
+                )
+            elif ph.get("kind") == "test":
+                errors.append(
+                    f'phase "{ph.get("name", "?")}": expand_from_plan on kind: test is '
+                    "unsupported — only an agent phase can expand into unit slices + gates"
+                )
+            elif ph.get("checkpoint"):
+                # The expansion REPLACES the declaring phase, so a checkpoint on it would
+                # silently vanish (a safety requirement expressed in prose/schema must be
+                # enforceable). Refuse rather than drop it.
+                errors.append(
+                    f'phase "{ph.get("name", "?")}": expand_from_plan with checkpoint: true is '
+                    "unsupported — the expansion replaces the phase, so the checkpoint would "
+                    "silently vanish (put the checkpoint on its own phase)"
+                )
+
+    # The plan-expansion unit ceiling (the loop's open extension): a positive integer, so a
+    # typo cannot silently disable the bound that keeps a plan's N bounded.
+    if "plan_unit_cap" in spec.workflow.params:
+        cap = spec.workflow.params.get("plan_unit_cap")
+        if isinstance(cap, bool) or not isinstance(cap, int) or cap < 1:
+            errors.append(f"workflow.params.plan_unit_cap must be a positive integer (got {cap!r})")
+
     # ── Phase-level gate: ``no_emit`` (kb_finding_layer k1) ─────────────
     # Optional per-phase marker, default false. Findings are the DEFAULT for workflow runs
     # (every successful committed phase emits its scoped finding); a phase that must not emit

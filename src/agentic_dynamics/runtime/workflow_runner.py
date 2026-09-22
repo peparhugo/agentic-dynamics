@@ -541,6 +541,12 @@ class WorkflowRunResult:
     #: (the final-checkpoint approval is the canonical case) executes nothing — that is LOGICAL
     #: COMPLETION, never a cancelled run. Additive key; pre-2d ledgers lack it and parse False.
     already_complete: bool = False
+    #: The plan→phases expansion record (the world-model loop's open extension, 2026-09-21):
+    #: ``{"plan", "base_phase", "units", "phases", "unit_budgets_usd", "total_budget_usd"}``
+    #: when a phase declared ``expand_from_plan`` and the runner replaced it with unit slices +
+    #: gates; ``None`` for every spec without the key (the byte-identical no-op). Additive key —
+    #: old ledgers lack it; consumers read it via ``.get("plan_expansion")``.
+    plan_expansion: dict[str, Any] | None = None
 
     @property
     def total_cost_usd(self) -> float:
@@ -649,6 +655,10 @@ class WorkflowRunResult:
             # complete) reached the ``{prior_answers}`` channel this run. Old ledgers lack
             # the key; consumers read it via ``.get("answers_delivered", [])``.
             "answers_delivered": [dict(entry) for entry in self.answers_delivered],
+            # ADDED key (the loop's open extension, 2026-09-21 — never renames an existing
+            # key): the plan→phases expansion record. Old ledgers lack it; consumers read it
+            # via ``.get("plan_expansion")``.
+            "plan_expansion": self.plan_expansion,
         }
 
 
@@ -1488,6 +1498,13 @@ def _resolve_test_targets(
     exact for code-producing ones.
     """
     declared = phase_def.get("tests")
+    # An EXPLICITLY EMPTY target list is an explicit SKIP (the plan→phases bridge emits it for
+    # a unit that names no tests): the gate records ``test_gate_note`` and never fabricates a
+    # verdict, instead of silently falling through to the whole-tree default. Absent/None
+    # keeps the historical whole-tree semantics — only the explicit ``[]`` changes meaning,
+    # and no committed spec declares one.
+    if isinstance(declared, list) and not declared:
+        return None, True
     if declared:
         return declared, False
     plan_rel = str(phase_def.get("tests_from_plan") or "").strip()
@@ -1497,6 +1514,329 @@ def _resolve_test_targets(
     if not targets:
         return None, True
     return targets, False
+
+
+# ── The plan→phases bridge (the world-model loop's open extension, 2026-09-21) ────────────────
+#
+# A phase may declare ``expand_from_plan: <path>`` — a machine-readable workstream plan
+# (``{"units": [{id, goal, files, tests, acceptance, budget_usd, depends_on}, ...]}``). At run
+# time the runner REPLACES that one declared phase with one bounded agent slice per unit plus
+# one independent ``kind: test`` gate per unit, so a plan with N workstreams becomes N bounded
+# sub-phases in ONE run (same ledger, same candidate, same promotion check) instead of one turn
+# that silently grows unbounded — the shape the ``cap_*`` family authored by hand, generalized
+# to a plan written at run time.
+#
+# ONE-LINE JUSTIFICATION (the project rule for a net-new mechanism): the plan is written at RUN
+# time by the prior phase, so the execute workstreams cannot exist in the spec's authored phase
+# list; expanding ONE declared phase into its plan's units is the minimal bridge between a
+# run-time artifact and a static runner, and it reuses the existing phase/gate/commit machinery
+# unchanged.
+EXPAND_FROM_PLAN_KEY = "expand_from_plan"
+#: The default ceiling on how many units one plan may expand into. The extension's whole point
+#: is that N is BOUNDED; an uncapped expansion re-creates the unbounded turn it removes.
+#: Overridable per spec with ``workflow.params.plan_unit_cap``.
+PLAN_UNIT_CAP_DEFAULT = 24
+#: A unit id must be usable as a phase-name token — it appears in the generated phase names,
+#: the ``[workflow] <phase> —`` commit subjects, and the ledger. Letters/digits first, then
+#: letters/digits/``.``/``_``/``-``.
+_PLAN_UNIT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+#: Bound every free-text unit field: unit text flows into sub-phase prompts, so an unbounded
+#: field is a prompt-injection / prompt-bloat vector (the plan's risk #4). Truncation is
+#: explicit and marked, never a silent drop.
+_PLAN_UNIT_FIELD_LIMIT = 2000
+
+
+def _plan_unit_cap(spec: ExperimentSpec) -> int:
+    """The effective plan-expansion unit ceiling (``workflow.params.plan_unit_cap``).
+
+    Defensive by construction: a malformed value falls back to the default rather than
+    disabling the bound (``validate_spec`` refuses a malformed cap on the authored path, so
+    this only guards programmatically-constructed specs and direct callers — and a bad cap can
+    never mean "unlimited").
+    """
+    raw = (spec.workflow.params or {}).get("plan_unit_cap", PLAN_UNIT_CAP_DEFAULT)
+    try:
+        cap = int(raw)
+    except (TypeError, ValueError):
+        return PLAN_UNIT_CAP_DEFAULT
+    return cap if cap > 0 else PLAN_UNIT_CAP_DEFAULT
+
+
+def _truncate_plan_field(value: str) -> str:
+    """Bound one free-text plan field to ``_PLAN_UNIT_FIELD_LIMIT`` chars (marked)."""
+    text = str(value)
+    if len(text) <= _PLAN_UNIT_FIELD_LIMIT:
+        return text
+    return text[:_PLAN_UNIT_FIELD_LIMIT] + "…[truncated]"
+
+
+def _plan_unit_str_list(value: Any, label: str) -> list[str]:
+    """Coerce a plan field to a list of non-empty strings (``None`` → ``[]``).
+
+    A non-list, or a list with a non-string member, is a named refusal — a plan the runner
+    cannot read is never silently reinterpreted.
+    """
+    if value is None:
+        return []
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        raise ValueError(f"{label} must be a list of strings")
+    return [item.strip() for item in value if item.strip()]
+
+
+def _normalize_plan_unit(entry: dict[str, Any], index: int) -> dict[str, Any]:
+    """Validate + normalize one unit from ``notes/plan.units.json``.
+
+    Every refusal is a named ``ValueError`` so the declaring phase fails with a legible
+    ``PLAN_EXPANSION`` reason rather than producing a half-built phase list.
+    """
+    uid = entry.get("id")
+    if not isinstance(uid, str) or not uid.strip():
+        raise ValueError(f"plan unit #{index} has no non-empty string 'id'")
+    uid = uid.strip()
+    if not _PLAN_UNIT_ID_RE.match(uid):
+        raise ValueError(
+            f"plan unit id {uid!r} is not a safe phase-name token "
+            "(letters/digits first; then letters/digits/._-)"
+        )
+    goal = entry.get("goal")
+    if not isinstance(goal, str) or not goal.strip():
+        raise ValueError(f"plan unit {uid!r} has no non-empty string 'goal'")
+    acceptance = entry.get("acceptance", "")
+    if acceptance is None:
+        acceptance = ""
+    if not isinstance(acceptance, str):
+        raise ValueError(f"plan unit {uid!r} 'acceptance' must be a string")
+    budget = entry.get("budget_usd", 0.0)
+    if isinstance(budget, bool) or not isinstance(budget, (int, float)) or budget < 0:
+        raise ValueError(f"plan unit {uid!r} 'budget_usd' must be a number >= 0")
+    return {
+        "id": uid,
+        "goal": _truncate_plan_field(goal.strip()),
+        "files": [
+            _truncate_plan_field(item)
+            for item in _plan_unit_str_list(entry.get("files"), f"plan unit {uid!r} 'files'")
+        ],
+        "tests": _plan_unit_str_list(entry.get("tests"), f"plan unit {uid!r} 'tests'"),
+        "acceptance": _truncate_plan_field(acceptance),
+        "budget_usd": float(budget),
+        "depends_on": _plan_unit_str_list(
+            entry.get("depends_on"), f"plan unit {uid!r} 'depends_on'"
+        ),
+    }
+
+
+def _load_plan_units(plan_ref: str, wd: Path) -> list[dict[str, Any]]:
+    """Load + validate the machine-readable workstream plan (the plan→phases bridge).
+
+    Returns the units in DECLARATION order (topological ordering is
+    :func:`_order_plan_units`). Every refusal raises ``ValueError`` with a named reason, so the
+    declaring phase records a visible ``PLAN_EXPANSION`` failure instead of silently producing
+    a zero-phase execute. The path is worktree-relative unless absolute, resolved against the
+    CANDIDATE tree (``git_wd`` — the same clone-aware choice the artifact gate makes).
+    """
+    path = Path(str(plan_ref))
+    if not path.is_absolute():
+        path = Path(wd) / path
+    if not path.is_file():
+        raise ValueError(f"plan units artifact not found: {plan_ref}")
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise ValueError(f"plan units artifact unreadable: {plan_ref}: {exc}") from None
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"plan units artifact is not valid JSON: {plan_ref}: {exc}") from None
+    if not isinstance(raw, dict) or not isinstance(raw.get("units"), list) or not raw["units"]:
+        raise ValueError(
+            f"plan units artifact {plan_ref} must be an object with a non-empty 'units' list"
+        )
+    units: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for index, entry in enumerate(raw["units"], start=1):
+        if not isinstance(entry, dict):
+            raise ValueError(f"plan unit #{index} must be a mapping")
+        unit = _normalize_plan_unit(entry, index)
+        if unit["id"] in seen:
+            raise ValueError(f"duplicate plan unit id {unit['id']!r}")
+        seen.add(unit["id"])
+        units.append(unit)
+    known = {unit["id"] for unit in units}
+    for unit in units:
+        unknown = [dep for dep in unit["depends_on"] if dep not in known]
+        if unknown:
+            raise ValueError(f"plan unit {unit['id']!r} depends_on unknown unit(s): {unknown}")
+    return units
+
+
+def _order_plan_units(units: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Kahn topological order of the units by ``depends_on`` (declaration order breaks ties).
+
+    A dependency cycle means no valid execution order exists — refused by name. Unknown
+    dependencies were already refused by :func:`_load_plan_units`, so every edge here resolves.
+    """
+    by_id = {unit["id"]: unit for unit in units}
+    indegree = {unit["id"]: 0 for unit in units}
+    dependents: dict[str, list[str]] = {unit["id"]: [] for unit in units}
+    for unit in units:
+        for dep in unit["depends_on"]:
+            indegree[unit["id"]] += 1
+            dependents[dep].append(unit["id"])
+    ready = [unit["id"] for unit in units if indegree[unit["id"]] == 0]
+    ordered: list[dict[str, Any]] = []
+    while ready:
+        uid = ready.pop(0)
+        ordered.append(by_id[uid])
+        for child in dependents[uid]:
+            indegree[child] -= 1
+            if indegree[child] == 0:
+                ready.append(child)
+    if len(ordered) != len(units):
+        raise ValueError("plan units contain a dependency cycle")
+    return ordered
+
+
+def _render_unit_prompt(prompt: str, unit: dict[str, Any]) -> str:
+    """Substitute the four unit placeholders into the declared phase prompt template.
+
+    Plain ``str.replace`` (not ``str.format``) so the template's OTHER placeholders —
+    ``{goal}`` / ``{prior_phases}`` / ``{prior_answers}`` / ``{domain_context}`` — survive for
+    ``_build_phase_prompt``, and a stray brace in unit text can never raise.
+    """
+    rendered = str(prompt)
+    values = {
+        "{unit_id}": unit["id"],
+        "{unit_goal}": unit["goal"],
+        "{unit_files}": ", ".join(unit["files"]) or "(none named)",
+        "{unit_acceptance}": unit["acceptance"] or "(none stated)",
+    }
+    for token, value in values.items():
+        rendered = rendered.replace(token, value)
+    return rendered
+
+
+def _unit_slice_def(phase_def: dict[str, Any], unit: dict[str, Any]) -> dict[str, Any]:
+    """The bounded AGENT phase for one plan unit.
+
+    Inherits the declaring phase's execution envelope (``scope`` / ``timeout`` / ``run_model`` /
+    ``enforce_pytest`` / ``deploy_allowed`` / ``no_emit`` / ``requires_files`` /
+    ``requires_content``) so the unit is gated exactly like the whole phase was, and adds
+    ``requires_deliverable: true`` — a unit that changes nothing is a plan miss, not a green
+    phase (without it, a no-op slice would pass and block promotion later). ``unit_id`` /
+    ``unit_acceptance`` are additive provenance (also encoded in the generated name).
+    """
+    slice_def: dict[str, Any] = {
+        "name": f"{str(phase_def.get('name') or 'execute')}__{unit['id']}",
+        "kind": "agent",
+        "prompt": _render_unit_prompt(str(phase_def.get("prompt", "")), unit),
+        "requires_deliverable": True,
+        "unit_id": unit["id"],
+        "unit_acceptance": unit["acceptance"],
+    }
+    for key in ("scope", "timeout", "run_model", "enforce_pytest", "deploy_allowed", "no_emit"):
+        if key in phase_def:
+            slice_def[key] = phase_def[key]
+    if phase_def.get("requires_files"):
+        slice_def["requires_files"] = list(phase_def["requires_files"])
+    if phase_def.get("requires_content"):
+        slice_def["requires_content"] = {
+            key: list(markers) for key, markers in phase_def["requires_content"].items()
+        }
+    return slice_def
+
+
+def _unit_gate_def(phase_def: dict[str, Any], unit: dict[str, Any]) -> dict[str, Any]:
+    """The independent ``kind: test`` gate for one plan unit.
+
+    The unit's declared ``tests`` are the gate targets (the existing declared ``tests:``
+    semantics). A unit that names none gets an EXPLICITLY EMPTY ``tests: []`` — the runner
+    reads that as an explicit skip (``test_gate_note``, no fabricated verdict), so an
+    analysis-only unit never runs the whole tree's suite and never claims a pass it did not earn.
+    """
+    return {
+        "name": f"g_{unit['id']}_test_gate",
+        "kind": "test",
+        "scope": str(phase_def.get("scope") or "implementation"),
+        "timeout": int(phase_def.get("timeout", 1800) or 1800),
+        "tests": list(unit["tests"]),
+        "unit_id": unit["id"],
+        "prompt": (
+            f"The independent test runner verifies plan unit `{unit['id']}` "
+            f"({unit['goal'][:200]}) against the targets the unit names. A unit that names no "
+            "targets SKIPS explicitly (recorded as test_gate_note; no fabricated verdict)."
+        ),
+    }
+
+
+def _expand_plan_phases(
+    phases: list[dict[str, Any]],
+    wd: Path,
+    *,
+    run_budget_usd: float | None = None,
+    unit_cap: int = PLAN_UNIT_CAP_DEFAULT,
+) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+    """Replace the single ``expand_from_plan`` phase with its plan's unit slices + gates.
+
+    Returns ``(phases, expansion_record)``. ``expansion_record`` is ``None`` when no phase
+    declares the key — the byte-identical no-op every spec without the extension takes. Exactly
+    ONE phase may declare the key (the design's execute step); two are refused as ambiguous.
+
+    Refusals (all named ``ValueError``, all BEFORE any spend — the declaring phase records
+    ``PLAN_EXPANSION`` and the loop stops): a missing/unreadable/invalid plan artifact; a
+    dependency cycle or unknown dependency; a duplicate or colliding generated phase name; an
+    over-budget unit sum versus ``spec.stop.budget_usd``; or more units than the cap. The
+    splice preserves the declaring phase's position, so the run's phase ORDER is unchanged.
+    """
+    expanders = [p for p in phases if isinstance(p, dict) and p.get(EXPAND_FROM_PLAN_KEY)]
+    if not expanders:
+        return phases, None
+    if len(expanders) > 1:
+        raise ValueError(
+            "only one phase may declare expand_from_plan — got "
+            f"{[str(p.get('name')) for p in expanders]}"
+        )
+    target = expanders[0]
+    plan_ref = str(target.get(EXPAND_FROM_PLAN_KEY, "")).strip()
+    if not plan_ref:
+        raise ValueError("expand_from_plan must name a non-empty plan artifact path")
+
+    units = _order_plan_units(_load_plan_units(plan_ref, wd))
+    if len(units) > int(unit_cap):
+        raise ValueError(
+            f"plan {plan_ref} names {len(units)} units — above the {int(unit_cap)}-unit cap "
+            "(the cap keeps N bounded; raise workflow.params.plan_unit_cap to allow more)"
+        )
+    total_budget = sum(unit["budget_usd"] for unit in units)
+    if run_budget_usd is not None and total_budget > float(run_budget_usd):
+        raise ValueError(
+            f"plan {plan_ref} unit budgets sum to ${total_budget:.4f} — above the run budget "
+            f"${float(run_budget_usd):.4f} (spec.stop.budget_usd)"
+        )
+
+    base = str(target.get("name") or "execute")
+    reserved = {str(p.get("name", "?")) for p in phases if p is not target}
+    generated: set[str] = set()
+    splices: list[dict[str, Any]] = []
+    for unit in units:
+        slice_def = _unit_slice_def(target, unit)
+        gate_def = _unit_gate_def(target, unit)
+        for name in (slice_def["name"], gate_def["name"]):
+            if name in reserved or name in generated:
+                raise ValueError(
+                    f"expanded phase name {name!r} collides with a declared or generated phase name"
+                )
+        generated.update((slice_def["name"], gate_def["name"]))
+        splices.extend((slice_def, gate_def))
+
+    target_index = next(i for i, p in enumerate(phases) if p is target)
+    new_phases = [*phases[:target_index], *splices, *phases[target_index + 1 :]]
+    record = {
+        "plan": plan_ref,
+        "base_phase": base,
+        "units": len(units),
+        "phases": [phase_def["name"] for phase_def in splices],
+        "unit_budgets_usd": {unit["id"]: unit["budget_usd"] for unit in units},
+        "total_budget_usd": round(total_budget, 6),
+    }
+    return new_phases, record
 
 
 def _run_test_gate(
@@ -4592,6 +4932,26 @@ def run_workflow(
             prior_answers.append(block)
             answers_delivered.append(manifest)
     result.answers_delivered = answers_delivered
+    # ── The plan→phases bridge, pre-loop pass (the loop's open extension, 2026-09-21) ────────
+    # When the machine-readable plan ALREADY exists in the candidate tree (a resume, or a plan
+    # committed before the run), expand now so the resume completion-set filter below sees the
+    # EXPANDED phase names — a parent ledger records the unit slices, never the single execute.
+    # A fresh run's plan does not exist yet (the prior phase writes it), so this is best-effort:
+    # a missing OR invalid plan is swallowed here and surfaced by the declaring phase's own
+    # lazy expansion below, so a malformed artifact never crashes the run before a phase record
+    # exists. No phase declaring the key → byte-identical no-op.
+    try:
+        _pre_phases, _pre_record = _expand_plan_phases(
+            phases,
+            git_wd,
+            run_budget_usd=spec.stop.budget_usd,
+            unit_cap=_plan_unit_cap(spec),
+        )
+    except ValueError:
+        _pre_phases, _pre_record = phases, None
+    if _pre_record is not None:
+        phases = _pre_phases
+        result.plan_expansion = _pre_record
     completed: set[str] = set()
     #: Reached-but-awaiting checkpoint phases from the selected parent snapshot — carried
     #: separately from ``completed`` so a checkpoint is treated as skippable only AFTER its
@@ -4789,6 +5149,47 @@ def run_workflow(
         phase_loop_idx += 1
         name = str(phase_def.get("name", "?"))
         kind = str(phase_def.get("kind", "agent"))
+        # ── Lazy plan→phases expansion (the fresh-run path) ──────────────────────────────────
+        # The prior phase writes the plan DURING this run, so a fresh run's expansion cannot
+        # happen in the pre-loop pass. When the loop reaches the declaring phase, replace it
+        # in-place with its unit slices + gates and re-read the first slice. A refusal FAILS the
+        # declaring phase with ``PLAN_EXPANSION`` and ZERO agent invocations (the artifact
+        # gate's before-spend contract): the ValueError never escapes as a crash, and the phase
+        # row says exactly what the plan got wrong.
+        if isinstance(phase_def, dict) and phase_def.get(EXPAND_FROM_PLAN_KEY):
+            try:
+                phases, _expansion_record = _expand_plan_phases(
+                    phases,
+                    git_wd,
+                    run_budget_usd=spec.stop.budget_usd,
+                    unit_cap=_plan_unit_cap(spec),
+                )
+            except ValueError as exc:
+                pr = PhaseResult(
+                    phase=name,
+                    kind=kind,
+                    status="failed",
+                    spec_id=spec.spec_id,
+                    error=f"PLAN_EXPANSION: {exc}",
+                )
+                prior.append(f"{name} (failed)")
+                result.phases.append(pr)
+                print(f"[workflow] phase '{name}' failed: PLAN_EXPANSION: {exc}", flush=True)
+                if publisher is not None and publisher.enabled:
+                    publisher.publish_event(
+                        {
+                            "type": "text",
+                            "sessionID": cell_id,
+                            "part": {"text": f"phase {name} failed: PLAN_EXPANSION: {exc}"},
+                        }
+                    )
+                if stop_on_error:
+                    break
+                continue
+            result.plan_expansion = _expansion_record
+            # Rewind one step: ``phases[phase_idx]`` is now the first generated unit slice.
+            phase_loop_idx = phase_idx
+            continue
         if resume and name in completed:
             # Recorded completion evidence (the phase's own committed phase commit, or the
             # explicit parent ledger's entry) — skip it. NEVER inferred from a later commit
@@ -4865,11 +5266,21 @@ def run_workflow(
                 # section; a plan naming no resolvable targets SKIPS explicitly below.
                 gate_targets, gate_skipped = _resolve_test_targets(phase_def, git_wd)
                 if gate_skipped:
-                    pr.test_gate_note = (
-                        f"SKIPPED: tests_from_plan={str(phase_def.get('tests_from_plan'))!r} "
-                        "resolved to zero test targets (no such file, or none of its named "
-                        "targets exist in the worktree)"
-                    )
+                    if isinstance(phase_def.get("tests"), list) and not phase_def["tests"]:
+                        # The plan→phases bridge's explicit-skip shape: an expansion emits
+                        # ``tests: []`` for a unit that names no tests. Analysis-only, so no
+                        # verdict is fabricated — but the reason is named exactly.
+                        pr.test_gate_note = (
+                            f"SKIPPED: phase '{name}' declares no test targets (tests: []) — "
+                            "an explicit analysis-only skip; no verdict fabricated"
+                        )
+                    else:
+                        pr.test_gate_note = (
+                            f"SKIPPED: tests_from_plan="
+                            f"{str(phase_def.get('tests_from_plan'))!r} resolved to zero test "
+                            "targets (no such file, or none of its named targets exist in the "
+                            "worktree)"
+                        )
                 else:
                     _run_test_gate(
                         pr,

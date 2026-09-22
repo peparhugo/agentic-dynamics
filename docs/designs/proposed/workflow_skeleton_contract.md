@@ -35,6 +35,7 @@ Evidence: `cap_runner_hardening`, `control_db_publication`, `self_knowledge_laye
 | **sources** | `d0_pin_sources`, `h0_pin_sources`; the `sources.jsonl` catalog | prompt-required + recorded in `world_model.md` `## Sources` (shape-gated) |
 | **skill creation** | `cap_pattern_minting` (p2_mint_patterns); `kb_produce_skill` (pattern/v1); `claude_tools_to_skills` (scope→build→verify); `control_room_facelift_review` a2_dynamic_workflow | convention: KB pattern record + reviewed promotion (a producer exists; a loop step does not yet) |
 | **execution contents** | the slices; world_model_loop `execute` | `requires_content` on the PLAN (`## Files`, `## Tests`, `## Acceptance`); `deviations.md` records drifts |
+| **plan-driven expansion** | world_model_loop `execute` (`expand_from_plan`); the static `cap_*` slices it generalizes | runner: `_expand_plan_phases` — ONE declared phase → one agent slice + one `kind: test` gate per plan unit (`notes/plan.units.json`, written at run time); refusals (`PLAN_EXPANSION`) before spend |
 | **adversarial check** | `gN_adversarial` / `adversary_*` with `run_model` (a different model, readonly) | phase presence + the runner's per-phase gates; added to world_model_loop as `g_adversarial` |
 | **human gates** | `checkpoint: true` phases (`cap_site_revamp3/4`, `fleet_ladder_implementation`, `control_room_rules_design`) | runner: `awaiting_operator_approval` — the run STOPS |
 | **compiled workflows** | `workflows/compile_workflow.py` | refusal-first linter: `refused-*` codes — unsupported semantics refuse before submission |
@@ -64,3 +65,15 @@ on posterior and the durable-emission contract (`FINOPS_RESULTS_DIR`).
 across runs — two runs' branches conflicted on all four files at merge time (resolved by
 namespacing the second run's notes). Next convention: namespace run notes by run/task, or
 route them to the durable results dir.
+
+## The loop's open extension (2026-09-21, `loop-execute-as-workflow`)
+
+The gap the enforcement map now closes: a plan WRITTEN AT RUN TIME that compiles into phases.
+The loop's `execute` declares `expand_from_plan: notes/plan.units.json`; the runner expands that
+ONE phase into one bounded agent slice plus one independent `kind: test` gate per plan unit, in
+dependency order, inside the SAME run (same ledger, same candidate, same promotion check). This
+generalizes the `cap_*` static slices — the units are authored by the prior at run time, so they
+cannot sit in the spec's authored phase list. Refusals (a missing/invalid plan, a cycle or
+unknown dependency, a name collision, over-budget units, too many units) fail the declaring
+phase with `PLAN_EXPANSION` before any spend. Mechanics and residual gaps:
+`world_model_loop.md` → "Open extension: built".

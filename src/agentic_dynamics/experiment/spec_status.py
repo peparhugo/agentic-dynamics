@@ -184,6 +184,12 @@ class RunSummary:
     #: OLDER one: if the current spec declares a phase no run ever executed (a gate appended
     #: after the last green run), the green runs predate it and cannot certify completion.
     executed_phases: frozenset[str] = frozenset()
+    #: The plan→phases expansion record (the world-model loop's open extension, 2026-09-21):
+    #: ``{"base_phase", "phases", ...}`` when the run replaced one declared phase with generated
+    #: unit slices + gates. ``None`` for every run without the key (and for legacy ledgers).
+    #: :func:`_executed_with_expansions` folds a fully-executed expansion back to its base phase
+    #: name so the declared phase list can still be covered by an expanded run.
+    plan_expansion: dict[str, Any] | None = None
     #: The split-run family link (engine_gaps_followups g1, F5). ``run_id`` is the run's own
     #: control-db identity (minted by ``scripts/run_workflow.py`` and stamped onto the ledger
     #: at write time; ``""`` for pre-g1 ledgers). ``parent_run_id`` names the run this run
@@ -221,6 +227,9 @@ class RunSummary:
             "git_sha": self.git_sha,
             "workflow_revision_id": self.workflow_revision_id,
             "executed_phases": sorted(self.executed_phases),
+            # ADDED key (the loop's open extension — never renames an existing key): the
+            # plan→phases expansion record, if any. Old ledgers lack the key.
+            "plan_expansion": self.plan_expansion,
             "awaiting": self.awaiting,
             "started_at": self.started_at,
             "open": self.open,
@@ -260,6 +269,14 @@ def summarize_run(path: Path, payload: dict[str, Any], *, root: Path) -> RunSumm
             str(p.get("phase"))
             for p in (payload.get("phases") or [])
             if isinstance(p, dict) and p.get("phase")
+        ),
+        # The plan→phases expansion record (the loop's open extension): read defensively so
+        # pre-extension ledgers (no key) parse unchanged. Used to fold generated unit slices
+        # back to their declared base phase in the revision-coverage checks.
+        plan_expansion=(
+            payload.get("plan_expansion")
+            if isinstance(payload.get("plan_expansion"), dict)
+            else None
         ),
         awaiting=payload.get("awaiting") is True,
         started_at=_iso(started) if started else None,
@@ -427,6 +444,29 @@ def _spec_phase_names(spec: ExperimentSpec) -> list[str]:
     return [str(p.get("name")) for p in phases if isinstance(p, dict) and p.get("name")]
 
 
+def _executed_with_expansions(run: RunSummary) -> set[str]:
+    """A run's executed phase names, with each fully-executed expansion folded to its base.
+
+    The plan→phases bridge (the world-model loop's open extension) replaces ONE declared phase
+    with generated unit slices + independent gates, so the ledger records ``execute__u1`` /
+    ``g_u1_test_gate`` rather than ``execute``. For revision coverage the DECLARED phase counts
+    as executed once every generated name the expansion recorded is present — then the base
+    name is added, so an expanded green run can certify the current definition instead of
+    reading as "the runs predate the spec". A partially-executed expansion never folds.
+    """
+    executed = set(run.executed_phases)
+    record = run.plan_expansion or {}
+    base = str(record.get("base_phase") or "")
+    phases = [str(p) for p in (record.get("phases") or [])]
+    if base and phases and set(phases) <= executed:
+        # Fully executed: the generated names are the expansion of ONE declared phase, so they
+        # are FOLDED AWAY and the base name stands in — otherwise the unmatched generated names
+        # would read as "a phase was renamed/removed" and falsely invalidate the revision.
+        executed -= set(phases)
+        executed.add(base)
+    return executed
+
+
 def _is_definition_changed_after_runs(spec: ExperimentSpec, runs: list[RunSummary]) -> bool:
     """True when the run corpus cannot certify the CURRENT spec definition.
 
@@ -469,7 +509,11 @@ def _is_definition_changed_after_runs(spec: ExperimentSpec, runs: list[RunSummar
     has_green = any(run.ok is True for run in runs)
     if not has_green:
         return False
-    executed = set().union(*(run.executed_phases for run in runs)) if runs else set()
+    # Fold each run's fully-executed plan expansion back to its declared base phase, so the
+    # expanded phase names the extension records are not mistaken for a definition change (1).
+    executed: set[str] = set()
+    for run in runs:
+        executed |= _executed_with_expansions(run)
     if not executed:
         return False
     # (1) Mid-list structural edit: an executed phase no longer exists in the current
@@ -545,10 +589,15 @@ def _certifying_families(certifying: list[RunSummary]) -> list[list[RunSummary]]
 
 
 def _family_executed_union(family: list[RunSummary]) -> set[str]:
-    """The union of every phase name the family's members executed, across all of them."""
+    """The union of every phase name the family's members executed, across all of them.
+
+    Uses :func:`_executed_with_expansions` so a member whose plan→phases expansion fully
+    executed contributes its declared ``base_phase`` (not only the generated unit slices), and
+    the family can cover the spec's declared phase list.
+    """
     union: set[str] = set()
     for run in family:
-        union |= set(run.executed_phases)
+        union |= _executed_with_expansions(run)
     return union
 
 

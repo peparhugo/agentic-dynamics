@@ -548,6 +548,76 @@ def test_quoted_or_bare_deploy_mentions_are_not_commands():
     assert errors == []
 
 
+# ── The plan→phases bridge (the loop's open extension) ───────────────────────
+
+
+def test_validator_accepts_a_string_expand_from_plan():
+    errors = validate_spec(
+        _phase_spec(
+            [
+                {
+                    "name": "execute",
+                    "kind": "agent",
+                    "expand_from_plan": "notes/plan.units.json",
+                    "prompt": "x",
+                }
+            ]
+        )
+    )
+    assert errors == []
+
+
+def test_validator_flags_a_non_string_expand_from_plan():
+    errors = validate_spec(
+        _phase_spec([{"name": "execute", "kind": "agent", "expand_from_plan": 123, "prompt": "x"}])
+    )
+    assert any("expand_from_plan must be a non-empty string" in e for e in errors)
+
+
+def test_validator_refuses_expand_from_plan_on_a_test_phase():
+    errors = validate_spec(
+        _phase_spec(
+            [
+                {
+                    "name": "execute",
+                    "kind": "test",
+                    "expand_from_plan": "notes/plan.units.json",
+                    "prompt": "x",
+                }
+            ]
+        )
+    )
+    assert any("expand_from_plan on kind: test is unsupported" in e for e in errors)
+
+
+def test_validator_refuses_expand_from_plan_with_a_checkpoint():
+    errors = validate_spec(
+        _phase_spec(
+            [
+                {
+                    "name": "execute",
+                    "kind": "agent",
+                    "expand_from_plan": "notes/plan.units.json",
+                    "checkpoint": True,
+                    "prompt": "x",
+                }
+            ]
+        )
+    )
+    assert any("would silently vanish" in e for e in errors)
+
+
+def test_validator_flags_a_malformed_plan_unit_cap():
+    spec = _minimal_spec(
+        workflow=Workflow(
+            "agent_task",
+            {"phases": [{"name": "p1", "kind": "agent", "prompt": "x"}], "plan_unit_cap": 0},
+        )
+    )
+    errors = validate_spec(spec)
+    assert any("plan_unit_cap must be a positive integer" in e for e in errors)
+
+
 def test_machinery_mentions_do_not_trigger_halt_rule():
     prompt = "Implement the checkpoint phase kind: a phase declaring checkpoint: true that completes successfully stops with awaiting_operator_approval."
     errors = validate_spec(_phase_spec([{"name": "p1", "kind": "agent", "prompt": prompt}]))

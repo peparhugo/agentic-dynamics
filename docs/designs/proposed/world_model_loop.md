@@ -156,12 +156,48 @@ The emit seam is now observable (L12): a swallowed emission failure lands on the
 `_phase_emit_scope` makes `rag.emit_scope` ONE precedence for BOTH the metadata finding and the
 report variant (previously only the report variant honored it).
 
-## Open extension: execute as a workflow (controller, 2026-09-21)
+## Open extension: built (2026-09-21, `loop-execute-as-workflow`) — execute as a plan-expanded workflow
 
-A massive plan must not run as ONE execute phase — the execute step should itself be a
-workflow, and the plan should decompose. The seed exists (`ExperimentSpec`'s cells + the DAG
-compiler: spec → cells → phases), so the natural shape: the PRIOR phase emits a plan that
-COMPILES into the execute DAG (units with dependencies, budgets, and acceptance each), and the
-POSTERIOR diffs the whole shape — including which units the plan mis-sized. Open questions:
-the plan→spec bridge (what the prior writes that the compiler consumes), per-unit budgets, and
-aggregating the posterior across units. v0 keeps one execute phase; decomposition is v1.
+The controller's open extension is built by generalizing the `cap_*` slice shape into the loop's
+execute step. A massive plan no longer runs as ONE execute phase: the prior writes a
+machine-readable twin of the plan, and the runner expands the declared `execute` phase into one
+bounded sub-phase per workstream — each with its own commit and its own independent gate — in
+ONE run.
+
+- **The plan→spec bridge.** The prior writes `notes/plan.units.json` (next to `notes/plan.md`):
+  `{"units": [{"id", "goal", "files", "tests", "acceptance", "budget_usd", "depends_on"}]}`.
+  `notes/plan.md` gains a `## Workstreams` section describing the same units.
+- **The one new mechanism: `expand_from_plan`.** A phase declaring `expand_from_plan: <path>`
+  is replaced, at run time, by `_expand_plan_phases` (`workflow_runner.py`): units are validated
+  (`_load_plan_units`) and topologically ordered by `depends_on` (`_order_plan_units`), then
+  spliced at the declaring phase's position as, per unit, an agent slice `<base>__<unit_id>`
+  (inheriting `scope`/`timeout`/`run_model`/`requires_*`, with `requires_deliverable: true`) and
+  an independent `kind: test` gate `g_<unit_id>_test_gate` (`tests:` = the unit's tests; a unit
+  that names none gets `tests: []` → an explicit skip, never a fabricated verdict). ONE-LINE
+  JUSTIFICATION: *the plan is written at run time, so the execute workstreams cannot exist in
+  the spec's authored phase list; expanding ONE declared phase into its plan's units is the
+  minimal bridge between a run-time artifact and a static runner, and it reuses the existing
+  phase/gate/commit machinery unchanged.*
+- **The gates are the existing ones.** Each slice commits like any agent phase; each unit gate
+  is an ordinary `kind: test` phase; the loop's whole-plan `g_test_gate`
+  (`tests_from_plan: notes/plan.md`) stays as the final independent verification. The plan gate
+  (`requires_files`/`requires_content`) is inherited by every slice, so a unit cannot run
+  without the plan.
+- **Refusals are before spend.** A missing/invalid plan, a dependency cycle or unknown
+  dependency, a generated-name collision, a unit count above `workflow.params.plan_unit_cap`
+  (default 24), or unit budgets above `spec.stop.budget_usd` refuses the declaring phase with
+  `PLAN_EXPANSION` and ZERO agent invocations.
+- **One run, not a fleet.** The expansion is a pure in-process list transform before the phase
+  loop (plus a lazy pass at the declaring phase for a fresh run, whose plan is written during
+  the run): same run id, same candidate clone, same ledger, same admission context, same
+  promotion check. A typed `plan_expansion` record (`{plan, base_phase, units, phases,
+  unit_budgets_usd, total_budget_usd}`) rides the run ledger.
+- **`spec_status` folds expansions.** A fully-executed expansion is folded back to its declared
+  base phase for revision coverage, so an expanded green run certifies the current definition
+  (and a genuinely removed phase still reads as an edit).
+
+Residual gaps (v0): a true per-`unit_id` dollar lease (only the pre-flight sum versus
+`stop.budget_usd` plus per-phase admission is enforced); the posterior aggregates across units
+only through the final worktree and the phase names; and the pre-loop resume pass reads the plan
+only when it already exists (a fresh run expands lazily at the declaring phase, so a resume that
+lacks the plan file re-runs the slices rather than skipping them).
