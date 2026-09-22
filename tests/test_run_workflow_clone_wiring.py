@@ -346,3 +346,16 @@ def test_spec_loading_goes_through_load_spec_any(tmp_path, monkeypatch):
     ])
     module.main()
     assert seen["path"] == spec_path
+
+
+def test_parent_watchdog_is_disabled_for_orchestrated_phases():
+    """The 2026-09-22 false STALLED: under ``--orchestrator`` the parent's transcript-only
+    clock fired on a working sibling cell (429 message/part writes it cannot see). The
+    sibling cell owns the stall monitor for orchestrated phases — it resolves the cell's
+    XDG state namespace (the child-activity probe is active there) and holds the kill
+    handle. In-process runs keep the CLI threshold unchanged."""
+    module = _load_module()
+    assert module._parent_watchdog_min(True, 20) == 0
+    assert module._parent_watchdog_min(True, 0) == 0
+    assert module._parent_watchdog_min(False, 20) == 20
+    assert module._parent_watchdog_min(False, 0) == 0
