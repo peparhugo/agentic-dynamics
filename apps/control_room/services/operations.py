@@ -25,6 +25,8 @@ from collections.abc import Mapping
 from dataclasses import asdict
 from typing import Any
 
+from agentic_dynamics.control import control_status
+from agentic_dynamics.control.control_db import RunState
 from agentic_dynamics.control.control_status import build_packet
 from agentic_dynamics.control.live import EVENT_LOG_MAX, EVENT_LOG_PREFIX
 from apps.control_room.services import run_evidence
@@ -40,6 +42,11 @@ FLEET_JOBS_KEY = "fleet:jobs"
 
 #: How many retained job events the run detail's logs block carries (a bounded tail).
 LOGS_EVENT_LIMIT = 50
+
+# ``RunState`` is the lifecycle authority.  Keeping this tuple here makes the Operations
+# projection's roster explicit while still deriving the values from the database enum rather
+# than maintaining a second, UI-only state machine.
+RUN_STATE_VALUES = tuple(state.value for state in RunState)
 
 
 def logs_block(
@@ -151,7 +158,7 @@ def _live_phase_cell(redis_client: Any, spec_name: str, started_at: str) -> str:
                 break
         if ts is None or ts + 1.0 < started:
             continue
-        name = str(key)[len(EVENT_LOG_PREFIX):]
+        name = str(key)[len(EVENT_LOG_PREFIX) :]
         if best is None or ts > best[0]:
             best = (ts, name)
     return best[1] if best else ""
@@ -323,6 +330,126 @@ def _epoch(value: Any) -> float | None:
         return None
 
 
+def _age_label(started_at: Any, now: Any | None) -> str:
+    """Return a deterministic age label, or the named ``age unknown`` state.
+
+    The browser must not consult its wall clock to decide how old a run is: a capture taken one
+    second later would otherwise assert a different operational value.  ``now`` is injected by
+    the composition root/tests, and an absent timestamp remains an explicit unknown.
+    """
+    started = _epoch(started_at)
+    observed = _epoch(now)
+    if started is None or observed is None:
+        return "age unknown"
+    seconds = max(0, int(observed - started))
+    if seconds < 60:
+        return f"{seconds}s ago"
+    if seconds < 3600:
+        return f"{seconds // 60}m ago"
+    if seconds < 86400:
+        return f"{seconds // 3600}h ago"
+    return f"{seconds // 86400}d ago"
+
+
+def _run_ref(db: Any, run: Any) -> dict[str, Any]:
+    """Render one database run using the control packet's own reference vocabulary."""
+    if run.state in control_status.ACTIVE_RUN_STATES:
+        return control_status.active_run_ref(db, run)
+    return control_status.run_ref(run)
+
+
+def _state_screen_row(
+    run: Mapping[str, Any],
+    *,
+    detail: Mapping[str, Any] | None,
+    attention: Mapping[str, Any] | None,
+    epoch: Any,
+    now: Any | None,
+) -> dict[str, Any]:
+    """Project one authoritative run into the Operations state-screen row.
+
+    The row is intentionally additive to the narrow packet reference.  The packet answers the
+    lifecycle/identity question; the run detail answers evidence, receipt, and ledger questions.
+    A missing detail field is delegated to ``run_evidence`` and rendered as a named state rather
+    than filled with a browser default.  ``attention.state`` is emitted here so the client cannot
+    infer it from array membership.
+    """
+    row = dict(run)
+    state = str(run.get("state") or "unknown")
+    detail_dict = dict(detail or {})
+    ledger = run_evidence.recorded_ledger(detail_dict)
+    cost = run_evidence.cost_block(row, detail_dict, ledger)
+    evidence = run_evidence.evidence_block(detail_dict, ledger)
+    active_attention = attention is not None
+    candidate_sha = str(run.get("candidate_sha") or "")
+    row.update(
+        {
+            "state_screen": state,
+            "session.identity": str(run.get("run_id") or "unknown"),
+            "spec.cell": run_evidence._cell_binding(ledger),
+            "terminal.target": run_evidence._workspace_target(detail_dict, ledger),
+            "command.current": str(run.get("spec_name") or "unknown"),
+            "model.provider": str(run.get("model") or "unknown"),
+            "attempt.number": run_evidence._attempt_number(detail_dict),
+            "phase.progress": (
+                f"{int(run.get('phases_completed', 0))}/{int(run.get('phases_total', 0))}"
+                if "phases_completed" in run or "phases_total" in run
+                else "unknown"
+            ),
+            "lifecycle.state": state,
+            "run.live": "live"
+            if state not in {s.value for s in control_status.TERMINAL_RUN_STATES}
+            else "not-live",
+            "source.commit": candidate_sha or "unknown",
+            "cost.provenance": cost.get("provenance", "unknown"),
+            "attention.state": "active" if active_attention else "none",
+            "evidence.advisory": evidence.get("narration", "narration unknown"),
+            "evidence.measured": evidence.get("measured", "test result unknown"),
+            "evidence.source": f"commit {candidate_sha}" if candidate_sha else "source unknown",
+            "decision.eligibility": (
+                "approve"
+                if state == RunState.AWAITING_APPROVAL.value
+                else "promote"
+                if state == RunState.PROMOTABLE.value
+                else "inspect"
+            ),
+            "decision.receipt": run_evidence._receipt_state(detail_dict),
+            "started.age": _age_label(run.get("started_at"), now),
+            "control_epoch": epoch,
+        }
+    )
+    if attention:
+        row["attention.kind"] = str(attention.get("kind") or "attention")
+        row["attention.reason"] = str(attention.get("purpose") or attention.get("reason") or "")
+    return row
+
+
+def _worker_health(packet: Mapping[str, Any]) -> dict[str, Any]:
+    """Name whether worker health was observed before exposing its count.
+
+    ``[]`` means zero unhealthy workers only when the heartbeat source was readable.  A degraded
+    or unobserved source is a separate state and must never become a reassuring ``0`` in the UI.
+    """
+    notes = [
+        entry for entry in packet.get("degraded", []) if entry.get("surface") == "unhealthy_workers"
+    ]
+    if notes:
+        return {"state": "unavailable", "reason": notes[0].get("reason", "workers not observed")}
+    return {
+        "state": "recorded",
+        "count": len(packet.get("unhealthy_workers", [])),
+        "reason": "heartbeat source observed",
+    }
+
+
+def _state_screen_detail(db: Any, run_id: str) -> dict[str, Any] | None:
+    """Read optional evidence for one row without blanking the whole roster on one bad ledger."""
+    try:
+        return run_detail(db, run_id, redis_client=None)
+    except Exception:  # noqa: BLE001 — the row remains with named unknown evidence
+        return None
+
+
 def operational_snapshot(
     db: Any,
     *,
@@ -337,7 +464,11 @@ def operational_snapshot(
     projection of the packet, not a second source of truth — the parity test asserts the
     identifiers match block-for-block.
     """
-    packet = build_packet(db, repo_head_sha=repo_head_sha, heartbeats=heartbeats, now=now)
+    # ``build_packet`` performs arithmetic for worker ages, so pass it a numeric observation time
+    # when the caller supplied an ISO stamp.  The original value is retained for stable run-age
+    # labels below.
+    packet_now = _epoch(now) if now is not None else None
+    packet = build_packet(db, repo_head_sha=repo_head_sha, heartbeats=heartbeats, now=packet_now)
 
     attention: list[dict[str, Any]] = []
     for entry in packet.get("awaiting_approvals", []):
@@ -345,6 +476,26 @@ def operational_snapshot(
         attention.append({"kind": "approval", **dict(entry)})
     for entry in packet.get("failed_runs", []):
         attention.append({"kind": "failed", **dict(entry)})
+
+    attention_by_run = {
+        str(entry.get("run_id")): entry for entry in attention if entry.get("run_id")
+    }
+
+    # One consistent database read supplies every lifecycle row, including terminal
+    # ``cancelled``/``quarantined`` records.  The older packet blocks remain unchanged for actor
+    # compatibility; ``runs`` and ``state_screens`` are the room's canonical ordered roster.
+    records = db.runs(states=RUN_STATE_VALUES)
+    runs = [_run_ref(db, record) for record in records]
+    state_screens = [
+        _state_screen_row(
+            run,
+            detail=_state_screen_detail(db, str(run.get("run_id") or "")),
+            attention=attention_by_run.get(str(run.get("run_id") or "")),
+            epoch=packet.get("control_epoch"),
+            now=now,
+        )
+        for run in runs
+    ]
 
     return {
         "schema": SCHEMA,
@@ -359,13 +510,22 @@ def operational_snapshot(
         "active_runs": list(packet.get("active_runs", [])),
         "promotable_runs": list(packet.get("promotable_runs", [])),
         "unhealthy_workers": list(packet.get("unhealthy_workers", [])),
+        "worker_health": _worker_health(packet),
+        "runs": runs,
+        "state_screens": state_screens,
         "projection_lag": packet.get("projection_lag", {}),
         "safe_actions": list(packet.get("safe_actions", [])),
         "degraded": list(packet.get("degraded", [])),
     }
 
 
-def run_detail(db: Any, run_id: str, *, redis_client: Any | None = None) -> dict[str, Any] | None:
+def run_detail(
+    db: Any,
+    run_id: str,
+    *,
+    redis_client: Any | None = None,
+    now: Any | None = None,
+) -> dict[str, Any] | None:
     """The P1/P2 per-run view: identity, attempts, gates, approvals, command receipts.
 
     Every raw block is read from the control records AS THEY ARE: a record the database has
@@ -398,6 +558,10 @@ def run_detail(db: Any, run_id: str, *, redis_client: Any | None = None) -> dict
         "approvals": [asdict(row) for row in db.approvals(run_id)],
         "commands": [asdict(row) for row in db.commands(run_id=run_id)],
     }
+    # The drawer is another consumer of the same server-owned age/state contract as the board.
+    # Keep these additive fields on the run object so raw control records remain untouched.
+    detail["run"]["state_screen"] = run.state.value
+    detail["run"]["started.age"] = _age_label(run.started_at, now)
     # The ledger is read ONCE and shared by every ledger-derived block, so cost, evidence,
     # delivery, and prepared-step references all describe the same recorded artifact.
     ledger = run_evidence.recorded_ledger(detail)

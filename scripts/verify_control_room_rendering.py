@@ -59,6 +59,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from agentic_dynamics.control.control_db import RunState
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
@@ -2490,6 +2492,18 @@ BOARDS_PROBE_JS = r"""
       return el ? el.hidden : null; })(),
     routingText: text('#routing-content'),
     runRows: document.querySelectorAll('tr[data-run-id]').length,
+    operationsAttentionStates: Array.from(
+      document.querySelectorAll('#operations-content [data-field="attention.state"] [data-value]')
+    ).map((node) => (node.innerText || node.textContent || '').trim()),
+    operationsRosterIds: Array.from(
+      document.querySelectorAll('#operations-content .run-roster tr[data-run-id]')
+    ).map((node) => node.getAttribute('data-run-id') || ''),
+    operationsWorkerMetric: (() => {
+      const cards = Array.from(document.querySelectorAll('#operations-content .metric-card'));
+      const card = cards.find((node) =>
+        (node.querySelector('.metric-label')?.textContent || '').trim() === 'Unhealthy workers');
+      return card ? (card.querySelector('.metric-value')?.textContent || '').trim() : '';
+    })(),
     readyState: document.readyState,
   };
 }
@@ -2544,10 +2558,12 @@ def load_boards_fixture() -> dict[str, Any]:
 
 
 def build_operations_payload(degraded: bool = False) -> dict[str, Any]:
-    """Expand the committed seed into the exact ``/api/operations`` wire payload.
+    """Expand the committed Operations contract into its deterministic wire payload.
 
-    Deterministic: run ids are positional, so the attention rows and the keyboard check name
-    rows that always exist, and the list is long enough to overflow the board scroller.
+    ``runs`` is the canonical ordered identity list and ``state_screens`` is the service-owned
+    presentation projection.  The fixture intentionally keeps both arrays: ``check_boards_fixtures``
+    proves their identity/order invariant before a browser sees them, preventing a helper from
+    manufacturing a list the production read model could never emit.
     """
     fixture = load_boards_fixture()
     seed = fixture["operations_degraded"] if degraded else fixture["operations"]
@@ -2558,16 +2574,59 @@ def build_operations_payload(degraded: bool = False) -> dict[str, Any]:
         payload.setdefault("attention", [])
         return payload
     run_seed = seed["run_seed"]
-    active_count = int(seed.get("active_count", 0))
-    promotable_count = int(seed.get("promotable_count", 0))
+    canonical_runs = [copy.deepcopy(row) for row in seed.get("runs", [])]
+    canonical_screens = [copy.deepcopy(row) for row in seed.get("state_screens", [])]
+    # The service enriches each narrow run reference with the state-screen fields.  The fixture
+    # models that additive projection while retaining the two canonical arrays for the invariant
+    # check above; it never invents a different id or lifecycle state.
+    screens_by_id = {str(row.get("run_id")): row for row in canonical_screens}
     runs = []
-    for index in range(1, active_count + promotable_count + 1):
+    for canonical in canonical_runs:
         row = copy.deepcopy(run_seed)
-        row["run_id"] = f"run-fixture-{index:04d}"
-        row["state"] = "running" if index <= active_count else "promotable"
+        row.update(canonical)
+        screen = screens_by_id.get(str(canonical.get("run_id")), {})
+        row.update(screen)
+        row["lifecycle.state"] = row["state"]
+        row["session.identity"] = row["run_id"]
+        row["spec.cell"] = row.get("spec_name", run_seed.get("spec_name", "unknown"))
+        row["terminal.target"] = "worktree/control-room-fixture"
+        row["command.current"] = row.get("spec_name", "unknown")
+        row["model.provider"] = row.get("model", "unknown")
+        row["attempt.number"] = "unknown"
+        row["phase.progress"] = f"{row.get('phases_completed', 0)}/{row.get('phases_total', 0)}"
+        row["run.live"] = (
+            "not-live"
+            if row["state"] in {"published", "failed", "cancelled", "quarantined"}
+            else "live"
+        )
+        row["source.commit"] = row.get("candidate_sha", "unknown")
+        row["cost.provenance"] = "$0.0000 · metered"
+        row["attention.state"] = (
+            "active"
+            if any(item.get("run_id") == row["run_id"] for item in payload.get("attention", []))
+            else "none"
+        )
+        row["evidence.advisory"] = "narration unknown"
+        row["evidence.measured"] = "test result unknown"
+        row["evidence.source"] = "fixture source"
+        row["decision.eligibility"] = (
+            "approve"
+            if row["state"] == "awaiting_approval"
+            else "promote"
+            if row["state"] == "promotable"
+            else "inspect"
+        )
+        row["decision.receipt"] = "missing"
+        row["started.age"] = "1h ago"
         runs.append(row)
-    payload["active_runs"] = runs[:active_count]
-    payload["promotable_runs"] = runs[active_count:]
+    payload["runs"] = canonical_runs
+    payload["state_screens"] = runs
+    payload["active_runs"] = [
+        row
+        for row in canonical_runs
+        if row.get("state") not in {"published", "failed", "cancelled", "quarantined"}
+    ]
+    payload["promotable_runs"] = [row for row in canonical_runs if row.get("state") == "promotable"]
     return payload
 
 
@@ -2641,11 +2700,37 @@ def check_boards_fixtures() -> list[str]:
     if "error" not in (fixture.get("run_detail_error") or {}):
         problems.append("boards fixture: run_detail_error must carry an error envelope")
     normal = build_operations_payload(False)
-    rows = normal.get("active_runs", []) + normal.get("promotable_runs", [])
+    canonical_runs = normal.get("runs", [])
+    state_screens = normal.get("state_screens", [])
+    if len(canonical_runs) != len(state_screens):
+        problems.append("boards fixture: runs/state_screens lengths differ")
+    for index, (run, screen) in enumerate(zip(canonical_runs, state_screens, strict=True)):
+        if screen.get("run_id") != run.get("run_id"):
+            problems.append(
+                f"boards fixture: state_screens[{index}] id does not match runs[{index}]"
+            )
+        if screen.get("state") != run.get("state"):
+            problems.append(
+                f"boards fixture: state_screens[{index}] state does not match runs[{index}]"
+            )
+    rows = state_screens
     if len(rows) < 12:
         problems.append(
             "boards fixture: fewer than 12 run rows — the scroll check needs a long board"
         )
+    legal_states = {state.value for state in RunState}
+    states = {str(row.get("state")) for row in canonical_runs}
+    illegal = states - legal_states
+    if illegal:
+        problems.append(f"boards fixture: lifecycle states outside RunState: {sorted(illegal)}")
+    for required in ("promotable", "cancelled", "quarantined"):
+        if required not in states:
+            problems.append(f"boards fixture: missing reachable lifecycle state {required!r}")
+    if "stalled" in states or "escalated" in states:
+        problems.append("boards fixture: manufactured stalled/escalated lifecycle state")
+    unknown_case = normal.get("unknown_case")
+    if not isinstance(unknown_case, dict) or unknown_case.get("state") != "unknown":
+        problems.append("boards fixture: missing named unknown state case outside lifecycle roster")
     ids = {row["run_id"] for row in rows}
     for item in normal.get("attention", []):
         if item.get("run_id") not in ids:
@@ -2655,6 +2740,10 @@ def check_boards_fixtures() -> list[str]:
     degraded = build_operations_payload(True)
     if not degraded.get("degraded"):
         problems.append("boards fixture: the degraded variant carries no degraded surfaces")
+    if not any(item.get("surface") == "unhealthy_workers" for item in degraded["degraded"]):
+        problems.append("boards fixture: degraded worker health has no named source failure")
+    if (degraded.get("worker_health") or {}).get("state") != "unavailable":
+        problems.append("boards fixture: degraded worker health must be unavailable")
     for name in BOARD_SURFACE_PATHS:
         if name not in fixture["surfaces"]:
             problems.append(f"boards fixture: surfaces missing {name!r}")
@@ -2982,6 +3071,27 @@ def _check_board_loading(
         probe = page.evaluate(BOARDS_PROBE_JS)
         if board == "operations" and not probe["operationsText"]:
             _row(errors, label, "loading", board, "the operations board rendered no content")
+        if board == "operations":
+            if "active" not in probe["operationsAttentionStates"]:
+                _row(
+                    errors,
+                    label,
+                    "loading",
+                    "operations-attention.state",
+                    "the server-owned attention.state value 'active' was not rendered as visible text",
+                )
+            expected_ids = [
+                str(row.get("run_id")) for row in build_operations_payload(False)["state_screens"]
+            ]
+            if probe["operationsRosterIds"] != expected_ids:
+                _row(
+                    errors,
+                    label,
+                    "loading",
+                    "operations-roster-order",
+                    f"rendered roster {probe['operationsRosterIds']!r} differs from service order "
+                    f"{expected_ids!r}",
+                )
         if board == "surfaces" and not probe["surfacePanels"]:
             _row(errors, label, "loading", board, "the surfaces board rendered no panels")
         if board == "routing":
@@ -3142,6 +3252,16 @@ def _check_board_degraded(
                 f"{metric!r} rendered {value!r} on a degraded control db — an unreadable "
                 "database must read 'unavailable', never a fabricated 0",
             )
+    if probe["metrics"].get("Unhealthy workers") != "unavailable":
+        _row(
+            errors,
+            label,
+            "degraded",
+            "operations-workers",
+            "Unhealthy workers rendered "
+            f"{probe['metrics'].get('Unhealthy workers')!r} on an unobserved source; "
+            "it must read unavailable, never 0",
+        )
     if "control database not found" not in probe["operationsText"]:
         _row(
             errors,
@@ -3290,8 +3410,10 @@ def _expected_last_run_id() -> str:
         last_id = str((attention[-1] or {}).get("run_id") or "")
         if last_id:
             return last_id
-    total = int(seed.get("active_count", 0)) + int(seed.get("promotable_count", 0))
-    return f"run-fixture-{total:04d}"
+    screens = seed.get("state_screens") or []
+    if screens:
+        return str(screens[-1].get("run_id") or "")
+    return ""
 
 
 def _wheel_to_bottom(page: Any, box: dict[str, float] | None) -> dict[str, Any]:

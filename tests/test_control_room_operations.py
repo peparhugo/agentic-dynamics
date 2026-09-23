@@ -123,6 +123,98 @@ def test_absent_data_stays_absent_and_degraded_is_named(tmp_path):
     assert isinstance(snapshot["projection_lag"], dict)
 
 
+def test_operations_state_screens_follow_runstate_and_preserve_order(tmp_path):
+    """The room's state roster is the control DB lifecycle, not a browser-made vocabulary."""
+    with _db(tmp_path) as db:
+        for index, state in enumerate(RunState, start=1):
+            initial = RunState.QUEUED if state is RunState.QUEUED else RunState.RUNNING
+            run = db.create_run(
+                spec_name="flow",
+                model="m",
+                state=initial,
+                reason="fixture",
+                candidate_sha=f"{index:040d}",
+            )
+            path = {
+                RunState.QUEUED: (),
+                RunState.RUNNING: (),
+                RunState.AWAITING_APPROVAL: (RunState.AWAITING_APPROVAL,),
+                RunState.VERIFYING: (RunState.VERIFYING,),
+                RunState.PROMOTABLE: (RunState.PROMOTABLE,),
+                RunState.PROMOTING: (RunState.PROMOTABLE, RunState.PROMOTING),
+                RunState.MERGED: (
+                    RunState.PROMOTABLE,
+                    RunState.PROMOTING,
+                    RunState.MERGED,
+                ),
+                RunState.PROJECTING: (
+                    RunState.PROMOTABLE,
+                    RunState.PROMOTING,
+                    RunState.MERGED,
+                    RunState.PROJECTING,
+                ),
+                RunState.PUBLISHED: (
+                    RunState.PROMOTABLE,
+                    RunState.PROMOTING,
+                    RunState.MERGED,
+                    RunState.PROJECTING,
+                    RunState.PUBLISHED,
+                ),
+                RunState.FAILED: (RunState.FAILED,),
+                RunState.CANCELLED: (RunState.CANCELLED,),
+                RunState.QUARANTINED: (RunState.QUARANTINED,),
+            }[state]
+            for target in path:
+                db.transition_run(run.run_id, target, reason="fixture")
+        snapshot = operational_snapshot(
+            db,
+            repo_head_sha="c" * 40,
+            heartbeats={},
+            now="2026-09-12T01:00:00+00:00",
+        )
+
+    runs = snapshot["runs"]
+    screens = snapshot["state_screens"]
+    assert {row["state"] for row in runs} == {row.value for row in RunState}
+    assert [(screen["run_id"], screen["state"]) for screen in screens] == [
+        (run["run_id"], run["state"]) for run in runs
+    ]
+    assert {row["lifecycle.state"] for row in screens} == {row.value for row in RunState}
+    assert "stalled" not in {row["state"] for row in runs}
+    assert "escalated" not in {row["state"] for row in runs}
+
+
+def test_operations_emits_attention_state_as_a_row_value(tmp_path):
+    """Attention causation is server-owned and available to a visible renderer value node."""
+    with _db(tmp_path) as db:
+        run_id = _seed_awaiting(db)
+        snapshot = operational_snapshot(
+            db,
+            repo_head_sha="c" * 40,
+            heartbeats={},
+            now="2026-09-12T01:00:00+00:00",
+        )
+
+    row = next(screen for screen in snapshot["state_screens"] if screen["run_id"] == run_id)
+    assert row["attention.state"] == "active"
+    assert row["state_screen"] == "awaiting_approval"
+
+
+def test_operations_names_unobserved_worker_health(tmp_path):
+    """An unobserved heartbeat source is unavailable, not zero unhealthy workers."""
+    with _db(tmp_path) as db:
+        snapshot = operational_snapshot(
+            db,
+            repo_head_sha="c" * 40,
+            heartbeats=None,
+            now="2026-09-12T01:00:00+00:00",
+        )
+
+    assert snapshot["worker_health"]["state"] == "unavailable"
+    assert snapshot["unhealthy_workers"] == []
+    assert any(row["surface"] == "unhealthy_workers" for row in snapshot["degraded"])
+
+
 def test_run_detail_carries_every_control_record(tmp_path):
     """P1/P2: attempts, gates, approvals, and command receipts come from the records as-is."""
     with _db(tmp_path) as db:
@@ -509,12 +601,21 @@ def test_resolve_live_cell_maps_a_fleet_job_to_its_live_phase_stream():
     the substitution; a finished job and a non-job id pass through unchanged."""
     board = {
         "job-live": json.dumps(
-            {"job_id": "job-live", "spec": "workflows/repository/flow.yaml", "ts": 1790105820.0,
-             "status": "running"}
+            {
+                "job_id": "job-live",
+                "spec": "workflows/repository/flow.yaml",
+                "ts": 1790105820.0,
+                "status": "running",
+            }
         ),
         "job-done": json.dumps(
-            {"job_id": "job-done", "spec": "workflows/repository/flow.yaml", "ts": 1790105820.0,
-             "run_id": "run-1", "status": "completed"}
+            {
+                "job_id": "job-done",
+                "spec": "workflows/repository/flow.yaml",
+                "ts": 1790105820.0,
+                "run_id": "run-1",
+                "status": "completed",
+            }
         ),
     }
     logs = {
@@ -552,7 +653,9 @@ def test_read_run_logs_binds_the_live_phase_stream_for_an_in_flight_run():
             json.dumps({"type": "step_finish", "timestamp": "1790105800000"}),
         ],
         "events_log:flow:execute": [
-            json.dumps({"type": "tool_use", "timestamp": "1790105944000", "part": {"text": "write notes"}}),
+            json.dumps(
+                {"type": "tool_use", "timestamp": "1790105944000", "part": {"text": "write notes"}}
+            ),
             json.dumps({"type": "step_start", "timestamp": "1790105930000"}),
         ],
     }
@@ -695,5 +798,3 @@ def test_read_run_logs_matches_an_inflight_job_by_spec_and_time():
         redis, "run-inflight", spec_name="other", started_at="1970-01-01T00:33:30Z"
     )
     assert other["state"] == "unbound"
-
-

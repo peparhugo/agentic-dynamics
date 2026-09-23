@@ -44,6 +44,7 @@ filesystem, which would let a route quietly re-acquire the dependency the inject
 from __future__ import annotations
 
 import re
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -139,14 +140,20 @@ class ControlRoomServices:
         if git_error:
             degraded.append({"surface": "repo_head_sha", "reason": git_error})
         heartbeats: Any = None
-        heartbeats, redis_error = cs.read_worker_heartbeats()
+        try:
+            heartbeats, redis_error = cs.read_worker_heartbeats()
+        except Exception as exc:  # noqa: BLE001 — an unobserved source is named, never a 500
+            heartbeats, redis_error = None, f"{type(exc).__name__}: {exc}"
         if redis_error:
             heartbeats = None
             degraded.append({"surface": "unhealthy_workers", "reason": redis_error})
         try:
             with ControlDB.open_read_only() as db:
                 snapshot = ops.operational_snapshot(
-                    db, repo_head_sha=repo_head_sha, heartbeats=heartbeats
+                    db,
+                    repo_head_sha=repo_head_sha,
+                    heartbeats=heartbeats,
+                    now=time.time(),
                 )
         except Exception as exc:  # noqa: BLE001 — an unreadable control plane is degraded data
             return {
@@ -156,6 +163,19 @@ class ControlRoomServices:
                 "active_runs": [],
                 "promotable_runs": [],
                 "unhealthy_workers": [],
+                "worker_health": {
+                    "state": "unavailable",
+                    "reason": next(
+                        (
+                            entry["reason"]
+                            for entry in degraded
+                            if entry.get("surface") == "unhealthy_workers"
+                        ),
+                        "workers not observed",
+                    ),
+                },
+                "runs": [],
+                "state_screens": [],
                 "projection_lag": {},
                 "safe_actions": [],
                 "degraded": degraded
@@ -183,7 +203,12 @@ class ControlRoomServices:
             redis_error = f"{type(exc).__name__}: {exc}"
         try:
             with ControlDB.open_read_only() as db:
-                detail = ops.run_detail(db, run_id, redis_client=redis_client)
+                detail = ops.run_detail(
+                    db,
+                    run_id,
+                    redis_client=redis_client,
+                    now=time.time(),
+                )
         except Exception as exc:  # noqa: BLE001 — named degradation, never a 500
             return {
                 "error": "control_db_unavailable",

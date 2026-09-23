@@ -1,5 +1,5 @@
 {
-  "_note": "Deterministic wire payloads for the restored-board acceptance classes (navigation, loading, degraded, scrolling, keyboard). No live Redis/clock/network (waiver W2). Run rows are expanded from run_seed + active_count/promotable_count by scripts/verify_control_room_rendering.py:build_operations_payload(), so every id is stable and the list is long enough to scroll.",
+  "_note": "Deterministic wire payloads for the restored-board acceptance classes (navigation, loading, degraded, scrolling, keyboard). No live Redis/clock/network (waiver W2). The Operations fixture carries canonical runs plus state_screens; the browser receives the service-shaped ordered rows and the fixture gate asserts their identity/order invariant.",
   "operations": {
     "source": {
       "control_epoch": 812,
@@ -14,12 +14,42 @@
       "candidate_sha": "bc2c728633273947d278f285c2e8929946aaa082",
       "started_at": "2026-09-18T19:18:09Z"
     },
-    "active_count": 6,
-    "promotable_count": 12,
+    "runs": [
+      {"run_id": "run-fixture-0001", "state": "queued"},
+      {"run_id": "run-fixture-0002", "state": "running"},
+      {"run_id": "run-fixture-0003", "state": "awaiting_approval"},
+      {"run_id": "run-fixture-0004", "state": "verifying"},
+      {"run_id": "run-fixture-0005", "state": "promotable"},
+      {"run_id": "run-fixture-0006", "state": "promoting"},
+      {"run_id": "run-fixture-0007", "state": "merged"},
+      {"run_id": "run-fixture-0008", "state": "projecting"},
+      {"run_id": "run-fixture-0009", "state": "published"},
+      {"run_id": "run-fixture-0010", "state": "failed"},
+      {"run_id": "run-fixture-0011", "state": "cancelled"},
+      {"run_id": "run-fixture-0012", "state": "quarantined"}
+    ],
+    "state_screens": [
+      {"run_id": "run-fixture-0001", "state": "queued"},
+      {"run_id": "run-fixture-0002", "state": "running"},
+      {"run_id": "run-fixture-0003", "state": "awaiting_approval"},
+      {"run_id": "run-fixture-0004", "state": "verifying"},
+      {"run_id": "run-fixture-0005", "state": "promotable"},
+      {"run_id": "run-fixture-0006", "state": "promoting"},
+      {"run_id": "run-fixture-0007", "state": "merged"},
+      {"run_id": "run-fixture-0008", "state": "projecting"},
+      {"run_id": "run-fixture-0009", "state": "published"},
+      {"run_id": "run-fixture-0010", "state": "failed"},
+      {"run_id": "run-fixture-0011", "state": "cancelled"},
+      {"run_id": "run-fixture-0012", "state": "quarantined"}
+    ],
+    "unknown_case": {
+      "state": "unknown",
+      "reason": "lifecycle state is absent from a separate read-model record"
+    },
     "attention": [
       {
         "kind": "approval",
-        "run_id": "run-fixture-0007",
+        "run_id": "run-fixture-0003",
         "spec_name": "control_room_followups",
         "gate_id": "gate-fixture",
         "candidate_sha": "bc2c728633273947d278f285c2e8929946aaa082",
@@ -27,7 +57,7 @@
       },
       {
         "kind": "promotion",
-        "run_id": "run-fixture-0001",
+        "run_id": "run-fixture-0010",
         "spec_name": "control_room_followups",
         "gate_id": "",
         "candidate_sha": "bc2c728633273947d278f285c2e8929946aaa082",
@@ -45,7 +75,12 @@
         "session_id": "ses_fixture_stale",
         "age_seconds": 845
       }
-    ]
+    ],
+    "worker_health": {
+      "state": "recorded",
+      "count": 1,
+      "reason": "heartbeat source observed"
+    }
   },
   "operations_degraded": {
     "source": {
@@ -59,10 +94,20 @@
       {
         "surface": "control_db",
         "reason": "control database not found"
+      },
+      {
+        "surface": "unhealthy_workers",
+        "reason": "heartbeat source unavailable"
       }
     ],
     "projection_lag": {},
-    "unhealthy_workers": []
+    "unhealthy_workers": [],
+    "worker_health": {
+      "state": "unavailable",
+      "reason": "heartbeat source unavailable"
+    },
+    "runs": [],
+    "state_screens": []
   },
   "run_detail": {
     "schema": "control-room-run-detail/v1",
@@ -72,8 +117,10 @@
       "workflow_revision_id": "control_room_followups@1",
       "candidate_sha": "bc2c728633273947d278f285c2e8929946aaa082",
       "state": "promotable",
+      "state_screen": "promotable",
       "model": "deepseek/deepseek-v4-flash",
       "started_at": "2026-09-18T19:18:09Z",
+      "started.age": "1h ago",
       "ended_at": "2026-09-18T19:42:11Z",
       "ledger_path": "/repo/experiments/results/workflows/control_room_followups/20260918T191809000000Z_run-fixture-0001.json",
       "cost_usd": 0.0,
@@ -281,8 +328,10 @@
       "workflow_revision_id": "control_room_followups@1",
       "candidate_sha": "bc2c728633273947d278f285c2e8929946aaa082",
       "state": "promotable",
+      "state_screen": "promotable",
       "model": "deepseek/deepseek-v4-flash",
       "started_at": "2026-09-18T19:18:09Z",
+      "started.age": "age unknown",
       "ended_at": "",
       "ledger_path": "",
       "cost_usd": 0.0,

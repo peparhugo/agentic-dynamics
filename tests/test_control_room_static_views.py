@@ -124,6 +124,16 @@ def test_operations_board_renders_the_packet_fields_it_claims():
         assert anchor in app, f"the restored Operations renderer does not read {anchor}"
 
 
+def test_operations_board_renders_server_owned_state_screen_values():
+    """The served roster consumes ordered state screens and paints attention as text."""
+    app = (STATIC / "app.js").read_text(encoding="utf-8")
+    assert "data.state_screens" in app
+    assert "operationsAttentionStates" not in app  # probe-only gate code must stay separate
+    assert "document.createTextNode(state)" in app
+    assert "runs.sort" not in app
+    assert "entry[field]" in app
+
+
 def test_non_home_boards_start_hidden_so_one_board_shows_at_rest():
     """One board visible at rest; every other board starts hidden (the room's lazy-load rule)."""
     index = _index_text()
@@ -218,7 +228,7 @@ def test_run_drawer_renders_the_run_inspection_blocks():
         "dataset.deliveredPhase",
         "dataset.preparedStepPath",
         "selected — use not established",
-        'tr.dataset.state',
+        "tr.dataset.state",
     ):
         assert anchor in app, anchor
 
