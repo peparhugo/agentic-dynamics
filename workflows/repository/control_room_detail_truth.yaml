@@ -71,6 +71,18 @@ workflow:
         value only as a data-* attribute). A green in-cell run is not an accepted candidate:
         the AIO runs verify_control_room_rendering.py --profile acceptance against THIS run's
         candidate on the host, and promotion waits on it.
+
+        ATTEMPT-ELEVEN FINDING (2026-09-23, run-8c1e7d30cf22 — its execute candidate is
+        archived at refs/experiments/control_room_detail_truth/run-8c1e7d30cf22): the run
+        reached 2/5 ok (prior + execute committed) and died AT THE DECLARED TEST GATE, 78/79:
+        tests/test_control_room_static_views.py::test_operations_board_renders_the_packet_fields_it_claims
+        is red because app.js dropped the `unhealthy_workers` read while adopting a
+        server-owned worker block (`worker_health`). The suite's anchor lists ARE the read
+        contract: when a redesign renames or moves a packet read a declared suite anchors,
+        update that anchoring suite DELIBERATELY in the same commit — and ALL FIVE declared
+        gate suites must be green on the FINAL commit before the phase ends (the gate re-runs
+        them independently; a red one is a failed run). You rebuild from main, not from the
+        archive.
     phases:
       - name: prior
         kind: agent
@@ -109,8 +121,14 @@ workflow:
           its source is degraded, and every value your gate asserts must render as visible
           text (a data-* attribute is not a rendered value). The container CANNOT run the
           browser profile (no Playwright — register L47): run the browser-free checks
-          (`python3 scripts/verify_control_room_rendering.py --check-fixtures`) and the room
-          suites (`tests/test_control_room_*.py`, `tests/test_admin_*.py`); do NOT install
+          (`python3 scripts/verify_control_room_rendering.py --check-fixtures`) and the five
+          declared gate suites (`tests/test_control_room_operations.py`,
+          `tests/test_control_room_glance_integrity.py`,
+          `tests/test_control_room_build_contract.py`,
+          `tests/test_control_room_static_views.py`, `tests/test_control_room_paths.py`)
+          TO FULL GREEN on your FINAL commit — if your redesign renames or moves a packet
+          read that a suite anchors, update that suite in the same commit (the previous
+          attempt died 78/79 on exactly that drift); do NOT install
           Playwright and do NOT fabricate captures — the host runs the acceptance profile
           against this run's candidate. Commit.
       - name: g_test_gate
