@@ -224,10 +224,71 @@ rail record* (semi-structured, ADVISORY authority). The words match; the semanti
 
 ## 10. Bounded claims — what was read, and what was not
 
-**Read (2026-09-23):** `hindsight.vectorize.io/` (Overview), `/developer/observations`, and
-`/developer/api/mental-models` (v0.10). **Not read:** `/developer/retain`, `/developer/retrieval`,
-`/developer/reflect` deep pages, `/developer/performance`, `/developer/storage`,
-`/developer/memory-defense`, `/developer/knowledge-pages`, the API reference and the paper
-(arXiv:2512.12818). Claims about those surfaces are deliberately absent; anything above that touches
-them is inference from the overview diagrams and is marked as such in tone. No repo files were modified
-by this review.
+**Read (docs, 2026-09-23):** `hindsight.vectorize.io/` (Overview), `/developer/observations`, and
+`/developer/api/mental-models` (v0.10). **Then read (source, same day):** a shallow clone of
+`github.com/vectorize-io/hindsight` — `README.md`, `CLAUDE.md`, the package layout, and
+`hindsight-api-slim/hindsight_api/engine/`: `mental_model_refresh.py`,
+`consolidation/consolidator.py` (head) + `consolidation/prompts.py`, `search/retrieval.py` +
+`search/fusion.py`, `reflect/agent.py` (head) + `reflect/delta_ops.py` + `reflect/structured_doc.py`,
+`query_analyzer.py`, and the `retain/` file listing. **Not read:** the full 3,763-line consolidator,
+the paper (arXiv:2512.12818), the benchmarks/evals internals, the Next.js control plane, and most of
+the ~40 integrations. Claims are bounded accordingly. No repo files were modified by this review.
+
+## 11. Source-level addendum (the clone)
+
+The published docs are honest about this codebase — every mechanism reviewed in §2 exists as named
+code, at production weight. The server lives in `hindsight-api-slim` (≈920 Python modules;
+`hindsight-api` is a meta-package pinning `hindsight-api-slim[all]`), alongside a Next.js control
+plane, benchmark suites (`hindsight-dev/benchmarks`: consolidation, document_evolution, perf,
+multimodal_retain, …), system evals, and ~40 integrations. Five finds matter for this repo:
+
+1. **The structured-document rationale is the strongest idea in the tree.**
+   `reflect/structured_doc.py` states why mental models are stored as an ordered section/block
+   structure with markdown as a *deterministic render*: "the intrinsic mechanism of an LLM is to
+   *generate* the next token from a gestalt of the input — not to copy tokens verbatim", so
+   "preserve unchanged content" is fundamentally a soft constraint. The fix is to give the model
+   **no opportunity to drift**: blocks are opaque verbatim fragments, and delta refreshes emit
+   operations against ids; unmentioned blocks are physically untouched ("prose drift is structurally
+   impossible"). A v1 typed-AST variant was abandoned because unexpressible constructs silently
+   collapsed into paragraphs — a clean cautionary tale for anyone modelling prose as a typed tree.
+2. **Shape vs reference validation — two different answers.** `reflect/delta_ops.py`: a reply whose
+   *shape* is wrong refuses the whole reply and re-asks with the errors quoted; a reply naming
+   unknown ids (a misread document) drops those operations and applies the rest — "the model
+   addressed a document it misread, which the next refresh sees afresh". Ids, never positions, are
+   the addressing scheme (issue #3273: an off-by-one index "silently overwrites an unrelated block
+   and is recorded as a success" — an id is copied, not derived, and a wrong one does not resolve).
+3. **Consolidation is a decision engine with enforced epistemics.** `consolidation/prompts.py`'s
+   DECISION GUIDE is prompt-encoded discipline: prefer update over create; one observation per
+   distinct facet (entity/facet, not topic); cascade to affected observations; never delete history;
+   and **NO COMPUTATION** — "never calculate, derive, or adjust numeric values … if the user says 'I
+   have 2 dogs' and then 'I have a dog named Rex', do NOT update the count to 3". That is our
+   *measured-or-absent* rule arrived at from the other direction: the system refuses to manufacture a
+   number it cannot ground. Enforcement is mechanical too — every create/update/delete carries a
+   required `reason`; at most one update per observation id; a delete without the exact id rejects
+   the **whole** response (fail-closed).
+4. **Retrieval fusion carries its own critique.** `search/fusion.py` implements RRF with `k=60` and
+   *also* an `interleave_fusion` alternative, whose docstring names RRF's failure mode: a
+   unique-but-important result reached by a small arm can be buried by its low reciprocal rank — the
+   interleave exists for "dedup-style recall". Their temporal analyzer (`query_analyzer.py`)
+   documents the opposite instinct: a false-positive date window is "worse than none, because the
+   constraint is non-null so nothing downstream can tell extraction failed" — extraction that cannot
+   be trusted must not masquerade as a constraint.
+5. **The reflect loop is budgeted like an admission system.** `reflect/agent.py` (≈2,100 lines) runs
+   structured tool calls only (`search_mental_models → search_observations → recall → expand →
+   finish`), with token-budget ceilings *tightened by the remaining context* and a floor ("an
+   unusable tool result is worse than the round-trip"), parallel calls bounded so they cannot
+   overshoot the budget — the same shape as our admission/headroom thinking at a different layer.
+
+Also of note: the storage split is explicit — observations are rows in `memory_units`
+(`fact_type='observation'`, with `proof_count` / `source_memory_ids` / a JSONB `history`), while
+mental models live in their own table refreshed via reflect. And their repo culture rhymes with ours
+(`AGENTS.md` → `CLAUDE.md`, coding-agent integrations first-class, an `opencode` integration
+directory plus e2e Dockerfiles) — while the epistemics differ where it counts: no measurement plane,
+no admission/spend gate, no permanence gate, and a truth model that consolidates beliefs rather than
+recording measured facts.
+
+**Updated borrow read:** §7's #1 (delta-typed refresh for curated prose) is now the clear first
+candidate — the design is proven at production weight, and our register / `mental-model.md` /
+architecture docs have exactly the hybrid hand-plus-machine edit pattern it protects. Add one nuance
+to §7's #4: their interleave-fusion alternative is worth citing when our retrieval's RRF buries a
+small-arm finding.
