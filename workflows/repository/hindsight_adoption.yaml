@@ -1,0 +1,181 @@
+name: hindsight_adoption
+question: >-
+  What must this codebase ADOPT from Hindsight 0.10 — across the mental model, agents, tools,
+  hooks, setup, architecture, knowledge base, retrieval, augmentation, and analysis surfaces — and
+  what can be landed, gated, in this run?
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+factors:
+  - {name: model, levels: [openai/gpt-5.6-luna]}
+design: factorial
+rules: []
+metrics: []
+comparison: null
+writeup: {format: lab_book, sections: [question, evidence]}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_uncertainty}
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: false
+    plan_unit_cap: 12
+    rag:
+      emit_self: true
+      emit_report: true
+      emit_scope: agentic-dynamics
+    context:
+      domain_context: >-
+        THE DIRECTIVE (controller, 2026-09-23, verbatim): "get a workflow that does a massive deep
+        dive into this and what we need to adopt into our code base. this should be a mental model
+        update and adding to our agents, tools, hooks, setup, architecutre, knowledgebase,
+        retrieval, augmentation, analysis, etc"
+
+        THE DOSSIER (read FIRST — cells have NO egress; the fleet allows only model endpoints, so
+        this committed material is the WHOLE external record): (1)
+        docs/reviews/hindsight_memory_solution_dissection.md — the dissection (nouns mapped onto
+        ours, convergences, divergences, borrow candidates §7; the source-level addendum §10–§11;
+        read §7 and §11 twice); (2) docs/reviews/hindsight/README.md + source_notes.md — the
+        vendored source-level excerpts, quoted by clone path (structured_doc's "no opportunity to
+        drift"; delta_ops' shape-vs-reference layers and ids-not-indices; consolidation's DECISION
+        GUIDE incl. NO COMPUTATION; fusion's RRF + interleave critique; the budgeted reflect
+        agent). Register rows L48 (execution granularity — this run uses the plan-units shape,
+        FIRST non-exemplar use) and L50 (the evaluation that produced the dossier) are the queue
+        context.
+
+        THE ADOPTION TARGETS (the surfaces the directive names — map each against the dossier:
+        what does Hindsight teach THIS surface, and what does the surface ADOPT?):
+        - mental model: agent_config/mental-model.md (a GENERATED surface — edit the agent_config/
+          sources, regenerate, keep the file map's freshness discipline);
+        - agents: agent_config/agents/*.md → .opencode/agents/ + .claude/ mirrors (generated);
+        - tools: .opencode/tools/*.ts (HAND-AUTHORED, outside the generator);
+        - hooks: .opencode/plugins/ (hand-authored — the plugin seam);
+        - setup: opencode.json (hand-authored project config);
+        - architecture: ARCHITECTURE.md + docs/architecture/current/* (architectural claims land
+          there);
+        - knowledge base: src/agentic_dynamics/knowledge/ (stream, producers, identity, registry)
+          with the two-channel rule and the authority ordering;
+        - retrieval: src/agentic_dynamics/knowledge/retrieval.py (+ the projections it fuses);
+        - augmentation: src/agentic_dynamics/knowledge/augment.py + prompt_constructor.py;
+        - analysis: src/agentic_dynamics/reporting/ + the labs/analyzers consuming the corpus;
+        - etc: name any further surface the dive proves — never stretch a listed one to fit.
+
+        THE HONESTY FRAME (rules this unit must NOT violate): measured-or-absent (never a
+        fabricated zero, never an invented value); [M]/[C]/[H]/[X]/[P] tags on claims; every docs
+        file carries a valid `status` front-matter (docs/reviews/* = `accepted`;
+        docs/designs/proposed/* = `proposed`; tests/test_doc_lifecycle.py is the gate — it caught
+        a missing status on the dissection doc and main went red until PR #161); generated
+        surfaces are never hand-edited (edit agent_config/, then
+        `python3 scripts/_gen_instructions.py`, keep `--check` green); the doctrine (no net-new
+        top-level mechanism without a one-line justification naming the gap it closes; when a
+        documented path fails, record the gap — do not build around it); adoption must not weaken
+        the measurement/economics discipline or the control plane's gates. Do NOT touch the
+        Control Room's live surfaces (L49 is queued for them) and do not re-run the L33
+        attention/order/age work.
+
+        THE DELIVERABLE: (1) docs/designs/proposed/hindsight_adoption.md (`status: proposed`) —
+        the adoption plan: for EACH target, the item(s) to adopt, the dossier evidence (file or
+        quote), the gap it closes, the exact target files, the gate that proves it, and its risk;
+        items larger than this run become NAMED follow-up units in the same doc. (2) The units the
+        plan marks landable NOW, implemented and gated (the plan-expansion slices — keep each
+        unit's diff small, test-backed, inside its declared files). (3) notes/posterior.md names
+        which units landed, with the assertion or invariant that proves each.
+
+        ACCEPTANCE: the five declared gate suites green in-cell on the FINAL commit (the gate
+        re-runs them independently); every docs file touched carries valid status front-matter;
+        `python3 scripts/_gen_instructions.py --check` stays green; the AIO runs host-side checks
+        (docs scan, fast path) against the candidate before any promote.
+    phases:
+      - name: prior
+        kind: agent
+        scope: proposal_write
+        timeout: 1800
+        prompt: |
+          Recon for the adoption dive. Read the dossier (domain context) FIRST, then walk EACH
+          adoption target in the repo at its real depth (the files themselves — services, tools,
+          configs, docs — not just the file map). WRITE `notes/control_room.md`
+          (`## Problem`, `## What Exists`, `## Gaps`, `## Sources`), `notes/plan.md`
+          (`## Files`, `## Tests`, `## Acceptance`, `## Risks`, `## Adoptions`) and — the
+          load-bearing artifact — `notes/plan.units.json`: {"units": [{"id": "u1_...", "goal":
+          "...", "files": [...], "tests": [...], "acceptance": "...", "budget_usd": ...,
+          "depends_on": [...]}]}. One unit per concern; a unit that cannot be accepted
+          independently is not a unit (register L48 / the skeleton contract's selection rule).
+          Small, test-backed, landable units for this run; the plan doc's oversized items become
+          named follow-ups, not units. Write `notes/sources.jsonl`. Commit — `notes/` is
+          gitignored, so stage the notes explicitly (`git add -f notes/`) before committing; a
+          plain `git add` refuses ignored paths and the phase then records no commit.
+      - name: execute
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        requires_files: [notes/plan.md, notes/sources.jsonl, notes/plan.units.json]
+        expand_from_plan: notes/plan.units.json
+        prompt: |
+          Implement the plan units from `notes/plan.units.json`, one concern per unit, each unit's
+          changes confined to the files it declares. Write `docs/designs/proposed/hindsight_adoption.md`
+          (`status: proposed`) as the plan of record — per target: item, dossier evidence, gap,
+          target files, proving gate, risk — plus the named follow-ups the units did not cover.
+          Rules: docs front-matter valid on every touched file; generated surfaces via
+          agent_config/ + `python3 scripts/_gen_instructions.py` (keep `--check` green); do not
+          touch the Control Room live surfaces (L49) or the L33 surfaces; measured-or-absent and
+          [M]/[C]/[H]/[X]/[P] tags on claims; keep each unit's tests green on your FINAL commit.
+          Commit per unit (the expansion gates each unit independently).
+      - name: g_test_gate
+        kind: test
+        scope: implementation
+        timeout: 1800
+        requires_files: [notes/plan.md]
+        # The declared final sweep (deterministic; cell-safe suites, vetted on the host): the
+        # docs-lifecycle front-matter gate, the dependency-direction guard, the spec validator
+        # corpus guard, the knowledge-plane unit tests, and the data-flow guard.
+        tests:
+          - tests/test_doc_lifecycle.py
+          - tests/test_dependency_direction.py
+          - tests/test_experiment_spec.py
+          - tests/test_knowledge.py
+          - tests/test_data_flow.py
+        prompt: |
+          The independent runner verifies the worktree against the declared targets.
+      - name: posterior
+        kind: agent
+        scope: proposal_write
+        timeout: 900
+        requires_files: [notes/control_room.md, notes/plan.md]
+        prompt: |
+          Diff the plan against what landed. WRITE `notes/posterior.md` (`## Violations`,
+          `## Unknowns`, `## UPDATES`): which units landed and which did not (each with the
+          assertion or invariant that proves it); which adoption targets changed and how; which
+          follow-ups are named in docs/designs/proposed/hindsight_adoption.md; what remains
+          unverified (there are no captures here — the AIO runs host-side checks). Commit —
+          `notes/` is gitignored, so stage it explicitly (`git add -f notes/posterior.md`) before
+          committing. Keep every write inside the worktree (never `/tmp/...`, never `../...`): an
+          outside edit raises a permission ask the headless cell cannot answer.
+      - name: g_adversarial
+        kind: agent
+        scope: proposal_write
+        timeout: 1800
+        run_model: openai/gpt-5.6-terra
+        prompt: |
+          ADVERSARIAL REVIEW — a different model by design. Read the notes, the diffs, and the
+          adoption plan. Attack: does any adopted idea secretly weaken the measurement discipline
+          (an invented value, a fabricated zero, a client-side re-derivation, a gate loosened)? is
+          every claimed "adoption" actually IN the code it names (open the files — a plan that
+          describes a change it did not make is a miss)? does any docs file lack valid front-matter
+          or claim a status it does not have? does any unit's acceptance pass vacantly? does the
+          plan overclaim dossier evidence (a quote that is not in docs/reviews/hindsight/)? is any
+          follow-up unbounded (no files, no gate) or any generated surface hand-edited? Name at
+          least one falsifier per major claim. Write `notes/adversarial_review.md` with a final
+          `## FINDING` paragraph and commit it — `notes/` is gitignored, so stage the review
+          explicitly (`git add -f notes/adversarial_review.md`) before committing; the phase must
+          record a commit (a silently uncommitted review fails the promotion gate). KEEP EVERY
+          WRITE INSIDE THE WORKTREE (`/repo`): the review goes to the worktree-relative
+          `notes/adversarial_review.md`, and any scratch experiment lives under `notes/`
+          (gitignored) — never `/tmp/...`, never `../...`. An edit outside the worktree raises a
+          permission ASK that this headless cell cannot answer, and the phase stalls to its
+          timeout.

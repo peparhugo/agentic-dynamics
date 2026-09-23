@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-23T17:46:35.013353+00:00",
-  "n_specs": 247,
+  "generated_at": "2026-09-23T18:36:54.324317+00:00",
+  "n_specs": 248,
   "specs": [
     {
       "name": "adapter_snapshot_guard",
@@ -2691,6 +2691,26 @@
       "results_pointer": null,
       "n_runs": 0,
       "workflow_revision_id": "07b171db7dd8323fc53d1e10e6fa1bd61379ef03dbab6ed7ae25017cfe21ccb9",
+      "authored_status": null
+    },
+    {
+      "name": "hindsight_adoption",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/hindsight_adoption.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": true,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0,
+      "workflow_revision_id": "8ff1c928571d32282e69d2843ff679933aa39cb727ae5f5209250ae601a587ad",
       "authored_status": null
     },
     {
