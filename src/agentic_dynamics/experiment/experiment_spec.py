@@ -1192,6 +1192,21 @@ def validate_spec(
                     "silently vanish (put the checkpoint on its own phase)"
                 )
 
+    # Exactly ONE phase may declare the expansion (the loop's open extension). The runner
+    # refuses two declarers as ambiguous at EXPANSION time — when the declaring phase is
+    # reached, after the prior phase has already spent; uniqueness is a spec-level defect the
+    # earliest gate can see, so the validator refuses it here (mirroring the runner's rule).
+    declaring_phases = [
+        str(ph.get("name", "?"))
+        for ph in spec.workflow.params.get("phases") or []
+        if isinstance(ph, dict) and ph.get("expand_from_plan")
+    ]
+    if len(declaring_phases) > 1:
+        errors.append(
+            "only one phase may declare expand_from_plan — got "
+            f"{declaring_phases} (the expansion replaces ONE phase; two are ambiguous)"
+        )
+
     # The plan-expansion unit ceiling (the loop's open extension): a positive integer, so a
     # typo cannot silently disable the bound that keeps a plan's N bounded.
     if "plan_unit_cap" in spec.workflow.params:
