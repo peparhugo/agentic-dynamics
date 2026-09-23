@@ -85,7 +85,8 @@ workflow:
         items larger than this run become NAMED follow-up units in the same doc. (2) The units the
         plan marks landable NOW, implemented and gated (the plan-expansion slices). (3)
         notes/posterior.md names which units landed, with the assertion or invariant that proves
-        each.
+        each. (All of it lands through the UNIT slices — the prior's role is the plan and the
+        units; the prior writes only `notes/`.)
 
         THE EXECUTION SHAPE (controller directive, 2026-09-23 — SMALL UNITS ARE THE POINT):
         a unit is ONE concern — a handful of files, one verifiable change, ONE gate that proves
@@ -108,7 +109,12 @@ workflow:
         prompt: |
           Recon for the adoption dive. Read the dossier (domain context) FIRST, then take a FAST
           INVENTORY of each adoption target (paths, entry points, sizes — the deep walk belongs
-          to the UNITS, not this phase; never re-read a file you have read). WRITE
+          to the UNITS, not this phase; never re-read a file you have read). SCOPE FENCE: you
+          write ONLY the four `notes/` files below — never `docs/`, never `agent_config/`, never
+          source or generated mirrors, and never another phase's artifact (`notes/posterior.md`
+          belongs to the posterior phase). The UNITS own every repository change; a prior that
+          lands them makes its units no-ops and the run FAILS (NO_CHANGES, attempt 2's lesson,
+          2026-09-23). WRITE
           `notes/control_room.md`
           (`## Problem`, `## What Exists`, `## Gaps`, `## Sources`), `notes/plan.md`
           (`## Files`, `## Tests`, `## Acceptance`, `## Risks`, `## Adoptions`) and — the
