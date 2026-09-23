@@ -28,14 +28,20 @@ Evidence: `cap_runner_hardening`, `control_db_publication`, `self_knowledge_laye
 
 ## Execution granularity — the selection rule (2026-09-23)
 
-Decompose the build **when, and only when, the work decomposes**: expand into units when ≥2
-units have INDEPENDENT ACCEPTANCE (a unit's verdict stands on its own gate's targets, without
-the others) — or when one phase would otherwise risk the phase wall / the session's context
-budget. Otherwise keep ONE bounded agent phase and rely on the separate gates (`g_test_gate`,
-the adversarial phase, the host acceptance). A unit that cannot be accepted independently is
-not a unit: coupled work stays in the phase it belongs to — seams there would buy boundaries
-without verdicts. (L33, 2026-09-23: four coupled remediation items, one acceptance
-instrument, one `execute` phase — correctly single.)
+Decompose the build whenever it does not fit in one sitting — and treat that as the DEFAULT, not
+the exception. The 2026-09-23 evidence (L33's three attempts against one large `execute`) is that
+a monolithic execute is the failure factory: a large single concern-count drowns a session, hides
+verification gaps, and makes every miss cost a whole attempt. Two triggers, either sufficient:
+(a) ≥2 units with INDEPENDENT ACCEPTANCE (a unit's verdict stands on its own gate's targets); (b)
+the work has more than one CONCERN, or its diff is not reviewable in one sitting. A single
+bounded agent phase remains correct only for ONE concern with a small, single-gate diff.
+
+**The unit-size discipline (applies whenever the build expands).** A unit is ONE concern: a
+handful of files, one verifiable change, ONE gate that proves it. Prefer MORE, SMALLER units —
+eight small beats three large. If a unit touches more than ~4 files or two concerns, or cannot be
+proven by one gate, SPLIT it. `plan_unit_cap` is a ceiling, never a target. A unit that cannot be
+accepted independently is not a unit; neither is a unit too large for one gate. Seams are not the
+enemy — an unprovable monolith is.
 
 **The two halves (already built; no new mechanism).**
 

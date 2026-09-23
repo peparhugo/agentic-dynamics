@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-23T17:46:35.013353+00:00`  ·  247 spec(s)
-**Work remaining:** 207 open · 40 completed/retired
+Generated at: `2026-09-23T18:45:13.001267+00:00`  ·  248 spec(s)
+**Work remaining:** 208 open · 40 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -142,6 +142,7 @@ Generated at: `2026-09-23T17:46:35.013353+00:00`  ·  247 spec(s)
 | `green_main_closure` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `grit_calibration_design` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `herdr_inspired_ux` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `hindsight_adoption` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `i10_typed_checkpoint` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `investing_domain_audit` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `kb_event_typing` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |

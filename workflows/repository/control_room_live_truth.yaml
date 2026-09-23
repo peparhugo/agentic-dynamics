@@ -28,6 +28,7 @@ workflow:
     language: python
     fork: false
     rag_augment: false
+    plan_unit_cap: 8
     rag:
       emit_self: true
       emit_report: true
@@ -93,6 +94,16 @@ workflow:
         panel resolution (PRs #145/#147), the LIVE NOW board (`static/app.js`), the events
         route (`routes/telemetry.py`), the gate + fixtures. The AIO runs the host gate
         against this run's candidate before any promote.
+
+        THE EXECUTION SHAPE (controller directive, 2026-09-23 — SMALL UNITS ARE THE POINT): this
+        build runs as a PLAN-UNITS expansion, never one monolithic pass. The prior writes
+        `notes/plan.units.json`; the execute expands into one bounded slice + one independent
+        gate PER UNIT. A unit is ONE concern: a handful of files, one verifiable change, ONE
+        gate that proves it. Prefer MORE, SMALLER units over fewer large ones — if a slice
+        touches more than ~4 files or two concerns, or cannot be proven by one gate, SPLIT it.
+        The cap is a ceiling, never a target. Never let one agent session carry the whole
+        build: the 2026-09-23 evidence (L33's three attempts) is that a large execute is the
+        failure factory.
     phases:
       - name: prior
         kind: agent
@@ -106,21 +117,32 @@ workflow:
           NOW + transcript renderers in `apps/control_room/static/app.js`, and the render
           gate + fixtures. WRITE `notes/control_room.md` (`## Problem`, `## What Exists`,
           `## Gaps`, `## Sources`) and `notes/plan.md` (`## Files`, `## Tests`,
-          `## Acceptance`, `## Risks`, `## Insight`): the `## Insight` section must name, for
+          `## Acceptance`, `## Risks`, `## Insight`): the           `## Insight` section must name, for
           EACH activity/feed surface, the operator question it must answer (what is running
           now / what is THIS run doing / is it alive or stalled / what did the children do)
           and how the surface will answer it from RECORDED data — plus one line per
           domain-context finding (a)(b)(c) naming the file and the assertion that will prove
-          it fixed. Write `notes/sources.jsonl`. Commit — `notes/` is gitignored, so stage
-          the notes explicitly (`git add -f notes/`) before committing; a plain `git add`
-          refuses ignored paths and the phase then records no commit.
+          it fixed. And WRITE `notes/plan.units.json` — the SMALL-units decomposition the
+          execute expands: {"units": [{"id": "u1_...", "goal": "...", "files": [...], "tests":
+          [...], "acceptance": "...", "budget_usd": ..., "depends_on": [...]}]}; one concern
+          per unit, a handful of files each, one gate per unit (suggested coverage: run-scoped
+          stream; feed fidelity/normalization; identifier resolution; child activity; activity
+          legibility; gate+fixture updates). When in doubt, SPLIT — more small units beat
+          fewer large ones. Write `notes/sources.jsonl`. Commit — `notes/` is gitignored, so
+          stage the notes explicitly (`git add -f notes/`) before committing; a plain
+          `git add` refuses ignored paths and the phase then records no commit.
       - name: execute
         kind: agent
         scope: implementation
         timeout: 3600
-        requires_files: [notes/plan.md, notes/sources.jsonl]
+        requires_files: [notes/plan.md, notes/sources.jsonl, notes/plan.units.json]
+        expand_from_plan: notes/plan.units.json
         prompt: |
-          Make the room's activity + live-feed surfaces truthful and legible. (1) RUN-SCOPED
+          Implement the plan units from `notes/plan.units.json` — ONE concern per unit, each
+          slice confined to its declared files, each unit's own gate proving it. Small units
+          are the point: if a unit has grown past a handful of files or two concerns, split it
+          and record the split. Under the units, the goal is: the room's activity + live-feed
+          surfaces truthful and legible. (1) RUN-SCOPED
           TRUTH: the drawer and the panel must show the SELECTED run's own events; a
           run-scoped binding/filter must be real — if membership cannot be proven, the
           surface names that, it never guesses. (2) FEED FIDELITY: timestamps, text, and tool
