@@ -104,11 +104,12 @@ workflow:
       - name: prior
         kind: agent
         scope: proposal_write
-        timeout: 1800
+        timeout: 2400
         prompt: |
-          Recon for the adoption dive. Read the dossier (domain context) FIRST, then walk EACH
-          adoption target in the repo at its real depth (the files themselves — services, tools,
-          configs, docs — not just the file map). WRITE `notes/control_room.md`
+          Recon for the adoption dive. Read the dossier (domain context) FIRST, then take a FAST
+          INVENTORY of each adoption target (paths, entry points, sizes — the deep walk belongs
+          to the UNITS, not this phase; never re-read a file you have read). WRITE
+          `notes/control_room.md`
           (`## Problem`, `## What Exists`, `## Gaps`, `## Sources`), `notes/plan.md`
           (`## Files`, `## Tests`, `## Acceptance`, `## Risks`, `## Adoptions`) and — the
           load-bearing artifact — `notes/plan.units.json`: {"units": [{"id": "u1_...", "goal":
@@ -121,7 +122,10 @@ workflow:
           the plan doc's oversized items become named follow-ups, not units. Write
           `notes/sources.jsonl`. Commit — `notes/` is gitignored, so stage the notes explicitly
           (`git add -f notes/`) before committing; a plain `git add` refuses ignored paths and
-          the phase then records no commit.
+          the phase then records no commit. Write and COMMIT `notes/` EARLY (inside the first
+          third of the window), then refine. NEVER run long waits or `sleep` — there is nothing
+          to wait for, and a phase that burns its wall with no committed deliverable FAILS (a
+          `sleep 600` burned a prior's wall on 2026-09-23; register L46/#152 is the rule).
       - name: execute
         kind: agent
         scope: implementation
@@ -137,7 +141,9 @@ workflow:
           agent_config/ + `python3 scripts/_gen_instructions.py` (keep `--check` green); do not
           touch the Control Room live surfaces (L49) or the L33 surfaces; measured-or-absent and
           [M]/[C]/[H]/[X]/[P] tags on claims; keep each unit's tests green on your FINAL commit.
-          Commit per unit (the expansion gates each unit independently).
+          Commit per unit (the expansion gates each unit independently). NEVER run long waits or
+          `sleep` — commit each unit promptly; a phase that burns its wall with no committed
+          deliverable FAILS (register L46/#152).
       - name: g_test_gate
         kind: test
         scope: implementation

@@ -130,7 +130,10 @@ workflow:
           legibility; gate+fixture updates). When in doubt, SPLIT — more small units beat
           fewer large ones. Write `notes/sources.jsonl`. Commit — `notes/` is gitignored, so
           stage the notes explicitly (`git add -f notes/`) before committing; a plain
-          `git add` refuses ignored paths and the phase then records no commit.
+          `git add` refuses ignored paths and the phase then records no commit. Write and COMMIT
+          `notes/` EARLY, then refine. NEVER run long waits or `sleep` — there is nothing to
+          wait for, and a phase that burns its wall with no committed deliverable FAILS (register
+          L46/#152).
       - name: execute
         kind: agent
         scope: implementation
@@ -165,7 +168,8 @@ workflow:
           TO FULL GREEN on your FINAL commit — if your redesign renames or moves a read that
           a suite anchors, update that suite in the same commit; do NOT install Playwright
           and do NOT fabricate captures — the host runs the acceptance profile against this
-          run's candidate. Commit.
+          run's candidate. Commit. NEVER run long waits or `sleep` — a phase that burns its
+          wall with no committed deliverable FAILS (register L46/#152).
       - name: g_test_gate
         kind: test
         scope: implementation
