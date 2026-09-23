@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-23T14:05:11.164559+00:00",
-  "n_specs": 246,
+  "generated_at": "2026-09-23T14:33:33.495613+00:00",
+  "n_specs": 247,
   "specs": [
     {
       "name": "adapter_snapshot_guard",
@@ -1669,6 +1669,26 @@
       "results_pointer": null,
       "n_runs": 0,
       "workflow_revision_id": "34b1b082c219c1e093a409abb753204d6adac926c9ca0fa6c3f80ce5829e0a1b",
+      "authored_status": null
+    },
+    {
+      "name": "control_room_live_truth",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/control_room_live_truth.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": true,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0,
+      "workflow_revision_id": "7fba2ecf354ed93a41e5fd241812d5e962bc55778e2f78ea1489ac7301312d82",
       "authored_status": null
     },
     {

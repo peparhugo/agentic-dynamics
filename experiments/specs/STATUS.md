@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-23T14:05:11.164559+00:00`  ·  246 spec(s)
-**Work remaining:** 206 open · 40 completed/retired
+Generated at: `2026-09-23T14:33:33.495613+00:00`  ·  247 spec(s)
+**Work remaining:** 207 open · 40 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -91,6 +91,7 @@ Generated at: `2026-09-23T14:05:11.164559+00:00`  ·  246 spec(s)
 | `control_room_facelift_review` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_hardening` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_live_board` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `control_room_live_truth` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_new_ui` | workflow | no | runnable | 0.2 | — | — | — | — | — | 0 |
 | `control_room_parity_rebuild` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_posthoc_visibility` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
