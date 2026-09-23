@@ -83,9 +83,18 @@ workflow:
         the adoption plan: for EACH target, the item(s) to adopt, the dossier evidence (file or
         quote), the gap it closes, the exact target files, the gate that proves it, and its risk;
         items larger than this run become NAMED follow-up units in the same doc. (2) The units the
-        plan marks landable NOW, implemented and gated (the plan-expansion slices — keep each
-        unit's diff small, test-backed, inside its declared files). (3) notes/posterior.md names
-        which units landed, with the assertion or invariant that proves each.
+        plan marks landable NOW, implemented and gated (the plan-expansion slices). (3)
+        notes/posterior.md names which units landed, with the assertion or invariant that proves
+        each.
+
+        THE EXECUTION SHAPE (controller directive, 2026-09-23 — SMALL UNITS ARE THE POINT):
+        a unit is ONE concern — a handful of files, one verifiable change, ONE gate that proves
+        it. Prefer MORE, SMALLER units: eight small beats three large. If a unit touches more
+        than ~4 files or two concerns, or cannot be proven by one gate, SPLIT it. The cap (12) is
+        a ceiling, never a target. Never let one slice carry a surface's entire adoption — an
+        adoption item too large for a small unit becomes a NAMED follow-up unit in the plan doc,
+        not a big slice. The 2026-09-23 evidence (L33's three attempts, one large execute) is
+        that a large execute is the failure factory.
 
         ACCEPTANCE: the five declared gate suites green in-cell on the FINAL commit (the gate
         re-runs them independently); every docs file touched carries valid status front-matter;
@@ -104,12 +113,15 @@ workflow:
           (`## Files`, `## Tests`, `## Acceptance`, `## Risks`, `## Adoptions`) and — the
           load-bearing artifact — `notes/plan.units.json`: {"units": [{"id": "u1_...", "goal":
           "...", "files": [...], "tests": [...], "acceptance": "...", "budget_usd": ...,
-          "depends_on": [...]}]}. One unit per concern; a unit that cannot be accepted
-          independently is not a unit (register L48 / the skeleton contract's selection rule).
-          Small, test-backed, landable units for this run; the plan doc's oversized items become
-          named follow-ups, not units. Write `notes/sources.jsonl`. Commit — `notes/` is
-          gitignored, so stage the notes explicitly (`git add -f notes/`) before committing; a
-          plain `git add` refuses ignored paths and the phase then records no commit.
+          "depends_on": [...]}]}. One concern per unit, a handful of files each, ONE gate per
+          unit; when in doubt, SPLIT — more small units beat fewer large ones, and the cap (12)
+          is a ceiling, not a target. A unit that cannot be accepted independently is not a
+          unit; neither is a unit too big to prove with one gate (register L48 / the skeleton
+          contract's selection + size rules). Small, test-backed, landable units for this run;
+          the plan doc's oversized items become named follow-ups, not units. Write
+          `notes/sources.jsonl`. Commit — `notes/` is gitignored, so stage the notes explicitly
+          (`git add -f notes/`) before committing; a plain `git add` refuses ignored paths and
+          the phase then records no commit.
       - name: execute
         kind: agent
         scope: implementation
