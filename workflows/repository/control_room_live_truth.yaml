@@ -1,0 +1,202 @@
+name: control_room_live_truth
+question: >-
+  Make the Control Room's ACTIVITY and LIVE-FEED surfaces trustworthy for the operator: the
+  run drawer and Cell/Transcript feed show the SELECTED run's own events (never a mixed
+  tail), with timestamps, text, and tool detail preserved; the identifiers the operator
+  actually has (run id, fleet job id, cell id) all resolve; delegated (child) session
+  activity is published or explicitly named absent; and the LIVE NOW / activity surfaces let
+  the operator answer "what is happening right now — and is it alive?" at a glance.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+factors:
+  - {name: model, levels: [openai/gpt-5.6-luna]}
+design: factorial
+rules: []
+metrics: []
+comparison: null
+writeup: {format: lab_book, sections: [question, evidence]}
+stop: {budget_usd: 4.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_uncertainty}
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: false
+    rag:
+      emit_self: true
+      emit_report: true
+      emit_scope: agentic-dynamics
+    context:
+      domain_context: >-
+        OPERATOR COMPLAINT (2026-09-23, verbatim): "the activity and live feed is off
+        relative to the logs. i dont have good insight to what is going on. it's not just a
+        data problem but an entire ui problem." The room's RESTING detail truth was the L33
+        unit; THIS unit is the room's LIVE experience: what is happening right now, and what
+        just happened, in the activity surfaces (LIVE NOW / phase cards) and the live-feed
+        surfaces (the run drawer's Logs block; the Cell/Transcript panel).
+
+        THE NAMED CONTRACT (register L43's own residual, verbatim): "spec+phase keys mix runs
+        in the retained tail (live tail is current) — a run-scoped key/filter is the
+        follow-up; child-session activity still unpublished to the stream." The stream plane:
+        sibling cells publish under `events_log:<spec>:<phase>` (LPUSH + LTRIM at
+        EVENT_LOG_MAX=500; `apps/control_room/services/operations.py` reads the head;
+        `apps/control_room/routes/telemetry.py` serves `/api/events/<cell>`); the drawer
+        binds the newest live phase stream (`stream_match=by_phase_time`) and the panel
+        resolves a FLEET JOB id to its live phase stream (PRs #145/#147).
+
+        THE 2026-09-23 WATCH FINDINGS (AIO, live, while this spec was authored — all real):
+        (a) the drawer's Logs block answered with 50 events whose mix was 12 step_finish +
+        12 step_start + 22 tool_use + 4 text, and rendered 46 of them as "TOOL_USE —" with
+        no clock: `services/operations.py`'s `logs_block` reads `part.get("time") or
+        event.get("time")` while the stream writes `timestamp`, and reads `event.get("id")`
+        while the stream nests `part.id`; tool frames carry no text (the tool name/args sit
+        in `part.tool` / `part.state.input`); (b) `/api/events/<run_id>` resolves to NOTHING
+        — an empty replay echoing `requested` — so the identifier the operator actually has
+        from the packet/board (the run id) yields an empty panel, while only the fleet job
+        id / cell id resolve; (c) because the retained tail mixes runs, the drawer's events
+        for a selected run can PREDATE that run — its first 50 can be other runs' history.
+
+        THE PRODUCT CONSTRAINT (the controller's, 2026-09-23): "we had started prototyping
+        something but then the prototype superseded the current room and broke my view ...
+        now we are back to this but i still dont love the experience." The parked workbench
+        (`static/parity.js`, `charts.js`, `visuals.js`) STAYS PARKED — the controller chose
+        the served-shell integration (register L25); do NOT resurface it as the primary
+        surface. The deliverable is the seven-board served room with its activity + live-feed
+        surfaces TRUTHFUL and LEGIBLE — the operator can answer, at a glance: what is running
+        now; what is THIS run doing; is it alive or stalled; what did its delegated children
+        do — and the feed agrees with the run's own events.
+
+        THE ROOM'S HONESTY RULES (the constraint): `services/operations.py` — every read
+        model renders a NAMED state (recorded / unbound / unavailable; never a fabricated
+        zero, never a 500); selection and delivery, never causation; ages and liveness only
+        from recorded timestamps (an unknown age is named, never invented). The publisher
+        seam is the adapter (`adapters/opencode.py` LivePublisher) plus the runner env
+        (`FINOPS_CELL_ID`, `FINOPS_ADMISSION_RUN_ID`, the XDG state dir) — a run-scoped
+        binding must be REAL; a client-side filter over a tail that cannot prove membership
+        is not scoping, it is a guess.
+
+        ACCEPTANCE: the render gate's required profile WITH captures
+        (`scripts/verify_control_room_rendering.py --profile acceptance`; zero captures =
+        structural FAIL; the boards fixtures under `apps/control_room/verification/fixtures/`
+        are the contract the gate reads) runs on the HOST — the fleet image has NO Playwright
+        (register L47: do not install it, do not fabricate captures; make every browser-class
+        assertion satisfiable by your OWN renderer, asserted values as VISIBLE text) — and
+        the five declared suites must be green on the FINAL commit in-cell (the gate re-runs
+        them independently; register L45's ambient-env audit applies before declaring new
+        targets). Prior art to SCAN before building: L25's drawer-logs block, L43's binding +
+        panel resolution (PRs #145/#147), the LIVE NOW board (`static/app.js`), the events
+        route (`routes/telemetry.py`), the gate + fixtures. The AIO runs the host gate
+        against this run's candidate before any promote.
+    phases:
+      - name: prior
+        kind: agent
+        scope: proposal_write
+        timeout: 1200
+        prompt: |
+          Read the register rows L25, L33, L43, and L45 in `docs/reviews/loose_ends_register.md`,
+          then the room's live surfaces: `apps/control_room/services/operations.py`
+          (`read_run_logs` / `logs_block` / the live-phase binding),
+          `apps/control_room/routes/telemetry.py` (`/api/events/<cell>`), the drawer + LIVE
+          NOW + transcript renderers in `apps/control_room/static/app.js`, and the render
+          gate + fixtures. WRITE `notes/control_room.md` (`## Problem`, `## What Exists`,
+          `## Gaps`, `## Sources`) and `notes/plan.md` (`## Files`, `## Tests`,
+          `## Acceptance`, `## Risks`, `## Insight`): the `## Insight` section must name, for
+          EACH activity/feed surface, the operator question it must answer (what is running
+          now / what is THIS run doing / is it alive or stalled / what did the children do)
+          and how the surface will answer it from RECORDED data — plus one line per
+          domain-context finding (a)(b)(c) naming the file and the assertion that will prove
+          it fixed. Write `notes/sources.jsonl`. Commit — `notes/` is gitignored, so stage
+          the notes explicitly (`git add -f notes/`) before committing; a plain `git add`
+          refuses ignored paths and the phase then records no commit.
+      - name: execute
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        requires_files: [notes/plan.md, notes/sources.jsonl]
+        prompt: |
+          Make the room's activity + live-feed surfaces truthful and legible. (1) RUN-SCOPED
+          TRUTH: the drawer and the panel must show the SELECTED run's own events; a
+          run-scoped binding/filter must be real — if membership cannot be proven, the
+          surface names that, it never guesses. (2) FEED FIDELITY: timestamps, text, and tool
+          detail survive the normalization (`logs_block` fixes for `timestamp` / `part.id` /
+          the tool name; the drawer and the panel agree on the same run). (3) IDENTIFIER
+          RESOLUTION: the identifiers the operator actually has (run id, fleet job id, cell
+          id) all resolve to the same live stream with a NAMED first frame. (4) CHILD
+          ACTIVITY: the delegated (child) sessions' activity is published to the stream or
+          explicitly named absent on the surface. (5) ACTIVITY LEGIBILITY: the LIVE NOW /
+          phase-card surfaces show states with recorded ages (never an invented liveness), so
+          "alive" versus "stalled" is readable at a glance. Extend the fixtures + the gate's
+          assertions and the renderers; keep the parked workbench parked (never served,
+          never the primary reference). The container CANNOT run the browser profile (no
+          Playwright — register L47): run the browser-free checks
+          (`python3 scripts/verify_control_room_rendering.py --check-fixtures`) and the five
+          declared gate suites (`tests/test_control_room_operations.py`,
+          `tests/test_control_room_glance_integrity.py`,
+          `tests/test_control_room_build_contract.py`,
+          `tests/test_control_room_static_views.py`, `tests/test_control_room_paths.py`)
+          TO FULL GREEN on your FINAL commit — if your redesign renames or moves a read that
+          a suite anchors, update that suite in the same commit; do NOT install Playwright
+          and do NOT fabricate captures — the host runs the acceptance profile against this
+          run's candidate. Commit.
+      - name: g_test_gate
+        kind: test
+        scope: implementation
+        timeout: 1800
+        requires_files: [notes/plan.md]
+        # The DECLARED room-suite targets (deterministic): a plan-driven resolution ran an
+        # earlier run's gate into a zero-target SKIP (the plan's `## Tests` was prose), which
+        # promotes as a forbidden phase (test_executed_success=None). The declared list is the
+        # acceptance contract the spec's own prompt names.
+        tests:
+          - tests/test_control_room_operations.py
+          - tests/test_control_room_glance_integrity.py
+          - tests/test_control_room_build_contract.py
+          - tests/test_control_room_static_views.py
+          - tests/test_control_room_paths.py
+        prompt: |
+          The independent runner verifies the worktree against the declared room-suite targets.
+      - name: posterior
+        kind: agent
+        scope: proposal_write
+        timeout: 900
+        requires_files: [notes/control_room.md, notes/plan.md]
+        prompt: |
+          Diff the plan against what landed. WRITE `notes/posterior.md` (`## Violations`,
+          `## Unknowns`, `## UPDATES`): which surfaces changed and which domain finding
+          (a)(b)(c) each closes, with the assertion or invariant that proves it; what remains
+          mixed or unbound and why (named, never hidden); and the acceptance evidence that
+          exists in-cell (there are no captures here — the host runs the browser profile).
+          Commit — `notes/` is gitignored, so stage it explicitly
+          (`git add -f notes/posterior.md`) before committing. Keep every write inside the
+          worktree (never `/tmp/...`, never `../...`): an outside edit raises a permission ask
+          the headless cell cannot answer.
+      - name: g_adversarial
+        kind: agent
+        scope: proposal_write
+        timeout: 1800
+        run_model: openai/gpt-5.6-terra
+        prompt: |
+          ADVERSARIAL REVIEW — a different model by design. Read the notes, the diffs, and
+          the fixtures. Attack: does any "run-scoped" promise secretly show a mixed tail
+          (seed another run's events and prove the discrimination)? is any age, liveness, or
+          child-activity claim derived from data the surface cannot know (an invented age, a
+          fabricated zero)? do the drawer and the panel tell the same story for the same run
+          (or can they disagree)? does the panel resolve the identifiers the operator
+          actually has (run id, job id, cell id) — or only one, silently? does any gate
+          assertion pass vacuously, and is every browser-class assertion satisfiable by the
+          renderer it asserts (visible text, not a data-* attribute)? Name at least one
+          falsifier per major claim. Write `notes/adversarial_review.md` with a final
+          `## FINDING` paragraph and commit it — `notes/` is gitignored, so stage the review
+          explicitly (`git add -f notes/adversarial_review.md`) before committing; the phase
+          must record a commit (a silently uncommitted review fails the promotion gate).
+          KEEP EVERY WRITE INSIDE THE WORKTREE (`/repo`): the review goes to the
+          worktree-relative `notes/adversarial_review.md`, and any scratch experiment lives
+          under `notes/` (gitignored) — never `/tmp/...`, never `../...`. An edit outside the
+          worktree raises a permission ASK that this headless cell cannot answer, and the
+          phase stalls to its timeout.
