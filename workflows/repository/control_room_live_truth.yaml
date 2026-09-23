@@ -109,6 +109,7 @@ workflow:
         kind: agent
         scope: proposal_write
         timeout: 1200
+        requires_deliverable: true
         prompt: |
           Read the register rows L25, L33, L43, and L45 in `docs/reviews/loose_ends_register.md`,
           then the room's live surfaces: `apps/control_room/services/operations.py`
@@ -133,7 +134,10 @@ workflow:
           `git add` refuses ignored paths and the phase then records no commit. Write and COMMIT
           `notes/` EARLY, then refine. NEVER run long waits or `sleep` — there is nothing to
           wait for, and a phase that burns its wall with no committed deliverable FAILS (register
-          L46/#152).
+          L46/#152). NEVER attempt to submit, launch, or re-run any workflow from inside this
+          run — no `run_workflow`, no fleet/launch-broker/docker calls: you are INSIDE the run;
+          the fleet path belongs to the AIO, and such attempts die on the absent socket and burn
+          the phase (attempt 1's lesson, 2026-09-23).
       - name: execute
         kind: agent
         scope: implementation

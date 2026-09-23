@@ -215,7 +215,8 @@ rail record* (semi-structured, ADVISORY authority). The words match; the semanti
   control-room truth, model pins, and workflow rails — none of them a memory-quality problem this repo
   cannot already state. If an external memory layer is ever wanted (e.g. cross-repo agent memory, or a
   memory arm in an economics grid), Hindsight is the obvious first candidate to evaluate as a *subject*,
-  with its opencode integration as the seam.
+  with its opencode integration as the seam. **Controller's call (2026-09-23): inspiration only — no
+  integration, now or as a default; the study is for patterns.**
 
 ## 9. If pursued (options only)
 

@@ -75,7 +75,12 @@ workflow:
         `python3 scripts/_gen_instructions.py`, keep `--check` green); the doctrine (no net-new
         top-level mechanism without a one-line justification naming the gap it closes; when a
         documented path fails, record the gap — do not build around it); adoption must not weaken
-        the measurement/economics discipline or the control plane's gates. Do NOT touch the
+        the measurement/economics discipline or the control plane's gates. INSPIRATION, NOT
+        INTEGRATION (controller, 2026-09-23): study HOW Hindsight solves problems and adopt
+        PATTERNS into our own mechanisms — this unit adds NO dependency on Hindsight (no
+        package, no service call, no SDK, no MCP/plugin, no vendored runtime). Every adopted
+        item must be implementable with our own code; anything else is a named follow-up,
+        never a dependency. Do NOT touch the
         Control Room's live surfaces (L49 is queued for them) and do not re-run the L33
         attention/order/age work.
 
@@ -106,6 +111,7 @@ workflow:
         kind: agent
         scope: proposal_write
         timeout: 2400
+        requires_deliverable: true
         prompt: |
           Recon for the adoption dive. Read the dossier (domain context) FIRST, then take a FAST
           INVENTORY of each adoption target (paths, entry points, sizes — the deep walk belongs
@@ -114,15 +120,22 @@ workflow:
           source or generated mirrors, and never another phase's artifact (`notes/posterior.md`
           belongs to the posterior phase). The UNITS own every repository change; a prior that
           lands them makes its units no-ops and the run FAILS (NO_CHANGES, attempt 2's lesson,
-          2026-09-23). WRITE
+          2026-09-23). NEVER attempt to submit, launch, or re-run any workflow from inside this
+          run — no `run_workflow`, no fleet/launch-broker/docker calls: you are INSIDE the run;
+          the fleet path belongs to the AIO, and such attempts die on the absent socket and burn
+          the phase (attempt 3's lesson). WRITE
           `notes/control_room.md`
           (`## Problem`, `## What Exists`, `## Gaps`, `## Sources`), `notes/plan.md`
           (`## Files`, `## Tests`, `## Acceptance`, `## Risks`, `## Adoptions`) and — the
           load-bearing artifact — `notes/plan.units.json`: {"units": [{"id": "u1_...", "goal":
           "...", "files": [...], "tests": [...], "acceptance": "...", "budget_usd": ...,
           "depends_on": [...]}]}. One concern per unit, a handful of files each, ONE gate per
-          unit; when in doubt, SPLIT — more small units beat fewer large ones, and the cap (12)
-          is a ceiling, not a target. A unit that cannot be accepted independently is not a
+          unit; the unit's `tests` is a list of pytest TARGET PATHS ONLY — e.g.
+          `tests/test_doc_lifecycle.py` — never a command string and never flags
+          (`pytest tests/... -q` as a list entry is INVALID and fails that unit's gate; attempt
+          3's lesson); non-pytest proofs (a generator `--check`) go in the unit's
+          `goal`/`acceptance` for the slice to run, not in `tests`; when in doubt, SPLIT — more
+          small units beat fewer large ones, and the cap (12) is a ceiling, not a target. A unit that cannot be accepted independently is not a
           unit; neither is a unit too big to prove with one gate (register L48 / the skeleton
           contract's selection + size rules). Small, test-backed, landable units for this run;
           the plan doc's oversized items become named follow-ups, not units. Write
