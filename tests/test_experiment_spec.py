@@ -618,6 +618,34 @@ def test_validator_flags_a_malformed_plan_unit_cap():
     assert any("plan_unit_cap must be a positive integer" in e for e in errors)
 
 
+def test_validator_refuses_two_expand_from_plan_declarers():
+    """Two declaring phases is a spec defect — refused at validate, not after the prior spent.
+
+    The runner refuses two expanders as ambiguous at EXPANSION time (when the declaring
+    phase is reached — after the prior phase already ran); the validator is the earliest
+    gate, so the uniqueness rule belongs here too.
+    """
+    errors = validate_spec(
+        _phase_spec(
+            [
+                {
+                    "name": "execute_a",
+                    "kind": "agent",
+                    "expand_from_plan": "notes/a.units.json",
+                    "prompt": "x",
+                },
+                {
+                    "name": "execute_b",
+                    "kind": "agent",
+                    "expand_from_plan": "notes/b.units.json",
+                    "prompt": "y",
+                },
+            ]
+        )
+    )
+    assert any("only one phase may declare expand_from_plan" in e for e in errors)
+
+
 def test_machinery_mentions_do_not_trigger_halt_rule():
     prompt = "Implement the checkpoint phase kind: a phase declaring checkpoint: true that completes successfully stops with awaiting_operator_approval."
     errors = validate_spec(_phase_spec([{"name": "p1", "kind": "agent", "prompt": prompt}]))

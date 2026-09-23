@@ -26,6 +26,46 @@ Evidence: `cap_runner_hardening`, `control_db_publication`, `self_knowledge_laye
 `control_room_facelift`, the `cap_2a..cap_2f` families, `fleet_launch_*` — 30+ specs carry
 `gN_adversarial[adversarial_readonly,run_model]` and `gN_test_gate[test]`.
 
+## Execution granularity — the selection rule (2026-09-23)
+
+Decompose the build **when, and only when, the work decomposes**: expand into units when ≥2
+units have INDEPENDENT ACCEPTANCE (a unit's verdict stands on its own gate's targets, without
+the others) — or when one phase would otherwise risk the phase wall / the session's context
+budget. Otherwise keep ONE bounded agent phase and rely on the separate gates (`g_test_gate`,
+the adversarial phase, the host acceptance). A unit that cannot be accepted independently is
+not a unit: coupled work stays in the phase it belongs to — seams there would buy boundaries
+without verdicts. (L33, 2026-09-23: four coupled remediation items, one acceptance
+instrument, one `execute` phase — correctly single.)
+
+**The two halves (already built; no new mechanism).**
+
+* The SPEC author decides **whether** a phase is expandable: the phase declares
+  `expand_from_plan: <units path>`, and exactly ONE phase per spec may declare it — refused at
+  validate time (`experiment_spec.validate_spec`, the earliest gate) and again by the runner.
+* The PRIOR decides **what the units are**: it writes the machine-readable plan
+  (`notes/plan.units.json` — `{id, goal, files, tests, acceptance, budget_usd, depends_on}`)
+  during its own phase, so the structure is FIXED before the declaring phase begins. The
+  runner then replaces the one phase with one bounded agent slice (`<phase>__<unit>`) plus one
+  independent `kind: test` gate (`g_<unit>_test_gate`) per unit, in dependency order, inside
+  the SAME run (same ledger, same candidate, same promotion check); `plan_unit_cap` (default
+  24) bounds N.
+* The prior's units file is therefore LOAD-BEARING structure — its quality decides the run's
+  shape. The runner refuses by name (missing/invalid plan, dependency cycle or unknown
+  dependency, name collision, over-budget, over-cap) and never repairs; a unit whose
+  acceptance is prose-only is a plan miss.
+* First candidates: **L34–L36** (harness / wiring / scoping — independent verdicts each)
+  once the model-pin sweep (L39) unblocks them; their priors write the units file and their
+  executes declare the expansion.
+
+**What is deliberately NOT linted** (evaluated 2026-09-23). *"Multi-unit build without
+`expand_from_plan`"* is a judgment about acceptance — no static property of a YAML can decide
+it, and a heuristic would manufacture false findings. *"Declares expansion but the prior
+writes no units"* is only knowable at run time, where the runner already refuses the declaring
+phase by name before that phase spends. The statically checkable half is enforced where it
+belongs: `validate_spec` refuses the unsupported combinations and the two-declarer defect, and
+the runner refuses the plan's structural defects. Authoring guidance lives here, not as a lint
+guess.
+
 ## Each concern → its precedent → its enforcement
 
 | concern | precedent (specs/tools) | enforcement |
@@ -35,7 +75,7 @@ Evidence: `cap_runner_hardening`, `control_db_publication`, `self_knowledge_laye
 | **sources** | `d0_pin_sources`, `h0_pin_sources`; the `sources.jsonl` catalog | prompt-required + recorded in `world_model.md` `## Sources` (shape-gated) |
 | **skill creation** | `cap_pattern_minting` (p2_mint_patterns); `kb_produce_skill` (pattern/v1); `claude_tools_to_skills` (scope→build→verify); `control_room_facelift_review` a2_dynamic_workflow | convention: KB pattern record + reviewed promotion (a producer exists; a loop step does not yet) |
 | **execution contents** | the slices; world_model_loop `execute` | `requires_content` on the PLAN (`## Files`, `## Tests`, `## Acceptance`); `deviations.md` records drifts |
-| **plan-driven expansion** | world_model_loop `execute` (`expand_from_plan`); the static `cap_*` slices it generalizes | runner: `_expand_plan_phases` — ONE declared phase → one agent slice + one `kind: test` gate per plan unit (`notes/plan.units.json`, written at run time); refusals (`PLAN_EXPANSION`) before spend |
+| **plan-driven expansion** | world_model_loop `execute` (`expand_from_plan`); the static `cap_*` slices it generalizes | runner: `_expand_plan_phases` — ONE declared phase → one agent slice + one `kind: test` gate per plan unit (`notes/plan.units.json`, written at run time); refusals (`PLAN_EXPANSION`) before the declaring phase spends; the single-declarer rule is also refused at validate time — the selection rule is § "Execution granularity" above |
 | **adversarial check** | `gN_adversarial` / `adversary_*` with `run_model` (a different model, readonly) | phase presence + the runner's per-phase gates; added to world_model_loop as `g_adversarial` |
 | **human gates** | `checkpoint: true` phases (`cap_site_revamp3/4`, `fleet_ladder_implementation`, `control_room_rules_design`) | runner: `awaiting_operator_approval` — the run STOPS |
 | **compiled workflows** | `workflows/compile_workflow.py` | refusal-first linter: `refused-*` codes — unsupported semantics refuse before submission |
