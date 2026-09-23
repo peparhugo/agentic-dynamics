@@ -106,10 +106,9 @@ def test_operations_board_renders_the_packet_fields_it_claims():
     """The restored Operations board renders the packet fields it actually reads: the summary
     source, active/promotable runs, attention, degraded surfaces, projection lag, workers.
 
-    Safe actions are deliberately NOT part of this list: the control packet carries them, but
-    the restored Operations renderer does not display them (the parked workbench lens did). A
-    test asserting them here would only pass by reading the parked module — the exact
-    false-confidence the 2026-09-18 review found.
+    Safe actions and named state screens are served by the same Operations payload and are
+    asserted separately below; the served board remains the acceptance target, never the parked
+    workbench.
     """
     app = (STATIC / "app.js").read_text(encoding="utf-8")
     for anchor in (
@@ -122,6 +121,23 @@ def test_operations_board_renders_the_packet_fields_it_claims():
         "unhealthy_workers",
     ):
         assert anchor in app, f"the restored Operations renderer does not read {anchor}"
+
+
+def test_operations_board_consumes_server_owned_triage_age_and_state_screens():
+    """The browser preserves the Operations wire order and does not recreate its decisions."""
+    app = (STATIC / "app.js").read_text(encoding="utf-8")
+    for anchor in (
+        "Array.isArray(data.runs)",
+        'entry["attention.state"]',
+        'entry["attention.kind"]',
+        "run.started_age",
+        "state_screens",
+        "Safe actions",
+        "State screens",
+    ):
+        assert anchor in app, anchor
+    assert "runs.sort(" not in app
+    assert "formatAge(entry.started_at)" not in app
 
 
 def test_non_home_boards_start_hidden_so_one_board_shows_at_rest():
@@ -218,7 +234,7 @@ def test_run_drawer_renders_the_run_inspection_blocks():
         "dataset.deliveredPhase",
         "dataset.preparedStepPath",
         "selected — use not established",
-        'tr.dataset.state',
+        "tr.dataset.state",
     ):
         assert anchor in app, anchor
 

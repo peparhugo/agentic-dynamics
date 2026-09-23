@@ -37,6 +37,7 @@ from apps.control_room.services.operations import (  # noqa: E402
     read_run_logs,
     resolve_live_cell,
     run_detail,
+    run_row,
 )
 
 _NOW = "2026-09-12T00:00:00+00:00"
@@ -121,6 +122,55 @@ def test_absent_data_stays_absent_and_degraded_is_named(tmp_path):
     ]
     # the lag block itself stays the packet's value (possibly null per projection), never zeros.
     assert isinstance(snapshot["projection_lag"], dict)
+
+
+def test_operations_rows_carry_server_attention_order_state_and_age():
+    """The served row contract is derived once, with an injected observation basis.
+
+    This is the regression guard for L23: a client must not match attention arrays, sort by a
+    guessed urgency, classify lifecycle states, or consult its own clock.  Missing time remains a
+    named unknown rather than a fabricated zero.
+    """
+    approval = {
+        "run_id": "run-blocked",
+        "gate_id": "gate-1",
+        "candidate_sha": "a" * 40,
+        "kind": "approval",
+    }
+    blocked = run_row(
+        {
+            "run_id": "run-blocked",
+            "spec_name": "flow",
+            "model": "m",
+            "state": "awaiting_approval",
+            "candidate_sha": "a" * 40,
+            "started_at": "2026-09-12T00:00:00Z",
+            "phases_completed": 2,
+            "phases_total": 4,
+        },
+        epoch=7,
+        detail={"attempts": [], "gates": [], "approvals": [], "commands": []},
+        attention_entry=approval,
+        now=_NOW,
+        triage_rank=0,
+    )
+    unknown_age = run_row(
+        {"run_id": "run-unknown", "state": "running"},
+        epoch=7,
+        detail=None,
+        now=_NOW,
+    )
+
+    assert blocked["attention.state"] == "active"
+    assert blocked["attention.kind"] == "approval"
+    assert blocked["operator_state"] == "blocked"
+    assert blocked["triage_rank"] == 0
+    assert blocked["started.age"] == "0s ago"
+    assert blocked["started.age_state"] == "measured"
+    assert blocked["state_screen"]["action"] == "approve"
+    assert unknown_age["started.age"] == "age unknown"
+    assert unknown_age["started.age_seconds"] is None
+    assert unknown_age["started.age_state"] == "unknown"
 
 
 def test_run_detail_carries_every_control_record(tmp_path):
@@ -509,12 +559,21 @@ def test_resolve_live_cell_maps_a_fleet_job_to_its_live_phase_stream():
     the substitution; a finished job and a non-job id pass through unchanged."""
     board = {
         "job-live": json.dumps(
-            {"job_id": "job-live", "spec": "workflows/repository/flow.yaml", "ts": 1790105820.0,
-             "status": "running"}
+            {
+                "job_id": "job-live",
+                "spec": "workflows/repository/flow.yaml",
+                "ts": 1790105820.0,
+                "status": "running",
+            }
         ),
         "job-done": json.dumps(
-            {"job_id": "job-done", "spec": "workflows/repository/flow.yaml", "ts": 1790105820.0,
-             "run_id": "run-1", "status": "completed"}
+            {
+                "job_id": "job-done",
+                "spec": "workflows/repository/flow.yaml",
+                "ts": 1790105820.0,
+                "run_id": "run-1",
+                "status": "completed",
+            }
         ),
     }
     logs = {
@@ -552,7 +611,9 @@ def test_read_run_logs_binds_the_live_phase_stream_for_an_in_flight_run():
             json.dumps({"type": "step_finish", "timestamp": "1790105800000"}),
         ],
         "events_log:flow:execute": [
-            json.dumps({"type": "tool_use", "timestamp": "1790105944000", "part": {"text": "write notes"}}),
+            json.dumps(
+                {"type": "tool_use", "timestamp": "1790105944000", "part": {"text": "write notes"}}
+            ),
             json.dumps({"type": "step_start", "timestamp": "1790105930000"}),
         ],
     }
@@ -695,5 +756,3 @@ def test_read_run_logs_matches_an_inflight_job_by_spec_and_time():
         redis, "run-inflight", spec_name="other", started_at="1970-01-01T00:33:30Z"
     )
     assert other["state"] == "unbound"
-
-

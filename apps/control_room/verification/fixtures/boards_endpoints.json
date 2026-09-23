@@ -12,7 +12,29 @@
       "phases_total": 2,
       "model": "deepseek/deepseek-v4-flash",
       "candidate_sha": "bc2c728633273947d278f285c2e8929946aaa082",
-      "started_at": "2026-09-18T19:18:09Z"
+      "started_at": "2026-09-18T19:18:09Z",
+      "spec.cell": "unknown",
+      "terminal.target": "unknown",
+      "command.current": "control_room_followups",
+      "model.provider": "deepseek/deepseek-v4-flash",
+      "attempt.number": "unknown",
+      "phase.progress": "2/2",
+      "lifecycle.state": "running",
+      "run.live": "live",
+      "source.commit": "bc2c728633273947d278f285c2e8929946aaa082",
+      "cost.provenance": "unknown",
+      "attention.state": "none",
+      "attention.kind": "none",
+      "evidence.advisory": "narration unknown",
+      "evidence.measured": "test result unknown",
+      "evidence.source": "commit bc2c728633273947d278f285c2e8929946aaa082",
+      "decision.eligibility": "inspect",
+      "decision.receipt": "missing",
+      "operator_state": "running",
+      "triage_rank": 1,
+      "started.age": "5d ago",
+      "started.age_seconds": 432000,
+      "started.age_state": "measured"
     },
     "active_count": 6,
     "promotable_count": 12,
@@ -34,6 +56,28 @@
         "purpose": "candidate verified; awaiting the permanence decision"
       }
     ],
+    "safe_actions": [
+      {
+        "action": "approve",
+        "run_id": "run-fixture-0007",
+        "gate_id": "gate-fixture",
+        "candidate_sha": "bc2c728633273947d278f285c2e8929946aaa082"
+      },
+      {
+        "action": "promote",
+        "run_id": "run-fixture-0001",
+        "gate_id": "",
+        "candidate_sha": "bc2c728633273947d278f285c2e8929946aaa082"
+      }
+    ],
+    "state_screens": [
+      {"state": "running", "run_id": "run-state-running", "lifecycle": "running", "phase": "2/4", "attention": "none", "age": "4s ago", "action": "inspect"},
+      {"state": "blocked", "run_id": "run-state-blocked", "lifecycle": "awaiting_approval", "phase": "2/4", "attention": "approval", "age": "8m ago", "action": "approve"},
+      {"state": "stalled", "run_id": "run-state-stalled", "lifecycle": "running", "phase": "2/4", "attention": "stalled", "age": "18m ago", "action": "cancel"},
+      {"state": "failed", "run_id": "run-state-failed", "lifecycle": "failed", "phase": "1/4", "attention": "failed", "age": "22m ago", "action": "inspect"},
+      {"state": "escalated", "run_id": "run-state-escalated", "lifecycle": "running", "phase": "3/4", "attention": "escalated", "age": "3m ago", "action": "interrupt"},
+      {"state": "done", "run_id": "run-state-done", "lifecycle": "published", "phase": "4/4", "attention": "none", "age": "1h ago", "action": "promote"}
+    ],
     "projection_lag": {
       "chroma": 0,
       "ledger": 1,
@@ -52,9 +96,11 @@
       "control_epoch": 812,
       "repo_head_sha": "bc2c728633273947d278f285c2e8929946aaa082"
     },
-    "active_count": 0,
-    "promotable_count": 0,
-    "attention": [],
+      "active_count": 0,
+      "promotable_count": 0,
+      "attention": [],
+      "safe_actions": [],
+      "state_screens": [],
     "degraded": [
       {
         "surface": "control_db",
@@ -74,6 +120,9 @@
       "state": "promotable",
       "model": "deepseek/deepseek-v4-flash",
       "started_at": "2026-09-18T19:18:09Z",
+      "started_age": "5d ago",
+      "started.age_seconds": 432000,
+      "started.age_state": "measured",
       "ended_at": "2026-09-18T19:42:11Z",
       "ledger_path": "/repo/experiments/results/workflows/control_room_followups/20260918T191809000000Z_run-fixture-0001.json",
       "cost_usd": 0.0,
@@ -283,6 +332,9 @@
       "state": "promotable",
       "model": "deepseek/deepseek-v4-flash",
       "started_at": "2026-09-18T19:18:09Z",
+      "started_age": "age unknown",
+      "started.age_seconds": null,
+      "started.age_state": "unknown",
       "ended_at": "",
       "ledger_path": "",
       "cost_usd": 0.0,

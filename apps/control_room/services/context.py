@@ -130,6 +130,8 @@ class ControlRoomServices:
         control plane that cannot be opened is named degraded too — the room must render the
         outage, not 500 on it.
         """
+        from datetime import datetime, timezone
+
         from agentic_dynamics.control import control_status as cs
         from agentic_dynamics.control.control_db import ControlDB
         from apps.control_room.services import operations as ops
@@ -146,7 +148,13 @@ class ControlRoomServices:
         try:
             with ControlDB.open_read_only() as db:
                 snapshot = ops.operational_snapshot(
-                    db, repo_head_sha=repo_head_sha, heartbeats=heartbeats
+                    db,
+                    repo_head_sha=repo_head_sha,
+                    heartbeats=heartbeats,
+                    # The observation instant is selected at the composition boundary and
+                    # passed into the pure read model.  This keeps browser captures stable and
+                    # ensures every row in one response shares one age basis.
+                    now=datetime.now(timezone.utc).isoformat(),
                 )
         except Exception as exc:  # noqa: BLE001 — an unreadable control plane is degraded data
             return {
@@ -155,9 +163,12 @@ class ControlRoomServices:
                 "attention": [],
                 "active_runs": [],
                 "promotable_runs": [],
+                "failed_runs": [],
+                "runs": [],
+                "state_screens": [],
+                "safe_actions": [],
                 "unhealthy_workers": [],
                 "projection_lag": {},
-                "safe_actions": [],
                 "degraded": degraded
                 + [{"surface": "control_db", "reason": f"{type(exc).__name__}: {exc}"}],
             }, 200
@@ -172,6 +183,8 @@ class ControlRoomServices:
         produce a client leaves a NAMED ``unavailable`` logs block — never a 500, never a
         silently empty log.
         """
+        from datetime import datetime, timezone
+
         from agentic_dynamics.control.control_db import ControlDB
         from apps.control_room.services import operations as ops
 
@@ -183,7 +196,12 @@ class ControlRoomServices:
             redis_error = f"{type(exc).__name__}: {exc}"
         try:
             with ControlDB.open_read_only() as db:
-                detail = ops.run_detail(db, run_id, redis_client=redis_client)
+                detail = ops.run_detail(
+                    db,
+                    run_id,
+                    redis_client=redis_client,
+                    now=datetime.now(timezone.utc).isoformat(),
+                )
         except Exception as exc:  # noqa: BLE001 — named degradation, never a 500
             return {
                 "error": "control_db_unavailable",

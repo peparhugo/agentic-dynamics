@@ -40,20 +40,9 @@ from typing import TYPE_CHECKING, Any
 
 from flask import Response, jsonify, stream_with_context
 
-# The shared per-run evidence derivations live in the service layer so the glance row and the
-# run drawer give the SAME answer for the same run. The private names are imported (not
-# re-implemented) so existing callers and tests keep resolving them through this module.
-from apps.control_room.services.run_evidence import (
-    _attempt_number,
-    _cell_binding,
-    _cost_provenance,
-    _measured_state,
-    _narration_state,
-    _receipt_state,
-    _recorded_ledger,
-    _token,
-    _workspace_target,
-)
+# The shared per-run projection lives in the Operations service. Glance and the served Operations
+# board therefore consume one row builder instead of independently deriving evidence and age.
+from apps.control_room.services.operations import run_row
 
 if TYPE_CHECKING:  # pragma: no cover - import only for static typing
     from flask import Flask
@@ -356,108 +345,6 @@ def _run_counts(packet: dict[str, Any] | None) -> dict[str, int | None]:
     return {"running": running, "queued": queued, "failed": failed, "live": live}
 
 
-def _row_events(detail: dict[str, Any] | None, *, limit: int = 8) -> list[dict[str, Any]]:
-    """Recorded events for one run — real ids and timestamps, oldest first, bounded.
-
-    Every entry is derived from a control record the Operations lens already reads (an attempt,
-    a gate verdict, an approval, a command). The dock's feed renders these instead of a
-    fabricated history with fixed ages; an empty list is an empty feed, never invented rows.
-    """
-    if not detail:
-        return []
-    events: list[dict[str, Any]] = []
-    for attempt in detail.get("attempts") or []:
-        events.append(
-            {
-                "id": str(attempt.get("attempt_id") or ""),
-                "ts": str(attempt.get("started_at") or ""),
-                "class": "lifecycle",
-                "text": (
-                    f"attempt {_token(attempt.get('attempt_no'))} "
-                    f"{_token(attempt.get('state'))} · {str(attempt.get('model') or 'model unknown')}"
-                ),
-            }
-        )
-    for gate in detail.get("gates") or []:
-        events.append(
-            {
-                "id": str(gate.get("gate_id") or ""),
-                "ts": str(gate.get("ended_at") or gate.get("started_at") or ""),
-                "class": "measured",
-                "text": (
-                    f"gate {str(gate.get('gate_id') or 'unnamed')} "
-                    f"{_token(gate.get('verdict'))} · {str(gate.get('executor') or 'executor unknown')}"
-                ),
-            }
-        )
-    for approval in detail.get("approvals") or []:
-        events.append(
-            {
-                "id": str(approval.get("approval_id") or ""),
-                "ts": str(approval.get("decided_at") or ""),
-                "class": "policy",
-                "text": f"approved by {str(approval.get('operator') or 'unknown')}",
-            }
-        )
-    for command in detail.get("commands") or []:
-        receipt = " · receipt" if str(command.get("receipt_json") or "").strip() else ""
-        events.append(
-            {
-                "id": str(command.get("command_id") or ""),
-                "ts": str(command.get("created_at") or ""),
-                "class": "source",
-                "text": (
-                    f"{str(command.get('verb') or 'command')} "
-                    f"{_token(command.get('state'))}{receipt}"
-                ),
-            }
-        )
-    events.sort(key=lambda event: (event["ts"], event["id"]))
-    return events[-limit:] if limit > 0 else events
-
-
-def _run_row(run: dict[str, Any], *, epoch: int, detail: dict[str, Any] | None) -> dict[str, Any]:
-    """Project one packet run reference + its control records into the 16-field row schema.
-
-    Every field the gate requires at rest is present and non-empty. Fields the records answer
-    are composed from them — the attempt number from ``step_attempts``, the workspace from the
-    run ledger, narration/test evidence from the ledger, the receipt from the approval/command
-    journal. A field with no recorded value renders an explicit ``unknown`` token, never a
-    hard-coded default or a reassuring assertion the records do not support. ``run.events``
-    carries the real recorded event history the dock's feed renders (an additive key; the gate
-    row schema is unchanged).
-    """
-    state = str(run.get("state", "queued"))
-    completed = int(run.get("phases_completed", 0))
-    total = int(run.get("phases_total", 0))
-    sha = str(run.get("candidate_sha") or "uncommitted")
-    awaiting = state == "awaiting_approval"
-    promotable = state == "promotable"
-    eligibility = "approve" if awaiting else ("promote" if promotable else "inspect")
-    ledger = _recorded_ledger(detail)
-    return {
-        "session.identity": str(run.get("run_id", "unknown")),
-        "spec.cell": _cell_binding(ledger),
-        "terminal.target": _workspace_target(detail, ledger),
-        "command.current": str(run.get("spec_name") or "unknown"),
-        "model.provider": str(run.get("model") or "unknown"),
-        "attempt.number": _attempt_number(detail),
-        "phase.progress": f"{completed}/{total}",
-        "lifecycle.state": state,
-        "run.live": "live" if state not in {"failed", "cancelled", "quarantined"} else "not-live",
-        "source.commit": sha,
-        "cost.provenance": _cost_provenance(run, detail, ledger),
-        "attention.state": "active" if awaiting else "none",
-        "evidence.advisory": _narration_state(detail, ledger),
-        "evidence.measured": _measured_state(detail, ledger),
-        "evidence.source": f"commit {sha}",
-        "decision.eligibility": eligibility,
-        "decision.receipt": _receipt_state(detail),
-        "control_epoch": epoch,
-        "run.events": _row_events(detail),
-    }
-
-
 def _cost_block(services: ControlRoomServices) -> dict[str, Any]:
     """The five `ON-G4` values from the subscription-usage snapshot, or explicit unknowns.
 
@@ -572,10 +459,18 @@ def build_glance(services: ControlRoomServices) -> dict[str, Any]:
     system = _system_block(packet, projections, workers)
     trust = _trust_block(packet, projections, system)
     epoch = trust["epoch"]
+    observed_at = _utc_now()
 
     def _rows(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        # Glance has no second clock or triage policy. It consumes the same service-owned row
+        # projection as Operations and only supplies its own packet epoch and observation instant.
         return [
-            _run_row(run, epoch=epoch, detail=details.get(str(run.get("run_id") or "")))
+            run_row(
+                run,
+                epoch=epoch,
+                detail=details.get(str(run.get("run_id") or "")),
+                now=observed_at,
+            )
             for run in runs
         ]
 

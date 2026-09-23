@@ -2458,12 +2458,22 @@ BOARDS_PROBE_JS = r"""
     const value = card.querySelector('.metric-value');
     if (label && value) metrics[(label.textContent || '').trim()] = (value.textContent || '').trim();
   });
-  const surfacePanels = {};
+   const surfacePanels = {};
   document.querySelectorAll('#surfaces-content .surface-panel').forEach((panel) => {
     surfacePanels[panel.dataset.surface || '?'] =
-      (panel.innerText || panel.textContent || '').trim().slice(0, 400);
-  });
-  return {
+       (panel.innerText || panel.textContent || '').trim().slice(0, 400);
+   });
+   const operationRows = Array.from(document.querySelectorAll('#operations-content .run-row')).map((row) => ({
+     id: row.getAttribute('data-run-id') || '',
+     fields: Object.fromEntries(Array.from(row.querySelectorAll('[data-field]')).map((field) => {
+       const value = field.querySelector(':scope > [data-value]');
+       return [field.dataset.field || '', value ? (value.innerText || value.textContent || '').trim() : ''];
+     })),
+   }));
+   const stateScreens = Array.from(document.querySelectorAll('#operations-content .surface-block')).find(
+     (block) => (block.querySelector('h3')?.textContent || '').trim() === 'State screens'
+   );
+   return {
     board: document.body.dataset.board || '',
     sections: sections,
     destinations: destinations,
@@ -2482,7 +2492,9 @@ BOARDS_PROBE_JS = r"""
     metrics: metrics,
     operationsLoaded: (() => { const el = document.getElementById('operations-content');
       return el ? el.dataset.loaded : null; })(),
-    operationsText: text('#operations-content'),
+     operationsText: text('#operations-content'),
+     operationRows: operationRows,
+     stateScreensText: stateScreens ? (stateScreens.innerText || stateScreens.textContent || '').trim() : '',
     surfacesLoaded: (() => { const el = document.getElementById('surfaces-content');
       return el ? el.dataset.loaded : null; })(),
     surfacePanels: surfacePanels,
@@ -2555,6 +2567,8 @@ def build_operations_payload(degraded: bool = False) -> dict[str, Any]:
     if degraded:
         payload.setdefault("active_runs", [])
         payload.setdefault("promotable_runs", [])
+        payload.setdefault("failed_runs", [])
+        payload.setdefault("runs", [])
         payload.setdefault("attention", [])
         return payload
     run_seed = seed["run_seed"]
@@ -2565,9 +2579,32 @@ def build_operations_payload(degraded: bool = False) -> dict[str, Any]:
         row = copy.deepcopy(run_seed)
         row["run_id"] = f"run-fixture-{index:04d}"
         row["state"] = "running" if index <= active_count else "promotable"
+        # This expansion mirrors the service-owned wire shape, not a browser-side derivation.
+        # Attention membership is applied once here so the acceptance fixture exercises the same
+        # explicit fields the real Operations read model emits.
+        row["session.identity"] = row["run_id"]
+        attention = next(
+            (item for item in seed.get("attention", []) if item.get("run_id") == row["run_id"]),
+            None,
+        )
+        row["attention.state"] = "active" if attention else "none"
+        row["attention.kind"] = str((attention or {}).get("kind") or "none")
+        row["operator_state"] = "running"
+        row["triage_rank"] = 0 if attention else 1
+        row["state_screen"] = {
+            "state": row["operator_state"],
+            "run_id": row["run_id"],
+            "lifecycle": row["lifecycle.state"],
+            "phase": row["phase.progress"],
+            "attention": row["attention.kind"],
+            "age": row["started.age"],
+            "action": row["decision.eligibility"],
+        }
         runs.append(row)
     payload["active_runs"] = runs[:active_count]
     payload["promotable_runs"] = runs[active_count:]
+    payload["failed_runs"] = []
+    payload["runs"] = sorted(runs, key=lambda row: int(row.get("triage_rank", 1)))
     return payload
 
 
@@ -2621,6 +2658,8 @@ def check_boards_fixtures() -> list[str]:
         problems.append("boards fixture: run_detail needs at least one unknown timing row")
     if detail.get("evidence", {}).get("measured") != "independent tests passed":
         problems.append("boards fixture: run_detail needs a measured independent verification case")
+    if (detail.get("run") or {}).get("started_age") != "5d ago":
+        problems.append("boards fixture: run_detail needs the server-owned started_age label")
     delivered = detail.get("delivered_knowledge") or {}
     if not delivered.get("phases") or not delivered["phases"][0].get("selected_evidence_ids"):
         problems.append("boards fixture: run_detail needs a delivered-knowledge id case")
@@ -2636,6 +2675,8 @@ def check_boards_fixtures() -> list[str]:
     unknown = fixture.get("run_detail_unknown") or {}
     if (unknown.get("cost") or {}).get("provenance") != "unknown":
         problems.append("boards fixture: run_detail_unknown must carry the unknown cost case")
+    if (unknown.get("run") or {}).get("started_age") != "age unknown":
+        problems.append("boards fixture: run_detail_unknown must carry a named unknown age")
     if (unknown.get("logs") or {}).get("state") != "unbound":
         problems.append("boards fixture: run_detail_unknown must carry the unbound logs case")
     if "error" not in (fixture.get("run_detail_error") or {}):
@@ -2652,6 +2693,41 @@ def check_boards_fixtures() -> list[str]:
             problems.append(
                 f"boards fixture: attention references unknown run {item.get('run_id')!r}"
             )
+    required_row_fields = {
+        "session.identity",
+        "attention.state",
+        "attention.kind",
+        "operator_state",
+        "triage_rank",
+        "started.age",
+        "started.age_seconds",
+        "started.age_state",
+    }
+    for row in normal.get("runs", []):
+        missing = required_row_fields - set(row)
+        if missing:
+            problems.append(
+                f"boards fixture: Operations row {row.get('run_id')!r} missing {sorted(missing)}"
+            )
+        if row.get("started.age_state") == "unknown" and row.get("started.age_seconds") is not None:
+            problems.append(
+                f"boards fixture: unknown age row {row.get('run_id')!r} carries seconds"
+            )
+    if [row.get("run_id") for row in normal.get("runs", [])] != [
+        row.get("run_id") for row in sorted(rows, key=lambda row: int(row.get("triage_rank", 1)))
+    ]:
+        problems.append(
+            "boards fixture: Operations runs are not in the server-provided triage order"
+        )
+    if len(normal.get("state_screens") or []) != 6:
+        problems.append("boards fixture: state_screens must cover the six named operator states")
+    else:
+        states = {str(screen.get("state")) for screen in normal["state_screens"]}
+        if states != {"running", "blocked", "stalled", "failed", "escalated", "done"}:
+            problems.append(f"boards fixture: incomplete state screens {sorted(states)}")
+    for action in normal.get("safe_actions", []):
+        if not {"action", "run_id", "gate_id", "candidate_sha"} <= set(action):
+            problems.append("boards fixture: safe action missing packet identifiers")
     degraded = build_operations_payload(True)
     if not degraded.get("degraded"):
         problems.append("boards fixture: the degraded variant carries no degraded surfaces")
@@ -2982,6 +3058,52 @@ def _check_board_loading(
         probe = page.evaluate(BOARDS_PROBE_JS)
         if board == "operations" and not probe["operationsText"]:
             _row(errors, label, "loading", board, "the operations board rendered no content")
+        if board == "operations":
+            rows = probe.get("operationRows") or []
+            if not rows:
+                _row(
+                    errors,
+                    label,
+                    "loading",
+                    "operations-rows",
+                    "the packet run ledger rendered no rows",
+                )
+            else:
+                for field, expected in (
+                    ("attention.state", "active"),
+                    ("attention.kind", "approval"),
+                    ("started.age", "5d ago"),
+                    ("operator_state", "running"),
+                ):
+                    if expected not in probe["operationsText"] and not any(
+                        expected in str((row.get("fields") or {}).get(field, "")) for row in rows
+                    ):
+                        _row(
+                            errors,
+                            label,
+                            "loading",
+                            f"operations-{field}",
+                            f"the server-owned {field} value {expected!r} was not rendered",
+                        )
+            state_text = probe.get("stateScreensText", "")
+            for state in ("running", "blocked", "stalled", "failed", "escalated", "done"):
+                if state not in state_text:
+                    _row(
+                        errors,
+                        label,
+                        "loading",
+                        "operations-state-screens",
+                        f"the named {state!r} state screen was not rendered",
+                    )
+            for action in ("approve", "promote"):
+                if action not in probe["operationsText"]:
+                    _row(
+                        errors,
+                        label,
+                        "loading",
+                        "operations-safe-actions",
+                        f"the packet safe action {action!r} was not rendered",
+                    )
         if board == "surfaces" and not probe["surfacePanels"]:
             _row(errors, label, "loading", board, "the surfaces board rendered no panels")
         if board == "routing":
