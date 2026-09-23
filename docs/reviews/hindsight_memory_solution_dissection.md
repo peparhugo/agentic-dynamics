@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # Hindsight (Vectorize) — solution dissection, read against `agentic_dynamics`
 
 **Date:** 2026-09-23 · **Author:** AIO Control Agent · **Trigger:** controller directive ("dissect this
