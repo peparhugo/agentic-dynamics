@@ -3,7 +3,15 @@ description: The adversarial gate — a refusal-first reviewer that runs on a DI
 mode: subagent
 model: deepseek/deepseek-v4-pro
 permission:
-  edit: ask
+  # edit: allow — NOT ask. A headless sibling cell (every fleet workflow phase) has nobody to
+  # answer an ask, so an edit tool call HANGS the phase to its wall: L33 attempts 7-9 each
+  # stalled on `asking permission=edit` for this agent's own review file (2026-09-23). The
+  # mechanical posture is "read-only except its review file"; opencode cannot scope "edit" by
+  # path, and between the two expressible postures "allow" keeps the review committable while
+  # the prose below (never edit the artifact you judge) + the diff review carry the guard.
+  # The other ask-postured roster agents (data-analysis/instrument-dev/pipeline-ops) share
+  # this headless hazard — audit before their phases write (register L47).
+  edit: allow
   bash: allow
   task: deny
 ---
