@@ -46,19 +46,51 @@ workflow:
         the L23 resting-screen restructure (routes/operations.py, board-*.js, shell.js).
         SCAN the fixtures, the gate, and the existing services BEFORE adding a derivation —
         the vocabulary (named states, caps, provenance labels) usually exists.
+
+        THE L33 ACCEPTANCE FINDINGS (2026-09-23 — this brief supersedes the parked candidate;
+        its work is NOT on main): run-eb4adaa72899 reached 5/5 ok + g_test_gate 77/77 + a
+        committed adversarial review and still FAILED the HOST render gate on one assertion:
+        "[desktop/boards/loading] operations-attention.state: the server-owned attention.state
+        value 'active' was not rendered" (gate report:
+        experiments/results/control_room_render/L33_candidate_f7ab43551/gate_report.json; the
+        full review is archived at refs/experiments/control_room_detail_truth/run-eb4adaa72899
+        -> notes/adversarial_review.md; register rows L33 + L47). That candidate is FROZEN by
+        its ledger — never edit it; absorb its four Required Remediation items instead:
+        (1) generate the Operations fixture from the service's read-model contract, or make the
+        fixture assert the state_screens[i] <-> runs[i] identity/order invariant — a
+        hand-authored twin the service could never emit is the P1 finding; (2) reconcile the
+        operator-state / required state roster with control_db.RunState — implement evidence
+        for stalled/escalated or REMOVE the manufactured states, then cover the reachable
+        unknown / promotable / cancelled / quarantined cases; (3) render "Unhealthy workers"
+        as unavailable whenever its source is degraded or unobserved (never a fabricated 0),
+        and extend the degraded render assertions to catch exactly that; (4) Playwright is NOT
+        a container fix (the fleet image has none) — the browser acceptance is proven on the
+        HOST, so every browser-class assertion the candidate's gate carries must be satisfiable
+        by the candidate's OWN renderer, including rendering asserted server-owned values as
+        visible text (the parked candidate asserted 'active' while its client exposed the
+        value only as a data-* attribute). A green in-cell run is not an accepted candidate:
+        the AIO runs verify_control_room_rendering.py --profile acceptance against THIS run's
+        candidate on the host, and promotion waits on it.
     phases:
       - name: prior
         kind: agent
         scope: proposal_write
         timeout: 1200
         prompt: |
-          Read the L23 candidate's notes/adversarial_review.md (in the run clone, if reachable)
-          or the register's L23 row; the room's services, routes, static boards, and the render
-          gate + fixtures. WRITE `notes/control_room.md` (`## Problem`, `## What Exists`,
+          Read the register rows L23, L33, and L47 in `docs/reviews/loose_ends_register.md`,
+          and the failed host gate report
+          `experiments/results/control_room_render/L33_candidate_f7ab43551/gate_report.json`;
+          then the room's services, routes, static boards, and the render gate + fixtures.
+          WRITE `notes/control_room.md` (`## Problem`, `## What Exists`,
           `## Gaps`, `## Sources`) and `notes/plan.md` (`## Files`, `## Tests`,
-          `## Acceptance`, `## Risks`): for EACH value the room currently derives or hides,
-          say which service should own it, which fixture the gate will assert, and which
-          capture shows it. Write `notes/sources.jsonl`. Commit — `notes/` is gitignored, so
+          `## Acceptance`, `## Risks`, `## Remediation`): for EACH value the room currently
+          derives or hides, say which service should own it, which fixture the gate will
+          assert, and which capture shows it; the `## Remediation` section must address EACH
+          of the four L33 items named in the domain context (fixture from the service
+          contract or the state_screens<->runs invariant; the RunState-reachable state roster;
+          the degraded "Unhealthy workers" render; assertions satisfiable by your own renderer
+          on the host), naming the file and the assertion that proves each. Write
+          `notes/sources.jsonl`. Commit — `notes/` is gitignored, so
           stage the notes explicitly (`git add -f notes/`) before committing; a plain
           `git add` refuses ignored paths and the phase then records no commit.
       - name: execute
@@ -69,10 +101,18 @@ workflow:
         prompt: |
           Move the derivations server-side into services/operations.py (or the owning service),
           extend the fixtures + the gate's assertions and the drawer/board renderers to use
-          them, and render the state screens the review named. Run the render gate
-          (`python3 scripts/verify_control_room_rendering.py --profile acceptance`) and VIEW the
-          captures yourself; run the room suites (`tests/test_control_room_*.py`,
-          `tests/test_admin_*.py`). Commit.
+          them, and render the state screens the review named — implementing the four L33
+          remediation items (domain context) rather than re-landing the parked candidate's
+          misses: the fixture must be service-plausible (generated from the read model or
+          asserting the state_screens[i] <-> runs[i] invariant), the state roster must be
+          reachable from control_db.RunState, "Unhealthy workers" must read unavailable when
+          its source is degraded, and every value your gate asserts must render as visible
+          text (a data-* attribute is not a rendered value). The container CANNOT run the
+          browser profile (no Playwright — register L47): run the browser-free checks
+          (`python3 scripts/verify_control_room_rendering.py --check-fixtures`) and the room
+          suites (`tests/test_control_room_*.py`, `tests/test_admin_*.py`); do NOT install
+          Playwright and do NOT fabricate captures — the host runs the acceptance profile
+          against this run's candidate. Commit.
       - name: g_test_gate
         kind: test
         scope: implementation
@@ -98,11 +138,13 @@ workflow:
         prompt: |
           Diff the plan against what landed. WRITE `notes/posterior.md` (`## Violations`,
           `## Unknowns`, `## UPDATES`): which values moved server-side (with the fixture +
-          capture that prove it), what remains client-side and why, and the gate evidence
-          (capture paths). Commit — `notes/` is gitignored, so stage it explicitly
-          (`git add -f notes/posterior.md`) before committing. Keep every write inside the
-          worktree (never `/tmp/...`, never `../...`): an outside edit raises a permission ask
-          the headless cell cannot answer.
+          the gate-check output that prove it), which of the four L33 remediation items landed
+          and which did not (each with the assertion or invariant that proves it), what
+          remains client-side and why, and the acceptance evidence that exists in-cell (there
+          are no captures here — the host runs the browser profile). Commit — `notes/` is
+          gitignored, so stage it explicitly (`git add -f notes/posterior.md`) before
+          committing. Keep every write inside the worktree (never `/tmp/...`, never `../...`):
+          an outside edit raises a permission ask the headless cell cannot answer.
       - name: g_adversarial
         kind: agent
         scope: proposal_write
@@ -110,10 +152,15 @@ workflow:
         run_model: openai/gpt-5.6-terra
         prompt: |
           ADVERSARIAL REVIEW — a different model by design. Read the notes, the diffs, and the
-          captures. Attack: does any "server-derived" value secretly re-derive in the client?
-          do the fixtures assert the REAL server shape or a hand-written twin? does an omitted
-          value now render as a fabricated zero anywhere? Name at least one falsifier per
-          major claim. Write `notes/adversarial_review.md` with a final `## FINDING` paragraph
+          fixtures. Attack: does any "server-derived" value secretly re-derive in the client?
+          do the fixtures assert the REAL server shape or a hand-written twin (state_screens
+          identities and order, row fields the service cannot emit, states unreachable from
+          control_db.RunState)? does an omitted value render as a fabricated zero anywhere
+          (check "Unhealthy workers" on a degraded or unobserved source)? does any gate
+          assertion pass vacuously, and is every browser-class assertion satisfiable by the
+          renderer it asserts (visible text, not a data-* attribute)? Name at least one
+          falsifier per major claim. Write `notes/adversarial_review.md` with a final
+          `## FINDING` paragraph
           and commit it — `notes/` is gitignored, so stage the review explicitly
           (`git add -f notes/adversarial_review.md`) before committing; the phase must record
           a commit (a silently uncommitted review fails the promotion gate).
