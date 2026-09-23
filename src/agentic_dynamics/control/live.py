@@ -20,8 +20,18 @@ from typing import Any
 from agentic_dynamics.control.supervisor import register_event_mapping, register_session_mapping
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
-REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
-REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
+
+
+def _env_int(name: str, default: int) -> int:
+    """Parse an infrastructure integer without turning a malformed env into an import failure."""
+    try:
+        return int(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+
+
+REDIS_PORT = _env_int("FINOPS_REDIS_PORT", 6380)
+REDIS_DB = _env_int("FINOPS_REDIS_DB", 1)
 STATUS_KEY = "story_status"
 #: Current live workflow phase, keyed by cell_id (display-only badge data).
 PHASE_KEY = "story_phase"

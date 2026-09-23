@@ -104,12 +104,8 @@ def test_the_operations_view_renders_the_packet_states_verbatim():
 
 def test_operations_board_renders_the_packet_fields_it_claims():
     """The restored Operations board renders the packet fields it actually reads: the summary
-    source, active/promotable runs, attention, degraded surfaces, projection lag, workers.
-
-    Safe actions are deliberately NOT part of this list: the control packet carries them, but
-    the restored Operations renderer does not display them (the parked workbench lens did). A
-    test asserting them here would only pass by reading the parked module — the exact
-    false-confidence the 2026-09-18 review found.
+    source, server-owned summaries, active runs, attention, degraded surfaces, projection lag,
+    workers, safe actions, and the complete state-screen roster.
     """
     app = (STATIC / "app.js").read_text(encoding="utf-8")
     for anchor in (
@@ -119,7 +115,11 @@ def test_operations_board_renders_the_packet_fields_it_claims():
         "data.attention",
         "data.degraded",
         "projection_lag",
-        "unhealthy_workers",
+        "summaryData.active_runs",
+        "worker_health",
+        "safe_actions",
+        "state_screens",
+        "State screens",
     ):
         assert anchor in app, f"the restored Operations renderer does not read {anchor}"
 
@@ -218,7 +218,7 @@ def test_run_drawer_renders_the_run_inspection_blocks():
         "dataset.deliveredPhase",
         "dataset.preparedStepPath",
         "selected — use not established",
-        'tr.dataset.state',
+        "tr.dataset.state",
     ):
         assert anchor in app, anchor
 

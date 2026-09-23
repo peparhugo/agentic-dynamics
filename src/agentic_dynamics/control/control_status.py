@@ -62,6 +62,7 @@ does not touch the instruction surfaces (p5), and does not publish (p6).
 from __future__ import annotations
 
 import json
+import math
 import os
 import subprocess
 import time
@@ -398,9 +399,7 @@ def active_run_ref(db: ControlDB, run: RunRecord) -> dict[str, Any]:
     return ref
 
 
-def run_gate_context(
-    db: ControlDB, run: RunRecord, *, pending_only: bool = False
-) -> list[str]:
+def run_gate_context(db: ControlDB, run: RunRecord, *, pending_only: bool = False) -> list[str]:
     """The run's approval gate context — the distinct gate ids its candidate carries.
 
     This is the durable identity an approval is bound to: the writer refuses a ``--gate-id``
@@ -434,7 +433,11 @@ def run_gate_context(
             return []
         return [""]
     return sorted(
-        {g.gate_id for g in gates if not pending_only or (g.gate_id, g.candidate_sha) not in approved}
+        {
+            g.gate_id
+            for g in gates
+            if not pending_only or (g.gate_id, g.candidate_sha) not in approved
+        }
     )
 
 
@@ -639,9 +642,10 @@ def _float_or_none(value: Any) -> float | None:
     if value in (None, ""):
         return None
     try:
-        return float(value)
+        parsed = float(value)
     except (TypeError, ValueError):
         return None
+    return parsed if math.isfinite(parsed) else None
 
 
 def _int_or_none(value: Any) -> int | None:
@@ -701,8 +705,14 @@ def read_worker_heartbeats() -> tuple[dict[Any, Mapping[Any, Any]], str]:
         return {}, f"redis_import_failed: {exc}"
 
     host = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
-    port = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
-    db = int(os.environ.get("FINOPS_REDIS_DB", "1"))
+    try:
+        port = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
+    except (TypeError, ValueError):
+        port = 6380
+    try:
+        db = int(os.environ.get("FINOPS_REDIS_DB", "1"))
+    except (TypeError, ValueError):
+        db = 1
     try:
         client = redis.Redis(
             host=host, port=port, db=db, decode_responses=True, socket_connect_timeout=2
@@ -819,7 +829,9 @@ def build_packet(
         "control_epoch": db.control_epoch(),
         "active_runs": [active_run_ref(db, r) for r in active],
         "awaiting_approvals": awaiting,
-        "promotable_runs": [active_run_ref(db, r) for r in runs_by_state.get(RunState.PROMOTABLE, [])],
+        "promotable_runs": [
+            active_run_ref(db, r) for r in runs_by_state.get(RunState.PROMOTABLE, [])
+        ],
         "failed_runs": [run_ref(r) for r in failed],
         "unhealthy_workers": workers,
         "projection_lag": projection_lag,
@@ -891,19 +903,20 @@ def validate_packet(packet: Any) -> list[str]:
                 )
             )
             if isinstance(entry, Mapping) and entry.get("state") not in run_states:
-                errors.append(f"{block}[{i}].state is not a known run state: {entry.get('state')!r}")
+                errors.append(
+                    f"{block}[{i}].state is not a known run state: {entry.get('state')!r}"
+                )
             # Phase progress is optional (terminal entries omit it); when present it must be a
             # non-negative int — `True` is an int subclass and must not pass as a phase count.
             if isinstance(entry, Mapping):
                 for field in ("phases_completed", "phases_total"):
                     value_count = entry.get(field)
                     if value_count is not None and (
-                        not isinstance(value_count, int) or isinstance(value_count, bool)
+                        not isinstance(value_count, int)
+                        or isinstance(value_count, bool)
                         or value_count < 0
                     ):
-                        errors.append(
-                            f"{block}[{i}].{field} must be a non-negative integer"
-                        )
+                        errors.append(f"{block}[{i}].{field} must be a non-negative integer")
 
     awaiting = packet.get("awaiting_approvals")
     if not isinstance(awaiting, list):
@@ -965,7 +978,9 @@ def validate_packet(packet: Any) -> list[str]:
                 )
             )
             if isinstance(entry, Mapping) and entry.get("action") not in known_actions:
-                errors.append(f"safe_actions[{i}].action is not in the vocabulary: {entry.get('action')!r}")
+                errors.append(
+                    f"safe_actions[{i}].action is not in the vocabulary: {entry.get('action')!r}"
+                )
 
     notes = packet.get(DEGRADED_KEY)
     if not isinstance(notes, list):

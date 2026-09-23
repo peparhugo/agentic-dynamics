@@ -1,7 +1,9 @@
 {
-  "_note": "Deterministic wire payloads for the restored-board acceptance classes (navigation, loading, degraded, scrolling, keyboard). No live Redis/clock/network (waiver W2). Run rows are expanded from run_seed + active_count/promotable_count by scripts/verify_control_room_rendering.py:build_operations_payload(), so every id is stable and the list is long enough to scroll.",
+  "_note": "Deterministic wire payloads for the restored-board acceptance classes (navigation, loading, degraded, scrolling, keyboard). No live Redis/clock/network (waiver W2). Run rows and the exhaustive RunState screens are generated from the Operations read-model helpers by scripts/verify_control_room_rendering.py:build_operations_payload(), so every id is stable and the list is long enough to scroll.",
   "operations": {
+    "schema": "control-room-operations/v1",
     "source": {
+      "packet_schema": "control-status/v1",
       "control_epoch": 812,
       "repo_head_sha": "bc2c728633273947d278f285c2e8929946aaa082"
     },
@@ -45,10 +47,31 @@
         "session_id": "ses_fixture_stale",
         "age_seconds": 845
       }
+    ],
+    "worker_health": {
+      "state": "recorded",
+      "count": 1,
+      "workers": [
+        {
+          "session_id": "ses_fixture_stale",
+          "age_seconds": 845
+        }
+      ],
+      "reason": ""
+    },
+    "safe_actions": [
+      {
+        "action": "approve",
+        "run_id": "run-fixture-0007",
+        "gate_id": "gate-fixture",
+        "candidate_sha": "bc2c728633273947d278f285c2e8929946aaa082"
+      }
     ]
   },
   "operations_degraded": {
+    "schema": "control-room-operations/v1",
     "source": {
+      "packet_schema": "control-status/v1",
       "control_epoch": 812,
       "repo_head_sha": "bc2c728633273947d278f285c2e8929946aaa082"
     },
@@ -62,7 +85,13 @@
       }
     ],
     "projection_lag": {},
-    "unhealthy_workers": []
+    "unhealthy_workers": [],
+    "worker_health": {
+      "state": "unavailable",
+      "count": null,
+      "workers": [],
+      "reason": "workers were not observed"
+    }
   },
   "run_detail": {
     "schema": "control-room-run-detail/v1",

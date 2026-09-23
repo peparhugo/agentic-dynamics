@@ -31,6 +31,7 @@ from agentic_dynamics.control.control_db import (  # noqa: E402
 from agentic_dynamics.control.control_status import build_packet  # noqa: E402
 from apps.control_room.services.operations import (  # noqa: E402
     RUN_DETAIL_SCHEMA,
+    RUN_STATE_ORDER,
     SCHEMA,
     logs_block,
     operational_snapshot,
@@ -103,8 +104,15 @@ def test_attention_is_a_projection_of_the_packet(tmp_path):
     }
     assert (failed_id, "flow") in failed_ids
 
-    # the packet blocks flow through unchanged.
-    assert snapshot["active_runs"] == list(packet["active_runs"])
+    # The packet's identifiers and lifecycle values flow through; Operations adds its own
+    # server-owned display facets and may order attention rows first for triage.
+    assert {row["run_id"] for row in snapshot["active_runs"]} == {
+        row["run_id"] for row in packet["active_runs"]
+    }
+    assert all("attention.state" in row and "started.age" in row for row in snapshot["active_runs"])
+    assert snapshot["summary"]["active_runs"]["value"] == len(packet["active_runs"])
+    assert snapshot["summary"]["promotable_runs"]["value"] == len(packet["promotable_runs"])
+    assert [screen["state"] for screen in snapshot["state_screens"]] == list(RUN_STATE_ORDER)
     assert snapshot["projection_lag"] == packet["projection_lag"]
 
 
@@ -509,12 +517,21 @@ def test_resolve_live_cell_maps_a_fleet_job_to_its_live_phase_stream():
     the substitution; a finished job and a non-job id pass through unchanged."""
     board = {
         "job-live": json.dumps(
-            {"job_id": "job-live", "spec": "workflows/repository/flow.yaml", "ts": 1790105820.0,
-             "status": "running"}
+            {
+                "job_id": "job-live",
+                "spec": "workflows/repository/flow.yaml",
+                "ts": 1790105820.0,
+                "status": "running",
+            }
         ),
         "job-done": json.dumps(
-            {"job_id": "job-done", "spec": "workflows/repository/flow.yaml", "ts": 1790105820.0,
-             "run_id": "run-1", "status": "completed"}
+            {
+                "job_id": "job-done",
+                "spec": "workflows/repository/flow.yaml",
+                "ts": 1790105820.0,
+                "run_id": "run-1",
+                "status": "completed",
+            }
         ),
     }
     logs = {
@@ -552,7 +569,9 @@ def test_read_run_logs_binds_the_live_phase_stream_for_an_in_flight_run():
             json.dumps({"type": "step_finish", "timestamp": "1790105800000"}),
         ],
         "events_log:flow:execute": [
-            json.dumps({"type": "tool_use", "timestamp": "1790105944000", "part": {"text": "write notes"}}),
+            json.dumps(
+                {"type": "tool_use", "timestamp": "1790105944000", "part": {"text": "write notes"}}
+            ),
             json.dumps({"type": "step_start", "timestamp": "1790105930000"}),
         ],
     }
@@ -695,5 +714,3 @@ def test_read_run_logs_matches_an_inflight_job_by_spec_and_time():
         redis, "run-inflight", spec_name="other", started_at="1970-01-01T00:33:30Z"
     )
     assert other["state"] == "unbound"
-
-

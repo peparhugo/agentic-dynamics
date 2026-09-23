@@ -62,6 +62,8 @@ from urllib.parse import urlparse
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from apps.control_room.services import operations as operations_service  # noqa: E402
+
 FIXTURE_DIR = ROOT / "apps" / "control_room" / "verification" / "fixtures"
 REPORT_DIR_DEFAULT = ROOT / "apps" / "control_room" / "verification"
 
@@ -2521,11 +2523,14 @@ DRAWER_PROBE_JS = r"""
     present: true,
     text: text,
     costProvenance: cost ? cost.dataset.costProvenance : null,
+    costText: cost ? (cost.innerText || cost.textContent || '').trim() : '',
     verification: verification,
     deliveredPhase: delivered ? delivered.dataset.deliveredPhase : null,
     deliveredText: deliveredText,
     preparedPath: prepared ? prepared.dataset.preparedStepPath : null,
+    preparedText: prepared ? (prepared.innerText || prepared.textContent || '').trim() : '',
     hasUnknownTiming: Boolean(unknownTiming),
+    unknownTimingText: unknownTiming ? (unknownTiming.innerText || unknownTiming.textContent || '').trim() : '',
     logState: logState ? logState.dataset.logState : null,
     logEntryCount: logEntries.length,
     logText: Array.from(logEntries)
@@ -2556,6 +2561,19 @@ def build_operations_payload(degraded: bool = False) -> dict[str, Any]:
         payload.setdefault("active_runs", [])
         payload.setdefault("promotable_runs", [])
         payload.setdefault("attention", [])
+        reason = next(
+            (
+                str(item.get("reason") or "source unavailable")
+                for item in payload.get("degraded", [])
+                if item.get("surface") == "control_db"
+            ),
+            "source unavailable",
+        )
+        payload["summary"] = {
+            key: {"state": "unavailable", "value": None, "reason": reason}
+            for key in ("active_runs", "decisions_owed", "promotable_runs")
+        }
+        payload.setdefault("state_screens", [])
         return payload
     run_seed = seed["run_seed"]
     active_count = int(seed.get("active_count", 0))
@@ -2566,8 +2584,63 @@ def build_operations_payload(degraded: bool = False) -> dict[str, Any]:
         row["run_id"] = f"run-fixture-{index:04d}"
         row["state"] = "running" if index <= active_count else "promotable"
         runs.append(row)
-    payload["active_runs"] = runs[:active_count]
-    payload["promotable_runs"] = runs[active_count:]
+    # The fixture is generated through the service's lifecycle roster rather than maintaining a
+    # second hand-written state vocabulary.  Terminal examples live only in state screens, as in
+    # the real packet where ``active_runs`` is non-terminal and ``failed_runs`` is capped.
+    state_examples = []
+    terminal_states = {state.value for state in operations_service.TERMINAL_RUN_STATES}
+    for state in operations_service.RUN_STATE_ORDER:
+        example = copy.deepcopy(run_seed)
+        example["run_id"] = f"state-fixture-{state}"
+        example["state"] = state
+        state_examples.append(example)
+    active_examples = [row for row in state_examples if row["state"] not in terminal_states]
+    failed_examples = [row for row in state_examples if row["state"] == "failed"]
+    payload["active_runs"] = runs + active_examples
+    payload["promotable_runs"] = [
+        row for row in payload["active_runs"] if row["state"] == "promotable"
+    ]
+    payload["failed_runs"] = failed_examples
+    attention_ids = {str(item.get("run_id") or "") for item in payload.get("attention", [])}
+    for row in payload["active_runs"] + payload["failed_runs"]:
+        row["run.live"] = (
+            "not-live"
+            if row["state"] in {"failed", "cancelled", "quarantined", "published"}
+            else "live"
+        )
+        row["terminal.target"] = "unknown"
+        row["attempt.number"] = "unknown"
+        row["cost.provenance"] = "unknown"
+        row["decision.eligibility"] = (
+            "approve"
+            if row["state"] == "awaiting_approval"
+            else "promote"
+            if row["state"] == "promotable"
+            else "inspect"
+        )
+        row["decision.receipt"] = "missing"
+        row["evidence.advisory"] = "narration unknown"
+        row["attention.state"] = "active" if row["run_id"] in attention_ids else "none"
+        row["attention.kind"] = "attention" if row["run_id"] in attention_ids else ""
+        row["started.age"] = "8d ago"
+    payload["active_runs"] = operations_service.order_run_refs(
+        payload["active_runs"], attention_ids
+    )
+    payload["promotable_runs"] = [
+        row for row in payload["active_runs"] if row["state"] == "promotable"
+    ]
+    payload["state_screens"] = operations_service.state_screens_from_runs(
+        payload["active_runs"] + [row for row in state_examples if row["state"] in terminal_states]
+    )
+    payload["summary"] = {
+        "active_runs": {"state": "recorded", "value": len(payload["active_runs"]), "reason": ""},
+        "decisions_owed": {"state": "recorded", "value": len(payload["attention"]), "reason": ""},
+        "promotable_runs": {
+            "state": "recorded",
+            "value": len(payload["promotable_runs"]),
+            "reason": "",
+        },
+    }
     return payload
 
 
@@ -2652,9 +2725,48 @@ def check_boards_fixtures() -> list[str]:
             problems.append(
                 f"boards fixture: attention references unknown run {item.get('run_id')!r}"
             )
+    if normal.get("schema") != "control-room-operations/v1":
+        problems.append("boards fixture: operations must carry its top-level schema")
+    if (normal.get("source") or {}).get("packet_schema") != "control-status/v1":
+        problems.append("boards fixture: operations source must carry packet_schema")
+    for summary_key in ("active_runs", "decisions_owed", "promotable_runs"):
+        summary = (normal.get("summary") or {}).get(summary_key) or {}
+        if summary.get("state") != "recorded" or not isinstance(summary.get("value"), int):
+            problems.append(f"boards fixture: summary {summary_key!r} is not server-recorded")
+    if not any(row.get("state") == "promotable" for row in normal.get("active_runs", [])):
+        problems.append("boards fixture: active_runs must include promotable packet entries")
+    active_ids = {row.get("run_id") for row in normal.get("active_runs", [])}
+    promotable_ids = {row.get("run_id") for row in normal.get("promotable_runs", [])}
+    if not promotable_ids <= active_ids:
+        problems.append("boards fixture: promotable_runs must be a subset of active_runs")
+    screens = normal.get("state_screens")
+    expected_states = list(operations_service.RUN_STATE_ORDER)
+    if [screen.get("state") for screen in screens or []] != expected_states:
+        problems.append("boards fixture: state_screens must exhaust the RunState roster")
+    screen_rows = [row for screen in screens or [] for row in screen.get("runs", [])]
+    screen_ids = {row.get("run_id") for row in screen_rows}
+    expected_screen_ids = active_ids | {row.get("run_id") for row in normal.get("failed_runs", [])}
+    # The state-screen examples for cancelled/quarantined/published are read-model rows too, so
+    # validate the stronger invariant directly: each screen contains only its own state and its
+    # count equals its rendered run list.
+    for screen in screens or []:
+        members = screen.get("runs") or []
+        if screen.get("count") != len(members):
+            problems.append(f"boards fixture: state screen {screen.get('state')!r} count mismatch")
+        if any(row.get("state") != screen.get("state") for row in members):
+            problems.append(f"boards fixture: state screen {screen.get('state')!r} mixes states")
+    if not screen_ids or not expected_screen_ids <= screen_ids:
+        problems.append("boards fixture: state_screens do not cover the packet run identities")
+    worker_health = normal.get("worker_health") or {}
+    if worker_health.get("state") != "recorded" or worker_health.get("count") != len(
+        normal.get("unhealthy_workers", [])
+    ):
+        problems.append("boards fixture: worker_health must be a service-owned recorded count")
     degraded = build_operations_payload(True)
     if not degraded.get("degraded"):
         problems.append("boards fixture: the degraded variant carries no degraded surfaces")
+    if (degraded.get("worker_health") or {}).get("state") != "unavailable":
+        problems.append("boards fixture: degraded worker health must be unavailable")
     for name in BOARD_SURFACE_PATHS:
         if name not in fixture["surfaces"]:
             problems.append(f"boards fixture: surfaces missing {name!r}")
@@ -2982,6 +3094,61 @@ def _check_board_loading(
         probe = page.evaluate(BOARDS_PROBE_JS)
         if board == "operations" and not probe["operationsText"]:
             _row(errors, label, "loading", board, "the operations board rendered no content")
+        if board == "operations":
+            operations_payload = build_operations_payload(False)
+            for summary_key, metric_label in (
+                ("active_runs", "Active runs"),
+                ("decisions_owed", "Decisions owed"),
+                ("promotable_runs", "Promotable runs"),
+            ):
+                expected = (operations_payload.get("summary", {}).get(summary_key) or {}).get(
+                    "value"
+                )
+                if probe["metrics"].get(metric_label) != str(expected):
+                    _row(
+                        errors,
+                        label,
+                        "loading",
+                        "operations-summary",
+                        f"{metric_label!r} did not render the service-owned value {expected!r}",
+                    )
+            rendered = (probe.get("operationsText") or "").casefold()
+            if "state screens" not in rendered:
+                _row(
+                    errors,
+                    label,
+                    "loading",
+                    "operations-state-projection",
+                    "the server-owned Operations value 'State screens' was not rendered",
+                )
+            for screen in operations_payload.get("state_screens", []):
+                if str(screen.get("label") or screen.get("state") or "").casefold() not in rendered:
+                    _row(
+                        errors,
+                        label,
+                        "loading",
+                        "operations-state-roster",
+                        f"the RunState screen {screen.get('state')!r} was not rendered",
+                    )
+            if "active · approval" not in rendered:
+                _row(
+                    errors,
+                    label,
+                    "loading",
+                    "operations-attention",
+                    "the server-owned attention.state value 'active' was not rendered",
+                )
+            for action in operations_payload.get("safe_actions", []):
+                action_text = str(action.get("action") or "").casefold()
+                run_text = str(action.get("run_id") or "").casefold()
+                if action_text not in rendered or run_text not in rendered:
+                    _row(
+                        errors,
+                        label,
+                        "loading",
+                        "operations-safe-actions",
+                        f"safe action {action.get('action')!r} for {action.get('run_id')!r} was not rendered as text",
+                    )
         if board == "surfaces" and not probe["surfacePanels"]:
             _row(errors, label, "loading", board, "the surfaces board rendered no panels")
         if board == "routing":
@@ -3131,7 +3298,7 @@ def _check_board_degraded(
         )
     _settle(page, 200)
     probe = page.evaluate(BOARDS_PROBE_JS)
-    for metric in ("Active runs", "Decisions owed", "Promotable runs"):
+    for metric in ("Active runs", "Decisions owed", "Promotable runs", "Unhealthy workers"):
         value = probe["metrics"].get(metric)
         if value != "unavailable":
             _row(
@@ -3617,14 +3784,24 @@ def _check_board_keyboard(
                     "the drawer has no content node to inspect",
                 )
             else:
-                if drawer.get("costProvenance") != "$0.0000 \u00b7 metered":
+                if "/repo/experiments/results/workflows/control_room_followups/" not in (
+                    drawer.get("text") or ""
+                ):
+                    _row(
+                        errors,
+                        label,
+                        "keyboard",
+                        "drawer-recording",
+                        "the drawer must render the recorded ledger pointer as visible text",
+                    )
+                if "$0.0000 \u00b7 metered" not in (drawer.get("costText") or ""):
                     _row(
                         errors,
                         label,
                         "keyboard",
                         "drawer-cost",
-                        "the drawer must show the measured-zero cost provenance "
-                        f"(got {drawer.get('costProvenance')!r})",
+                        "the drawer must show the measured-zero cost provenance as visible text "
+                        f"(got {drawer.get('costText')!r})",
                     )
                 measured = (drawer.get("verification") or {}).get("measured", "")
                 if "independent" not in measured:
@@ -3655,21 +3832,26 @@ def _check_board_keyboard(
                         "drawer-delivered",
                         "the drawer must show the delivered-knowledge ids",
                     )
-                if drawer.get("preparedPath") != ".fleet/prepared_steps/implement.a1.json":
+                if ".fleet/prepared_steps/implement.a1.json" not in (
+                    drawer.get("preparedText") or ""
+                ):
                     _row(
                         errors,
                         label,
                         "keyboard",
                         "drawer-prepared",
-                        "the drawer must show the prepared-step reference",
+                        "the drawer must show the prepared-step reference as visible text",
                     )
-                if not drawer.get("hasUnknownTiming"):
+                if (
+                    not drawer.get("hasUnknownTiming")
+                    or "unknown" not in (drawer.get("unknownTimingText") or "").casefold()
+                ):
                     _row(
                         errors,
                         label,
                         "keyboard",
                         "drawer-timing-unknown",
-                        "the drawer must render an unknown-state timing row",
+                        "the drawer must render an unknown-state timing row as visible text",
                     )
                 if drawer.get("logState") != "recorded" or not drawer.get("logEntryCount"):
                     _row(
@@ -3754,7 +3936,7 @@ def _check_board_keyboard(
                 unknown_row.first.focus()
                 page.keyboard.press("Enter")
                 try:
-                    page.locator('#run-detail-content [data-cost-provenance="unknown"]').wait_for(
+                    page.locator('#run-detail-content:has-text("provenance: unknown")').wait_for(
                         timeout=5000
                     )
                 except Exception:  # noqa: BLE001 — the failed state is the finding
@@ -3767,15 +3949,16 @@ def _check_board_keyboard(
                     )
                 page.keyboard.press("Escape")
                 _settle(page, 150)
-            # HTTP-200 error envelope: the service's named error renders by name, never a blank.
+            # HTTP-200 error envelope: both the service's named error and its reason render as
+            # visible text, never only as a metadata attribute or a blank.
             error_row = page.locator('tr[data-run-id="run-fixture-0008"]')
             if error_row.count():
                 error_row.first.focus()
                 page.keyboard.press("Enter")
                 try:
-                    page.locator('#run-detail-content:has-text("Run detail unavailable")').wait_for(
-                        timeout=5000
-                    )
+                    page.locator(
+                        '#run-detail-content:has-text("Run detail unavailable"):has-text("control database could not be read")'
+                    ).wait_for(timeout=5000)
                 except Exception:  # noqa: BLE001 — the failed state is the finding
                     _row(
                         errors,

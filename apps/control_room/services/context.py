@@ -44,6 +44,7 @@ filesystem, which would let a route quietly re-acquire the dependency the inject
 from __future__ import annotations
 
 import re
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -146,22 +147,19 @@ class ControlRoomServices:
         try:
             with ControlDB.open_read_only() as db:
                 snapshot = ops.operational_snapshot(
-                    db, repo_head_sha=repo_head_sha, heartbeats=heartbeats
+                    db,
+                    repo_head_sha=repo_head_sha,
+                    heartbeats=heartbeats,
+                    now=time.time(),
+                    degraded=degraded,
                 )
         except Exception as exc:  # noqa: BLE001 — an unreadable control plane is degraded data
-            return {
-                "schema": ops.SCHEMA,
-                "source": {},
-                "attention": [],
-                "active_runs": [],
-                "promotable_runs": [],
-                "unhealthy_workers": [],
-                "projection_lag": {},
-                "safe_actions": [],
-                "degraded": degraded
-                + [{"surface": "control_db", "reason": f"{type(exc).__name__}: {exc}"}],
-            }, 200
-        snapshot["degraded"] = list(snapshot.get("degraded", [])) + degraded
+            return ops.unavailable_snapshot(
+                reason=f"{type(exc).__name__}: {exc}", degraded=degraded
+            ), 200
+        # The read model already merged collector degradation into the packet before deriving its
+        # summary and worker blocks.  Keep this assignment defensive for injected test services.
+        snapshot["degraded"] = list(snapshot.get("degraded", []))
         return snapshot, 200
 
     def run_detail(self, run_id: str) -> tuple[Any, int]:

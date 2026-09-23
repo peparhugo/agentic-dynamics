@@ -3132,7 +3132,9 @@
     value.title = entry.purpose || entry.reason || `attention: ${kind}`
     const glyph = element("span", "status-glyph", vocabulary.glyph)
     glyph.setAttribute("aria-hidden", "true")
-    value.replaceChildren(glyph, document.createTextNode(kind.toUpperCase()))
+    // The state is a server-owned value, not merely a CSS/data attribute.  Keep it in the
+    // visible label so the browser gate and assistive technology read the same fact.
+    value.replaceChildren(glyph, document.createTextNode(`ACTIVE · ${kind.toUpperCase()}`))
     return value
   }
 
@@ -3152,11 +3154,12 @@
       case "model.provider":
         return runValue(entry.model || "unknown")
       case "phase.progress": {
-        const missing =
-          entry.phases_completed === undefined && entry.phases_total === undefined
-        return missing
-          ? runUnknown("no phases_completed/phases_total emitted")
-          : runValue(`${entry.phases_completed ?? 0}/${entry.phases_total ?? 0}`)
+        const completed = entry.phases_completed
+        const total = entry.phases_total
+        if (completed === undefined || completed === null || total === undefined || total === null) {
+          return runUnknown("incomplete phases_completed/phases_total")
+        }
+        return runValue(`${completed}/${total}`)
       }
       case "lifecycle.state":
         return runStateChip(entry.state)
@@ -3167,17 +3170,23 @@
           : runUnknown("no candidate_sha emitted")
       }
       case "attention.state":
-        return runAttentionValue(attentionByRun.get(entry.run_id) || null)
+        if (entry["attention.state"] === "active") {
+          return runAttentionValue(
+            attentionByRun.get(entry.run_id) || { kind: entry["attention.kind"] || "attention" },
+          )
+        }
+        if (entry["attention.state"] === "none") return runAttentionValue(null)
+        return runUnknown("attention state not emitted")
       case "started.age":
-        return entry.started_at
-          ? runValue(formatAge(entry.started_at))
-          : runUnknown("no started_at emitted")
+        return entry["started.age"]
+          ? runValue(entry["started.age"])
+          : runUnknown("no server-owned started.age emitted")
       default:
-        // run.live / terminal.target / attempt.number / cost.provenance / decision.eligibility /
-        // decision.receipt / evidence.advisory: facets the served /api/operations row does not
-        // carry. A labelled unknown is the honest render; the escalation to bind /api/glance is
-        // recorded in the run's decision record, not adopted silently here.
-        return runUnknown()
+        // These facets are emitted by the Operations read model. A missing field remains a
+        // labelled unknown; the browser never reconstructs it from a second endpoint.
+        return entry[field] !== undefined && entry[field] !== null
+          ? runValue(entry[field])
+          : runUnknown(`no ${field} emitted by /api/operations`)
     }
   }
 
@@ -3233,11 +3242,12 @@
     return item
   }
 
-  function renderTruthStrip(source, lag) {
+  function renderTruthStrip(source, lag, operationsSchema) {
     const strip = element("div", "truth-strip")
     strip.setAttribute("role", "group")
     strip.setAttribute("aria-label", "Snapshot provenance")
     const schema = source.packet_schema || ""
+    strip.appendChild(truthItem("operations schema", operationsSchema, { source: "operations read model" }))
     strip.appendChild(truthItem("packet", source.packet_schema, { source: "control status" }))
     strip.appendChild(truthItem("control epoch", source.control_epoch, { source: schema }))
     strip.appendChild(truthItem("repo head", source.repo_head_sha, { source: schema }))
@@ -3285,11 +3295,11 @@
   function renderOperations(data) {
     const content = $("#operations-content")
     const source = data.source || {}
-    const active = data.active_runs || []
-    const promotable = data.promotable_runs || []
+    const active = Array.isArray(data.active_runs) ? data.active_runs : []
     const attention = data.attention || []
     const degraded = data.degraded || []
     const lag = data.projection_lag || {}
+    const summaryData = data.summary || {}
     // The packet's own decisions-owed block, keyed by run, so each roster row can render its
     // attention facet (the emitted evidence) instead of inventing one.
     const attentionByRun = new Map()
@@ -3297,17 +3307,16 @@
       if (entry.run_id && !attentionByRun.has(entry.run_id)) attentionByRun.set(entry.run_id, entry)
     })
 
-    // A degraded control DB means every count derived from it reads "unavailable", never 0
-    // (the payload is a legitimate HTTP 200 with empty arrays plus a named degradation).
-    const dbDegraded = degraded.some((entry) => entry.surface === "control_db")
+    // Counts are read-model values. The browser does not count delivered arrays, because an empty
+    // array can mean either "none" or "the source was unavailable".
     const summary = element("div", "metric-grid")
     const cards = [
       ["Control epoch", String(source.control_epoch ?? "—")],
       ["Repo head", (source.repo_head_sha || "—").slice(0, 9)],
-      ["Active runs", dbDegraded ? "unavailable" : String(active.length)],
-      ["Decisions owed", dbDegraded ? "unavailable" : String(attention.length)],
-      ["Promotable runs", dbDegraded ? "unavailable" : String(promotable.length)],
-      ["Unhealthy workers", String((data.unhealthy_workers || []).length)],
+      ["Active runs", namedReadModelValue(summaryData.active_runs)],
+      ["Decisions owed", namedReadModelValue(summaryData.decisions_owed)],
+      ["Promotable runs", namedReadModelValue(summaryData.promotable_runs)],
+      ["Unhealthy workers", workerHealthValue(data.worker_health)],
     ]
     cards.forEach(([label, value]) => {
       const card = element("article", "metric-card")
@@ -3315,7 +3324,7 @@
       card.appendChild(element("strong", "metric-value", value))
       summary.appendChild(card)
     })
-    const children = [summary, renderTruthStrip(source, lag)]
+    const children = [summary, renderTruthStrip(source, lag, data.schema)]
 
     if (degraded.length) {
       const block = element("section", "surface-block")
@@ -3332,6 +3341,7 @@
 
     const attentionBlock = element("section", "surface-block")
     attentionBlock.appendChild(element("h3", "", "Attention"))
+    const dbDegraded = degraded.some((entry) => entry.surface === "control_db")
     if (dbDegraded) {
       attentionBlock.appendChild(
         paragraph("Decisions owed unavailable — the control database could not be read."),
@@ -3356,8 +3366,8 @@
       )
     }
     const runsBlock = element("section", "surface-block")
-    runsBlock.appendChild(element("h3", "", "Active + promotable runs"))
-    const runs = active.concat(promotable)
+    runsBlock.appendChild(element("h3", "", "Active runs (including promotable)"))
+    const runs = active
     if (dbDegraded) {
       runsBlock.appendChild(
         paragraph("Active and promotable runs unavailable — the control database could not be read."),
@@ -3365,10 +3375,6 @@
     } else if (runs.length === 0) {
       runsBlock.appendChild(paragraph("No active or promotable runs."))
     } else {
-      // Blocked/failed runs lead (state screens §1: they are what needs the operator next).
-      // `Array.sort` is stable, so runs the packet does not flag keep the packet's own order.
-      const rank = (entry) => (runLeads(entry, attentionByRun.get(entry.run_id) || null) ? 0 : 1)
-      runs.sort((left, right) => rank(left) - rank(right))
       runsBlock.appendChild(
         runRoster(
           `Active and promotable runs — E10 fields: ${RUN_HEADERS.join(", ")}`,
@@ -3384,6 +3390,39 @@
     children.push(runsBlock)
     children.push(attentionBlock)
 
+    const actionsBlock = element("section", "surface-block")
+    actionsBlock.appendChild(element("h3", "", "Safe actions"))
+    const actions = Array.isArray(data.safe_actions) ? data.safe_actions : null
+    if (actions === null) {
+      actionsBlock.appendChild(paragraph("Safe actions unavailable — source not recorded."))
+    } else if (!actions.length) {
+      actionsBlock.appendChild(paragraph("No safe actions recorded."))
+    } else {
+      actionsBlock.appendChild(
+        dataTable(
+          "Safe actions",
+          ["Action", "Run", "Gate", "Candidate"],
+          actions.map((action) => [
+            action.action || "unknown",
+            action.run_id || "unknown",
+            action.gate_id || "(run)",
+            action.candidate_sha ? String(action.candidate_sha).slice(0, 12) : "unknown",
+          ]),
+        ),
+      )
+    }
+    children.push(actionsBlock)
+
+    const workerBlock = element("section", "surface-block")
+    workerBlock.appendChild(element("h3", "", "Worker health"))
+    workerBlock.appendChild(paragraph(workerHealthText(data.worker_health)))
+    children.push(workerBlock)
+
+    const stateBlock = element("section", "surface-block")
+    stateBlock.appendChild(element("h3", "", "State screens"))
+    stateBlock.appendChild(renderStateScreens(data.state_screens))
+    children.push(stateBlock)
+
     const lagBlock = element("section", "surface-block")
     lagBlock.appendChild(element("h3", "", "Projection lag"))
     const lagRows = Object.entries(lag).map(([projection, events]) => [projection, stateText(events)])
@@ -3394,6 +3433,45 @@
     children.push(lagBlock)
 
     content.replaceChildren(...children)
+  }
+
+  /** Read a server-owned named scalar; absent or malformed blocks stay explicitly unknown. */
+  function namedReadModelValue(block) {
+    if (!block || typeof block !== "object") return "unknown"
+    if (block.state === "unavailable") return "unavailable"
+    if (block.state !== "recorded" || block.value === null || block.value === undefined) return "unknown"
+    return String(block.value)
+  }
+
+  /** Worker health is fail-closed: no block, malformed block, or degraded source means unavailable. */
+  function workerHealthValue(block) {
+    if (!block || typeof block !== "object" || block.state !== "recorded") return "unavailable"
+    if (!Number.isInteger(block.count) || block.count < 0) return "unavailable"
+    return String(block.count)
+  }
+
+  function workerHealthText(block) {
+    if (!block || typeof block !== "object" || block.state !== "recorded") {
+      return `worker health unavailable — ${(block && block.reason) || "source not observed"}`
+    }
+    return `recorded — ${workerHealthValue(block)} unhealthy worker(s)`
+  }
+
+  /** Render the complete service-owned RunState roster, including empty reachable states. */
+  function renderStateScreens(screens) {
+    if (!Array.isArray(screens)) return paragraph("State screens unavailable — roster not recorded.")
+    if (!screens.length) return paragraph("State screens unavailable — roster not recorded.")
+    return dataTable(
+      "State screens",
+      ["State", "Runs", "Run ids"],
+      screens.map((screen) => [
+        screen.label || screen.state || "unknown",
+        screen.count === undefined || screen.count === null ? "unknown" : screen.count,
+        Array.isArray(screen.runs) && screen.runs.length
+          ? screen.runs.map((run) => run.run_id).join(", ")
+          : "none",
+      ]),
+    )
   }
 
   /** The P1/P2 run detail: identity, attempts, gates, approvals, command receipts. */
@@ -3421,7 +3499,8 @@
       // render the named error instead of falling into the renderer (which would crash on
       // missing numeric fields — the review's toFixed finding).
       if (data && data.error) {
-        content.replaceChildren(paragraph(`Run detail unavailable: ${data.error}`))
+        const reason = data.reason ? ` — ${data.reason}` : ""
+        content.replaceChildren(paragraph(`Run detail unavailable: ${data.error}${reason}`))
         return
       }
       if (!response.ok) throw new Error(data.error || "run unavailable")
@@ -3499,6 +3578,8 @@
     verifyBlock.appendChild(verificationLine("receipt", "Receipt", evidence.receipt))
     children.push(verifyBlock)
 
+    children.push(renderRecorded(data.recorded || {}))
+
     const attempts = data.attempts || []
     const attemptBlock = element("section", "surface-block")
     attemptBlock.appendChild(element("h3", "", "Attempts"))
@@ -3543,6 +3624,16 @@
     line.appendChild(element("strong", "", `${label}: `))
     line.appendChild(document.createTextNode(value || "unknown"))
     return line
+  }
+
+  /** Render the ledger pointer and resolution state as visible text, not metadata only. */
+  function renderRecorded(recorded) {
+    const block = element("section", "surface-block")
+    block.appendChild(element("h3", "", "Recording"))
+    const path = recorded.ledger_path || "unknown"
+    const state = recorded.present === true ? "recorded" : "missing"
+    block.appendChild(element("p", "pane-note", `ledger: ${path} · state: ${state}`))
+    return block
   }
 
   /**

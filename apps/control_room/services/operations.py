@@ -25,7 +25,8 @@ from collections.abc import Mapping
 from dataclasses import asdict
 from typing import Any
 
-from agentic_dynamics.control.control_status import build_packet
+from agentic_dynamics.control.control_db import RunState, TERMINAL_RUN_STATES
+from agentic_dynamics.control.control_status import active_run_ref, build_packet, run_ref
 from agentic_dynamics.control.live import EVENT_LOG_MAX, EVENT_LOG_PREFIX
 from apps.control_room.services import run_evidence
 
@@ -40,6 +41,10 @@ FLEET_JOBS_KEY = "fleet:jobs"
 
 #: How many retained job events the run detail's logs block carries (a bounded tail).
 LOGS_EVENT_LIMIT = 50
+
+# ``RunState`` is the authority for this roster.  Keeping the order derived from the enum makes
+# adding a lifecycle state a visible contract change instead of silently dropping it from the room.
+RUN_STATE_ORDER = tuple(state.value for state in RunState)
 
 
 def logs_block(
@@ -151,7 +156,7 @@ def _live_phase_cell(redis_client: Any, spec_name: str, started_at: str) -> str:
                 break
         if ts is None or ts + 1.0 < started:
             continue
-        name = str(key)[len(EVENT_LOG_PREFIX):]
+        name = str(key)[len(EVENT_LOG_PREFIX) :]
         if best is None or ts > best[0]:
             best = (ts, name)
     return best[1] if best else ""
@@ -323,21 +328,190 @@ def _epoch(value: Any) -> float | None:
         return None
 
 
+def _age_label(started_at: Any, now: Any | None) -> str:
+    """Render a server-owned age label, or a named unknown when no reference time was supplied.
+
+    The browser must not read its own clock to order or age operational rows.  The service accepts
+    an injected reference time so tests and fixture generation remain deterministic.
+    """
+    started = _epoch(started_at)
+    reference = _epoch(now)
+    if started is None or reference is None:
+        return "unknown"
+    seconds = max(0, int(reference - started))
+    if seconds < 60:
+        return f"{seconds}s ago"
+    if seconds < 3600:
+        return f"{seconds // 60}m ago"
+    if seconds < 86400:
+        return f"{seconds // 3600}h ago"
+    return f"{seconds // 86400}d ago"
+
+
+def _run_ref(
+    db: Any, ref: Mapping[str, Any], *, attention_ids: set[str], now: Any | None
+) -> dict[str, Any]:
+    """Enrich one packet reference with the service-owned roster facets.
+
+    ``control_status`` remains the source for lifecycle identity and phase progress.  The
+    additive facets are read from the same control records and recorded ledger that the drawer
+    uses, so a row and its drawer cannot disagree about cost provenance, attempt depth, receipt,
+    narration, or the workspace target.
+    """
+    enriched = dict(ref)
+    run_id = str(ref.get("run_id") or "")
+    detail = run_detail(db, run_id)
+    ledger = run_evidence.recorded_ledger(detail)
+    evidence = (detail or {}).get("evidence") or {}
+    state = str(ref.get("state") or "")
+    completed = ref.get("phases_completed")
+    total = ref.get("phases_total")
+    if completed is None or total is None:
+        enriched["phase.progress"] = "unknown — incomplete phase progress"
+    else:
+        enriched["phase.progress"] = f"{completed}/{total}"
+    enriched.update(
+        {
+            "run.live": "live"
+            if state not in {s.value for s in TERMINAL_RUN_STATES}
+            else "not-live",
+            "terminal.target": run_evidence._workspace_target(detail, ledger),
+            "attempt.number": run_evidence._attempt_number(detail),
+            "cost.provenance": (detail or {}).get("cost", {}).get("provenance", "unknown"),
+            "decision.eligibility": (
+                "approve"
+                if state == RunState.AWAITING_APPROVAL.value
+                else "promote"
+                if state == RunState.PROMOTABLE.value
+                else "inspect"
+            ),
+            "decision.receipt": run_evidence._receipt_state(detail),
+            "evidence.advisory": evidence.get("narration", "unknown"),
+            "attention.state": "active" if run_id in attention_ids else "none",
+            "attention.kind": "attention" if run_id in attention_ids else "",
+            "started.age": _age_label(ref.get("started_at"), now),
+        }
+    )
+    return enriched
+
+
+def state_screens_from_runs(runs: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Build the complete state-screen roster from the authoritative ``RunState`` enum.
+
+    Every screen carries the exact run references assigned to that state and a server-owned
+    count.  Empty states remain present, which makes the roster exhaustive and distinguishes
+    "no run is in this state" from "the state was never modelled".
+    """
+    screens: list[dict[str, Any]] = []
+    for state in RUN_STATE_ORDER:
+        members = [dict(run) for run in runs if str(run.get("state") or "") == state]
+        screens.append(
+            {
+                "state": state,
+                "label": state.replace("_", " "),
+                "count": len(members),
+                "runs": members,
+            }
+        )
+    return screens
+
+
+def order_run_refs(runs: list[Mapping[str, Any]], attention_ids: set[str]) -> list[dict[str, Any]]:
+    """Order roster rows with server-owned attention priority and deterministic id ties."""
+    return sorted(
+        (dict(run) for run in runs),
+        key=lambda entry: (
+            0 if str(entry.get("run_id") or "") in attention_ids else 1,
+            str(entry.get("run_id") or ""),
+        ),
+    )
+
+
+def _named_count(value: int | None, *, available: bool, reason: str = "") -> dict[str, Any]:
+    """Return a count with an explicit state; an unavailable count is never rendered as zero."""
+    if not available:
+        return {"state": "unavailable", "value": None, "reason": reason or "source unavailable"}
+    return {"state": "recorded", "value": value, "reason": ""}
+
+
+def _worker_health(packet: Mapping[str, Any]) -> dict[str, Any]:
+    """Project worker health with a fail-closed unavailable state."""
+    degraded = [
+        item
+        for item in packet.get("degraded", [])
+        if isinstance(item, Mapping) and item.get("surface") == "unhealthy_workers"
+    ]
+    if degraded:
+        return {
+            "state": "unavailable",
+            "count": None,
+            "workers": [],
+            "reason": degraded[0].get("reason"),
+        }
+    workers = packet.get("unhealthy_workers")
+    if not isinstance(workers, list):
+        return {
+            "state": "unavailable",
+            "count": None,
+            "workers": [],
+            "reason": "worker health malformed",
+        }
+    return {"state": "recorded", "count": len(workers), "workers": list(workers), "reason": ""}
+
+
+def unavailable_snapshot(
+    *, reason: str, degraded: list[Mapping[str, Any]] | None = None
+) -> dict[str, Any]:
+    """Return the named, HTTP-200 Operations envelope used when the control DB cannot be read."""
+    notes = [dict(item) for item in (degraded or [])]
+    notes.append({"surface": "control_db", "reason": reason})
+    unknown = {
+        key: _named_count(None, available=False, reason=reason)
+        for key in ("active_runs", "decisions_owed", "promotable_runs")
+    }
+    return {
+        "schema": SCHEMA,
+        "source": {
+            "packet_schema": "control-status/v1",
+            "control_epoch": None,
+            "repo_head_sha": "",
+        },
+        "summary": unknown,
+        "attention": [],
+        "active_runs": [],
+        "promotable_runs": [],
+        "unhealthy_workers": [],
+        "worker_health": {"state": "unavailable", "count": None, "workers": [], "reason": reason},
+        "state_screens": [],
+        "projection_lag": {},
+        "safe_actions": [],
+        "degraded": notes,
+    }
+
+
 def operational_snapshot(
     db: Any,
     *,
     repo_head_sha: str,
     heartbeats: Mapping[str, Mapping[str, Any]] | None,
     now: Any | None = None,
+    degraded: list[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """The room's operational view: the packet, plus a triage-ordered ``attention`` block.
+    """The room's operational view: packet, server-owned summaries, and state screens.
 
     ``attention`` is the decisions-owed view: every awaiting approval (with the purpose the
     operator owes) and every failed run, carrying the packet's own identifiers. It is a
     projection of the packet, not a second source of truth — the parity test asserts the
-    identifiers match block-for-block.
+    identifiers match block-for-block.  All values needed by the browser roster are derived here;
+    the browser only formats and lays out these read-model values.
     """
-    packet = build_packet(db, repo_head_sha=repo_head_sha, heartbeats=heartbeats, now=now)
+    packet = build_packet(
+        db,
+        repo_head_sha=repo_head_sha,
+        heartbeats=heartbeats,
+        now=now,
+        degraded=degraded or (),
+    )
 
     attention: list[dict[str, Any]] = []
     for entry in packet.get("awaiting_approvals", []):
@@ -345,6 +519,40 @@ def operational_snapshot(
         attention.append({"kind": "approval", **dict(entry)})
     for entry in packet.get("failed_runs", []):
         attention.append({"kind": "failed", **dict(entry)})
+
+    attention_ids = {str(entry.get("run_id") or "") for entry in attention}
+    # `active_runs` is the packet's complete non-terminal block, including promotable.  Do not
+    # append the separate promotable projection to it: that would duplicate those rows on screen.
+    active_runs = [
+        _run_ref(db, entry, attention_ids=attention_ids, now=now)
+        for entry in packet.get("active_runs", [])
+    ]
+    active_runs = order_run_refs(active_runs, attention_ids)
+    promotable_runs = [
+        dict(entry) for entry in active_runs if entry.get("state") == RunState.PROMOTABLE.value
+    ]
+    failed_runs = [
+        _run_ref(db, entry, attention_ids=attention_ids, now=now)
+        for entry in packet.get("failed_runs", [])
+    ]
+    # State screens answer a different question from the compact packet blocks: they must expose
+    # every reachable lifecycle state, including terminal cancelled/quarantined/published rows
+    # that the packet intentionally does not carry in its active/failed blocks.
+    all_runs: list[dict[str, Any]] = []
+    for record in db.runs():
+        base = (
+            active_run_ref(db, record)
+            if record.state not in TERMINAL_RUN_STATES
+            else run_ref(record)
+        )
+        all_runs.append(_run_ref(db, base, attention_ids=attention_ids, now=now))
+    worker_health = _worker_health(packet)
+    degraded_notes = list(packet.get("degraded", []))
+    summary = {
+        "active_runs": _named_count(len(active_runs), available=True),
+        "decisions_owed": _named_count(len(attention), available=True),
+        "promotable_runs": _named_count(len(promotable_runs), available=True),
+    }
 
     return {
         "schema": SCHEMA,
@@ -356,12 +564,15 @@ def operational_snapshot(
         "attention": attention,
         # the packet's blocks flow through unchanged — the room renders what the authority
         # returned (or names it in ``degraded``), never a re-derivation.
-        "active_runs": list(packet.get("active_runs", [])),
-        "promotable_runs": list(packet.get("promotable_runs", [])),
+        "summary": summary,
+        "active_runs": active_runs,
+        "promotable_runs": promotable_runs,
         "unhealthy_workers": list(packet.get("unhealthy_workers", [])),
+        "worker_health": worker_health,
+        "state_screens": state_screens_from_runs(all_runs),
         "projection_lag": packet.get("projection_lag", {}),
         "safe_actions": list(packet.get("safe_actions", [])),
-        "degraded": list(packet.get("degraded", [])),
+        "degraded": degraded_notes,
     }
 
 
