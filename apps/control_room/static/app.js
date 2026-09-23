@@ -3028,6 +3028,7 @@
     ["model.provider", "Model"],
     ["phase.progress", "Phase"],
     ["lifecycle.state", "State"],
+    ["state.screen", "State screen"],
     ["source.commit", "Commit"],
     ["run.live", "Live"],
     ["terminal.target", "Target"],
@@ -3118,7 +3119,7 @@
    * invented: `active`/`none` is the packet's whole domain.
    */
   function runAttentionValue(entry) {
-    if (!entry) {
+    if (!entry || entry.state === "none") {
       const none = element("span", "run-value run-attention", "none")
       none.dataset.attentionState = "none"
       none.title = "the run is not in the packet's attention (decisions-owed) block"
@@ -3132,13 +3133,16 @@
     value.title = entry.purpose || entry.reason || `attention: ${kind}`
     const glyph = element("span", "status-glyph", vocabulary.glyph)
     glyph.setAttribute("aria-hidden", "true")
-    value.replaceChildren(glyph, document.createTextNode(kind.toUpperCase()))
+    // The state is a server-owned value, not merely a CSS/data attribute. Keep the kind beside
+    // it for triage, but render the literal ``active`` so the gate and operator see the same
+    // decision state the read model returned.
+    value.replaceChildren(glyph, document.createTextNode(`active · ${kind}`))
     return value
   }
 
   /** True when the packet puts the run in decisions-owed, or its emitted state needs a human. */
   function runLeads(entry, attentionEntry) {
-    if (attentionEntry) return true
+    if (entry.attention?.state === "active" || attentionEntry) return true
     return entry.state === "awaiting_approval" || entry.state === "failed"
   }
 
@@ -3160,6 +3164,12 @@
       }
       case "lifecycle.state":
         return runStateChip(entry.state)
+      case "state.screen": {
+        const screen = entry.state_screen
+        return screen && screen.screen
+          ? runValue(screen.screen, { title: screen.reason || "server-owned operator state" })
+          : runUnknown("no state_screen emitted")
+      }
       case "source.commit": {
         const sha = entry.candidate_sha ? String(entry.candidate_sha) : ""
         return sha
@@ -3167,11 +3177,11 @@
           : runUnknown("no candidate_sha emitted")
       }
       case "attention.state":
-        return runAttentionValue(attentionByRun.get(entry.run_id) || null)
+        return runAttentionValue(entry.attention || attentionByRun.get(entry.run_id) || null)
       case "started.age":
-        return entry.started_at
-          ? runValue(formatAge(entry.started_at))
-          : runUnknown("no started_at emitted")
+        return entry.started_age
+          ? runValue(entry.started_age, { title: entry.started_at || "server-owned age" })
+          : runUnknown("no started_age emitted")
       default:
         // run.live / terminal.target / attempt.number / cost.provenance / decision.eligibility /
         // decision.receipt / evidence.advisory: facets the served /api/operations row does not
@@ -3287,9 +3297,13 @@
     const source = data.source || {}
     const active = data.active_runs || []
     const promotable = data.promotable_runs || []
+    const unhealthyWorkers = data.unhealthy_workers || []
+    const runs = data.runs || active.concat(promotable)
+    const stateScreens = data.state_screens || []
     const attention = data.attention || []
     const degraded = data.degraded || []
     const lag = data.projection_lag || {}
+    const workerHealth = data.worker_health || {}
     // The packet's own decisions-owed block, keyed by run, so each roster row can render its
     // attention facet (the emitted evidence) instead of inventing one.
     const attentionByRun = new Map()
@@ -3307,7 +3321,12 @@
       ["Active runs", dbDegraded ? "unavailable" : String(active.length)],
       ["Decisions owed", dbDegraded ? "unavailable" : String(attention.length)],
       ["Promotable runs", dbDegraded ? "unavailable" : String(promotable.length)],
-      ["Unhealthy workers", String((data.unhealthy_workers || []).length)],
+      [
+        "Unhealthy workers",
+        workerHealth.state === "unavailable"
+          ? "unavailable"
+          : workerHealth.value ?? String(unhealthyWorkers.length),
+      ],
     ]
     cards.forEach(([label, value]) => {
       const card = element("article", "metric-card")
@@ -3356,8 +3375,7 @@
       )
     }
     const runsBlock = element("section", "surface-block")
-    runsBlock.appendChild(element("h3", "", "Active + promotable runs"))
-    const runs = active.concat(promotable)
+    runsBlock.appendChild(element("h3", "", "Run roster"))
     if (dbDegraded) {
       runsBlock.appendChild(
         paragraph("Active and promotable runs unavailable — the control database could not be read."),
@@ -3365,13 +3383,11 @@
     } else if (runs.length === 0) {
       runsBlock.appendChild(paragraph("No active or promotable runs."))
     } else {
-      // Blocked/failed runs lead (state screens §1: they are what needs the operator next).
-      // `Array.sort` is stable, so runs the packet does not flag keep the packet's own order.
-      const rank = (entry) => (runLeads(entry, attentionByRun.get(entry.run_id) || null) ? 0 : 1)
-      runs.sort((left, right) => rank(left) - rank(right))
+      // The server owns roster order. Sorting here would make the visible order depend on a
+      // second client-side policy rather than the read model's deterministic order.
       runsBlock.appendChild(
         runRoster(
-          `Active and promotable runs — E10 fields: ${RUN_HEADERS.join(", ")}`,
+          `All lifecycle runs — E10 fields: ${RUN_HEADERS.join(", ")}`,
           runs,
           attentionByRun,
         ),
@@ -3383,6 +3399,35 @@
     // order is now: what is RUNNING, then what needs a decision, then the rest.
     children.push(runsBlock)
     children.push(attentionBlock)
+
+    const statesBlock = element("section", "surface-block")
+    statesBlock.appendChild(element("h3", "", "State screens"))
+    if (dbDegraded) {
+      statesBlock.appendChild(
+        paragraph("State screens unavailable — the control database could not be read."),
+      )
+    } else if (!stateScreens.length) {
+      statesBlock.appendChild(paragraph("No state screens recorded."))
+    } else {
+      const runsById = new Map(runs.map((entry) => [entry.run_id, entry]))
+      statesBlock.appendChild(
+        dataTable(
+          "Server-owned state screens",
+          ["Run", "Screen", "Lifecycle", "Started", "Attention", "Reason"],
+          stateScreens.map((screen) => [
+            screen.run_id,
+            screen.screen,
+            screen.lifecycle_state,
+            screen.started_age,
+            runsById.get(screen.run_id)?.attention?.state || "unknown",
+            screen.reason || "—",
+          ]),
+        ),
+      )
+    }
+    // Keep the state roster adjacent to the run roster, but before it, so the roster remains the
+    // page's final clickable run list for keyboard and scrolling acceptance.
+    children.splice(children.indexOf(runsBlock), 0, statesBlock)
 
     const lagBlock = element("section", "surface-block")
     lagBlock.appendChild(element("h3", "", "Projection lag"))
@@ -3457,6 +3502,8 @@
   function renderRunDetail(data) {
     const content = $("#run-detail-content")
     const run = data.run || {}
+    const view = data.run_view || {}
+    const stateScreen = view.state_screen || {}
     const children = []
     const cost = data.cost || {}
     const evidence = data.evidence || {}
@@ -3464,9 +3511,10 @@
     ;[
       ["Spec", run.spec_name || "—"],
       ["State", run.state || "—"],
+      ["State screen", stateScreen.screen || "unknown"],
       ["Model", run.model || "—"],
       ["Candidate", run.candidate_sha ? String(run.candidate_sha).slice(0, 12) : "—"],
-      ["Started", run.started_at ? formatAge(run.started_at) : "—"],
+      ["Started", view.started_age || "age unknown"],
       // The identity card shows the cost's PROVENANCE, never a bare number: an absent cost is
       // "unavailable" and a measured zero is the server's own "$0.0000 · metered" label.
       ["Cost", cost.provenance || "unavailable"],

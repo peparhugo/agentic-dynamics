@@ -62,6 +62,11 @@ from urllib.parse import urlparse
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from apps.control_room.services.operations import (  # noqa: E402
+    PACKET_ACTIVE_STATES,
+    project_run_rows,
+)
+
 FIXTURE_DIR = ROOT / "apps" / "control_room" / "verification" / "fixtures"
 REPORT_DIR_DEFAULT = ROOT / "apps" / "control_room" / "verification"
 
@@ -2517,6 +2522,9 @@ DRAWER_PROBE_JS = r"""
   const logState = content.querySelector('[data-log-state]');
   const logEntries = content.querySelectorAll('[data-log-entry]');
   const logFollow = content.querySelector('[data-log-follow]');
+  const metricValue = (label) => Array.from(content.querySelectorAll('.metric-card'))
+    .find((card) => (card.querySelector('.metric-label')?.textContent || '').trim() === label)
+    ?.querySelector('.metric-value')?.textContent?.trim() || null;
   return {
     present: true,
     text: text,
@@ -2532,6 +2540,8 @@ DRAWER_PROBE_JS = r"""
       .map((node) => (node.innerText || node.textContent || '').trim())
       .join(' | '),
     logFollow: logFollow ? logFollow.dataset.logFollow : null,
+    stateScreen: metricValue('State screen'),
+    startedAge: metricValue('Started'),
   };
 }
 """
@@ -2556,18 +2566,47 @@ def build_operations_payload(degraded: bool = False) -> dict[str, Any]:
         payload.setdefault("active_runs", [])
         payload.setdefault("promotable_runs", [])
         payload.setdefault("attention", [])
+        payload.setdefault(
+            "worker_health",
+            {
+                "state": "unavailable",
+                "count": None,
+                "value": "unavailable",
+                "reason": "workers were not observed",
+            },
+        )
+        payload.setdefault("runs", [])
+        payload.setdefault("state_screens", [])
         return payload
     run_seed = seed["run_seed"]
-    active_count = int(seed.get("active_count", 0))
-    promotable_count = int(seed.get("promotable_count", 0))
-    runs = []
-    for index in range(1, active_count + promotable_count + 1):
+    states = list(seed.get("run_states") or [])
+    if not states:
+        active_count = int(seed.get("active_count", 0))
+        promotable_count = int(seed.get("promotable_count", 0))
+        states = ["running"] * active_count + ["promotable"] * promotable_count
+    entries = []
+    for index, state in enumerate(states, start=1):
         row = copy.deepcopy(run_seed)
         row["run_id"] = f"run-fixture-{index:04d}"
-        row["state"] = "running" if index <= active_count else "promotable"
-        runs.append(row)
-    payload["active_runs"] = runs[:active_count]
-    payload["promotable_runs"] = runs[active_count:]
+        row["state"] = state
+        entries.append(row)
+    # This is the same pure projection used by the Operations service.  The fixed instant makes
+    # the fixture deterministic while preserving the service-owned age/attention/state-screen
+    # semantics in the browser-free and host acceptance profiles.
+    runs = project_run_rows(
+        entries,
+        payload.get("attention", []),
+        now="2026-09-23T00:00:00Z",
+    )
+    payload["runs"] = runs
+    payload["state_screens"] = [dict(row["state_screen"]) for row in runs]
+    payload["active_runs"] = [
+        row
+        for row in runs
+        if row.get("state") in PACKET_ACTIVE_STATES and row.get("state") != "promotable"
+    ]
+    payload["promotable_runs"] = [row for row in runs if row.get("state") == "promotable"]
+    payload["failed_runs"] = [row for row in runs if row.get("state") == "failed"]
     return payload
 
 
@@ -2611,6 +2650,11 @@ def check_boards_fixtures() -> list[str]:
     ):
         if key not in detail:
             problems.append(f"boards fixture: run_detail missing derived block {key!r}")
+    run_view = detail.get("run_view") or {}
+    if run_view.get("started_age") != "4d ago":
+        problems.append("boards fixture: run_detail.run_view must carry the server-owned age")
+    if (run_view.get("state_screen") or {}).get("screen") != "done":
+        problems.append("boards fixture: run_detail.run_view must carry the state screen")
     cost = detail.get("cost") or {}
     if cost.get("provenance") != "$0.0000 \u00b7 metered":
         problems.append(
@@ -2646,15 +2690,41 @@ def check_boards_fixtures() -> list[str]:
         problems.append(
             "boards fixture: fewer than 12 run rows — the scroll check needs a long board"
         )
-    ids = {row["run_id"] for row in rows}
+    ids = {row["run_id"] for row in normal.get("runs", [])}
     for item in normal.get("attention", []):
         if item.get("run_id") not in ids:
             problems.append(
                 f"boards fixture: attention references unknown run {item.get('run_id')!r}"
             )
+    all_runs = normal.get("runs", [])
+    screens = normal.get("state_screens", [])
+    if len(all_runs) != len(screens):
+        problems.append(
+            "boards fixture: state_screens must be parallel to the service-owned runs roster"
+        )
+    else:
+        run_ids = [str(row.get("run_id") or "") for row in all_runs]
+        screen_ids = [str(row.get("run_id") or "") for row in screens]
+        if run_ids != screen_ids:
+            problems.append(
+                "boards fixture: state_screens and runs must carry identical ids in identical order"
+            )
+        if not all(row.get("started_age") for row in all_runs):
+            problems.append("boards fixture: every service-owned run must carry started_age")
+        if not all(row.get("attention", {}).get("state") in {"active", "none"} for row in all_runs):
+            problems.append("boards fixture: every service-owned run must carry attention.state")
+        expected_states = {"cancelled", "quarantined", "promotable"}
+        present_states = {str(row.get("state") or "") for row in all_runs}
+        missing_states = sorted(expected_states - present_states)
+        if missing_states:
+            problems.append(
+                "boards fixture: reachable state coverage missing " + ", ".join(missing_states)
+            )
     degraded = build_operations_payload(True)
     if not degraded.get("degraded"):
         problems.append("boards fixture: the degraded variant carries no degraded surfaces")
+    if (degraded.get("worker_health") or {}).get("state") != "unavailable":
+        problems.append("boards fixture: degraded workers must render an unavailable state")
     for name in BOARD_SURFACE_PATHS:
         if name not in fixture["surfaces"]:
             problems.append(f"boards fixture: surfaces missing {name!r}")
@@ -2982,6 +3052,19 @@ def _check_board_loading(
         probe = page.evaluate(BOARDS_PROBE_JS)
         if board == "operations" and not probe["operationsText"]:
             _row(errors, label, "loading", board, "the operations board rendered no content")
+        if board == "operations":
+            # These are the server-owned values the L33 remediation makes visible.  Checking the
+            # rendered text, rather than a data-* attribute, catches a client that receives the
+            # projection but hides its state from the operator.
+            for expected in ("State screens", "active", "cancelled", "quarantined", "promotable"):
+                if expected not in probe["operationsText"]:
+                    _row(
+                        errors,
+                        label,
+                        "loading",
+                        "operations-state-projection",
+                        f"the server-owned Operations value {expected!r} was not rendered",
+                    )
         if board == "surfaces" and not probe["surfacePanels"]:
             _row(errors, label, "loading", board, "the surfaces board rendered no panels")
         if board == "routing":
@@ -3142,6 +3225,16 @@ def _check_board_degraded(
                 f"{metric!r} rendered {value!r} on a degraded control db — an unreadable "
                 "database must read 'unavailable', never a fabricated 0",
             )
+    worker_value = probe["metrics"].get("Unhealthy workers")
+    if worker_value != "unavailable":
+        _row(
+            errors,
+            label,
+            "degraded",
+            "operations-workers",
+            f"Unhealthy workers rendered {worker_value!r} on a degraded worker source — "
+            "an unobserved worker population must read 'unavailable'",
+        )
     if "control database not found" not in probe["operationsText"]:
         _row(
             errors,
@@ -3670,6 +3763,24 @@ def _check_board_keyboard(
                         "keyboard",
                         "drawer-timing-unknown",
                         "the drawer must render an unknown-state timing row",
+                    )
+                if drawer.get("stateScreen") != "done":
+                    _row(
+                        errors,
+                        label,
+                        "keyboard",
+                        "drawer-state-screen",
+                        "the drawer must visibly render the server-owned state screen "
+                        f"(got {drawer.get('stateScreen')!r})",
+                    )
+                if drawer.get("startedAge") != "4d ago":
+                    _row(
+                        errors,
+                        label,
+                        "keyboard",
+                        "drawer-started-age",
+                        "the drawer must visibly render the fixture's server-owned age "
+                        f"(got {drawer.get('startedAge')!r})",
                     )
                 if drawer.get("logState") != "recorded" or not drawer.get("logEntryCount"):
                     _row(

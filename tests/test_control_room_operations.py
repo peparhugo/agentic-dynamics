@@ -123,6 +123,61 @@ def test_absent_data_stays_absent_and_degraded_is_named(tmp_path):
     assert isinstance(snapshot["projection_lag"], dict)
 
 
+def test_operations_roster_uses_reachable_states_and_named_worker_degradation(tmp_path):
+    """The additive roster keeps lifecycle truth while naming unsupported observations.
+
+    ``cancelled`` and ``quarantined`` are terminal ``RunState`` values, not operator screens.  A
+    stale heartbeat is enough evidence for ``stalled``; without that evidence the service must
+    not manufacture the screen.  An unobserved worker source is similarly unavailable, never a
+    measured zero.
+    """
+    with _db(tmp_path) as db:
+        stalled = db.create_run(
+            spec_name="flow",
+            model="m",
+            state=RunState.RUNNING,
+            reason="start",
+            candidate_sha="a" * 40,
+            started_at="2026-09-11T00:00:00Z",
+        )
+        db.record_run_heartbeat(stalled.run_id, at="2026-09-11T00:01:00Z")
+        cancelled = db.create_run(
+            spec_name="flow",
+            model="m",
+            state=RunState.QUEUED,
+            reason="queued",
+            candidate_sha="b" * 40,
+            started_at="2026-09-11T00:00:00Z",
+        )
+        db.transition_run(cancelled.run_id, RunState.CANCELLED, reason="operator")
+        quarantined = db.create_run(
+            spec_name="flow",
+            model="m",
+            state=RunState.QUEUED,
+            reason="queued",
+            candidate_sha="c" * 40,
+            started_at="2026-09-11T00:00:00Z",
+        )
+        db.transition_run(quarantined.run_id, RunState.QUARANTINED, reason="lease expired")
+
+        snapshot = operational_snapshot(
+            db,
+            repo_head_sha="d" * 40,
+            heartbeats=None,
+            now=_NOW,
+        )
+
+    rows = {row["run_id"]: row for row in snapshot["runs"]}
+    assert rows[stalled.run_id]["state_screen"]["screen"] == "stalled"
+    assert rows[cancelled.run_id]["state_screen"]["screen"] == "unknown"
+    assert rows[quarantined.run_id]["state_screen"]["screen"] == "unknown"
+    assert snapshot["worker_health"]["state"] == "unavailable"
+    assert snapshot["worker_health"]["value"] == "unavailable"
+    assert [row["run_id"] for row in snapshot["state_screens"]] == [
+        row["run_id"] for row in snapshot["runs"]
+    ]
+
+
 def test_run_detail_carries_every_control_record(tmp_path):
     """P1/P2: attempts, gates, approvals, and command receipts come from the records as-is."""
     with _db(tmp_path) as db:
@@ -509,12 +564,21 @@ def test_resolve_live_cell_maps_a_fleet_job_to_its_live_phase_stream():
     the substitution; a finished job and a non-job id pass through unchanged."""
     board = {
         "job-live": json.dumps(
-            {"job_id": "job-live", "spec": "workflows/repository/flow.yaml", "ts": 1790105820.0,
-             "status": "running"}
+            {
+                "job_id": "job-live",
+                "spec": "workflows/repository/flow.yaml",
+                "ts": 1790105820.0,
+                "status": "running",
+            }
         ),
         "job-done": json.dumps(
-            {"job_id": "job-done", "spec": "workflows/repository/flow.yaml", "ts": 1790105820.0,
-             "run_id": "run-1", "status": "completed"}
+            {
+                "job_id": "job-done",
+                "spec": "workflows/repository/flow.yaml",
+                "ts": 1790105820.0,
+                "run_id": "run-1",
+                "status": "completed",
+            }
         ),
     }
     logs = {
@@ -552,7 +616,9 @@ def test_read_run_logs_binds_the_live_phase_stream_for_an_in_flight_run():
             json.dumps({"type": "step_finish", "timestamp": "1790105800000"}),
         ],
         "events_log:flow:execute": [
-            json.dumps({"type": "tool_use", "timestamp": "1790105944000", "part": {"text": "write notes"}}),
+            json.dumps(
+                {"type": "tool_use", "timestamp": "1790105944000", "part": {"text": "write notes"}}
+            ),
             json.dumps({"type": "step_start", "timestamp": "1790105930000"}),
         ],
     }
@@ -695,5 +761,3 @@ def test_read_run_logs_matches_an_inflight_job_by_spec_and_time():
         redis, "run-inflight", spec_name="other", started_at="1970-01-01T00:33:30Z"
     )
     assert other["state"] == "unbound"
-
-

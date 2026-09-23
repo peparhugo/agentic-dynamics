@@ -155,7 +155,16 @@ class ControlRoomServices:
                 "attention": [],
                 "active_runs": [],
                 "promotable_runs": [],
+                "failed_runs": [],
+                "runs": [],
+                "state_screens": [],
                 "unhealthy_workers": [],
+                "worker_health": {
+                    "state": "unavailable",
+                    "count": None,
+                    "value": "unavailable",
+                    "reason": "control database could not be read",
+                },
                 "projection_lag": {},
                 "safe_actions": [],
                 "degraded": degraded
