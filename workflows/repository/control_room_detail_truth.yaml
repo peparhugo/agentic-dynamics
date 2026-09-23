@@ -83,6 +83,36 @@ workflow:
         gate suites must be green on the FINAL commit before the phase ends (the gate re-runs
         them independently; a red one is a failed run). You rebuild from main, not from the
         archive.
+
+        ATTEMPT-TWELVE FINDINGS (2026-09-23, run-07394068a0a0 — archived at
+        refs/experiments/control_room_detail_truth/run-07394068a0a0): the run reached 5/5 ok +
+        g_test_gate 76/76 and its HOST acceptance FAILED one assertion —
+        "[desktop/boards/loading] operations-state-projection: the server-owned Operations
+        value 'State screens' was not rendered". The capture proves the section IS visibly
+        rendered (label 'STATE SCREENS' — the room's `h3 { text-transform: uppercase }`,
+        static/style.css — with the full table); the candidate's own assertion compared TITLE
+        CASE against `innerText`, which reflects the transformed text. (i) Fix that assertion
+        class: every text assertion must match what the browser actually reports
+        (case-insensitive or the transformed form), and audit its siblings — an assertion that
+        disagrees with the rendered text is itself a defect. (ii) The candidate's committed
+        adversarial review (notes/adversarial_review.md in the archive; FINDING "not ready for
+        promotion") named P1s to CLOSE, not re-land: summary values (Active runs / Decisions
+        owed / Promotable runs) are still derived client-side from delivered-list lengths, and
+        a half-omitted progress pair renders as `0` (`{phases_total: 2}` -> `0/2`;
+        `{phases_completed: 1}` -> `1/0`) — an omitted measure renders a NAMED value, never a
+        fabricated zero; the Operations fixture still omits the service response's top-level
+        `schema` and `source.packet_schema` and manufactures `active_runs` with `promotable`
+        excluded while the real active block carries every non-terminal RunState (incl.
+        `promotable`) — the fixture must be field-faithful to the service contract, or the
+        pass-through blocks asserted against it; the lifecycle coverage omits the reachable
+        `verifying` / `promoting` / `projecting` screens — cover them and assert the FULL
+        `RunState` roster, not a selected subset; the renderer's worker fallback still
+        fabricates `0` when `worker_health` is absent or malformed (render `unavailable`); and
+        the drawer's cost-provenance / prepared-step-path / unknown-timing assertions are
+        metadata-only (`data-*`) — make them visible-text assertions like the repaired ones.
+        P2: `FINOPS_REDIS_PORT` / `FINOPS_REDIS_DB` parse before the named-degradation
+        boundary (a malformed env value can 500 instead of degrading), and `_float_or_none`
+        accepts `inf` as a future heartbeat.
     phases:
       - name: prior
         kind: agent
@@ -119,7 +149,21 @@ workflow:
           asserting the state_screens[i] <-> runs[i] invariant), the state roster must be
           reachable from control_db.RunState, "Unhealthy workers" must read unavailable when
           its source is degraded, and every value your gate asserts must render as visible
-          text (a data-* attribute is not a rendered value). The container CANNOT run the
+          text (a data-* attribute is not a rendered value). ALSO close the attempt-12 P1s
+          (domain context): summary values (Active runs / Decisions owed / Promotable runs)
+          server-owned or NAMED unknown — never client-derived counts, and an omitted half of a
+          progress pair renders a named incomplete/unknown, never `0`; the fixture
+          field-faithful to the service contract (top-level `schema` + `source.packet_schema`
+          present; `active_runs` semantics per the packet INCLUDING `promotable`), or the
+          pass-through blocks asserted against the service; the FULL `RunState` roster covered
+          (add `verifying` / `promoting` / `projecting`) with an exhaustive-roster assertion;
+          the worker renderer FAIL-CLOSED (a missing or malformed `worker_health` renders
+          `unavailable`, never a fallback count); the drawer's cost-provenance /
+          prepared-step-path / unknown-timing assertions on VISIBLE TEXT; and every TEXT
+          assertion must match what the browser reports — the room's CSS uppercases h1-h4
+          (`text-transform: uppercase`), so compare case-insensitively or match the
+          transformed form (the previous attempt's acceptance died on exactly that). The
+          container CANNOT run the
           browser profile (no Playwright — register L47): run the browser-free checks
           (`python3 scripts/verify_control_room_rendering.py --check-fixtures`) and the five
           declared gate suites (`tests/test_control_room_operations.py`,
@@ -176,7 +220,12 @@ workflow:
           control_db.RunState)? does an omitted value render as a fabricated zero anywhere
           (check "Unhealthy workers" on a degraded or unobserved source)? does any gate
           assertion pass vacuously, and is every browser-class assertion satisfiable by the
-          renderer it asserts (visible text, not a data-* attribute)? Name at least one
+          renderer it asserts (visible text, not a data-* attribute)? does any TEXT assertion
+          disagree with what the browser actually reports (the CSS uppercases h1-h4 —
+          `innerText` reflects it)? are summary values or partial progress pairs fabricated
+          (`0/2`, a length-derived count)? is the fixture field-faithful (`schema` /
+          `source.packet_schema`; `active_runs` incl. `promotable`)? is the FULL `RunState`
+          roster covered, not a selected subset? Name at least one
           falsifier per major claim. Write `notes/adversarial_review.md` with a final
           `## FINDING` paragraph
           and commit it — `notes/` is gitignored, so stage the review explicitly
