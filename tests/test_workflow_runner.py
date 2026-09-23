@@ -3476,3 +3476,30 @@ def test_commit_prefix_gate_is_merge_aware(tmp_path, monkeypatch):
     _enforce_commit_prefix(pr2, repo, "p1", "goal", base)
     assert pr2.status == "failed"
     assert pr2.commit_gate and pr2.commit_gate.get("reason") == "COMMIT_PREFIX"
+
+
+def test_wall_burned_phase_without_a_deliverable_fails(tmp_path):
+    """A phase killed at its timeout wall with NOTHING committed must FAIL, never read ok
+    (2026-09-22, the L33 g_adversarial: status ok + timed_out=True + commit "" made a run
+    read 'succeeded' and only promote's commit check refused it)."""
+    spec = load_spec(SPEC)
+
+    import subprocess
+
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.email", "t@t"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "t"], check=True)
+
+    def agent(prompt, *, model, backend, workdir, watchdog=None, **kwargs):
+        time.sleep(1.2)  # burn past the 1s wall; write nothing, commit nothing
+        return _fake_agent()
+
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path, commit=True,
+        phase_watchdog_min=0, timeout=1, run_agentic_fn=agent,
+    )
+    phase = result.phases[0]
+    assert phase.timed_out is True
+    assert phase.status == "failed"
+    assert "TIMEOUT" in (phase.error or "")
+    assert result.ok is False
