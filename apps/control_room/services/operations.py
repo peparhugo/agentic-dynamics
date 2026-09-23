@@ -25,7 +25,7 @@ from collections.abc import Mapping
 from dataclasses import asdict
 from typing import Any
 
-from agentic_dynamics.control.control_db import RunState, TERMINAL_RUN_STATES
+from agentic_dynamics.control.control_db import TERMINAL_RUN_STATES, RunState
 from agentic_dynamics.control.control_status import active_run_ref, build_packet, run_ref
 from agentic_dynamics.control.live import EVENT_LOG_MAX, EVENT_LOG_PREFIX
 from apps.control_room.services import run_evidence
@@ -530,10 +530,6 @@ def operational_snapshot(
     active_runs = order_run_refs(active_runs, attention_ids)
     promotable_runs = [
         dict(entry) for entry in active_runs if entry.get("state") == RunState.PROMOTABLE.value
-    ]
-    failed_runs = [
-        _run_ref(db, entry, attention_ids=attention_ids, now=now)
-        for entry in packet.get("failed_runs", [])
     ]
     # State screens answer a different question from the compact packet blocks: they must expose
     # every reachable lifecycle state, including terminal cancelled/quarantined/published rows
