@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-23T22:18:48.368647+00:00",
+  "generated_at": "2026-09-23T22:42:38.482109+00:00",
   "n_specs": 248,
   "specs": [
     {
@@ -1688,7 +1688,7 @@
       "latest_git_sha": null,
       "results_pointer": null,
       "n_runs": 0,
-      "workflow_revision_id": "99ca153bac9450c81757ae433b06dcc9e5d6c5d108bd8fdf17d8b2ade1fc6058",
+      "workflow_revision_id": "d605655c8ffe83076803f07684d8fb3f32ac8967a047ccf3b23888733fd8b54a",
       "authored_status": null
     },
     {
