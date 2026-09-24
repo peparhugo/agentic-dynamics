@@ -36,9 +36,17 @@ SPEC = _ROOT / "workflows" / "repository" / "control_room_portal.yaml"
 
 def _agent(**overrides):
     base = dict(
-        ok=True, exit_code=0, error="", prompt_tokens=1, completion_tokens=1,
-        reasoning_tokens=0, total_tokens=2, estimated_cost_usd=0.001,
-        files_created=[], files_modified=[], final_response="x",
+        ok=True,
+        exit_code=0,
+        error="",
+        prompt_tokens=1,
+        completion_tokens=1,
+        reasoning_tokens=0,
+        total_tokens=2,
+        estimated_cost_usd=0.001,
+        files_created=[],
+        files_modified=[],
+        final_response="x",
     )
     base.update(overrides)
     return SimpleNamespace(**base)
@@ -55,7 +63,11 @@ def test_required_native_gate_refuses_a_zero_test_suite(tmp_path):
     """#5b: total 0 is a FAILURE for a required gate — never a false green."""
     spec = _with_gate(load_spec(SPEC))
     result = run_workflow(
-        spec, goal="g", model="m/one", workdir=tmp_path, commit=False,
+        spec,
+        goal="g",
+        model="m/one",
+        workdir=tmp_path,
+        commit=False,
         run_agentic_fn=lambda *a, **k: _agent(),
     )
     phase = result.phases[0]
@@ -82,12 +94,18 @@ def test_native_gate_dispatches_to_the_injected_verifier(tmp_path):
     """Dispatch parity: the native gate uses the independent verifier when present."""
     spec = _with_gate(load_spec(SPEC))
     verifier = _FakeVerifier(
-        SimpleNamespace(ok=True, tests_passed=3, tests_total=3, test_executed_success=True,
-                        error="")
+        SimpleNamespace(
+            ok=True, tests_passed=3, tests_total=3, test_executed_success=True, error=""
+        )
     )
     result = run_workflow(
-        spec, goal="g", model="m/one", workdir=tmp_path, commit=False,
-        run_agentic_fn=lambda *a, **k: _agent(), verifier_executor=verifier,
+        spec,
+        goal="g",
+        model="m/one",
+        workdir=tmp_path,
+        commit=False,
+        run_agentic_fn=lambda *a, **k: _agent(),
+        verifier_executor=verifier,
     )
     phase = result.phases[0]
     # BOTH verification shapes dispatched to the verifier — the native gate and the spec's
@@ -114,15 +132,21 @@ def test_native_gate_request_is_a_concrete_test_boundary(tmp_path):
     spec.workflow.params["phases"][0]["scope"] = "implementation"
     spec.workflow.params["phases"][0]["tests"] = ["tests/test_boundary.py"]
     verifier = _FakeVerifier(
-        SimpleNamespace(ok=True, tests_passed=1, tests_total=1, test_executed_success=True,
-                        error="")
+        SimpleNamespace(
+            ok=True, tests_passed=1, tests_total=1, test_executed_success=True, error=""
+        )
     )
     run_workflow(
-        spec, goal="g", model="m/one", workdir=tmp_path, commit=False,
-        run_agentic_fn=lambda *a, **k: _agent(), verifier_executor=verifier,
+        spec,
+        goal="g",
+        model="m/one",
+        workdir=tmp_path,
+        commit=False,
+        run_agentic_fn=lambda *a, **k: _agent(),
+        verifier_executor=verifier,
     )
     native = verifier.requests[0]
-    assert native.phase_kind == "test"          # never the producing agent's kind
+    assert native.phase_kind == "test"  # never the producing agent's kind
     assert native.phase_def["kind"] == "test"
     assert native.phase_def["tests"] == ["tests/test_boundary.py"]
     assert native.phase_def["scope"] == "implementation"
@@ -132,8 +156,8 @@ def test_native_gate_request_is_a_concrete_test_boundary(tmp_path):
     boundary = native.test_boundary
     assert boundary is not None
     assert boundary.phase_name == "scope__test_gate"
-    assert boundary.suite == ["tests/test_boundary.py"]     # the concrete suite/target
-    assert boundary.candidate == str(tmp_path)              # the concrete candidate
+    assert boundary.suite == ["tests/test_boundary.py"]  # the concrete suite/target
+    assert boundary.candidate == str(tmp_path)  # the concrete candidate
     assert boundary.language == "python"
     assert boundary.scope == "implementation"
 
@@ -141,15 +165,28 @@ def test_native_gate_request_is_a_concrete_test_boundary(tmp_path):
 def _canned_verifier_outcome() -> dict:
     """A sibling outcome carrying a passing test-phase envelope (the classify contract)."""
     envelope = {
-        "spec_name": "spec_x", "state": "succeeded", "ok": True, "awaiting": False,
-        "phases": [{
-            "phase": "scope__test_gate", "kind": "test", "status": "ok",
-            "test_executed_success": True, "tests_passed": 1, "tests_total": 1, "error": "",
-        }],
+        "spec_name": "spec_x",
+        "state": "succeeded",
+        "ok": True,
+        "awaiting": False,
+        "phases": [
+            {
+                "phase": "scope__test_gate",
+                "kind": "test",
+                "status": "ok",
+                "test_executed_success": True,
+                "tests_passed": 1,
+                "tests_total": 1,
+                "error": "",
+            }
+        ],
     }
     return {
-        "ok": True, "argv": ["docker", "run", "--rm", "-i"], "returncode": 0,
-        "stdout": "noise\n" + json.dumps(envelope, indent=2), "stderr": "",
+        "ok": True,
+        "argv": ["docker", "run", "--rm", "-i"],
+        "returncode": 0,
+        "stdout": "noise\n" + json.dumps(envelope, indent=2),
+        "stderr": "",
     }
 
 
@@ -167,18 +204,27 @@ def test_real_executor_accepts_the_constructed_boundary_and_refuses_agent_kind(
     spec.workflow.params["phases"][0]["scope"] = "implementation"
     spec.workflow.params["phases"][0]["tests"] = ["tests/test_boundary.py"]
     capture = _FakeVerifier(
-        SimpleNamespace(ok=True, tests_passed=1, tests_total=1, test_executed_success=True,
-                        error="")
+        SimpleNamespace(
+            ok=True, tests_passed=1, tests_total=1, test_executed_success=True, error=""
+        )
     )
     run_workflow(
-        spec, goal="g", model="m/one", workdir=tmp_path, commit=False,
-        run_agentic_fn=lambda *a, **k: _agent(), verifier_executor=capture,
+        spec,
+        goal="g",
+        model="m/one",
+        workdir=tmp_path,
+        commit=False,
+        run_agentic_fn=lambda *a, **k: _agent(),
+        verifier_executor=capture,
     )
     boundary_request = capture.requests[0]
 
     executor = DockerVerifierExecutor(
         spec_path="/repo/workflows/repository/control_room_portal.yaml",
-        spec_name="control_room_portal", goal="g", model="m/one", workdir=str(tmp_path),
+        spec_name="control_room_portal",
+        goal="g",
+        model="m/one",
+        workdir=str(tmp_path),
     )
     spawned: list[dict] = []
 
@@ -196,14 +242,92 @@ def test_real_executor_accepts_the_constructed_boundary_and_refuses_agent_kind(
     # an AGENT-kind request is refused before the broker is ever reached
     spawned.clear()
     agent_request = StepRequest(
-        phase_name="scope", phase_kind="agent", prompt="do work", model="m/one", goal="g",
-        spec_name="control_room_portal", workdir=str(tmp_path),
+        phase_name="scope",
+        phase_kind="agent",
+        prompt="do work",
+        model="m/one",
+        goal="g",
+        spec_name="control_room_portal",
+        workdir=str(tmp_path),
         phase_def={"name": "scope", "kind": "agent", "test_gate": True},
     )
     refused = executor.execute(agent_request)
     assert refused.state == "refused"
     assert "VERIFIER_REFUSED" in refused.error
     assert spawned == []
+
+
+def test_failed_verdict_surfaces_the_child_phase_error_not_the_stderr_banner(tmp_path, monkeypatch):
+    """L58: the verdict carries the SUITE tail, never the child's closing banner.
+
+    A failed verifier child's envelope usually has an EMPTY top-level ``error`` and a stderr
+    that ends with the runner's banner lines ("admission: gate disarmed…" / "control: child
+    mode…"). The real failure — the independent runner's suite tail ("FAILED …") — lives on
+    the child's PHASE record and must win: three gate failures (L49 att2 u3, L51 att4 u4, L51
+    att7 u5) needed host-side re-runs only because the banner was recorded instead.
+    """
+    spec = _with_gate(load_spec(SPEC))
+    spec.workflow.params["phases"][0]["scope"] = "implementation"
+    spec.workflow.params["phases"][0]["tests"] = ["tests/test_boundary.py"]
+    capture = _FakeVerifier(
+        SimpleNamespace(
+            ok=True, tests_passed=1, tests_total=1, test_executed_success=True, error=""
+        )
+    )
+    run_workflow(
+        spec,
+        goal="g",
+        model="m/one",
+        workdir=tmp_path,
+        commit=False,
+        run_agentic_fn=lambda *a, **k: _agent(),
+        verifier_executor=capture,
+    )
+    boundary_request = capture.requests[0]
+    executor = DockerVerifierExecutor(
+        spec_path="/repo/workflows/repository/control_room_portal.yaml",
+        spec_name="control_room_portal",
+        goal="g",
+        model="m/one",
+        workdir=str(tmp_path),
+    )
+    envelope = {
+        "spec_name": "spec_x",
+        "state": "failed",
+        "ok": False,
+        "awaiting": False,
+        "error": "",
+        "phases": [
+            {
+                "phase": "scope__test_gate",
+                "kind": "test",
+                "status": "failed",
+                "test_executed_success": False,
+                "tests_passed": 12,
+                "tests_total": 16,
+                "error": "TEST_GATE: FAILED tests/test_boundary.py::test_x\n4 failed, 12 passed\n",
+            }
+        ],
+    }
+    outcome = {
+        "ok": True,
+        "argv": ["docker", "run"],
+        "returncode": 20,
+        "stdout": "noise\n" + json.dumps(envelope, indent=2),
+        "stderr": (
+            "admission: gate disarmed (FINOPS_ADMISSION_REQUIRED unset) — phases run unleased\n"
+            "cost: $0.0000  ok: False\n"
+            "control: child mode — parent aggregates, child emits nothing\n"
+        ),
+    }
+    monkeypatch.setattr(spawn_wrapper, "spawn_sibling", lambda request, **kw: outcome)
+
+    verdict = executor.execute(boundary_request)
+    assert verdict.ok is False
+    assert "FAILED tests/test_boundary.py::test_x" in verdict.error
+    assert "gate disarmed" not in verdict.error
+    assert verdict.test_executed_success is False
+    assert (verdict.tests_passed, verdict.tests_total) == (12, 16)
 
 
 def test_verifier_child_never_reloads_the_producing_phase_by_name(tmp_path):
@@ -216,17 +340,26 @@ def test_verifier_child_never_reloads_the_producing_phase_by_name(tmp_path):
     spec.workflow.params["phases"][0]["scope"] = "implementation"
     spec.workflow.params["phases"][0]["tests"] = ["tests/test_boundary.py"]
     capture = _FakeVerifier(
-        SimpleNamespace(ok=True, tests_passed=1, tests_total=1, test_executed_success=True,
-                        error="")
+        SimpleNamespace(
+            ok=True, tests_passed=1, tests_total=1, test_executed_success=True, error=""
+        )
     )
     run_workflow(
-        spec, goal="g", model="m/one", workdir=tmp_path, commit=False,
-        run_agentic_fn=lambda *a, **k: _agent(), verifier_executor=capture,
+        spec,
+        goal="g",
+        model="m/one",
+        workdir=tmp_path,
+        commit=False,
+        run_agentic_fn=lambda *a, **k: _agent(),
+        verifier_executor=capture,
     )
     request = capture.requests[0]
     executor = DockerVerifierExecutor(
         spec_path="/repo/workflows/repository/control_room_portal.yaml",
-        spec_name="control_room_portal", goal="g", model="m/one", workdir=str(tmp_path),
+        spec_name="control_room_portal",
+        goal="g",
+        model="m/one",
+        workdir=str(tmp_path),
     )
     spawn_request = executor.build_request(request)
     command = [str(c) for c in spawn_request.get("command", [])]
@@ -261,7 +394,11 @@ def test_verifier_child_never_reloads_the_producing_phase_by_name(tmp_path):
 
     boundary_spec = load_spec(generated)
     result = run_workflow(
-        boundary_spec, goal="g", model="m/one", workdir=tmp_path, commit=False,
+        boundary_spec,
+        goal="g",
+        model="m/one",
+        workdir=tmp_path,
+        commit=False,
         run_agentic_fn=_must_not_run,
     )
     assert result.ok is True
@@ -274,12 +411,18 @@ def test_native_gate_refuses_an_empty_verifier_verdict(tmp_path):
     """The required-empty rule applies to the DISPATCHED shape too — one contract."""
     spec = _with_gate(load_spec(SPEC))
     verifier = _FakeVerifier(
-        SimpleNamespace(ok=True, tests_passed=0, tests_total=0, test_executed_success=False,
-                        error="")
+        SimpleNamespace(
+            ok=True, tests_passed=0, tests_total=0, test_executed_success=False, error=""
+        )
     )
     result = run_workflow(
-        spec, goal="g", model="m/one", workdir=tmp_path, commit=False,
-        run_agentic_fn=lambda *a, **k: _agent(), verifier_executor=verifier,
+        spec,
+        goal="g",
+        model="m/one",
+        workdir=tmp_path,
+        commit=False,
+        run_agentic_fn=lambda *a, **k: _agent(),
+        verifier_executor=verifier,
     )
     assert result.phases[0].status == "failed"
     assert "TEST_GATE" in result.phases[0].error
@@ -293,7 +436,12 @@ def test_multi_attempt_acceptance_is_finalized_after_the_gate(tmp_path):
         return _agent(ok=model != "m/one", exit_code=0 if model != "m/one" else 1)
 
     result = run_workflow(
-        spec, goal="g", model="m/one", workdir=tmp_path, commit=False, run_agentic_fn=agent,
+        spec,
+        goal="g",
+        model="m/one",
+        workdir=tmp_path,
+        commit=False,
+        run_agentic_fn=agent,
     )
     assert result.phases[0].status == "failed"  # the empty required gate failed the phase
     first, second = result.attempts[:2]
