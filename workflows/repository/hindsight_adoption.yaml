@@ -163,23 +163,34 @@ workflow:
         timeout: 3600
         requires_files: [notes/plan.md, notes/sources.jsonl, notes/plan.units.json]
         expand_from_plan: notes/plan.units.json
+        # The per-unit template the runner renders (`{unit_id}` / `{unit_goal}` / `{unit_files}` /
+        # `{unit_acceptance}` — `_render_unit_prompt`). Never remove the placeholders: without
+        # them every slice receives the whole plan and becomes the whole-plan executor (L51
+        # att6's class — u1 swept all three units, u2 found nothing to do, NO_CHANGES).
         prompt: |
-          Implement the plan units from `notes/plan.units.json`, one concern per unit, each unit's
-          changes confined to the files it declares. Write `docs/designs/proposed/hindsight_adoption.md`
-          (`status: proposed`) as the plan of record — per target: item, dossier evidence, gap,
-          target files, proving gate, risk — plus the named follow-ups the units did not cover.
+          You are the EXECUTE phase for ONE unit of this workflow ({goal}). The runner has
+          expanded this phase into one bounded slice per unit in `notes/plan.units.json`; this
+          slice is unit `{unit_id}`.
+
+          THIS UNIT'S GOAL: {unit_goal}
+          DECLARED FILES (your entire write scope): {unit_files}
+          ACCEPTANCE: {unit_acceptance}
+
+          Implement ONLY this unit, against `notes/plan.md` and the spec context. Another slice
+          owns every other unit — do NOT read or implement their work, do not subsume a
+          sibling's scope, and do not edit files outside your declared list (generated mirrors
+          owned by your `agent_config/` sources are regenerated outputs: edit the source, run
+          `python3 scripts/_gen_instructions.py`, never hand-edit the mirror).
           Rules: docs front-matter valid on every touched file; generated surfaces via
           agent_config/ + `python3 scripts/_gen_instructions.py` (keep `--check` green); do not
           touch the Control Room live surfaces (L49) or the L33 surfaces; measured-or-absent and
-          [M]/[C]/[H]/[X]/[P] tags on claims; keep each unit's tests green on your FINAL commit.
-          Commit per unit (the expansion gates each unit independently). A unit slice must
-          ALWAYS deliver a committed diff: if the unit's work already exists (an earlier unit
-          or the prior landed it), make the smallest necessary change that PROVES the unit —
-          add the missing test/assertion/doc line — and commit; "nothing to do" is NEVER valid
-          (a no-change slice fails the run: NO_CHANGES, u2's lesson, 2026-09-24). Keep unit
-          scopes DISJOINT — one unit may not subsume another's work. NEVER run long waits or
-          `sleep` — commit each unit promptly; a phase that burns its wall with no committed
-          deliverable FAILS (register L46/#152).
+          [M]/[C]/[H]/[X]/[P] tags on claims; keep this unit's tests green on your FINAL commit.
+          A unit slice must ALWAYS deliver a committed diff: if the unit's work already exists
+          (an earlier unit or the prior landed it), make the smallest necessary change that
+          PROVES the unit — add the missing test/assertion/doc line — and commit; "nothing to
+          do" is NEVER valid (a no-change slice fails the run: NO_CHANGES, u2's lesson,
+          2026-09-24). Commit. NEVER run long waits or `sleep` — a phase that burns its wall
+          with no committed deliverable FAILS (register L46/#152).
       - name: g_test_gate
         kind: test
         scope: implementation

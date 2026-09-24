@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-24T01:43:00.040746+00:00",
+  "generated_at": "2026-09-24T02:36:06.461806+00:00",
   "n_specs": 248,
   "specs": [
     {
@@ -1688,7 +1688,7 @@
       "latest_git_sha": null,
       "results_pointer": null,
       "n_runs": 0,
-      "workflow_revision_id": "9fd7a68b5c93f2b54b79d90add1e3f8975c7f1beabed4933a78fefb5342868cc",
+      "workflow_revision_id": "fdd660ddc546f3bcd697baea2456dcc1499aea77ccd3a90232f96f85330d3ad1",
       "authored_status": null
     },
     {
@@ -2710,7 +2710,7 @@
       "latest_git_sha": null,
       "results_pointer": null,
       "n_runs": 0,
-      "workflow_revision_id": "f1674376af3226dbb556dd532ee91f35234cec96ac552338930530a31f85ad29",
+      "workflow_revision_id": "e2cc1a30b1247c04b8fe99d636ba44d3a40ebb5a16a935215dde965021f09c47",
       "authored_status": null
     },
     {
