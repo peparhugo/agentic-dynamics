@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-24T14:30:18.870778+00:00",
-  "n_specs": 248,
+  "generated_at": "2026-09-24T17:57:13.641237+00:00",
+  "n_specs": 249,
   "specs": [
     {
       "name": "adapter_snapshot_guard",
@@ -1449,6 +1449,26 @@
       "results_pointer": null,
       "n_runs": 0,
       "workflow_revision_id": "85530cfaa86e2546fb86e41e0f672a9b49443dd5b395e3bbb250e250ecfb546f",
+      "authored_status": null
+    },
+    {
+      "name": "context_layer_routing",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/context_layer_routing.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": true,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0,
+      "workflow_revision_id": "81a9fef701108b87c20dd240ea7c77d24dd1a371a0dd5314022fdbfed930df57",
       "authored_status": null
     },
     {

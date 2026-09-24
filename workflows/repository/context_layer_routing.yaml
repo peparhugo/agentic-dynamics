@@ -1,0 +1,226 @@
+name: context_layer_routing
+question: >-
+  Can the augmentation seam route the RIGHT context layers into each workflow phase — the
+  system's structure for planning, the history of prior attempts and decisions, and (where it
+  exists) the measured record of what typically happens — and RECORD what it served per phase,
+  so the routing itself becomes measurable and the next wave can serve predictions?
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+factors:
+  - {name: model, levels: [openai/gpt-5.6-luna]}
+design: factorial
+rules: []
+metrics: []
+comparison: null
+writeup: {format: lab_book, sections: [question, evidence]}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_uncertainty}
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: true
+    plan_unit_cap: 8
+    rag:
+      emit_self: false
+    context:
+      domain_context: >-
+        THE DIRECTIVE (controller, 2026-09-24, verbatim): "we wont be able to complete anything
+        until this is done: Agent world models (the big one) — first unit = route the right context
+        into each phase (structure / history / outcomes) and record what was served." This is
+        register L60's first bounded unit; the design doc is the SPEC.
+
+        READ FIRST (in this order, fast): (1) docs/designs/proposed/agent_world_models.md — §6
+        THE CONTEXT LAYERS (L0 task / L1 structure / L2 history / L3 outcomes / L4 self) and §9
+        FIRST STEPS; (2) the seam's code: src/agentic_dynamics/knowledge/augment.py (the
+        retrieve -> construct -> render seam; `default_retrieve_fn`, `augment_prompt`),
+        src/agentic_dynamics/knowledge/retrieval.py (`build_query_plan`, `retrieve`, the RRF
+        fusion + hard per-cell scope pre-filter, `leg_errors`/`fallback_mode`), and
+        src/agentic_dynamics/knowledge/prompt_constructor.py; (3) the seam's call site and its
+        config in src/agentic_dynamics/runtime/workflow_runner.py (`rag_augment` resolution — now
+        default ON — and `rag_params`); (4) the run ledger's augmentation/cost fields
+        (src/agentic_dynamics/knowledge/ledger_ingestion.py + experiment_spec.py's ledger table)
+        — the recording target; (5) the KB's source-type vocabulary (the nine producers under
+        src/agentic_dynamics/knowledge/*_ingestion.py + knowledge.py's OBSERVATION_TYPES) — the
+        material the layers are made of.
+
+        THE WORK: (1) A ROUTING RULE — resolve, per phase, which context layers to serve from the
+        phase's ROLE/KIND (planning / implementation / verification / review; the phases' names
+        and kinds are in the spec) and any explicit spec hints; the layers map onto the EXISTING
+        one knowledge plane as source-type + intent shaping of the existing `retrieve()` — do NOT
+        build a parallel retrieval path or a new store; if `build_query_plan` lacks the source
+        filter the shaping needs, ADDING that filter (with its test) is in scope for one unit.
+        (2) THE RECORD — the per-phase routing decision (which layers were resolved, what was
+        served from each, which legs failed, the fallback reason if any) must be written to the
+        RUN LEDGER, extending the existing augmentation fields; an auditor must be able to read it
+        from the ledger without the host, and it must be MEASURED-OR-ABSENT (a layer that could
+        not retrieve is a NAMED fallback — never an empty success, never a fabricated zero).
+        (3) L3 (outcome/failure-class evidence) may land PARTIALLY or be named as the next unit —
+        the point of THIS run is the routing + recording + the L1/L2 sources built on what exists;
+        do not force L3 if it cannot be bounded to one gate.
+
+        THE HONESTY FRAME (rules no unit may violate): measured-or-absent; [M]/[C]/[H]/[X]/[P]
+        tags on claims; the seam NEVER blocks a phase and NEVER replaces a valid base prompt
+        (failure preserves the base prompt with a named fallback reason); docs front-matter valid
+        on every touched file (docs/reviews/* = accepted; docs/designs/proposed/* = proposed;
+        tests/test_doc_lifecycle.py is the gate); generated surfaces are never hand-edited (edit
+        agent_config/, regenerate, keep `--check` green); no net-new top-level mechanism without a
+        one-line justification naming the gap it closes; do NOT touch the Control Room's live
+        surfaces (L49 is mid-flight there) or the L33 surfaces; do NOT add any external memory
+        service, package, or plugin (the world-models doc's non-goals bind).
+
+        EVERY HEADLINE CLAIM NAMES ITS GATE (earned 2026-09-24, L49 att6): a claim without a gate
+        assertion that would fail if the claim were false is a convention, not a result — the plan
+        must say, per unit, which assertion proves it.
+
+        THE DELIVERABLE: (1) the routing rule + the per-phase record, implemented and gated; (2)
+        notes/context_layers.md (`## Problem`, `## What Exists`, `## Gaps`, `## Sources`) — the
+        layer mapping as it actually is in code (file:line), what each layer serves today, and
+        which layers are NAMED follow-ups; (3) notes/posterior.md naming which units landed with
+        the assertion that proves each. (All repository change lands through the UNIT slices — the
+        prior writes only `notes/`.)
+
+        THE EXECUTION SHAPE: a unit is ONE concern — a handful of files, one verifiable change,
+        ONE gate that proves it. Prefer MORE, SMALLER units: the cap (8) is a ceiling, never a
+        target; a unit touching more than ~4 files or two concerns, or unprovable by one gate,
+        SPLITS. A unit too large for a small slice becomes a NAMED follow-up, not a big slice.
+
+        ACCEPTANCE: the five declared gate suites green in-cell on the FINAL commit; the run
+        ledger (read from the worktree) shows the per-phase routing record for every agent phase
+        of THIS run; `python3 -m ruff check` green on touched paths; the AIO runs host-side checks
+        (docs scan, fast path) against the candidate before any promote.
+    phases:
+      - name: prior
+        kind: agent
+        scope: proposal_write
+        timeout: 2400
+        requires_deliverable: true
+        prompt: |
+          Recon for the context-layer routing build. Read the domain context FIRST, then take a
+          FAST INVENTORY of the seam (augment / retrieval / prompt_constructor / the runner's
+          call site), the ledger's augmentation fields, and the KB source-type vocabulary — the
+          deep walk belongs to the UNITS, not this phase; never re-read a file you have read.
+          SCOPE FENCE: you write ONLY the `notes/` files below — never `src/`, never `tests/`,
+          never `docs/`, never another phase's artifact. The UNITS own every repository change; a
+          prior that lands them makes its units no-ops and the run FAILS (NO_CHANGES). NEVER
+          attempt to submit, launch, or re-run any workflow from inside this run — no
+          `run_workflow`, no fleet/launch-broker/docker calls: you are INSIDE the run; the fleet
+          path belongs to the AIO (register L53). WRITE `notes/context_layers.md`
+          (`## Problem`, `## What Exists`, `## Gaps`, `## Sources`), `notes/plan.md`
+          (`## Files`, `## Tests`, `## Acceptance`, `## Risks`, `## Layers`) and — the
+          load-bearing artifact — `notes/plan.units.json`: {"units": [{"id": "u1_...", "goal":
+          "...", "files": [...], "tests": [...], "acceptance": "...", "budget_usd": ...,
+          "depends_on": [...]}]}. One concern per unit, a handful of files each, ONE gate per
+          unit; the unit's `tests` is a list of pytest TARGET PATHS ONLY — e.g.
+          `tests/test_prompt_constructor.py` — never a command string and never flags; non-pytest
+          proofs (a read of the run ledger, `ruff check`) go in the unit's `goal`/`acceptance` for
+          the slice to run, not in `tests`; declare ONLY CELL-SAFE targets — the verifier runs in
+          a read-only cell with NO Redis/Neo4j/network AND base deps only (no optional extras:
+          a test that directly or transitively imports httpx / ollama / chromadb / neo4j FAILS
+          in-cell although it passes on the host — L51 att7's u5 class; `tests/test_retrieval.py`
+          and `tests/test_prompt_constructor.py` are the cell-safe homes for these proofs);
+          declare EXISTING targets only — never invent a nodeid for a test the slice will create
+          (declare the FILE it adds the test to, and keep the proof in a file its own gate
+          declares); the unit budgets must SUM to at most the spec's stop budget (`stop.budget_usd`
+          = **$8.00**): keep each unit small ($0.25–$1.00; `budget_usd` is a planning hint) — a
+          plan summing above the ceiling is REFUSED; when in doubt, SPLIT. Every unit's goal must
+          NAME the assertion that proves it (a claim without a failing-if-false gate is a
+          convention — L49 att6's lesson). A unit that cannot be accepted independently is not a
+          unit. Write `notes/sources.jsonl`. Commit — `notes/` is gitignored, so stage the notes
+          explicitly (`git add -f notes/`) before committing. Write and COMMIT `notes/` EARLY
+          (inside the first third of the window), then refine. NEVER run long waits or `sleep` —
+          a phase that burns its wall with no committed deliverable FAILS (register L46/#152).
+      - name: execute
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        requires_files: [notes/plan.md, notes/sources.jsonl, notes/plan.units.json]
+        expand_from_plan: notes/plan.units.json
+        # The per-unit template the runner renders (`{unit_id}` / `{unit_goal}` / `{unit_files}` /
+        # `{unit_acceptance}` — `_render_unit_prompt`). Never remove the placeholders: without
+        # them every slice receives the whole plan and becomes the whole-plan executor (L51
+        # att6's class).
+        prompt: |
+          You are the EXECUTE phase for ONE unit of this workflow ({goal}). The runner has
+          expanded this phase into one bounded slice per unit in `notes/plan.units.json`; this
+          slice is unit `{unit_id}`.
+
+          THIS UNIT'S GOAL: {unit_goal}
+          DECLARED FILES (your entire write scope): {unit_files}
+          ACCEPTANCE: {unit_acceptance}
+
+          Implement ONLY this unit, against `notes/plan.md` and the spec context. Another slice
+          owns every other unit — do NOT read or implement their work, do not subsume a
+          sibling's scope, and do not edit files outside your declared list.
+          Rules: measured-or-absent and [M]/[C]/[H]/[X]/[P] tags on claims; the seam never blocks
+          a phase and never replaces a valid base prompt (failure = named fallback, base prompt
+          preserved); docs front-matter valid on every touched file; do not touch the Control Room
+          live surfaces (L49) or the L33 surfaces; no external service/package/plugin; run
+          `python3 -m ruff check` on the paths you touch before committing; keep this unit's
+          tests green on your FINAL commit.
+          A unit slice must ALWAYS deliver a committed diff: if the unit's work already exists,
+          make the smallest necessary change that PROVES the unit — add the missing
+          test/assertion/doc line — and commit; "nothing to do" is NEVER valid (NO_CHANGES).
+          Commit. NEVER run long waits or `sleep` — a phase that burns its wall with no committed
+          deliverable FAILS (register L46/#152).
+      - name: g_test_gate
+        kind: test
+        scope: implementation
+        timeout: 1800
+        requires_files: [notes/plan.md]
+        # The declared final sweep (deterministic; cell-safe suites, vetted on the host and
+        # by the L51/L49 runs): the seam's engine tests, the pure augmentation gate, the
+        # dependency-free retrieval gate, the docs-lifecycle gate, and the dependency direction.
+        tests:
+          - tests/test_workflow_runner.py
+          - tests/test_prompt_constructor.py
+          - tests/test_retrieval.py
+          - tests/test_doc_lifecycle.py
+          - tests/test_dependency_direction.py
+        prompt: |
+          The independent runner verifies the worktree against the declared targets.
+      - name: posterior
+        kind: agent
+        scope: proposal_write
+        timeout: 900
+        requires_files: [notes/context_layers.md, notes/plan.md]
+        prompt: |
+          Diff the plan against what landed. WRITE `notes/posterior.md` (`## Violations`,
+          `## Unknowns`, `## UPDATES`): which units landed and which did not (each with the
+          assertion or invariant that proves it); which layers are actually served today and
+          from which sources; which layers remain named follow-ups; and — read THIS run's own
+          ledger in the worktree (`experiments/results/workflows/`) — whether the per-phase
+          routing record is present for every agent phase, quoting the record's shape. Commit —
+          `notes/` is gitignored, so stage it explicitly (`git add -f notes/posterior.md`) before
+          committing. Keep every write inside the worktree (never `/tmp/...`, never `../...`).
+      - name: g_adversarial
+        kind: agent
+        scope: proposal_write
+        timeout: 1800
+        run_model: openai/gpt-5.6-terra
+        prompt: |
+          ADVERSARIAL REVIEW — a different model by design. Read the notes, the diffs, and the
+          ledger. Attack: is the "routing" REAL (does it change what is queried/served, or is it a
+          label applied after a single generic retrieve)? Open the code and the tests — a plan
+          that describes a change it did not make is a miss. Does the per-phase record actually
+          reach the run ledger, per agent phase, with provenance (what was served, which legs
+          failed, which fallback reason) — or is the claim of recording a convention with no
+          assertion? Could any layer failure read as an empty success (the cardinal sin — a failed
+          leg must stay distinguishable from an empty one)? Does the seam still degrade to the
+          base prompt with a named fallback, never blocking a phase? Is any claim overreaching its
+          evidence ([M] where nothing was measured)? Name at least one falsifier per major claim.
+          Write `notes/adversarial_review.md` with a final `## FINDING` paragraph and commit it —
+          `notes/` is gitignored, so stage the review explicitly
+          (`git add -f notes/adversarial_review.md`) before committing; the phase must record a
+          commit (a silently uncommitted review fails the promotion gate). KEEP EVERY WRITE
+          INSIDE THE WORKTREE (`/repo`): the review goes to the worktree-relative
+          `notes/adversarial_review.md`, and any scratch experiment lives under `notes/`
+          (gitignored) — never `/tmp/...`, never `../...`. An edit outside the worktree raises a
+          permission ASK that this headless cell cannot answer, and the phase stalls to its
+          timeout.
