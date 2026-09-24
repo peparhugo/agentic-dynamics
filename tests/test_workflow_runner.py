@@ -36,7 +36,9 @@ from agentic_dynamics.runtime.workflow_runner import (
     run_workflow,
 )
 
-SPEC = Path(__file__).resolve().parent.parent / "workflows" / "repository" / "control_room_portal.yaml"
+SPEC = (
+    Path(__file__).resolve().parent.parent / "workflows" / "repository" / "control_room_portal.yaml"
+)
 
 
 def _fake_agent(**overrides):
@@ -61,7 +63,12 @@ def test_spec_loads_and_validates():
     spec = load_spec(SPEC)
     assert spec.name == "control_room_portal"
     assert spec.workflow.kind == "agent_task"
-    assert [p["name"] for p in spec.workflow.params["phases"]] == ["scope", "ux_design", "implement", "verify"]
+    assert [p["name"] for p in spec.workflow.params["phases"]] == [
+        "scope",
+        "ux_design",
+        "implement",
+        "verify",
+    ]
     assert validate_spec(spec) == []
 
 
@@ -220,8 +227,14 @@ def test_run_workflow_phases_in_order(tmp_path):
         seen.append(prompt.splitlines()[1][:12])  # capture the "Goal: ..." line tail
         return _fake_agent()
 
-    result = run_workflow(spec, goal="the goal", model="openai/gpt-5.6-sol",
-                          workdir=tmp_path, commit=False, run_agentic_fn=agent)
+    result = run_workflow(
+        spec,
+        goal="the goal",
+        model="openai/gpt-5.6-sol",
+        workdir=tmp_path,
+        commit=False,
+        run_agentic_fn=agent,
+    )
     assert [p.phase for p in result.phases] == ["scope", "ux_design", "implement", "verify"]
     assert len(seen) == 3  # scope, ux, implement are agent phases; verify is test
     assert result.phases[0].tokens["total"] == 35
@@ -244,8 +257,9 @@ def test_phase_result_carries_change_detection_availability(tmp_path):
             change_observation_partial=True,
         )
 
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
-                          run_agentic_fn=agent)
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path, commit=False, run_agentic_fn=agent
+    )
 
     assert result.phases[0].change_detection == "git_status"
     assert result.phases[0].change_observation_partial is True
@@ -275,8 +289,13 @@ def test_phase_result_carries_the_prepared_step_reference(tmp_path):
 
     spec = load_spec(SPEC)
     result = run_workflow(
-        spec, goal="g", model="m", workdir=tmp_path, commit=False,
-        run_agentic_fn=lambda *a, **k: _fake_agent(), step_executor=_PreparedExecutor(),
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        run_agentic_fn=lambda *a, **k: _fake_agent(),
+        step_executor=_PreparedExecutor(),
     )
 
     phase = result.phases[0]
@@ -287,7 +306,11 @@ def test_phase_result_carries_the_prepared_step_reference(tmp_path):
     assert ledger["prepared_step_prompt_sha256"] == "b" * 64
     # A locally-executed phase (the default executor) records the named absence, not a guess.
     local = run_workflow(
-        spec, goal="g", model="m", workdir=tmp_path, commit=False,
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
         run_agentic_fn=lambda *a, **k: _fake_agent(),
     )
     assert local.phases[0].prepared_step_path == ""
@@ -315,9 +338,15 @@ def test_run_workflow_publishes_phase_per_phase(tmp_path, monkeypatch):
     monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
 
     spec = load_spec(SPEC)
-    run_workflow(spec, goal="g", model="m", workdir=tmp_path,
-                 commit=False, run_agentic_fn=lambda *a, **k: _fake_agent(),
-                 publisher_factory=FakePublisher)
+    run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        run_agentic_fn=lambda *a, **k: _fake_agent(),
+        publisher_factory=FakePublisher,
+    )
 
     assert [p["name"] for p in published] == ["scope", "ux_design", "implement", "verify"]
     assert all(p["total"] == 4 for p in published)
@@ -349,15 +378,25 @@ def test_run_workflow_publishes_phase_before_agent_runs(tmp_path, monkeypatch):
         order.append(("agent",))
         return _fake_agent()
 
-    run_workflow(spec, goal="g", model="m", workdir=tmp_path,
-                 commit=False, run_agentic_fn=agent, publisher_factory=FakePublisher)
+    run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        run_agentic_fn=agent,
+        publisher_factory=FakePublisher,
+    )
 
     # scope, ux_design, implement are agent phases (phase-before-agent); verify is
     # a test phase and emits a phase start with no agent invocation.
     assert order == [
-        ("phase", "scope"), ("agent",),
-        ("phase", "ux_design"), ("agent",),
-        ("phase", "implement"), ("agent",),
+        ("phase", "scope"),
+        ("agent",),
+        ("phase", "ux_design"),
+        ("agent",),
+        ("phase", "implement"),
+        ("agent",),
         ("phase", "verify"),
     ]
 
@@ -394,8 +433,14 @@ def test_run_workflow_resume_publishes_original_phase_index(tmp_path, monkeypatc
         (Path(workdir) / "docs" / "x.md").write_text(str(len(calls)))  # unique -> commits
         return _fake_agent(ok=len(calls) < 3, error="boom")
 
-    run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent,
-                 publisher_factory=FakePublisher)
+    run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        run_agentic_fn=agent,
+        publisher_factory=FakePublisher,
+    )
     # implement (3rd agent call) failed -> only scope + ux_design committed.
 
     captured.clear()
@@ -407,8 +452,15 @@ def test_run_workflow_resume_publishes_original_phase_index(tmp_path, monkeypatc
         (Path(workdir) / "docs" / "x.md").write_text(str(len(calls)))
         return _fake_agent()
 
-    run_workflow(spec, goal="g", model="m", workdir=tmp_path,
-                 resume=True, run_agentic_fn=agent2, publisher_factory=FakePublisher)
+    run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        resume=True,
+        run_agentic_fn=agent2,
+        publisher_factory=FakePublisher,
+    )
 
     assert [p["name"] for p in captured] == ["implement", "verify"]
     assert [p["index"] for p in captured] == [3, 4]
@@ -423,8 +475,9 @@ def test_run_workflow_fails_fast(tmp_path):
         calls.append(prompt)
         return _fake_agent(ok=False, error="boom") if len(calls) == 1 else _fake_agent()
 
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path,
-                          commit=False, run_agentic_fn=agent)
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path, commit=False, run_agentic_fn=agent
+    )
     assert len(result.phases) == 1  # stopped after first failure
     assert result.phases[0].status == "failed"
     assert result.phases[0].error == "boom"
@@ -435,8 +488,14 @@ def test_run_workflow_verify_phase_runs_tests(tmp_path):
     spec = load_spec(SPEC)
     (tmp_path / "test_ok.py").write_text("def test_passes():\n    assert True\n")
 
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path,
-                          commit=False, run_agentic_fn=lambda *a, **k: _fake_agent())
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        run_agentic_fn=lambda *a, **k: _fake_agent(),
+    )
     verify = result.phases[-1]
     assert verify.phase == "verify"
     assert verify.test_executed_success is True
@@ -467,12 +526,21 @@ def test_run_workflow_change_analysis_seam(tmp_path, monkeypatch):
 
     # The sonar/lsp legs are covered by their own unit tests; here they are stubbed to their
     # measured unavailable status so the seam test never reaches the real scanner/mypy.
-    monkeypatch.setattr(workflow_runner, "_sonar_evidence",
-                        lambda *a, **k: {"status": "unavailable", "revision_matches": None,
-                                         "new_critical_count": None, "analyzed_sha": ""})
-    monkeypatch.setattr(workflow_runner, "_lsp_evidence",
-                        lambda *a, **k: {"status": "unavailable", "new_error_count": None,
-                                         "tool": "mypy"})
+    monkeypatch.setattr(
+        workflow_runner,
+        "_sonar_evidence",
+        lambda *a, **k: {
+            "status": "unavailable",
+            "revision_matches": None,
+            "new_critical_count": None,
+            "analyzed_sha": "",
+        },
+    )
+    monkeypatch.setattr(
+        workflow_runner,
+        "_lsp_evidence",
+        lambda *a, **k: {"status": "unavailable", "new_error_count": None, "tool": "mypy"},
+    )
 
     class RecordingAnalyzer:
         def __init__(self):
@@ -481,8 +549,14 @@ def test_run_workflow_change_analysis_seam(tmp_path, monkeypatch):
         def analyze(self, change):
             self.changes.append(change)
             return ChangeAnalysis(
-                facts=({"predicate": "changed_symbol_count", "value": "1",
-                        "value_type": "int", "evidence_ids": ()},),
+                facts=(
+                    {
+                        "predicate": "changed_symbol_count",
+                        "value": "1",
+                        "value_type": "int",
+                        "evidence_ids": (),
+                    },
+                ),
                 neighborhood=("f",),
             )
 
@@ -500,8 +574,9 @@ def test_run_workflow_change_analysis_seam(tmp_path, monkeypatch):
         return _fake_agent(files_created=["app.py"])
 
     analyzer = RecordingAnalyzer()
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path,
-                          run_agentic_fn=agent, change_analyzer=analyzer)
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent, change_analyzer=analyzer
+    )
 
     # The FIRST phase's commit is the worktree's root commit — no parent to diff, so the
     # seam degrades to None. The SECOND committed phase has a parent: it gets analyzed.
@@ -549,12 +624,21 @@ def test_run_workflow_change_analysis_full_sha_and_next_phase_evidence(tmp_path,
 
     from agentic_dynamics.runtime.change_analyzer import ChangeAnalysis
 
-    monkeypatch.setattr(workflow_runner, "_sonar_evidence",
-                        lambda *a, **k: {"status": "unavailable", "revision_matches": None,
-                                         "new_critical_count": None, "analyzed_sha": ""})
-    monkeypatch.setattr(workflow_runner, "_lsp_evidence",
-                        lambda *a, **k: {"status": "unavailable", "new_error_count": None,
-                                         "tool": "mypy"})
+    monkeypatch.setattr(
+        workflow_runner,
+        "_sonar_evidence",
+        lambda *a, **k: {
+            "status": "unavailable",
+            "revision_matches": None,
+            "new_critical_count": None,
+            "analyzed_sha": "",
+        },
+    )
+    monkeypatch.setattr(
+        workflow_runner,
+        "_lsp_evidence",
+        lambda *a, **k: {"status": "unavailable", "new_error_count": None, "tool": "mypy"},
+    )
 
     class RecordingAnalyzer:
         def __init__(self):
@@ -563,8 +647,14 @@ def test_run_workflow_change_analysis_full_sha_and_next_phase_evidence(tmp_path,
         def analyze(self, change):
             self.changes.append(change)
             return ChangeAnalysis(
-                facts=({"predicate": "changed_symbol_count", "value": "1",
-                        "value_type": "int", "evidence_ids": ()},),
+                facts=(
+                    {
+                        "predicate": "changed_symbol_count",
+                        "value": "1",
+                        "value_type": "int",
+                        "evidence_ids": (),
+                    },
+                ),
                 neighborhood=("f",),
                 graph_status="available",
                 revision=change.revision,
@@ -584,8 +674,9 @@ def test_run_workflow_change_analysis_full_sha_and_next_phase_evidence(tmp_path,
         return _fake_agent(files_created=["app.py"])
 
     analyzer = RecordingAnalyzer()
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path,
-                          run_agentic_fn=agent, change_analyzer=analyzer)
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent, change_analyzer=analyzer
+    )
 
     # The FIRST phase's commit is the root commit (no parent to diff) -> not analyzed; the
     # SECOND committed phase is analyzed with FULL-SHA revisions.
@@ -603,7 +694,9 @@ def test_run_workflow_change_analysis_full_sha_and_next_phase_evidence(tmp_path,
     # bounded evidence block with graph status, revision, neighborhood, and facts.
     evidence_prompts = [p for p in prompts if "EVIDENCE" in p]
     assert evidence_prompts, "the next-phase prompt must receive the evidence context"
-    line = next(ln for ln in evidence_prompts[0].splitlines() if ln.strip().startswith("- EVIDENCE"))
+    line = next(
+        ln for ln in evidence_prompts[0].splitlines() if ln.strip().startswith("- EVIDENCE")
+    )
     payload = json.loads(line.split("EVIDENCE ", 1)[1])
     assert payload["graph_status"] == "available"
     assert payload["revision"] == change.revision
@@ -643,9 +736,15 @@ def test_run_workflow_change_analysis_root_commit_never_fails(tmp_path):
         (Path(workdir) / "app.py").write_text(f"def f{n}():\n    return {n}\n")
         return _fake_agent(files_created=["app.py"])
 
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path,
-                          run_agentic_fn=agent, change_analyzer=Analyzer(),
-                          change_analysis_legs=False)
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        run_agentic_fn=agent,
+        change_analyzer=Analyzer(),
+        change_analysis_legs=False,
+    )
     assert result.ok
     # Root-commit phases degrade gracefully (change_analysis may be None), never a failure.
     assert all(p.status == "ok" for p in result.phases)
@@ -724,8 +823,9 @@ def test_run_workflow_resume_skips_committed_phases(tmp_path):
         (Path(workdir) / "docs" / "x.md").write_text(str(len(calls)))
         return _fake_agent()
 
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path,
-                          resume=True, run_agentic_fn=agent2)
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path, resume=True, run_agentic_fn=agent2
+    )
     assert [p.phase for p in result.phases] == ["implement", "verify"]
     assert len(calls) == 1  # only implement re-runs; scope/ux skipped
 
@@ -738,9 +838,7 @@ def test_resume_state_is_the_completion_input_without_git_or_index(tmp_path, mon
     is required in the worktree and the spec index is never consulted. The provenance is
     stamped onto the result ledger."""
     consulted = []
-    monkeypatch.setattr(
-        spec_status, "index_entry", lambda name, **kw: consulted.append(name)
-    )
+    monkeypatch.setattr(spec_status, "index_entry", lambda name, **kw: consulted.append(name))
     executed = []
 
     def agent(prompt, *, model, backend, workdir, **kwargs):
@@ -753,12 +851,19 @@ def test_resume_state_is_the_completion_input_without_git_or_index(tmp_path, mon
         ledger_path="/ledgers/20260912T000000Z_run-parent.json",
         completed_phases=frozenset({"scope", "ux_design"}),
     )
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
-                          resume_state=state, run_agentic_fn=agent)
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        resume_state=state,
+        run_agentic_fn=agent,
+    )
 
     assert [p.phase for p in result.phases] == ["implement", "verify"]
     assert len(executed) == 1  # only implement re-runs; the parent's ok phases are skipped
-    assert consulted == []     # the spec-index fallback was never reached
+    assert consulted == []  # the spec-index fallback was never reached
     assert result.resumed_from_run_id == "run-parent"
     assert result.resumed_from_ledger == state.ledger_path
     assert result.to_dict()["resumed_from_run_id"] == "run-parent"
@@ -789,17 +894,25 @@ def test_resume_state_overrides_git_history_completion(tmp_path):
 
     # The selected parent completed ONLY scope; ux_design's commit here must not skip it.
     state = ResumeState(
-        parent_run_id="run-parent", ledger_path="/ledgers/run-parent.json",
+        parent_run_id="run-parent",
+        ledger_path="/ledgers/run-parent.json",
         completed_phases=frozenset({"scope"}),
     )
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path,
-                          resume_state=state, run_agentic_fn=lambda *a, **k: _fake_agent())
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        resume_state=state,
+        run_agentic_fn=lambda *a, **k: _fake_agent(),
+    )
 
     assert [p.phase for p in result.phases] == ["ux_design", "implement", "verify"]
     assert result.resumed_from_run_id == "run-parent"
 
 
 # ── RAG augmentation seam ───────────────────────────────────────
+
 
 class _FakeEvidence:
     def __init__(self, cid, text, authority="source"):
@@ -831,7 +944,9 @@ class _FakeAugmented:
         self.constructor_attempt_id = "ca:test"
 
 
-def test_no_rag_default_is_byte_identical(tmp_path):
+def test_explicit_no_rag_is_byte_identical(tmp_path):
+    """The rollback path (2026-09-24): ``rag_augment=False`` — the previously implicit
+    default, now the explicit opt-out — is byte-for-byte identical to a plain run."""
     spec = load_spec(SPEC)
     prompts = []
 
@@ -839,8 +954,15 @@ def test_no_rag_default_is_byte_identical(tmp_path):
         prompts.append(prompt)
         return _fake_agent()
 
-    run_workflow(spec, goal="the goal", model="m", workdir=tmp_path,
-                 commit=False, run_agentic_fn=agent)
+    run_workflow(
+        spec,
+        goal="the goal",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        run_agentic_fn=agent,
+        rag_augment=False,
+    )
 
     prior = []
     expected = []
@@ -849,6 +971,49 @@ def test_no_rag_default_is_byte_identical(tmp_path):
             expected.append(_build_phase_prompt(p, "the goal", prior))
         prior.append(f"{p['name']} (ok)")
     assert prompts == expected
+
+
+def test_rag_default_is_on(tmp_path, monkeypatch):
+    """2026-09-24 (the controller's on-by-default directive): with NO spec flag and NO
+    injection, the seam resolves ON — retrieve -> construct -> render actually run. A store
+    that is absent degrades to a NAMED fallback, never a silent skip; here the stubbed
+    constructor raising proves the fallback absorbs failure while the seam itself ran."""
+    import agentic_dynamics.runtime.workflow_runner as wr
+
+    spec = load_spec(SPEC)
+    calls: list[str] = []
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        return _fake_agent()
+
+    def fake_retrieve_fn():
+        calls.append("retrieve_fn")
+
+        def _retrieve(**kwargs):
+            calls.append("retrieve")
+            return _FakeAttempt([_FakeEvidence("k1", "cached evidence")])
+
+        return _retrieve
+
+    def fake_construct_fn(rag_params, run_agent):
+        calls.append("construct_fn")
+
+        def _construct(request):
+            calls.append("construct")
+            raise RuntimeError("stub constructor — the fallback must absorb this")
+
+        return _construct
+
+    monkeypatch.setattr(wr, "default_retrieve_fn", fake_retrieve_fn)
+    monkeypatch.setattr(wr, "default_construct_fn", fake_construct_fn)
+
+    run_workflow(
+        spec, goal="the goal", model="m", workdir=tmp_path, commit=False, run_agentic_fn=agent
+    )
+
+    # The seam ran WITHOUT any flag or injection — the default resolved ON.
+    assert "retrieve_fn" in calls and "retrieve" in calls
+    assert "construct_fn" in calls and "construct" in calls
 
 
 def test_rag_hook_ordering_between_route_and_agent(tmp_path):
@@ -867,9 +1032,17 @@ def test_rag_hook_ordering_between_route_and_agent(tmp_path):
         order.append("agent")
         return _fake_agent()
 
-    run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
-                 rag_augment=True, retrieve_fn=retrieve_fn, construct_fn=construct_fn,
-                 run_agentic_fn=agent)
+    run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        rag_augment=True,
+        retrieve_fn=retrieve_fn,
+        construct_fn=construct_fn,
+        run_agentic_fn=agent,
+    )
 
     # scope, ux_design, implement are agent phases (retrieve -> construct -> agent);
     # verify is a test phase and is bypassed entirely.
@@ -887,9 +1060,17 @@ def test_rag_bypasses_test_phases(tmp_path):
     def construct_fn(request):
         return _FakeAugmented("AUG")
 
-    run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
-                 rag_augment=True, retrieve_fn=retrieve_fn, construct_fn=construct_fn,
-                 run_agentic_fn=lambda *a, **k: _fake_agent())
+    run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        rag_augment=True,
+        retrieve_fn=retrieve_fn,
+        construct_fn=construct_fn,
+        run_agentic_fn=lambda *a, **k: _fake_agent(),
+    )
 
     assert len(retrieve_calls) == 3  # verify (kind == test) is never augmented
 
@@ -908,9 +1089,17 @@ def test_rag_prompt_is_augmented_and_provenance_serialized(tmp_path):
         captured.append(prompt)
         return _fake_agent()
 
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
-                          rag_augment=True, retrieve_fn=retrieve_fn, construct_fn=construct_fn,
-                          run_agentic_fn=agent)
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        rag_augment=True,
+        retrieve_fn=retrieve_fn,
+        construct_fn=construct_fn,
+        run_agentic_fn=agent,
+    )
 
     assert captured[0].startswith("AUGMENTED: ")
     d = result.phases[0].to_dict()
@@ -940,9 +1129,17 @@ def test_rag_fallback_on_retrieve_failure(tmp_path):
         captured.append(prompt)
         return _fake_agent()
 
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
-                          rag_augment=True, retrieve_fn=retrieve_fn, construct_fn=construct_fn,
-                          run_agentic_fn=agent)
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        rag_augment=True,
+        retrieve_fn=retrieve_fn,
+        construct_fn=construct_fn,
+        run_agentic_fn=agent,
+    )
 
     assert result.phases[0].fallback_mode == "no_rag"
     assert result.phases[0].status == "ok"  # never blocked the phase
@@ -959,9 +1156,17 @@ def test_rag_fallback_on_construct_failure(tmp_path):
     def construct_fn(request):
         raise RuntimeError("constructor model down")
 
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
-                          rag_augment=True, retrieve_fn=retrieve_fn, construct_fn=construct_fn,
-                          run_agentic_fn=lambda *a, **k: _fake_agent())
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        rag_augment=True,
+        retrieve_fn=retrieve_fn,
+        construct_fn=construct_fn,
+        run_agentic_fn=lambda *a, **k: _fake_agent(),
+    )
 
     assert result.phases[0].fallback_mode == "no_rag"
     assert result.phases[0].status == "ok"
@@ -1030,15 +1235,23 @@ def test_default_retrieve_fn_degrades_to_no_rag_when_stores_down(tmp_path, monke
     def construct_fn(request):
         return _FakeAugmented("AUGMENTED: " + request.raw_work_item)
 
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
-                          rag_augment=True, construct_fn=construct_fn,
-                          run_agentic_fn=lambda *a, **k: _fake_agent())
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        rag_augment=True,
+        construct_fn=construct_fn,
+        run_agentic_fn=lambda *a, **k: _fake_agent(),
+    )
 
     assert result.phases[0].fallback_mode == "no_rag"
     assert result.phases[0].status == "ok"
 
 
 # ── Per-cell retrieval scope threading ──────────────────────────
+
 
 def test_cell_scope_uses_worktree_basename(tmp_path, monkeypatch):
     monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
@@ -1060,10 +1273,17 @@ def test_rag_empty_repository_id_defaults_to_cell_scope(tmp_path, monkeypatch):
         captured["acl_scope"] = kwargs.get("acl_scope")
         return _FakeAttempt([_FakeEvidence("k1", "x")])
 
-    run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
-                 rag_augment=True, retrieve_fn=retrieve_fn,
-                 construct_fn=lambda request: _FakeAugmented("AUG"),
-                 run_agentic_fn=lambda *a, **k: _fake_agent())
+    run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        rag_augment=True,
+        retrieve_fn=retrieve_fn,
+        construct_fn=lambda request: _FakeAugmented("AUG"),
+        run_agentic_fn=lambda *a, **k: _fake_agent(),
+    )
 
     # The empty scope resolves to the per-cell scope, not the global store.
     expected = f"self-{tmp_path.name}"
@@ -1081,11 +1301,18 @@ def test_rag_explicit_repository_id_is_preserved(tmp_path, monkeypatch):
         captured["acl_scope"] = kwargs.get("acl_scope")
         return _FakeAttempt([_FakeEvidence("k1", "x")])
 
-    run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
-                 rag_augment=True, rag_params={"repository_id": "shared-scope"},
-                 retrieve_fn=retrieve_fn,
-                 construct_fn=lambda request: _FakeAugmented("AUG"),
-                 run_agentic_fn=lambda *a, **k: _fake_agent())
+    run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        rag_augment=True,
+        rag_params={"repository_id": "shared-scope"},
+        retrieve_fn=retrieve_fn,
+        construct_fn=lambda request: _FakeAugmented("AUG"),
+        run_agentic_fn=lambda *a, **k: _fake_agent(),
+    )
 
     # The shared-scope override is preserved unchanged — never overwritten by the
     # per-cell default.
@@ -1168,7 +1395,9 @@ class _CloneCommitExecutor:
         subprocess.run(["git", "add", "-A"], cwd=self.clone, check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", f"[workflow] {request.phase_name} — g"],
-            cwd=self.clone, check=True, capture_output=True,
+            cwd=self.clone,
+            check=True,
+            capture_output=True,
         )
         return _fake_agent()
 
@@ -1189,9 +1418,7 @@ def test_run_clone_bookkeeping_reads_the_run_clone(tmp_path, monkeypatch):
 
     clone = tmp_path / "runs" / "run-x" / "repo"
     clone.parent.mkdir(parents=True)
-    subprocess.run(
-        ["git", "clone", "-q", "--no-hardlinks", str(wt), str(clone)], check=True
-    )
+    subprocess.run(["git", "clone", "-q", "--no-hardlinks", str(wt), str(clone)], check=True)
     for key, value in (("user.email", "t@t"), ("user.name", "t")):
         subprocess.run(["git", "config", key, value], cwd=clone, check=True)
 
@@ -1202,7 +1429,10 @@ def test_run_clone_bookkeeping_reads_the_run_clone(tmp_path, monkeypatch):
         [{"name": "p1", "kind": "agent", "prompt": "do p1", "requires_deliverable": True}]
     )
     result = run_workflow(
-        spec, goal="g", model="m", workdir=wt,
+        spec,
+        goal="g",
+        model="m",
+        workdir=wt,
         step_executor=_CloneCommitExecutor(clone),
     )
     ph = result.phases[0]
@@ -1242,7 +1472,10 @@ def test_finding_emit_defaults_on_for_committed_phases(tmp_path, monkeypatch):
     monkeypatch.setattr(workflow_runner, "_emit_self_finding", _recorder)
 
     result = run_workflow(
-        spec, goal="g", model="m", workdir=tmp_path,
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
         run_agentic_fn=_agent_writes_marker([]),
     )
     assert [p.phase for p in result.phases] == ["p1", "p2"]
@@ -1266,12 +1499,16 @@ def test_finding_emit_no_emit_marker_suppresses_phase(tmp_path, monkeypatch):
     )
     emitted: list[str] = []
     monkeypatch.setattr(
-        workflow_runner, "_emit_self_finding",
+        workflow_runner,
+        "_emit_self_finding",
         lambda pr, *, goal, scope: emitted.append(pr.phase),
     )
 
     result = run_workflow(
-        spec, goal="g", model="m", workdir=tmp_path,
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
         run_agentic_fn=_agent_writes_marker([]),
     )
     assert [p.phase for p in result.phases] == ["p1", "p2"]
@@ -1288,11 +1525,15 @@ def test_finding_emit_explicit_true_outranks_env_disarm(tmp_path, monkeypatch):
     spec = _emit_synth_spec([{"name": "p1", "kind": "agent", "prompt": "do p1"}])
     emitted: list[str] = []
     monkeypatch.setattr(
-        workflow_runner, "_emit_self_finding",
+        workflow_runner,
+        "_emit_self_finding",
         lambda pr, *, goal, scope: emitted.append(pr.phase),
     )
     result = run_workflow(
-        spec, goal="g", model="m", workdir=tmp_path,
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
         run_agentic_fn=_agent_writes_marker([]),
         rag_params={"emit_self": True},
     )
@@ -1308,11 +1549,15 @@ def test_finding_emit_explicit_false_outranks_default_on(tmp_path, monkeypatch):
     spec = _emit_synth_spec([{"name": "p1", "kind": "agent", "prompt": "do p1"}])
     emitted: list[str] = []
     monkeypatch.setattr(
-        workflow_runner, "_emit_self_finding",
+        workflow_runner,
+        "_emit_self_finding",
         lambda pr, *, goal, scope: emitted.append(pr.phase),
     )
     result = run_workflow(
-        spec, goal="g", model="m", workdir=tmp_path,
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
         run_agentic_fn=_agent_writes_marker([]),
         rag_params={"emit_self": False},
     )
@@ -1341,13 +1586,15 @@ def test_finding_emit_fires_when_agent_self_commits(tmp_path, monkeypatch):
         subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "[workflow] p1 — g"],
-            cwd=workdir, check=True,
+            cwd=workdir,
+            check=True,
         )
         return _fake_agent()
 
     emitted: list[tuple] = []
     monkeypatch.setattr(
-        workflow_runner, "_emit_self_finding",
+        workflow_runner,
+        "_emit_self_finding",
         lambda pr, *, goal, scope: emitted.append((pr.phase, pr.commit_hash, scope)),
     )
 
@@ -1384,12 +1631,13 @@ def test_finding_emit_default_run_writes_enriched_records(tmp_path, monkeypatch)
     monkeypatch.setattr(ki, "PROJECT_ROOT", tmp_path)
     published: list = []
     monkeypatch.setattr(ks, "connect", lambda: object())
-    monkeypatch.setattr(
-        ks, "publish_event", lambda r, e, **kw: published.append(e) or "0-1"
-    )
+    monkeypatch.setattr(ks, "publish_event", lambda r, e, **kw: published.append(e) or "0-1")
 
     result = run_workflow(
-        spec, goal="g", model="m", workdir=tmp_path,
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
         run_agentic_fn=_agent_writes_marker([]),
     )
     assert [p.phase for p in result.phases] == ["p1", "p2"]
@@ -1429,12 +1677,18 @@ def test_ledger_records_carry_spec_id(tmp_path):
     bump are indistinguishable in the ledger.
     """
     spec = load_spec(SPEC)
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path,
-                          commit=False, run_agentic_fn=lambda *a, **k: _fake_agent())
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        run_agentic_fn=lambda *a, **k: _fake_agent(),
+    )
 
     expected = f"{spec.name}@{spec.version}"
-    assert result.spec_id == expected                                  # job record
-    assert all(p.spec_id == expected for p in result.phases)           # attempt records
+    assert result.spec_id == expected  # job record
+    assert all(p.spec_id == expected for p in result.phases)  # attempt records
 
     serialized = result.to_dict()
     assert serialized["spec_id"] == expected
@@ -1477,26 +1731,41 @@ def _index_ledger(tmp_path: Path, goal: str, phases: list[dict]) -> SpecStatusEn
         json.dumps({"spec_name": "control_room_portal", "goal": goal, "phases": phases})
     )
     return SpecStatusEntry(
-        name="control_room_portal", version="0.2", status="runnable",
+        name="control_room_portal",
+        version="0.2",
+        status="runnable",
         spec_path="workflows/repository/control_room_portal.yaml",
-        last_run_at="2026-08-19T00:00:00+00:00", results_pointer=rel, n_runs=1,
+        last_run_at="2026-08-19T00:00:00+00:00",
+        results_pointer=rel,
+        n_runs=1,
     )
 
 
 def test_resume_falls_back_to_the_index_without_workflow_commits(tmp_path, monkeypatch):
     # tmp_path is not a git repo, so the git-log path finds nothing — exactly the case
     # the index fallback exists for.
-    entry = _index_ledger(tmp_path, "g", [
-        {"phase": "scope", "status": "ok"},
-        {"phase": "ux_design", "status": "ok"},
-        {"phase": "implement", "status": "failed"},
-    ])
+    entry = _index_ledger(
+        tmp_path,
+        "g",
+        [
+            {"phase": "scope", "status": "ok"},
+            {"phase": "ux_design", "status": "ok"},
+            {"phase": "implement", "status": "failed"},
+        ],
+    )
     monkeypatch.setattr(workflow_runner, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(spec_status, "index_entry", lambda name, **kw: entry)
 
     spec = load_spec(SPEC)
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, resume=True,
-                          commit=False, run_agentic_fn=lambda *a, **k: _fake_agent())
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        resume=True,
+        commit=False,
+        run_agentic_fn=lambda *a, **k: _fake_agent(),
+    )
     # scope/ux_design were ok in the ledger and are skipped; the failed implement re-runs.
     assert [p.phase for p in result.phases] == ["implement", "verify"]
 
@@ -1504,9 +1773,7 @@ def test_resume_falls_back_to_the_index_without_workflow_commits(tmp_path, monke
 def test_index_fallback_is_not_consulted_when_commits_exist(tmp_path, monkeypatch):
     """The git-log path stays primary — the pre-existing behaviour must not regress."""
     consulted = []
-    monkeypatch.setattr(
-        spec_status, "index_entry", lambda name, **kw: consulted.append(name)
-    )
+    monkeypatch.setattr(spec_status, "index_entry", lambda name, **kw: consulted.append(name))
     spec = load_spec(SPEC)
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
@@ -1521,17 +1788,24 @@ def test_index_fallback_is_not_consulted_when_commits_exist(tmp_path, monkeypatc
         return _fake_agent(ok=len(calls) < 2, error="boom")
 
     run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, resume=True,
-                          run_agentic_fn=lambda *a, **k: _fake_agent())
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        resume=True,
+        run_agentic_fn=lambda *a, **k: _fake_agent(),
+    )
     assert [p.phase for p in result.phases][0] == "ux_design"  # scope skipped via git log
-    assert consulted == []                                     # ... and the index untouched
+    assert consulted == []  # ... and the index untouched
 
 
 def test_index_fallback_requires_a_matching_goal(tmp_path, monkeypatch):
     # Phase names collide across workflows (scope/verify), so a ledger written for a
     # different goal must not let a resume skip work that was never done for this one.
-    entry = _index_ledger(tmp_path, "a completely different goal",
-                          [{"phase": "scope", "status": "ok"}])
+    entry = _index_ledger(
+        tmp_path, "a completely different goal", [{"phase": "scope", "status": "ok"}]
+    )
     monkeypatch.setattr(workflow_runner, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(spec_status, "index_entry", lambda name, **kw: entry)
 
@@ -1549,8 +1823,13 @@ def test_index_fallback_degrades_to_empty_on_any_failure(tmp_path, monkeypatch):
     monkeypatch.setattr(spec_status, "index_entry", lambda name, **kw: None)
     assert _completed_phases_from_index(spec, phase_names, "g") == set()
 
-    dangling = SpecStatusEntry(name="control_room_portal", version="0.2", status="runnable",
-                               spec_path="x.yaml", results_pointer="does/not/exist.json")
+    dangling = SpecStatusEntry(
+        name="control_room_portal",
+        version="0.2",
+        status="runnable",
+        spec_path="x.yaml",
+        results_pointer="does/not/exist.json",
+    )
     monkeypatch.setattr(spec_status, "index_entry", lambda name, **kw: dangling)
     assert _completed_phases_from_index(spec, phase_names, "g") == set()
 
@@ -1567,8 +1846,9 @@ def test_index_fallback_degrades_to_empty_on_any_failure(tmp_path, monkeypatch):
 def _avail_metrics():
     from agentic_dynamics.measurement.sonar import SONAR_STATUS_AVAILABLE, SonarMetrics
 
-    return SonarMetrics(project_key="exp_wt", analyzed=True, status=SONAR_STATUS_AVAILABLE,
-                        analyzed_sha="c" * 40)
+    return SonarMetrics(
+        project_key="exp_wt", analyzed=True, status=SONAR_STATUS_AVAILABLE, analyzed_sha="c" * 40
+    )
 
 
 def _issue(rule, severity, file_path, line):
@@ -1651,7 +1931,9 @@ def test_lsp_evidence_novelty_introduced_error_counts_one(monkeypatch, tmp_path)
         if n == 0:  # parent revision: clean
             return LSPReport(tool="mypy", language="python", available=True)
         return LSPReport(
-            tool="mypy", language="python", available=True,
+            tool="mypy",
+            language="python",
+            available=True,
             diagnostics=[LSPDiagnostic("error", "bad", "calc.py", 10, 5, "return-value")],
         )
 
@@ -1697,7 +1979,11 @@ def test_watchdog_sigterms_a_stalled_agent_and_fails_the_phase(tmp_path):
     release = threading.Event()
 
     result = run_workflow(
-        spec, goal="g", model="m", workdir=tmp_path, commit=False,
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
         phase_watchdog_min=0.03,  # 1.8s — the test's whole runtime budget
         run_agentic_fn=_watchdog_stalled_agent(killed, release),
     )
@@ -1735,8 +2021,13 @@ def test_watchdog_never_kills_a_compliant_agent(tmp_path):
         return _fake_agent()
 
     result = run_workflow(
-        spec, goal="g", model="m", workdir=tmp_path, commit=False,
-        phase_watchdog_min=0.03, run_agentic_fn=agent,
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        phase_watchdog_min=0.03,
+        run_agentic_fn=agent,
     )
     assert result.phases[0].status == "ok"
     assert result.phases[0].stall_evidence is None
@@ -1751,7 +2042,11 @@ def test_watchdog_threshold_env_override(tmp_path, monkeypatch):
     release = threading.Event()
 
     result = run_workflow(
-        spec, goal="g", model="m", workdir=tmp_path, commit=False,  # no explicit arg → env wins
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,  # no explicit arg → env wins
         run_agentic_fn=_watchdog_stalled_agent(killed, release),
     )
     assert result.phases[0].status == "failed"
@@ -1833,8 +2128,13 @@ def test_watchdog_explicit_arg_overrides_env(tmp_path, monkeypatch):
         return _fake_agent()
 
     result = run_workflow(
-        spec, goal="g", model="m", workdir=tmp_path, commit=False,
-        phase_watchdog_min=60.0, run_agentic_fn=agent,
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        phase_watchdog_min=60.0,
+        run_agentic_fn=agent,
     )
     assert result.phases[0].status == "ok"
     assert result.phases[0].stall_evidence is None
@@ -1847,7 +2147,11 @@ def test_watchdog_default_threshold_does_not_fire_for_a_quick_agent(tmp_path, mo
     monkeypatch.delenv("FINOPS_PHASE_WATCHDOG_MIN", raising=False)
     spec = load_spec(SPEC)
     result = run_workflow(
-        spec, goal="g", model="m", workdir=tmp_path, commit=False,
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
         run_agentic_fn=lambda *a, **k: _fake_agent(),
     )
     assert result.ok
@@ -1867,8 +2171,13 @@ def test_watchdog_zero_disables_it(tmp_path, monkeypatch):
         return _fake_agent()
 
     result = run_workflow(
-        spec, goal="g", model="m", workdir=tmp_path, commit=False,
-        phase_watchdog_min=0, run_agentic_fn=agent,
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        phase_watchdog_min=0,
+        run_agentic_fn=agent,
     )
     assert result.phases[0].status == "ok"
     assert all("watchdog" not in kw for kw in seen)  # no seam threaded to the agent
@@ -1884,8 +2193,9 @@ def test_watchdog_only_wraps_agent_phases(tmp_path):
         watchdogs.append(watchdog)
         return _fake_agent()
 
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
-                          run_agentic_fn=agent)
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path, commit=False, run_agentic_fn=agent
+    )
     # scope/ux_design/implement are agent phases → seam present; verify (kind=test) never calls agent.
     assert len(watchdogs) == 3
     assert all(w is not None for w in watchdogs)
@@ -1898,26 +2208,28 @@ def test_watchdog_only_wraps_agent_phases(tmp_path):
 #: Faithful reconstruction of the revamp2 p3 session's deploy event (the bash tool_use whose
 #: input deployed BOTH production hosts). The command is the one that silently overwrote the
 #: site twice — the replay proof the gate must catch.
-REVAMP2_DEPLOY_LINE = json.dumps({
-    "type": "tool_use",
-    "timestamp": 1787783173755,
-    "sessionID": "ses_fbfd53722ffeHBFPqC3B3fC6Se",
-    "part": {
-        "type": "tool",
-        "tool": "bash",
-        "callID": "call_revamp2_p3",
-        "state": {
-            "status": "completed",
-            "input": {
-                "command": "firebase deploy --only hosting && firebase deploy --only hosting --project agentic-dynamics",
-                "workdir": "/tmp/wt_site_revamp2/apps/website",
-                "timeout": 120000,
+REVAMP2_DEPLOY_LINE = json.dumps(
+    {
+        "type": "tool_use",
+        "timestamp": 1787783173755,
+        "sessionID": "ses_fbfd53722ffeHBFPqC3B3fC6Se",
+        "part": {
+            "type": "tool",
+            "tool": "bash",
+            "callID": "call_revamp2_p3",
+            "state": {
+                "status": "completed",
+                "input": {
+                    "command": "firebase deploy --only hosting && firebase deploy --only hosting --project agentic-dynamics",
+                    "workdir": "/tmp/wt_site_revamp2/apps/website",
+                    "timeout": 120000,
+                },
+                "output": "=== Deploying to 'ai-finops-rulebook'...\n\u2714 Deploy complete!\n"
+                "=== Deploying to 'agentic-dynamics'...\n\u2714 Deploy complete!\n",
             },
-            "output": "=== Deploying to 'ai-finops-rulebook'...\n\u2714 Deploy complete!\n"
-                      "=== Deploying to 'agentic-dynamics'...\n\u2714 Deploy complete!\n",
         },
-    },
-})
+    }
+)
 
 
 def _deploy_agent(transcript_line, *, deploy_in_all=False):
@@ -1944,8 +2256,14 @@ def test_deploy_gate_fails_a_non_deploy_phase_with_evidence(tmp_path):
     """(a) A fake agent session containing 'firebase deploy' in a non-deploy phase fails with
     DEPLOY_GATE + the quoted offending command, and the evidence rides the phase's ledger record."""
     spec = load_spec(SPEC)
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
-                          run_agentic_fn=_deploy_agent(REVAMP2_DEPLOY_LINE))
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        run_agentic_fn=_deploy_agent(REVAMP2_DEPLOY_LINE),
+    )
     p = result.phases[0]
     assert p.status == "failed"
     assert p.deploy_gate is not None
@@ -1964,8 +2282,14 @@ def test_deploy_gate_passes_a_deploy_allowed_phase(tmp_path):
     is about the marker, never a naming rule; later clean phases stay clean (per-phase transcript)."""
     spec = load_spec(SPEC)
     spec.workflow.params["phases"][0]["deploy_allowed"] = True  # scope may deploy
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
-                          run_agentic_fn=_deploy_agent(REVAMP2_DEPLOY_LINE))
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        run_agentic_fn=_deploy_agent(REVAMP2_DEPLOY_LINE),
+    )
     assert result.ok
     assert result.phases[0].status == "ok"
     assert result.phases[0].deploy_gate is None
@@ -1976,19 +2300,26 @@ def test_deploy_gate_not_triggered_by_clean_phases_or_test_phases(tmp_path):
     """A clean agent phase (no deploy command) and the test phase never trip the gate; a bash
     command that merely mentions firebase in text (not a deploy) is not a violation."""
     spec = load_spec(SPEC)
-    clean_line = json.dumps({
-        "type": "tool_use", "sessionID": "s",
-        "part": {"type": "tool", "tool": "bash",
-                 "state": {"input": {"command": "python scripts/build_data.py"}}},
-    })
+    clean_line = json.dumps(
+        {
+            "type": "tool_use",
+            "sessionID": "s",
+            "part": {
+                "type": "tool",
+                "tool": "bash",
+                "state": {"input": {"command": "python scripts/build_data.py"}},
+            },
+        }
+    )
 
     def agent(prompt, *, model, backend, workdir, **kwargs):
         _watchdog_transcript(workdir).parent.mkdir(parents=True, exist_ok=True)
         _watchdog_transcript(workdir).write_text(clean_line + "\n")
         return _fake_agent()
 
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
-                          run_agentic_fn=agent)
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path, commit=False, run_agentic_fn=agent
+    )
     assert result.ok
     assert all(p.deploy_gate is None for p in result.phases)
     assert result.phases[-1].kind == "test"
@@ -2022,8 +2353,14 @@ def test_deploy_gate_replay_revamp2_p3_session(tmp_path):
 
     # (1) the embedded reconstruction of the exact production-affecting command
     spec = load_spec(SPEC)
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
-                          run_agentic_fn=_deploy_agent(REVAMP2_DEPLOY_LINE))
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        run_agentic_fn=_deploy_agent(REVAMP2_DEPLOY_LINE),
+    )
     p = result.phases[0]
     assert p.status == "failed"
     assert p.deploy_gate["reason"] == "DEPLOY_GATE"
@@ -2104,7 +2441,9 @@ def test_commit_prefix_canonicalizes_a_plain_message_commit(tmp_path):
     assert subjects[0] == "[workflow] scope — g"
 
 
-def test_commit_prefix_gate_rewrites_a_plain_message_commit_with_hook_disabled(tmp_path, monkeypatch):
+def test_commit_prefix_gate_rewrites_a_plain_message_commit_with_hook_disabled(
+    tmp_path, monkeypatch
+):
     """(a2) With FINOPS_COMMIT_HOOK=0 (no commit-time hook) AND the explicit opt-in
     FINOPS_COMMIT_GATE=canonicalize, the gate's own rewrite path fires for a plain-message
     commit: the proper history rewrite prefixes the subject, the phase CONTINUES, and
@@ -2261,7 +2600,9 @@ def test_commit_prefix_passes_a_matching_commit(tmp_path):
             (Path(workdir) / "docs").mkdir(exist_ok=True)
             (Path(workdir) / "docs" / "scope.md").write_text("---\nstatus: accepted\n---\n\nscope")
             subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
-            subprocess.run(["git", "commit", "-q", "-m", "[workflow] scope — g done"], cwd=workdir, check=True)
+            subprocess.run(
+                ["git", "commit", "-q", "-m", "[workflow] scope — g done"], cwd=workdir, check=True
+            )
         return _fake_agent()
 
     result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
@@ -2288,7 +2629,7 @@ def test_commit_prefix_fires_even_when_the_phase_already_failed(tmp_path, monkey
     result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
     p = result.phases[0]
     assert p.status == "failed"
-    assert "boom" in p.error          # the agent's own failure stays visible
+    assert "boom" in p.error  # the agent's own failure stays visible
     assert "COMMIT_PREFIX" in p.error  # ... and the commit violation is appended
     assert p.commit_gate and p.commit_gate["reason"] == "COMMIT_PREFIX"
 
@@ -2315,7 +2656,9 @@ def test_commit_prefix_replay_rejects_revamp2_plain_commits(tmp_path, monkeypatc
 
     # (1) the validator rejects all 7 plain commits ...
     for subject in REVAMP2_PLAIN_COMMITS:
-        assert wr._commit_subject_matches(subject, "p1_implement_inventory", goal_prefix) is False, subject
+        assert (
+            wr._commit_subject_matches(subject, "p1_implement_inventory", goal_prefix) is False
+        ), subject
     # ... and accepts the phase's own workflow commit (the runner's _git_commit shape)
     ok = f"[workflow] p1_implement_inventory — {REVAMP2_GOAL}:"
     assert wr._commit_subject_matches(ok, "p1_implement_inventory", goal_prefix) is True
@@ -2332,7 +2675,9 @@ def test_commit_prefix_replay_rejects_revamp2_plain_commits(tmp_path, monkeypatc
             subprocess.run(["git", "commit", "-q", "-m", subject], cwd=workdir, check=True)
         return _fake_agent()
 
-    result = run_workflow(spec, goal=REVAMP2_GOAL, model="m", workdir=tmp_path, run_agentic_fn=agent)
+    result = run_workflow(
+        spec, goal=REVAMP2_GOAL, model="m", workdir=tmp_path, run_agentic_fn=agent
+    )
     p = result.phases[0]
     assert p.status == "failed"
     assert p.commit_gate and p.commit_gate["reason"] == "COMMIT_PREFIX"
@@ -2353,10 +2698,13 @@ def test_commit_prefix_exempts_the_adapters_initial_commit(tmp_path, monkeypatch
 
     spec = load_spec(SPEC)
     _git_init(tmp_path)
+
     # the worktree starts EMPTY of commits; the fake simulates the adapter's _init_git_workdir
     # creating its "Initial" commit DURING the phase under the runner's init identity
     def agent(prompt, *, model, backend, workdir, **kwargs):
-        subprocess.run(["git", "config", "user.email", wr.RUNNER_INIT_AUTHOR_EMAIL], cwd=workdir, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", wr.RUNNER_INIT_AUTHOR_EMAIL], cwd=workdir, check=True
+        )
         subprocess.run(["git", "config", "user.name", "Experiment Runner"], cwd=workdir, check=True)
         (Path(workdir) / "seed.txt").write_text("seed")
         subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
@@ -2369,7 +2717,9 @@ def test_commit_prefix_exempts_the_adapters_initial_commit(tmp_path, monkeypatch
 
     # same forged identity, but a plain-message commit — NOT exempt (subject != "Initial")
     def agent_bad(prompt, *, model, backend, workdir, **kwargs):
-        subprocess.run(["git", "config", "user.email", wr.RUNNER_INIT_AUTHOR_EMAIL], cwd=workdir, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", wr.RUNNER_INIT_AUTHOR_EMAIL], cwd=workdir, check=True
+        )
         subprocess.run(["git", "config", "user.name", "Experiment Runner"], cwd=workdir, check=True)
         (Path(workdir) / "seed2.txt").write_text("changed")  # a NEW change → a real commit
         subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
@@ -2386,7 +2736,9 @@ def test_commit_prefix_exempts_the_adapters_initial_commit(tmp_path, monkeypatch
 # ── P0 fix: commit-prefix canonicalization is safe only for a single offender at HEAD ──
 
 
-def test_commit_prefix_seven_commit_range_with_violations_is_rewritten_in_canonicalize_mode(tmp_path, monkeypatch):
+def test_commit_prefix_seven_commit_range_with_violations_is_rewritten_in_canonicalize_mode(
+    tmp_path, monkeypatch
+):
     """(Drawing-board fix) A seven-commit phase range with violations at the beginning,
     middle, and end IS self-healed in canonicalize mode: the gate rewrites EVERY offender's
     subject via the proper history rewrite (git filter-branch over the exact range — the
@@ -2400,13 +2752,13 @@ def test_commit_prefix_seven_commit_range_with_violations_is_rewritten_in_canoni
     spec = load_spec(SPEC)
     _git_init(tmp_path)
     subjects = [
-        "beginning bad",            # violation — the FIRST commit of the range
-        "[workflow] scope — g",     # conforming
-        "[workflow] scope — g",     # conforming
-        "middle bad",               # violation — in the middle
-        "[workflow] scope — g",     # conforming
-        "[workflow] scope — g",     # conforming
-        "end bad",                  # violation — at HEAD
+        "beginning bad",  # violation — the FIRST commit of the range
+        "[workflow] scope — g",  # conforming
+        "[workflow] scope — g",  # conforming
+        "middle bad",  # violation — in the middle
+        "[workflow] scope — g",  # conforming
+        "[workflow] scope — g",  # conforming
+        "end bad",  # violation — at HEAD
     ]
     made = []
     calls: list[int] = []
@@ -2437,7 +2789,9 @@ def test_commit_prefix_seven_commit_range_with_violations_is_rewritten_in_canoni
     assert result.ok
 
 
-def test_commit_prefix_seven_commit_range_with_violations_fails_strict_in_strict_mode(tmp_path, monkeypatch):
+def test_commit_prefix_seven_commit_range_with_violations_fails_strict_in_strict_mode(
+    tmp_path, monkeypatch
+):
     """(P0) Same seven-commit range under FINOPS_COMMIT_GATE=strict: the strict mode never
     amends anything, so the run fails with COMMIT_PREFIX + the same full evidence."""
     monkeypatch.setenv("FINOPS_COMMIT_GATE", "strict")
@@ -2521,11 +2875,17 @@ def test_commit_prefix_rewrites_a_single_bad_commit_with_hook_disabled(tmp_path,
     # the rewrite preserved the TREE — only the message changed (content-addressed proof)
     orig_tree = subprocess.run(
         ["git", "rev-parse", f"{original_sha}^{{tree}}"],
-        cwd=tmp_path, capture_output=True, text=True, check=True,
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout.strip()
     new_tree = subprocess.run(
         ["git", "rev-parse", f"{rewritten_sha}^{{tree}}"],
-        cwd=tmp_path, capture_output=True, text=True, check=True,
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout.strip()
     assert orig_tree == new_tree
     assert result.ok
@@ -2570,12 +2930,18 @@ def test_commit_prefix_rewrites_a_single_bad_commit_not_at_head(tmp_path, monkey
     assert good_subject == "[workflow] scope — g"
     # the good commit's TREE is preserved (messages-only rewrite)
     good_tree = subprocess.run(
-        ["git", "rev-parse", f"{good_sha}^{{tree}}"], cwd=tmp_path,
-        capture_output=True, text=True, check=True,
+        ["git", "rev-parse", f"{good_sha}^{{tree}}"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout.strip()
     head_tree = subprocess.run(
-        ["git", "rev-parse", "HEAD^{tree}"], cwd=tmp_path,
-        capture_output=True, text=True, check=True,
+        ["git", "rev-parse", "HEAD^{tree}"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout.strip()
     assert head_tree == good_tree
     assert result.ok
@@ -2605,9 +2971,6 @@ def test_commit_prefix_handles_a_goal_whose_40th_char_is_a_space(tmp_path):
         ["git", "log", "--format=%s"], cwd=tmp_path, capture_output=True, text=True
     ).stdout.splitlines()
     assert subjects[0].startswith("[workflow] scope — Verify the I10 typed-checkpoint capture")
-
-
-
 
 
 def test_doc_contract_fails_a_phase_that_commits_a_doc_without_frontmatter(tmp_path):
@@ -2648,7 +3011,9 @@ def test_doc_contract_passes_a_doc_with_valid_status_frontmatter(tmp_path):
         )
         (Path(workdir) / "docs" / "scope.md").write_text("---\nstatus: accepted\n---\n\nscope")
         subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
-        subprocess.run(["git", "commit", "-q", "-m", "[workflow] scope — g done"], cwd=workdir, check=True)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "[workflow] scope — g done"], cwd=workdir, check=True
+        )
         return _fake_agent()
 
     result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
@@ -2666,14 +3031,15 @@ def test_doc_contract_ignores_unknown_status_values(tmp_path):
         (Path(workdir) / "docs").mkdir(parents=True, exist_ok=True)
         (Path(workdir) / "docs" / "scope.md").write_text("---\nstatus: draft\n---\n\nscope")
         subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
-        subprocess.run(["git", "commit", "-q", "-m", "[workflow] scope — g done"], cwd=workdir, check=True)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "[workflow] scope — g done"], cwd=workdir, check=True
+        )
         return _fake_agent()
 
     result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
     p = result.phases[0]
     assert p.status == "failed"
     assert p.commit_gate["reason"] == "DOC_CONTRACT"
-
 
 
 def test_commit_msg_hook_works_in_a_worktree_shape(tmp_path):
@@ -2751,7 +3117,6 @@ def test_commit_prefix_rewrites_in_a_worktree_shape(tmp_path, monkeypatch):
     assert subjects == ["[workflow] scope — g", "[workflow] scope — g", "Initial"]
 
 
-
 def test_watchdog_sees_through_a_junk_heartbeat(tmp_path):
     """(p5-1) A stalled agent that touches the session file with junk heartbeats — non-JSON
     lines AND valid-JSON-but-not-a-step dicts — is STILL caught: the stall clock advances only
@@ -2773,8 +3138,15 @@ def test_watchdog_sees_through_a_junk_heartbeat(tmp_path):
             release.wait(timeout=0.15)
         return _fake_agent()
 
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
-                          phase_watchdog_min=0.03, run_agentic_fn=agent)
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        phase_watchdog_min=0.03,
+        run_agentic_fn=agent,
+    )
     p = result.phases[0]
     assert p.status == "failed"
     assert p.stall_evidence and p.stall_evidence["reason"] == "STALLED"
@@ -2804,8 +3176,15 @@ def test_watchdog_cannot_distinguish_a_forged_valid_step(tmp_path):
                 fh.write('{"type": "step_finish"}\n')
         return _fake_agent()
 
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
-                          phase_watchdog_min=0.03, run_agentic_fn=agent)
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        phase_watchdog_min=0.03,
+        run_agentic_fn=agent,
+    )
     assert result.phases[0].status == "ok"
     assert killed == []
 
@@ -2814,10 +3193,10 @@ def test_watchdog_cannot_distinguish_a_forged_valid_step(tmp_path):
 
 DEPLOY_EVASION_COMMANDS = [
     ("firebase deploy --only hosting", {"workdir": "/somewhere/else"}),  # different cwd
-    ("firebase --help > /dev/null && firebase deploy", {}),              # pre-command obfuscation
-    ("npx firebase-tools deploy --only hosting", {}),                    # npx form
-    ("true; firebase deploy --only hosting", {}),                        # chained
-    ("firebase deploy --only hosting --project agentic-dynamics", {}),   # mirror host explicit
+    ("firebase --help > /dev/null && firebase deploy", {}),  # pre-command obfuscation
+    ("npx firebase-tools deploy --only hosting", {}),  # npx form
+    ("true; firebase deploy --only hosting", {}),  # chained
+    ("firebase deploy --only hosting --project agentic-dynamics", {}),  # mirror host explicit
 ]
 
 
@@ -2828,18 +3207,31 @@ def test_deploy_gate_evasion_attempts_that_are_caught(tmp_path):
     from agentic_dynamics.runtime import workflow_runner as wr
 
     for command, extra in DEPLOY_EVASION_COMMANDS:
-        line = json.dumps({
-            "type": "tool_use", "sessionID": "s",
-            "part": {"type": "tool", "tool": "bash", "state": {
-                "status": "completed",
-                "input": {"command": command, "workdir": extra.get("workdir", "/tmp/w")},
-                "output": "",
-            }},
-        })
+        line = json.dumps(
+            {
+                "type": "tool_use",
+                "sessionID": "s",
+                "part": {
+                    "type": "tool",
+                    "tool": "bash",
+                    "state": {
+                        "status": "completed",
+                        "input": {"command": command, "workdir": extra.get("workdir", "/tmp/w")},
+                        "output": "",
+                    },
+                },
+            }
+        )
         assert wr._deploy_pattern_match(command) is not None, command
         spec = load_spec(SPEC)
-        result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
-                              run_agentic_fn=_deploy_agent(line))
+        result = run_workflow(
+            spec,
+            goal="g",
+            model="m",
+            workdir=tmp_path,
+            commit=False,
+            run_agentic_fn=_deploy_agent(line),
+        )
         p = result.phases[0]
         assert p.status == "failed", command
         assert p.deploy_gate and p.deploy_gate["reason"] == "DEPLOY_GATE", command
@@ -2850,18 +3242,34 @@ def test_deploy_gate_catches_a_deploy_script_by_its_output(tmp_path):
     """(p5-2) Indirection caught by the OUTPUT tier: a script file (``./deploy.sh``) whose bash
     input contains no 'firebase' literal but whose captured output shows the production deploy
     banner is still caught — a real firebase deploy prints the banner however it is invoked."""
-    line = json.dumps({
-        "type": "tool_use", "sessionID": "s",
-        "part": {"type": "tool", "tool": "bash", "state": {
-            "status": "completed",
-            "input": {"command": "./deploy.sh", "workdir": "/tmp/wt_site_revamp2/apps/website"},
-            "output": "\n=== Deploying to 'ai-finops-rulebook'...\n\u2714 Deploy complete!\n"
-                      "Hosting URL: https://ai-finops-rulebook.web.app\n",
-        }},
-    })
+    line = json.dumps(
+        {
+            "type": "tool_use",
+            "sessionID": "s",
+            "part": {
+                "type": "tool",
+                "tool": "bash",
+                "state": {
+                    "status": "completed",
+                    "input": {
+                        "command": "./deploy.sh",
+                        "workdir": "/tmp/wt_site_revamp2/apps/website",
+                    },
+                    "output": "\n=== Deploying to 'ai-finops-rulebook'...\n\u2714 Deploy complete!\n"
+                    "Hosting URL: https://ai-finops-rulebook.web.app\n",
+                },
+            },
+        }
+    )
     spec = load_spec(SPEC)
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
-                          run_agentic_fn=_deploy_agent(line))
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        run_agentic_fn=_deploy_agent(line),
+    )
     p = result.phases[0]
     assert p.status == "failed"
     assert p.deploy_gate and p.deploy_gate["reason"] == "DEPLOY_GATE"
@@ -2877,15 +3285,24 @@ def test_deploy_gate_variable_indirection_without_a_banner_is_a_limitation(tmp_p
     fixed. The test pins the boundary so a future hardening knows where it stands."""
     from agentic_dynamics.runtime import workflow_runner as wr
 
-    line = json.dumps({
-        "type": "tool_use", "sessionID": "s",
-        "part": {"type": "tool", "tool": "bash", "state": {
-            "status": "completed",
-            "input": {"command": "$DEPLOY --only hosting --project agentic-dynamics",
-                      "workdir": "/tmp/apps/website"},
-            "output": "ok",  # a wrapper that swallows the deploy banner
-        }},
-    })
+    line = json.dumps(
+        {
+            "type": "tool_use",
+            "sessionID": "s",
+            "part": {
+                "type": "tool",
+                "tool": "bash",
+                "state": {
+                    "status": "completed",
+                    "input": {
+                        "command": "$DEPLOY --only hosting --project agentic-dynamics",
+                        "workdir": "/tmp/apps/website",
+                    },
+                    "output": "ok",  # a wrapper that swallows the deploy banner
+                },
+            },
+        }
+    )
     transcript = Path(tmp_path) / "lim.jsonl"
     transcript.write_text(line + "\n")
     assert wr._scan_transcript_for_deploys(transcript) == []
@@ -2901,14 +3318,20 @@ def test_commit_prefix_evasion_attempts_that_are_caught(tmp_path):
     from agentic_dynamics.runtime import workflow_runner as wr
 
     goal_prefix = "g"
-    assert wr._commit_subject_matches("[workflow] p3_dom_verification — g", "scope", goal_prefix) is False
+    assert (
+        wr._commit_subject_matches("[workflow] p3_dom_verification — g", "scope", goal_prefix)
+        is False
+    )
     assert wr._commit_subject_matches("[workflow] scope - g", "scope", goal_prefix) is False
     assert wr._commit_subject_matches("[workflow] scope -- g", "scope", goal_prefix) is False
     assert wr._commit_subject_matches("[workflow] scope —— g", "scope", goal_prefix) is False
     assert wr._commit_subject_matches("[workflow] scope —g", "scope", goal_prefix) is False
     assert wr._commit_subject_matches("[workflow] scope — g", "scope", goal_prefix) is True
     # a WRONG goal prefix is rejected (already covered, kept for the attack matrix)
-    assert wr._commit_subject_matches("[workflow] scope — different goal", "scope", goal_prefix) is False
+    assert (
+        wr._commit_subject_matches("[workflow] scope — different goal", "scope", goal_prefix)
+        is False
+    )
 
 
 def test_commit_prefix_trailing_content_after_a_valid_prefix_matches(tmp_path):
@@ -3056,8 +3479,14 @@ def test_checkpoint_phase_records_a_typed_checkpoint_record(tmp_path, monkeypatc
         (Path(workdir) / "docs" / "design.md").write_text("delta preview")
         return _fake_agent()
 
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path,
-                          run_agentic_fn=agent, publisher_factory=FakePublisher)
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        run_agentic_fn=agent,
+        publisher_factory=FakePublisher,
+    )
     assert result.awaiting is True
     assert result.awaiting_phase == "design"
     assert result.awaiting_reason == "checkpoint"
@@ -3117,8 +3546,7 @@ def test_resume_refusal_records_rejected_checkpoint_decision(tmp_path, monkeypat
         calls.append(1)
         return _fake_agent()
 
-    result = run_workflow(spec, goal="g", model="m", workdir=wd,
-                          run_agentic_fn=agent, resume=True)
+    result = run_workflow(spec, goal="g", model="m", workdir=wd, run_agentic_fn=agent, resume=True)
     assert calls == []  # nothing ran
     assert result.awaiting is True
     assert result.awaiting_reason == "approval_refused"
@@ -3149,8 +3577,13 @@ def test_resume_with_approval_records_approved_checkpoint_decision(tmp_path, mon
     spec = _checkpoint_spec(tmp_path)
     wd = _completed_checkpoint_wd(tmp_path / "wd")
     import subprocess as _sp
-    ck = _sp.run(["git", "rev-parse", "HEAD"], cwd=wd, capture_output=True, text=True).stdout.strip()
-    tree = _sp.run(["git", "rev-parse", "HEAD^{tree}"], cwd=wd, capture_output=True, text=True).stdout.strip()
+
+    ck = _sp.run(
+        ["git", "rev-parse", "HEAD"], cwd=wd, capture_output=True, text=True
+    ).stdout.strip()
+    tree = _sp.run(
+        ["git", "rev-parse", "HEAD^{tree}"], cwd=wd, capture_output=True, text=True
+    ).stdout.strip()
     ap = wd / "approvals" / spec.name
     ap.mkdir(parents=True)
     (ap / "design_approval.md").write_text(
@@ -3164,8 +3597,7 @@ def test_resume_with_approval_records_approved_checkpoint_decision(tmp_path, mon
         (Path(workdir) / "docs" / "impl.md").write_text("implemented")
         return _fake_agent()
 
-    result = run_workflow(spec, goal="g", model="m", workdir=wd,
-                          run_agentic_fn=agent, resume=True)
+    result = run_workflow(spec, goal="g", model="m", workdir=wd, run_agentic_fn=agent, resume=True)
     assert result.awaiting is False
     assert [p.phase for p in result.phases] == ["implement"]
     assert result.ok is True
@@ -3199,8 +3631,12 @@ def test_checkpoint_ledger_round_trips_spec_status_style(tmp_path):
         "started_at": "2026-08-19T14:25:30.123456+00:00",
         "ended_at": "2026-08-19T14:26:30.123456+00:00",
         "phases": [
-            {"phase": "design", "status": "awaiting", "cost_usd": 0.012,
-             "tokens": {"in": 1, "out": 2}},
+            {
+                "phase": "design",
+                "status": "awaiting",
+                "cost_usd": 0.012,
+                "tokens": {"in": 1, "out": 2},
+            },
         ],
     }
     (spec_dir / "legacy.json").write_text(json.dumps(legacy))
@@ -3208,13 +3644,23 @@ def test_checkpoint_ledger_round_trips_spec_status_style(tmp_path):
     # new I10 ledger — checkpoints present (one typed record)
     new = dict(legacy)
     new["ended_at"] = "2026-08-19T14:27:30.123456+00:00"
-    new["checkpoints"] = [{
-        "phase": "design", "phase_index": 1, "reason": "checkpoint_reached",
-        "approval_path": str(spec_dir / "approvals" / "cap_site_revamp3" / "design_approval.md"),
-        "decision": "awaiting", "reached_at": "2026-08-19T14:26:30.123456+00:00",
-        "decided_at": "2026-08-19T14:26:30.123456+00:00", "cost_usd": 0.012,
-        "tokens": {"in": 1, "out": 2}, "commit_hash": "abc123", "approval_evidence": None,
-    }]
+    new["checkpoints"] = [
+        {
+            "phase": "design",
+            "phase_index": 1,
+            "reason": "checkpoint_reached",
+            "approval_path": str(
+                spec_dir / "approvals" / "cap_site_revamp3" / "design_approval.md"
+            ),
+            "decision": "awaiting",
+            "reached_at": "2026-08-19T14:26:30.123456+00:00",
+            "decided_at": "2026-08-19T14:26:30.123456+00:00",
+            "cost_usd": 0.012,
+            "tokens": {"in": 1, "out": 2},
+            "commit_hash": "abc123",
+            "approval_evidence": None,
+        }
+    ]
     (spec_dir / "new.json").write_text(json.dumps(new))
 
     # spec_status-style loader: both ledgers project; the new key never changes the projection
@@ -3239,8 +3685,14 @@ def test_checkpoint_ledger_round_trips_spec_status_style(tmp_path):
     plain_yaml = CHECKPOINT_SPEC_YAML.replace("        checkpoint: true\n", "")
     plain_path = tmp_path / "plain.yaml"
     plain_path.write_text(plain_yaml)
-    plain = run_workflow(load_spec(plain_path), goal="g", model="m", workdir=tmp_path,
-                         commit=False, run_agentic_fn=lambda *a, **k: _fake_agent())
+    plain = run_workflow(
+        load_spec(plain_path),
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        run_agentic_fn=lambda *a, **k: _fake_agent(),
+    )
     assert plain.checkpoints == []
     assert plain.to_dict()["checkpoints"] == []
 
@@ -3252,20 +3704,30 @@ def test_deploy_gate_ignores_argument_position_firebase_mentions(tmp_path):
     The OUTPUT tier still catches real indirection (a script that reaches firebase prints
     the deploy banner)."""
     spec = load_spec(SPEC)
-    mention = json.dumps({
-        "type": "tool_use", "sessionID": "s",
-        "part": {"type": "tool", "tool": "bash",
-                 "state": {"input": {"command":
-                     "git commit -m \"[workflow] a4 — the AIO definition states: firebase deploy *: ask\""}}},
-    })
+    mention = json.dumps(
+        {
+            "type": "tool_use",
+            "sessionID": "s",
+            "part": {
+                "type": "tool",
+                "tool": "bash",
+                "state": {
+                    "input": {
+                        "command": 'git commit -m "[workflow] a4 — the AIO definition states: firebase deploy *: ask"'
+                    }
+                },
+            },
+        }
+    )
 
     def agent(prompt, *, model, backend, workdir, **kwargs):
         _watchdog_transcript(workdir).parent.mkdir(parents=True, exist_ok=True)
         _watchdog_transcript(workdir).write_text(mention + "\n")
         return _fake_agent()
 
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
-                          run_agentic_fn=agent)
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path, commit=False, run_agentic_fn=agent
+    )
     assert result.ok
     assert all(p.deploy_gate is None for p in result.phases)
 
@@ -3284,8 +3746,14 @@ def test_test_phase_with_phantom_target_is_a_false_green_guard(tmp_path):
     else:
         raise AssertionError("SPEC has no test phase")
 
-    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
-                          run_agentic_fn=lambda *a, **k: _fake_agent())
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        run_agentic_fn=lambda *a, **k: _fake_agent(),
+    )
     test_phase = [p for p in result.phases if p.kind == "test"][0]
     assert test_phase.status == "failed"  # zero tests is a failure, never ok
     assert test_phase.test_executed_success is False
@@ -3375,9 +3843,7 @@ def test_partial_self_commit_with_failed_final_commit_is_not_adopted(tmp_path, m
         # (1) the agent self-commits an initial part of the work
         (wd / "partial.txt").write_text("partial")
         subprocess.run(["git", "add", "-A"], cwd=wd, check=True)
-        subprocess.run(
-            ["git", "commit", "-q", "-m", "[workflow] p1 — g"], cwd=wd, check=True
-        )
+        subprocess.run(["git", "commit", "-q", "-m", "[workflow] p1 — g"], cwd=wd, check=True)
         # (2) the agent writes the final deliverable, committed only by the runner
         (wd / "deliverable.txt").write_text("final deliverable")
         # (3) a pre-commit hook rejects the runner's final commit
@@ -3419,9 +3885,7 @@ def test_clean_self_commit_is_adopted(tmp_path, monkeypatch):
         wd = Path(workdir)
         (wd / "work.txt").write_text("agent's own committed work")
         subprocess.run(["git", "add", "-A"], cwd=wd, check=True)
-        subprocess.run(
-            ["git", "commit", "-q", "-m", "[workflow] p1 — g"], cwd=wd, check=True
-        )
+        subprocess.run(["git", "commit", "-q", "-m", "[workflow] p1 — g"], cwd=wd, check=True)
         return _fake_agent()
 
     result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
@@ -3495,8 +3959,14 @@ def test_wall_burned_phase_without_a_deliverable_fails(tmp_path):
         return _fake_agent()
 
     result = run_workflow(
-        spec, goal="g", model="m", workdir=tmp_path, commit=True,
-        phase_watchdog_min=0, timeout=1, run_agentic_fn=agent,
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=True,
+        phase_watchdog_min=0,
+        timeout=1,
+        run_agentic_fn=agent,
     )
     phase = result.phases[0]
     assert phase.timed_out is True

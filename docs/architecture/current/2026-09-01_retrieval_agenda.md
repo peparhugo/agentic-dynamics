@@ -116,8 +116,10 @@ drop the other guard families when claiming the full slice-4 result.
   `retrieve -> construct -> render` seam. Retrieval and construction failures return the base
   prompt with a named fallback mode; the seam does not write to the knowledge base.
 - `src/agentic_dynamics/runtime/workflow_runner.py` resolves augmentation from an explicit
-  argument, then `workflow.params.rag_augment`, then `False`. Therefore the seam is default OFF,
-  although a workflow may opt in. Test phases bypass it.
+  argument, then `workflow.params.rag_augment`, then `True` (**2026-09-24, the controller's
+  on-by-default directive** — the runs use the knowledge plane; the cell network reaches the
+  Neo4j store by name). A workflow may opt out with `rag_augment: false` (the rollback); the
+  previous default-OFF posture made every run blind. Test phases bypass it.
 - `PatternPayload` exists as a frozen typed payload in `control/facts.py`, and
   `control/reducers/pattern.py` deterministically encodes it into a canonical `pattern` fact.
   The reducer carries claim, population, conditions, support, uncertainty, validity window, and
