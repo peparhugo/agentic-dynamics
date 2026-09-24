@@ -134,7 +134,15 @@ workflow:
           `tests/test_doc_lifecycle.py` — never a command string and never flags
           (`pytest tests/... -q` as a list entry is INVALID and fails that unit's gate; attempt
           3's lesson); non-pytest proofs (a generator `--check`) go in the unit's
-          `goal`/`acceptance` for the slice to run, not in `tests`; when in doubt, SPLIT — more
+          `goal`/`acceptance` for the slice to run, not in `tests`; declare ONLY CELL-SAFE
+          targets — the verifier runs in a read-only cell with NO Redis/Neo4j/network, so a
+          suite that connects to a live service FAILS in-cell although it passes on the host
+          (`tests/test_knowledge_stream.py` carries 93 Redis references and failed u4's gate;
+          register L45 warned this); the vetted cell-safe set is the five declared gate suites
+          plus pure/monkeypatched suites — if a service-backed test is needed, put it in a
+          cell-safe suite or make it hermetic; also declare EXISTING targets only (a suite file
+          or an already-existing nodeid) — never invent a nodeid for a test the slice will
+          create (declare the FILE it adds the test to); when in doubt, SPLIT — more
           small units beat fewer large ones, and the cap (12) is a ceiling, not a target. A unit that cannot be accepted independently is not a
           unit; neither is a unit too big to prove with one gate (register L48 / the skeleton
           contract's selection + size rules). Small, test-backed, landable units for this run;

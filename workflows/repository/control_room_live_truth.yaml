@@ -131,10 +131,16 @@ workflow:
           `::nodeid`); never a command string and never flags (`pytest tests/... -q` or
           `python3 scripts/... --check` as a list entry is INVALID and fails that unit's gate;
           2026-09-23's lesson); non-pytest proofs go in the unit's `goal`/`acceptance` for the
-          slice to run, not in `tests` (suggested coverage: run-scoped
-          stream; feed fidelity/normalization; identifier resolution; child activity; activity
-          legibility; gate+fixture updates). When in doubt, SPLIT — more small units beat
-          fewer large ones. Write `notes/sources.jsonl`. Commit — `notes/` is gitignored, so
+          slice to run, not in `tests`; declare ONLY CELL-SAFE targets — the verifier runs in a
+          read-only cell with NO Redis/Neo4j/network, so a suite that connects to a live
+          service FAILS in-cell although it passes on the host (register L45's audit; the
+          vetted cell-safe set is the five declared gate suites plus pure/monkeypatched
+          suites); declare EXISTING targets only — a suite file, or a nodeid that already
+          exists on main; NEVER invent a nodeid for a test the slice will create (u3's lesson:
+          the declared `test_resolve_live_cell_maps_a_run_id_to_its_phase_stream` was
+          implemented as `..._recorded_event_stream` and the gate found nothing — when a unit
+          adds a NEW test, declare the FILE it adds it to); when in doubt,
+          SPLIT — more small units beat fewer large ones. Write `notes/sources.jsonl`. Commit — `notes/` is gitignored, so
           stage the notes explicitly (`git add -f notes/`) before committing; a plain
           `git add` refuses ignored paths and the phase then records no commit. Write and COMMIT
           `notes/` EARLY, then refine. NEVER run long waits or `sleep` — there is nothing to
