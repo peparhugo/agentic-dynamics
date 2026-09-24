@@ -264,6 +264,38 @@ def _disarm_finding_emit(monkeypatch):
     monkeypatch.setenv("FINOPS_EMIT_SELF", "0")
 
 
+@pytest.fixture(autouse=True)
+def _no_real_retrieval_stores(monkeypatch):
+    """Keep engine tests off the knowledge plane (2026-09-24: the RAG seam defaults ON).
+
+    ``run_workflow`` now resolves augmentation by default, so without this every engine test
+    would construct the real Neo4j/ollama clients and stall on their timeouts (observed live:
+    the suite blocking inside the ollama embedder). The stubs return an EMPTY attempt — no
+    candidates, so the seam takes its named ``no_rag`` fallback and prompts stay
+    byte-identical. Tests that exercise the seam inject their own functions (unaffected);
+    the real factories keep their own targeted tests, and the fleet is where they run live.
+    """
+    import agentic_dynamics.runtime.workflow_runner as wr
+
+    class _EmptyAttempt:
+        selected_evidence: tuple = ()
+        fallback_mode = "no_rag"
+        retrieval_attempt_id = ""
+        leg_errors: dict = {}
+
+    def _no_retrieve(**kwargs):
+        return _EmptyAttempt()
+
+    def _no_construct(rag_params, run_agent):
+        def _construct(request):
+            raise RuntimeError("test stub: no real prompt constructor")
+
+        return _construct
+
+    monkeypatch.setattr(wr, "default_retrieve_fn", lambda: _no_retrieve)
+    monkeypatch.setattr(wr, "default_construct_fn", _no_construct)
+
+
 def _corpus_present() -> bool:
     """The canonical corpus (registry + aggregates) lives on disk post-migration.
 

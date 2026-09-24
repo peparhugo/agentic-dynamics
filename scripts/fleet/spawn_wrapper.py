@@ -160,6 +160,7 @@ from workflows.compile_workflow import load_spec_any  # noqa: E402
 # values from the SAME config, so a spawn request can never name a repo alias the validator
 # does not also derive.
 
+
 #: The default PathConfig the wrapper's request-builders and validators derive from when the
 #: caller does not pass one — the environment at call time, validated once (a missing repo root
 #: is refused). "Every consumer takes it as a parameter": a caller that cares about a specific
@@ -341,13 +342,30 @@ LEASE_FIELDS: tuple[str, ...] = LEASE_REQUEST_FIELDS
 #: tier and only touches these services").
 COMPOSE_ALLOWLIST: frozenset[str] = frozenset(
     {
-        "story-worker", "analysis-worker", "review-unit",
-        "kb-chroma", "kb-ledger", "kb-registry", "kb-neo4j",
-        "kb-produce", "kb-produce-sources", "kb-produce-facts", "kb-produce-campaign-evidence",
-        "run-single", "supervise", "orphan-sweep",
-        "egress", "fleet-manager", "control-room", "game-board", "trigger-reviews",
-        "registry-cli", "bundle-reference-check", "report-tools",
-        "campaign-wrapper", "workflow-runner",
+        "story-worker",
+        "analysis-worker",
+        "review-unit",
+        "kb-chroma",
+        "kb-ledger",
+        "kb-registry",
+        "kb-neo4j",
+        "kb-produce",
+        "kb-produce-sources",
+        "kb-produce-facts",
+        "kb-produce-campaign-evidence",
+        "run-single",
+        "supervise",
+        "orphan-sweep",
+        "egress",
+        "fleet-manager",
+        "control-room",
+        "game-board",
+        "trigger-reviews",
+        "registry-cli",
+        "bundle-reference-check",
+        "report-tools",
+        "campaign-wrapper",
+        "workflow-runner",
     }
 )
 
@@ -654,13 +672,9 @@ def validate_spawn(
             # commit-capable implementation cell (its commits land in ITS clone). Either is
             # contract-legal; the shared surfaces are already excluded above.
             if mode not in ("ro", "rw"):
-                errors.append(
-                    f"step 3: /repo clone mount mode {mode!r} not in ro/rw"
-                )
+                errors.append(f"step 3: /repo clone mount mode {mode!r} not in ro/rw")
         elif mode != contract_mode:
-            errors.append(
-                f"step 3: mount {target!r} mode {mode!r} != contract {contract_mode!r}"
-            )
+            errors.append(f"step 3: mount {target!r} mode {mode!r} != contract {contract_mode!r}")
     if clone_world and not any(
         str((m or {}).get("target", "")) == REPO_TARGET
         and str((m or {}).get("source", "") or "") == str(clone_ref)
@@ -764,7 +778,10 @@ def validate_fleet_command(
 
     if action == "submit":
         return validate_submit_request(
-            command, repo_root=repo_root, phase_scopes=phase_scopes, path_config=path_config,
+            command,
+            repo_root=repo_root,
+            phase_scopes=phase_scopes,
+            path_config=path_config,
         )
 
     allowed = allowlist if allowlist is not None else COMPOSE_ALLOWLIST
@@ -953,9 +970,9 @@ def _provenance_identity(token: str) -> str:
     """The comparable identity a provenance token carries ('' when absent/unusable)."""
     text = str(token or "").strip()
     if text.startswith("origin:"):
-        return _normalize_project(text[len("origin:"):])
+        return _normalize_project(text[len("origin:") :])
     if text.startswith("git-dir:"):
-        return text[len("git-dir:"):]
+        return text[len("git-dir:") :]
     return ""
 
 
@@ -1025,11 +1042,7 @@ def _project_agreement(repo_root: Path, workdir: str) -> tuple[set[str], list[st
         shared = ""
         if repo["origin"] and work["origin"] and repo["origin"] == work["origin"]:
             shared = repo["origin"]
-        elif (
-            repo["common_dir"]
-            and work["common_dir"]
-            and repo["common_dir"] == work["common_dir"]
-        ):
+        elif repo["common_dir"] and work["common_dir"] and repo["common_dir"] == work["common_dir"]:
             shared = f"git-dir:{repo['common_dir']}"
         else:
             # THE SHARED RULE (round-8 repair, 2026-09-16): preparation and execution call
@@ -1096,7 +1109,7 @@ def _deterministic_phase_errors(spec: Any) -> list[str]:
     if spec is None:
         return []
     offenders: list[str] = []
-    for phase in (spec.workflow.params.get("phases") or []):
+    for phase in spec.workflow.params.get("phases") or []:
         if not isinstance(phase, dict):
             continue
         kind = str(phase.get("kind") or "agent")  # the runner's default
@@ -1111,9 +1124,7 @@ def _deterministic_phase_errors(spec: Any) -> list[str]:
     ]
 
 
-def _validate_aio_binding(
-    aio: Any, *, repo_root: Path, workdir: str
-) -> list[str]:
+def _validate_aio_binding(aio: Any, *, repo_root: Path, workdir: str) -> list[str]:
     """The AIO actor's binding gate: resolve + validate the binding BY IDENTITY.
 
     The request's own claims are never proof: the binding is re-read from the durable store
@@ -1144,9 +1155,7 @@ def _validate_aio_binding(
         errors.append("submit: aio.binding_id is required (the durable binding record id)")
     revision = aio.get("task_revision")
     if isinstance(revision, bool) or not isinstance(revision, int) or revision < 1:
-        errors.append(
-            f"submit: aio.task_revision must be a positive integer (got {revision!r})"
-        )
+        errors.append(f"submit: aio.task_revision must be a positive integer (got {revision!r})")
     if errors:
         return errors
 
@@ -1191,7 +1200,11 @@ def _validate_aio_binding(
     agreed, agreement_errors = _project_agreement(repo_root, workdir)
     errors.extend(agreement_errors)
     binding_project = str(binding.get("project") or "").strip()
-    if binding_project and not agreement_errors and _normalize_project(binding_project) not in agreed:
+    if (
+        binding_project
+        and not agreement_errors
+        and _normalize_project(binding_project) not in agreed
+    ):
         errors.append(
             f"submit: the binding's project {binding_project!r} does not match the "
             f"submitted project ({sorted(agreed) or 'unresolvable'}) — a binding may only "
@@ -1218,7 +1231,9 @@ def _validate_aio_binding(
         # and an absence is not one. The documented escape exists ONLY for a staged migration
         # (a deployment whose live bindings predate vectors): it must be set explicitly and the
         # skip is named on stderr, so it can never be mistaken for a verified capability.
-        legacy_ok = str(os.environ.get("FINOPS_AIO_CAPABILITIES_LEGACY_OK", "") or "").strip() == "1"
+        legacy_ok = (
+            str(os.environ.get("FINOPS_AIO_CAPABILITIES_LEGACY_OK", "") or "").strip() == "1"
+        )
         if legacy_ok:
             print(
                 "submit: aio binding carries no capability vector (legacy record) — "
@@ -1350,7 +1365,9 @@ def validate_submit_request(
                 path_config=path_config,
             )
             for e in validate_spawn(
-                phase_request, phase_scopes=submit_scopes, path_config=path_config,
+                phase_request,
+                phase_scopes=submit_scopes,
+                path_config=path_config,
                 # The submit gate validates the LAUNCH MECHANICS (scope, mounts, network,
                 # write flags) — the lease block is a RUNTIME property the run's own admission
                 # gate mints against the campaign cap when the phase actually executes. Requiring
@@ -1425,9 +1442,7 @@ def validate_submit_request(
         if not parent_run_id.strip():
             errors.append("submit: parent_run_id must be a non-blank run id")
         elif not request.get("resume"):
-            errors.append(
-                "submit: parent_run_id declares a continuation — resume must be true"
-            )
+            errors.append("submit: parent_run_id declares a continuation — resume must be true")
     admission = request.get("admission")
     if admission is not None:
         if not isinstance(admission, dict):
@@ -1435,26 +1450,28 @@ def validate_submit_request(
         else:
             required = admission.get("required")
             if not isinstance(required, bool):
-                errors.append(
-                    "submit: admission.required must be a boolean "
-                    f"(got {required!r})"
-                )
+                errors.append(f"submit: admission.required must be a boolean (got {required!r})")
             for field, positive in (
-                ("campaign_budget_usd", False), ("campaign_concurrency", True),
+                ("campaign_budget_usd", False),
+                ("campaign_concurrency", True),
                 # The per-phase reservation the armed gate's per-token leases need (2026-09-14:
                 # the armed resubmission was denied with `cost_source=unknown` because the
                 # submit contract never carried the reserve the previous manual launch set by
                 # hand — the gate held, the rail lacked the field). `reserve_usd` must be
                 # POSITIVE: a per-token phase cannot reserve nothing (an unknown cost is never
                 # free); `hard_cap_usd` is the dollar ceiling the lease is checked against.
-                ("reserve_usd", True), ("hard_cap_usd", False),
+                ("reserve_usd", True),
+                ("hard_cap_usd", False),
             ):
                 value = admission.get(field)
                 if value is None:
                     continue
-                if isinstance(value, bool) or not isinstance(value, (int, float)) or (
-                    positive and value <= 0
-                ) or value < 0:
+                if (
+                    isinstance(value, bool)
+                    or not isinstance(value, (int, float))
+                    or (positive and value <= 0)
+                    or value < 0
+                ):
                     errors.append(
                         f"submit: admission.{field} must be a "
                         f"{'positive' if positive else 'non-negative'} number "
@@ -1470,9 +1487,7 @@ def validate_submit_request(
     execution = request.get("execution")
     if execution is not None:
         if not isinstance(execution, dict):
-            errors.append(
-                f"submit: execution must be a mapping (got {type(execution).__name__})"
-            )
+            errors.append(f"submit: execution must be a mapping (got {type(execution).__name__})")
         else:
             backend = execution.get("backend")
             if backend is not None and str(backend) not in ("opencode", "claude_cli"):
@@ -1483,8 +1498,7 @@ def validate_submit_request(
             effort = execution.get("thinking_effort")
             if effort is not None and (not isinstance(effort, str) or not effort.strip()):
                 errors.append(
-                    f"submit: execution.thinking_effort must be a non-blank string "
-                    f"(got {effort!r})"
+                    f"submit: execution.thinking_effort must be a non-blank string (got {effort!r})"
                 )
             for field in ("thinking_budget_tokens", "output_token_limit", "timeout_seconds"):
                 value = execution.get(field)
@@ -1492,14 +1506,11 @@ def validate_submit_request(
                     continue
                 if isinstance(value, bool) or not isinstance(value, int) or value < 0:
                     errors.append(
-                        f"submit: execution.{field} must be a non-negative integer "
-                        f"(got {value!r})"
+                        f"submit: execution.{field} must be a non-negative integer (got {value!r})"
                     )
             no_commit = execution.get("no_commit")
             if no_commit is not None and not isinstance(no_commit, bool):
-                errors.append(
-                    f"submit: execution.no_commit must be a boolean (got {no_commit!r})"
-                )
+                errors.append(f"submit: execution.no_commit must be a boolean (got {no_commit!r})")
             fork_checkpoint = execution.get("fork_checkpoint")
             if fork_checkpoint is not None and (
                 not isinstance(fork_checkpoint, str) or not fork_checkpoint.strip()
@@ -1538,9 +1549,7 @@ def validate_submit_request(
                 f"submit: an aio binding block was supplied with actor {actor!r} — an "
                 "inconsistent declaration (the block declares the AIO actor)"
             )
-        errors.extend(
-            _validate_aio_binding(aio, repo_root=repo_root, workdir=workdir)
-        )
+        errors.extend(_validate_aio_binding(aio, repo_root=repo_root, workdir=workdir))
 
     return errors
 
@@ -1580,8 +1589,10 @@ def _broker_outcome_or_raise(outcome: dict[str, Any]) -> dict[str, Any]:
         )
     if state == "DOCKER_UNAVAILABLE":
         raise SpawnValidationError(
-            [outcome.get("stderr") or "the host-side broker cannot reach docker (state "
-             "DOCKER_UNAVAILABLE)"]
+            [
+                outcome.get("stderr")
+                or "the host-side broker cannot reach docker (state DOCKER_UNAVAILABLE)"
+            ]
         )
     if state == "SERVER_ERROR":
         raise SpawnValidationError(
@@ -1625,7 +1636,10 @@ def spawn_sibling(
     deployment — a client never sends host paths or a config over the seam.
     """
     errors = validate_spawn(
-        request, phase_scopes=phase_scopes, now=now, require_lease=require_lease,
+        request,
+        phase_scopes=phase_scopes,
+        now=now,
+        require_lease=require_lease,
         path_config=path_config,
     )
     if errors:
@@ -1780,6 +1794,11 @@ def build_phase_request(
         "FINOPS_REDIS_PORT": os.environ.get("FINOPS_REDIS_PORT", "6379"),
         "FINOPS_REDIS_DB": "1",
         "FINOPS_KB_DB": "2",
+        # The retrieval seam is ON by default (2026-09-24): the dense + lexical legs ride ONE
+        # Neo4j client (Chroma is retired), so the cell must reach the store BY NAME on
+        # fleet-net — its internal bolt port, matching the ladder env's declaration. The
+        # client's user/password defaults (neo4j/password123) are the data plane's own.
+        "FINOPS_NEO4J_URI": os.environ.get("FINOPS_NEO4J_URI", "bolt://neo4j:7687"),
         "FINOPS_WORKTREE_ROOT": "/tmp",
         "HOME": str(auth_home),
         "OPENCODE_BIN": f"{auth_home}/.opencode/bin/opencode",
@@ -1812,13 +1831,20 @@ def build_phase_request(
         "mounts": mounts,
         "network": cfg.get("network", LAUNCH_NETWORK),
         "env": env,
-        "command": command or [
-            "python3", "scripts/fleet/phase_runner.py",
-            "--spec-name", spec_name,
-            "--phase", str(phase_def.get("name", "")),
-            "--goal", goal,
-            "--model", model,
-            "--workdir", "/tmp",
+        "command": command
+        or [
+            "python3",
+            "scripts/fleet/phase_runner.py",
+            "--spec-name",
+            spec_name,
+            "--phase",
+            str(phase_def.get("name", "")),
+            "--goal",
+            goal,
+            "--model",
+            model,
+            "--workdir",
+            "/tmp",
         ],
         # b3_launch_broker — the typed launch fields the broker validates against the fixed
         # profiles (image in the closed fleet namespace, network fixed, profile known,
@@ -1998,7 +2024,10 @@ def dispatch_submit(
     local validation; the broker validates + executes against its own host config.
     """
     errors = validate_submit_request(
-        command, repo_root=repo_root, phase_scopes=phase_scopes, path_config=path_config,
+        command,
+        repo_root=repo_root,
+        phase_scopes=phase_scopes,
+        path_config=path_config,
     )
     if errors:
         raise SpawnValidationError(errors)
@@ -2026,7 +2055,11 @@ def _connect_redis() -> Any:
     while True:
         try:
             client = redis.Redis(
-                host=host, port=port, db=db, decode_responses=True, socket_connect_timeout=5,
+                host=host,
+                port=port,
+                db=db,
+                decode_responses=True,
+                socket_connect_timeout=5,
                 # The crash-loop fix (see broker_contract.FLEET_REDIS_SOCKET_TIMEOUT): the
                 # socket timeout must outlast the 10s BLMOVE claim or an idle queue kills the
                 # consumer on every cycle.
@@ -2035,7 +2068,9 @@ def _connect_redis() -> Any:
             client.ping()
             return client
         except Exception as exc:  # noqa: BLE001 — the consumer must survive a Redis blip
-            print(f"[spawn-wrapper] redis unavailable ({exc}); retrying in {delay:.0f}s", flush=True)
+            print(
+                f"[spawn-wrapper] redis unavailable ({exc}); retrying in {delay:.0f}s", flush=True
+            )
             time.sleep(delay)
             delay = min(delay * 2, 30.0)
 
@@ -2097,7 +2132,11 @@ def _run_identity(spec_name: str, outcome: dict[str, Any]) -> dict[str, str]:
     resolved = next((path.resolve() for path in candidates if path.is_file()), None)
     # The named file must live in THIS spec's ledger directory: an unrelated path printed
     # by a confused run is not an identity this job may claim.
-    if resolved is None or resolved.parent.name != spec_name or resolved.parent.parent.name != "workflows":
+    if (
+        resolved is None
+        or resolved.parent.name != spec_name
+        or resolved.parent.parent.name != "workflows"
+    ):
         return identity
     identity["ledger"] = str(resolved)
     try:
@@ -2172,7 +2211,9 @@ def _dispatch_command(
             identity = _run_identity(spec_name, outcome)
             if outcome.get("returncode") == 0:
                 fleet_manager.record_job_status(
-                    client, job_id, "completed",
+                    client,
+                    job_id,
+                    "completed",
                     returncode=outcome.get("returncode"),
                     ledger=identity["ledger"] or None,
                     run_id=identity["run_id"],
@@ -2181,7 +2222,9 @@ def _dispatch_command(
             else:
                 reason = f"compose run exited {outcome.get('returncode')}"
                 fleet_manager.record_job_status(
-                    client, job_id, "failed",
+                    client,
+                    job_id,
+                    "failed",
                     returncode=outcome.get("returncode"),
                     ledger=identity["ledger"] or None,
                     run_id=identity["run_id"],
@@ -2198,8 +2241,9 @@ def _dispatch_command(
                 flush=True,
             )
             return
-        print(f"[spawn-wrapper] DISPATCH {action} {service or job_id}: {argv} (dry-run)",
-              flush=True)
+        print(
+            f"[spawn-wrapper] DISPATCH {action} {service or job_id}: {argv} (dry-run)", flush=True
+        )
 
 
 # ── Wave B2: the durable claim lane + restart recovery ──────────────────────
@@ -2434,7 +2478,10 @@ def consume_fleet_commands(
             # the BRPOP's own 10s) must not kill the orchestrator's hands — retry the read.
             # The 2026-09-01 crash: an unhandled socket TimeoutError exited the consume loop
             # mid-fleet, leaving a queued submit marked "launching" with no consumer.
-            print(f"[spawn-wrapper] redis read interrupted ({type(exc).__name__}); retrying", flush=True)
+            print(
+                f"[spawn-wrapper] redis read interrupted ({type(exc).__name__}); retrying",
+                flush=True,
+            )
             if once:
                 break
             continue
@@ -2473,7 +2520,9 @@ def consume_fleet_commands(
             # the worker resolves it.
             if job_id:
                 fleet_manager.record_job_status(
-                    client, job_id, "queued",
+                    client,
+                    job_id,
+                    "queued",
                     reason=f"accepted (fleet dispatch workers: {workers})",
                 )
             print(
@@ -2504,7 +2553,8 @@ def main(argv: list[str] | None = None) -> int:
         help="validate a submit request (JSON on stdin), including the AIO binding gate",
     )
     p_validate_submit.add_argument(
-        "--require-deterministic", action="store_true",
+        "--require-deterministic",
+        action="store_true",
         help="refuse a spec containing agent phases (the AIO in-process exception)",
     )
     p_consume = sub.add_parser("consume", help="claim fleet:commands and dispatch")

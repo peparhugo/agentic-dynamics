@@ -27,7 +27,7 @@ workflow:
   params:
     language: python
     fork: false
-    rag_augment: false
+    rag_augment: true
     plan_unit_cap: 8
     rag:
       emit_self: true

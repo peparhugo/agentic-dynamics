@@ -25,7 +25,7 @@ workflow:
   params:
     language: python
     fork: false
-    rag_augment: false
+    rag_augment: true
     rag:
       emit_self: true
     context:

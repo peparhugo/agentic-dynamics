@@ -416,7 +416,7 @@ first_pass_quality(attempts) -> RuleResult   # measurement (produces)
 model_cascade(attempts, state) -> RuleResult # control (consumes confidence)
 ```
 
-### Runtime RAG / Knowledge Base (v1.0 — merged; default OFF)
+### Runtime RAG / Knowledge Base (v1.0 — merged; retrieval seam ON by default since 2026-09-24)
 
 ```
 # knowledge.py — canonical identity + authority contract (two sha256 ids, ordered Authority)
@@ -512,10 +512,10 @@ EXTRACTOR_VERSION = "actuation/v1"
 derive_actuation_record(..., *, causes, repository_id, now=None) -> KnowledgeRecord
   # authority=POLICY "[P]"; causes-linked to an observation; ZERO call sites (nothing fires it yet)
 
-# augment.py — the retrieve->construct->render seam (R7; split out of workflow_runner, default OFF)
+# augment.py — the retrieve->construct->render seam (R7; split out of workflow_runner; ON by default since 2026-09-24 — specs opt out with `rag_augment: false`)
 augment_prompt(*, base_prompt, goal, phase_def, model, commit_sha, inherited_tools,
                pinned_policy, rag_params, retrieve_fn, construct_fn) -> AugmentationOutcome
-default_retrieve_fn() -> Callable    # dense ChromaStore + graph Neo4jClient -> functools.partial(retrieve)
+default_retrieve_fn() -> Callable    # dense Neo4jVectorStore + lexical/graph Neo4jClient (ONE client; Chroma retired) -> functools.partial(retrieve)
 default_construct_fn(rag_params, run_agent) -> Callable  # ModelPromptConstructor on DEFAULT_CONSTRUCTOR_MODEL
   # pure w.r.t. the worktree; any failure -> base_prompt + named fallback_mode; NEVER blocks the phase
 
