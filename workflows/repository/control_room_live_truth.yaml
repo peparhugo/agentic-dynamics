@@ -140,7 +140,11 @@ workflow:
           the declared `test_resolve_live_cell_maps_a_run_id_to_its_phase_stream` was
           implemented as `..._recorded_event_stream` and the gate found nothing — when a unit
           adds a NEW test, declare the FILE it adds it to); when in doubt,
-          SPLIT — more small units beat fewer large ones. Write `notes/sources.jsonl`. Commit — `notes/` is gitignored, so
+          SPLIT — more small units beat fewer large ones. The unit budgets must SUM to at most
+          the spec's stop budget (`stop.budget_usd` = **$4.00**): keep each unit small
+          ($0.25–$0.75; `budget_usd` is a planning hint, not a reservation) — a plan whose
+          budgets sum above the ceiling is REFUSED (2026-09-24's attempt 3: $10.75 > $4.00).
+          Write `notes/sources.jsonl`. Commit — `notes/` is gitignored, so
           stage the notes explicitly (`git add -f notes/`) before committing; a plain
           `git add` refuses ignored paths and the phase then records no commit. Write and COMMIT
           `notes/` EARLY, then refine. NEVER run long waits or `sleep` — there is nothing to
@@ -183,7 +187,12 @@ workflow:
           TO FULL GREEN on your FINAL commit — if your redesign renames or moves a read that
           a suite anchors, update that suite in the same commit; do NOT install Playwright
           and do NOT fabricate captures — the host runs the acceptance profile against this
-          run's candidate. Commit. NEVER run long waits or `sleep` — a phase that burns its
+          run's candidate. Commit. A unit slice must ALWAYS deliver a committed diff: if the
+          unit's work already exists (an earlier unit or the prior landed it), make the
+          smallest necessary change that PROVES the unit — add the missing test/assertion/doc
+          line — and commit; "nothing to do" is NEVER valid (a no-change slice fails the run:
+          NO_CHANGES). Keep unit scopes DISJOINT — one unit may not subsume another's work.
+          NEVER run long waits or `sleep` — a phase that burns its
           wall with no committed deliverable FAILS (register L46/#152).
       - name: g_test_gate
         kind: test

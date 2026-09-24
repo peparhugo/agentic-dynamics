@@ -142,7 +142,11 @@ workflow:
           plus pure/monkeypatched suites — if a service-backed test is needed, put it in a
           cell-safe suite or make it hermetic; also declare EXISTING targets only (a suite file
           or an already-existing nodeid) — never invent a nodeid for a test the slice will
-          create (declare the FILE it adds the test to); when in doubt, SPLIT — more
+          create (declare the FILE it adds the test to); the unit budgets must SUM to at most
+          the spec's stop budget (`stop.budget_usd` = **$8.00**): keep each unit small
+          ($0.25–$1.00; `budget_usd` is a planning hint, not a reservation) — a plan summing
+          above the ceiling is REFUSED (2026-09-24's L49 attempt 3: $10.75 > $4.00); when in
+          doubt, SPLIT — more
           small units beat fewer large ones, and the cap (12) is a ceiling, not a target. A unit that cannot be accepted independently is not a
           unit; neither is a unit too big to prove with one gate (register L48 / the skeleton
           contract's selection + size rules). Small, test-backed, landable units for this run;
@@ -168,7 +172,12 @@ workflow:
           agent_config/ + `python3 scripts/_gen_instructions.py` (keep `--check` green); do not
           touch the Control Room live surfaces (L49) or the L33 surfaces; measured-or-absent and
           [M]/[C]/[H]/[X]/[P] tags on claims; keep each unit's tests green on your FINAL commit.
-          Commit per unit (the expansion gates each unit independently). NEVER run long waits or
+          Commit per unit (the expansion gates each unit independently). A unit slice must
+          ALWAYS deliver a committed diff: if the unit's work already exists (an earlier unit
+          or the prior landed it), make the smallest necessary change that PROVES the unit —
+          add the missing test/assertion/doc line — and commit; "nothing to do" is NEVER valid
+          (a no-change slice fails the run: NO_CHANGES, u2's lesson, 2026-09-24). Keep unit
+          scopes DISJOINT — one unit may not subsume another's work. NEVER run long waits or
           `sleep` — commit each unit promptly; a phase that burns its wall with no committed
           deliverable FAILS (register L46/#152).
       - name: g_test_gate
