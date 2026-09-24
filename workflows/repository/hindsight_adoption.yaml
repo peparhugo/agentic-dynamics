@@ -135,14 +135,19 @@ workflow:
           (`pytest tests/... -q` as a list entry is INVALID and fails that unit's gate; attempt
           3's lesson); non-pytest proofs (a generator `--check`) go in the unit's
           `goal`/`acceptance` for the slice to run, not in `tests`; declare ONLY CELL-SAFE
-          targets — the verifier runs in a read-only cell with NO Redis/Neo4j/network, so a
-          suite that connects to a live service FAILS in-cell although it passes on the host
-          (`tests/test_knowledge_stream.py` carries 93 Redis references and failed u4's gate;
-          register L45 warned this); the vetted cell-safe set is the five declared gate suites
-          plus pure/monkeypatched suites — if a service-backed test is needed, put it in a
-          cell-safe suite or make it hermetic; also declare EXISTING targets only (a suite file
+          targets — the verifier runs in a read-only cell with NO Redis/Neo4j/network AND base
+          deps only (no optional extras: a test that directly or transitively imports httpx /
+          ollama / chromadb / neo4j FAILS in-cell although it passes on the host — attempt 7's
+          u5: `tests/test_retrieval_bounds.py`'s embedder/transport tests, 4 failed / 12 passed
+          in-cell; `tests/test_retrieval.py` is the cell-safe home for retrieval-bound proofs),
+          so a suite that connects to a live service FAILS in-cell although it passes on the
+          host (`tests/test_knowledge_stream.py` carries 93 Redis references and failed u4's
+          gate; register L45 warned this); the vetted cell-safe set is the five declared gate
+          suites plus pure/monkeypatched suites — if a service-backed test is needed, put it in
+          a cell-safe suite or make it hermetic; declare EXISTING targets only (a suite file
           or an already-existing nodeid) — never invent a nodeid for a test the slice will
-          create (declare the FILE it adds the test to); the unit budgets must SUM to at most
+          create (declare the FILE it adds the test to, and keep the proof in a file its own
+          gate declares — a proof test in an ungated file is unproven); the unit budgets must SUM to at most
           the spec's stop budget (`stop.budget_usd` = **$8.00**): keep each unit small
           ($0.25–$1.00; `budget_usd` is a planning hint, not a reservation) — a plan summing
           above the ceiling is REFUSED (2026-09-24's L49 attempt 3: $10.75 > $4.00); when in

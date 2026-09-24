@@ -1532,6 +1532,8 @@ def _resolve_test_targets(
 # run-time artifact and a static runner, and it reuses the existing phase/gate/commit machinery
 # unchanged.
 EXPAND_FROM_PLAN_KEY = "expand_from_plan"
+
+
 #: The default ceiling on how many units one plan may expand into. The extension's whole point
 #: is that N is BOUNDED; an uncapped expansion re-creates the unbounded turn it removes.
 def resolve_phase_agent(
@@ -2021,7 +2023,10 @@ def _apply_verifier_verdict(pr: PhaseResult, verdict: StepResult) -> None:
     pr.evaluator_independent = True if pr.test_executed_success is not None else None
     if not bool(getattr(verdict, "ok", False)):
         pr.status = "failed"
-        pr.error = str(getattr(verdict, "error", "") or "")[:400] or (
+        # The cap holds the verifier suite tail (the FAILED lines + counts) — 400 clipped it
+        # mid-line for a 4-failure gate (L58); the banner-shaped stderr fallback is never
+        # preferred when the child phase recorded its own error (docker_verifier_executor).
+        pr.error = str(getattr(verdict, "error", "") or "")[:800] or (
             f"verifier suite failed ({pr.tests_passed}/{pr.tests_total} passed)"
         )
 
@@ -2588,9 +2593,7 @@ class PhaseWatchdog:
         try:
             import sqlite3
 
-            con = sqlite3.connect(
-                f"file:{self.activity_db}?mode=ro", uri=True, timeout=1.0
-            )
+            con = sqlite3.connect(f"file:{self.activity_db}?mode=ro", uri=True, timeout=1.0)
             try:
                 newest = 0.0
                 for table in ("message", "part"):

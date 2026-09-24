@@ -216,17 +216,22 @@ class DockerVerifierExecutor(StepExecutor):
         # default cell command ("python3 scripts/fleet/phase_runner.py") and the compose
         # workflow-runner command already use the PATH-resolved python3; the executors'
         # sys.executable was the one spot that baked a host path into a container argv.
-        boundary_spec = self._write_boundary_spec(
-            boundary, model=request.model or self._model
-        )
+        boundary_spec = self._write_boundary_spec(boundary, model=request.model or self._model)
         sibling_cmd = [
-            "python3", "scripts/run_workflow.py",
-            "--spec", boundary_spec,
-            "--goal", self._goal,
-            "--model", request.model or self._model,
-            "--workdir", sibling_workdir,
-            "--only-phase", boundary.phase_name,
-            "--timeout", str(request.timeout or self._timeout),
+            "python3",
+            "scripts/run_workflow.py",
+            "--spec",
+            boundary_spec,
+            "--goal",
+            self._goal,
+            "--model",
+            request.model or self._model,
+            "--workdir",
+            sibling_workdir,
+            "--only-phase",
+            boundary.phase_name,
+            "--timeout",
+            str(request.timeout or self._timeout),
             # A test phase never commits; --no-commit is belt-and-braces. The verifier's
             # read-only-for-candidate contract is now ENFORCED at the mount (g1_verifier_mount:
             # build_verifier_request mounts the candidate's worktree + git dirs ro and
@@ -301,14 +306,22 @@ class DockerVerifierExecutor(StepExecutor):
         decision = _classify(outcome)
         state = decision["state"]
         envelope = decision.get("envelope") or {}
+        phase = _phase_from_envelope(envelope)
 
+        # Evidence precedence (L58, 2026-09-24): when the child ran a phase, THAT phase's
+        # error is the verdict's real content — the independent runner's suite tail
+        # ("FAILED … / N failed, M passed"). The envelope's top-level error is often empty,
+        # and the stderr fallback carries only the child's closing banner ("admission: gate
+        # disarmed…", "control: child mode…") — which reads like a refusal and cost three
+        # gate failures (L49 att2 u3, L51 att4 u4, L51 att7 u5) a host-side re-run to
+        # diagnose. Prefer the phase error whenever a phase record exists.
+        phase_error = str((phase or {}).get("error") or "")
         sr = StepResult(
             ok=state == "ok",
             state=state,
-            error=str(envelope.get("error") or outcome.get("stderr", ""))[:800],
+            error=(phase_error or str(envelope.get("error") or outcome.get("stderr", "")))[:800],
             exit_code=int(outcome.get("returncode", -1) or -1),
         )
-        phase = _phase_from_envelope(envelope)
         if phase is not None:
             # The verdict object is the child phase's own record — test_executed_success /
             # tests_passed / tests_total produced by the independent runner inside the
