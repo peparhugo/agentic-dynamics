@@ -98,7 +98,14 @@ def _close_days() -> set[str]:
 
 def _main_commits_by_day() -> dict[str, list[str]]:
     """First-parent main commits (subject + date) over the lookback window."""
-    since = (date.today() - timedelta(days=LOOKBACK_DAYS)).isoformat()
+    # Clamp the window floor to the epoch: a lookback reaching before it hands git an absurd
+    # ``--since``, and git (2.34.1) SILENTLY returns an empty history for some far-past dates
+    # (the 2026-09-24 incident: ``since=1752-12-08`` returned the commit, ``1752-12-09``
+    # returned nothing — one day apart — so the sweep read zero commit-days and every coverage
+    # gap vanished: a silent false negative in the recording rail). Dates below the epoch are
+    # meaningless for this repo's history; clamp to it.
+    floor = max(date.today() - timedelta(days=LOOKBACK_DAYS), date(1970, 1, 2))
+    since = floor.isoformat()
     out = _git(
         "log",
         "--first-parent",
