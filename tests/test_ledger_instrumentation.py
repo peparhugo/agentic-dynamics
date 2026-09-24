@@ -30,7 +30,9 @@ from agentic_dynamics.runtime.workflow_runner import (
     run_workflow,
 )
 
-SPEC = Path(__file__).resolve().parent.parent / "workflows" / "repository" / "control_room_portal.yaml"
+SPEC = (
+    Path(__file__).resolve().parent.parent / "workflows" / "repository" / "control_room_portal.yaml"
+)
 
 # The aggregator lives in scripts/ (not on the package import path); import it by module name,
 # matching the sibling script tests (tests/test_aggregate_workflow_metrics.py).
@@ -102,6 +104,11 @@ def _run_synthetic(tmp_path):
         workdir=tmp_path,
         commit=False,
         run_agentic_fn=lambda *a, **k: _fake_agent(),
+        # These tests pin the ABSENCE semantics of the writer fields ("never zero"): the
+        # orchestration-cost writer only measures on the augmentation path, so keep the seam
+        # explicitly off (2026-09-24: RAG now defaults ON; the comment in the assertion below
+        # is this flag).
+        rag_augment=False,
     )
     return result, result.to_dict()
 
@@ -180,8 +187,13 @@ def test_run_ledger_carries_attempt_fields(tmp_path):
 def _run_with(tmp_path, fake):
     spec = load_spec(SPEC)
     return run_workflow(
-        spec, goal="g", model="openai/gpt-5.6-sol", workdir=tmp_path, commit=False,
+        spec,
+        goal="g",
+        model="openai/gpt-5.6-sol",
+        workdir=tmp_path,
+        commit=False,
         run_agentic_fn=lambda *a, **k: fake,
+        rag_augment=False,  # absence semantics under test (2026-09-24: RAG defaults ON)
     ).to_dict()
 
 
@@ -191,16 +203,17 @@ def test_run_ledger_attempts_carry_measured_new_writer_fields(tmp_path):
     assert d["attempts"], "the synthetic run must produce attempt records"
     for attempt in d["attempts"]:
         assert attempt["first_token_at"] == "2026-09-13T00:00:01+00:00"
-        assert attempt["cost_inference"] == 0.001          # trusted source → the cost
-        assert attempt["cost_orchestration"] is None       # RAG off → not measured
-        assert attempt["leased_at"] is None                # no admission gate → no lease
-        assert attempt["evaluator_independent"] is None    # no test gate → no verdict
+        assert attempt["cost_inference"] == 0.001  # trusted source → the cost
+        assert attempt["cost_orchestration"] is None  # RAG off → not measured
+        assert attempt["leased_at"] is None  # no admission gate → no lease
+        assert attempt["evaluator_independent"] is None  # no test gate → no verdict
 
 
 def test_new_writer_fields_stay_none_when_unmeasured(tmp_path):
     """An untrusted cost and an absent first token serialize as ``None`` — never 0.0/epoch 0."""
-    d = _run_with(tmp_path, _fake_agent(first_token_at=None, cost_source=None,
-                                        estimated_cost_usd=0.001))
+    d = _run_with(
+        tmp_path, _fake_agent(first_token_at=None, cost_source=None, estimated_cost_usd=0.001)
+    )
     for attempt in d["attempts"]:
         assert attempt["first_token_at"] is None
         assert attempt["cost_inference"] is None
@@ -209,10 +222,14 @@ def test_new_writer_fields_stay_none_when_unmeasured(tmp_path):
 
 def test_attempt_record_serializes_the_new_writer_fields():
     rec = AttemptRecord(
-        attempt_id="wf_x_scope_a1", job_id="wf_x", phase="scope",
-        evaluator_independent=True, leased_at="2026-09-13T00:00:00+00:00",
+        attempt_id="wf_x_scope_a1",
+        job_id="wf_x",
+        phase="scope",
+        evaluator_independent=True,
+        leased_at="2026-09-13T00:00:00+00:00",
         first_token_at="2026-09-13T00:00:01+00:00",
-        cost_inference=0.002, cost_orchestration=0.0005,
+        cost_inference=0.002,
+        cost_orchestration=0.0005,
     )
     d = rec.to_dict()
     assert d["evaluator_independent"] is True
@@ -236,8 +253,13 @@ def test_leased_at_is_stamped_when_a_lease_is_acquired(tmp_path):
 
     spec = load_spec(SPEC)
     result = run_workflow(
-        spec, goal="g", model="openai/gpt-5.6-sol", workdir=tmp_path, commit=False,
-        phase_admission=_gate, run_agentic_fn=lambda *a, **k: _fake_agent(),
+        spec,
+        goal="g",
+        model="openai/gpt-5.6-sol",
+        workdir=tmp_path,
+        commit=False,
+        phase_admission=_gate,
+        run_agentic_fn=lambda *a, **k: _fake_agent(),
     )
     d = result.to_dict()
     for attempt in d["attempts"]:
@@ -249,6 +271,7 @@ def test_leased_at_is_stamped_when_a_lease_is_acquired(tmp_path):
 
 def test_cost_orchestration_emits_when_the_augmentation_seam_runs(tmp_path):
     """The G-41 split emits BOTH components on a real RAG-augmented run."""
+
     class _Attempt:
         fallback_mode = "full"
         selected_evidence = []
@@ -265,7 +288,11 @@ def test_cost_orchestration_emits_when_the_augmentation_seam_runs(tmp_path):
 
     spec = load_spec(SPEC)
     result = run_workflow(
-        spec, goal="g", model="openai/gpt-5.6-sol", workdir=tmp_path, commit=False,
+        spec,
+        goal="g",
+        model="openai/gpt-5.6-sol",
+        workdir=tmp_path,
+        commit=False,
         rag_augment=True,
         retrieve_fn=lambda **kw: _Attempt(),
         construct_fn=lambda req: _Aug(),
@@ -311,13 +338,21 @@ def test_old_ledger_without_new_fields_still_parses():
         "ok": True,
         "total_cost_usd": 0.003,
         "phases": [
-            {"phase": "scope", "kind": "agent", "status": "ok", "cost_usd": 0.001, "duration_s": 1.0},
+            {
+                "phase": "scope",
+                "kind": "agent",
+                "status": "ok",
+                "cost_usd": 0.001,
+                "duration_s": 1.0,
+            },
             {"phase": "verify", "kind": "test", "status": "ok", "cost_usd": 0.0, "duration_s": 0.5},
         ],
     }
     # Classification + extraction must succeed and preserve the phase rows (never a crash).
     assert agg.classify(old_ledger) == agg.KIND_WORKFLOW_RUN
-    corpus = agg.extract_ledger(old_ledger, "experiments/results/workflows/control_room_portal/x.json")
+    corpus = agg.extract_ledger(
+        old_ledger, "experiments/results/workflows/control_room_portal/x.json"
+    )
     assert [p.phase for p in corpus.phases] == ["scope", "verify"]
     # The old ledger records no breach evidence — and that is a coverage gap, never a fabricated
     # clean SLA record (the measured-not-estimated rule, applied to the old corpus).
@@ -333,9 +368,21 @@ def test_new_ledger_is_a_superset_of_the_old_shape(tmp_path):
     """
     _, d = _run_synthetic(tmp_path)
     # The pre-instrumentation keys are all still present, byte-for-byte in shape.
-    for key in ("spec_name", "spec_id", "model", "workdir", "goal", "git_sha",
-                "started_at", "ended_at", "ok", "state", "total_cost_usd", "phases",
-                "checkpoints"):
+    for key in (
+        "spec_name",
+        "spec_id",
+        "model",
+        "workdir",
+        "goal",
+        "git_sha",
+        "started_at",
+        "ended_at",
+        "ok",
+        "state",
+        "total_cost_usd",
+        "phases",
+        "checkpoints",
+    ):
         assert key in d, f"new ledger lost pre-existing key: {key}"
     # The new keys are additive.
     assert "attempts" in d

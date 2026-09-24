@@ -4940,14 +4940,19 @@ def run_workflow(
     git_wd = Path(_run_clone) if _run_clone and Path(_run_clone).is_dir() else wd
     step_executor = step_executor or LocalAgentExecutor(run_agent)
 
-    # RAG augmentation seam. Default OFF — the prompt passed to the executor is then
-    # byte-for-byte identical to ``_build_phase_prompt``. ``retrieve_fn``/``construct_fn``
-    # are injectable for tests; when unset, production resolves the real retrieve +
-    # a constructor whose model call reuses ``run_agent`` (default flash model).
+    # RAG augmentation seam. Default ON since 2026-09-24 (the controller's directive: the
+    # runs USE the knowledge plane — "we're flying blind" is the failure mode this closes;
+    # the cell network reaches the stores by name, see the launch env's FINOPS_NEO4J_URI).
+    # A spec may still opt OUT explicitly with ``rag_augment: false`` (the rollback), in
+    # which case the prompt passed to the executor is byte-for-byte identical to
+    # ``_build_phase_prompt``. ``retrieve_fn``/``construct_fn`` are injectable for tests;
+    # when unset, production resolves the real retrieve + a constructor whose model call
+    # reuses ``run_agent`` (default flash model). Retrieval failures degrade to a NAMED
+    # fallback (``fallback_mode``) and never block the phase.
     rag_augment = (
         rag_augment
         if rag_augment is not None
-        else bool(spec.workflow.params.get("rag_augment", False))
+        else bool(spec.workflow.params.get("rag_augment", True))
     )
     rag_params = _resolve_rag_params(spec, rag_params, wd=wd, rag_augment=rag_augment)
     # The domain-context transport (AIO remediation 2026-09-14) — resolved HERE, by the
