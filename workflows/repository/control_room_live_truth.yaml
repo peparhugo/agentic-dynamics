@@ -116,7 +116,17 @@ workflow:
           (`read_run_logs` / `logs_block` / the live-phase binding),
           `apps/control_room/routes/telemetry.py` (`/api/events/<cell>`), the drawer + LIVE
           NOW + transcript renderers in `apps/control_room/static/app.js`, and the render
-          gate + fixtures. WRITE `notes/control_room.md` (`## Problem`, `## What Exists`,
+          gate + fixtures. SCOPE FENCE: you write ONLY the `notes/` files below — never `apps/`,
+          never `src/`, never `scripts/`, never `tests/`, and never another phase's artifact;
+          the UNITS own every repository change, and a prior that lands them makes its units
+          no-ops (attempt 5's lesson: a prior slice landed ~194 lines of production code and
+          the run-binding logic was never gated as its own unit). HOST ACCEPTANCE (it can fail
+          where in-cell gates pass — attempt 5's class): the render gate runs `--profile
+          acceptance` against the candidate and must fail NOWHERE; the drawer's live-follow
+          binds the SERVER-resolved stream cell (`logs.cell_id` / the server's resolution),
+          NEVER a client-fabricated id (`requested_id: data.logs.requested_id || run.run_id`
+          was the att5 failure — the `drawer-logs-follow` check). WRITE `notes/control_room.md`
+          (`## Problem`, `## What Exists`,
           `## Gaps`, `## Sources`) and `notes/plan.md` (`## Files`, `## Tests`,
           `## Acceptance`, `## Risks`, `## Insight`): the           `## Insight` section must name, for
           EACH activity/feed surface, the operator question it must answer (what is running
@@ -132,7 +142,10 @@ workflow:
           `python3 scripts/... --check` as a list entry is INVALID and fails that unit's gate;
           2026-09-23's lesson); non-pytest proofs go in the unit's `goal`/`acceptance` for the
           slice to run, not in `tests`; declare ONLY CELL-SAFE targets — the verifier runs in a
-          read-only cell with NO Redis/Neo4j/network, so a suite that connects to a live
+          read-only cell with NO Redis/Neo4j/network AND base deps only (no optional extras:
+          a test that directly or transitively imports httpx / ollama / chromadb / neo4j
+          FAILS in-cell although it passes on the host — L51 att7's u5 class), so a suite that
+          connects to a live
           service FAILS in-cell although it passes on the host (register L45's audit; the
           vetted cell-safe set is the five declared gate suites plus pure/monkeypatched
           suites); declare EXISTING targets only — a suite file, or a nodeid that already
