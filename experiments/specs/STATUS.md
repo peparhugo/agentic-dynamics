@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-24T14:30:18.870778+00:00`  ·  248 spec(s)
-**Work remaining:** 208 open · 40 completed/retired
+Generated at: `2026-09-24T17:57:13.641237+00:00`  ·  249 spec(s)
+**Work remaining:** 209 open · 40 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -80,6 +80,7 @@ Generated at: `2026-09-24T14:30:18.870778+00:00`  ·  248 spec(s)
 | `contemplation_synthesis_rerun` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `context_abstraction_closure` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `context_abstraction_plane` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `context_layer_routing` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_db_followups` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_apply_skills` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_design_determination` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
