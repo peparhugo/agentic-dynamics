@@ -59,6 +59,9 @@ class AugmentationOutcome:
     prompt: str
     fallback: bool = True
     fallback_mode: str = "no_rag"
+    #: Named cause for a seam failure or constructor degradation. An empty value
+    #: means the augmentation completed without a failure outcome.
+    fallback_reason: str = ""
     raw_prompt_hash: str = ""
     retrieval_attempt_id: str = ""
     constructor_attempt_id: str = ""
@@ -135,9 +138,11 @@ def augment_prompt(
     """Run ``retrieve -> construct -> render`` between ``route_step`` and ``run_agent``.
 
     Pure w.r.t. the worktree (no writes). Any retrieval/constructor failure reverts to
-    ``base_prompt`` and records a named fallback mode — augmentation never blocks the
-    phase. ``retrieve_fn`` returns a ``RetrievalAttempt``-shaped object;
-    ``construct_fn`` maps a ``ConstructionRequest`` to an ``AugmentedPrompt``.
+    ``base_prompt`` and records a named fallback reason — augmentation never blocks the
+    phase. The injected callbacks are the only execution seam: this function does not
+    publish knowledge, create an admission, or retry a failed paid call. ``retrieve_fn``
+    returns a ``RetrievalAttempt``-shaped object; ``construct_fn`` maps a
+    ``ConstructionRequest`` to an ``AugmentedPrompt``.
     """
     from agentic_dynamics.knowledge.prompt_constructor import (
         DEFAULT_CONSTRUCTOR_MODEL,
@@ -152,6 +157,7 @@ def augment_prompt(
         raw_prompt_hash=hash_work_item(base_prompt),
     )
     t0 = time.time()
+    stage = "retrieve"
     try:
         # 1. retrieve (deterministic; may degrade but not raise on missing legs)
         attempt = retrieve_fn(
@@ -174,6 +180,7 @@ def augment_prompt(
         )
 
         # 2. construct (one bounded model call + deterministic renderer)
+        stage = "construct"
         evidence = _evidence_from_attempt(attempt)
         constructor_model = str(rag_params.get("constructor_model", DEFAULT_CONSTRUCTOR_MODEL))
         request = ConstructionRequest(
@@ -222,20 +229,22 @@ def augment_prompt(
                     "source_type": (
                         str(getattr(candidate, "source_type", "") or "") if candidate else ""
                     ),
-                    "locator": (
-                        str(getattr(candidate, "locator", "") or "") if candidate else ""
-                    ),
+                    "locator": (str(getattr(candidate, "locator", "") or "") if candidate else ""),
                 }
             )
         outcome.versions = dict(getattr(augmented, "versions", {}) or {})
         outcome.token_counts = dict(getattr(augmented, "token_counts", {}) or {})
         outcome.cost_usd = float(getattr(augmented, "cost_usd", 0.0) or 0.0)
         if constructor_fell_back:
+            outcome.fallback_reason = str(
+                getattr(augmented, "fallback_reason", "") or "constructor_fallback"
+            )
             outcome.versions = {**outcome.versions, "constructor": "deterministic-fallback"}
     except Exception as exc:  # noqa: BLE001 — the fallback must never block the phase
         outcome.prompt = base_prompt
         outcome.fallback = True
         outcome.fallback_mode = "no_rag"
+        outcome.fallback_reason = f"{stage}_failed"
         outcome.error = f"{type(exc).__name__}: {exc}"
     finally:
         outcome.latency_ms = round((time.time() - t0) * 1000.0, 2)

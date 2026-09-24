@@ -69,6 +69,31 @@ that decision. The contract layer (frontmatter/status/markers) is the state; the
 the render — derivation runs contract → render, never backwards (guards verify both
 directions).
 
+## Curated-document refresh guidance (proposed pattern)
+
+The Hindsight dossier's structured-document excerpts show [X] that model-mediated rewriting can
+drift unchanged prose, while opaque fragments and stable identifiers prevent that drift
+(`docs/reviews/hindsight/source_notes.md`, §§1–3). This is a conservative design pattern for our
+curated and generated surfaces, not a Hindsight dependency and not a claim that a generic delta
+engine already exists.
+
+- **Opaque unchanged content:** preserve unchanged prose or fragments as source-owned content; do
+  not send them through a model or paraphrase them merely to refresh a neighboring field. [X][P]
+- **Stable identifiers:** any future typed refresh must address sections or blocks by stable IDs,
+  never by positions, and must distinguish malformed operation shape from an unknown reference
+  before applying changes. [X][P] This is a named follow-up design constraint, not an implemented
+  refresh mechanism.
+- **Named freshness states:** use explicit states such as `CURRENT`, `STALE`, `LAGGING`, `FAILING`,
+  and `UNKNOWN` where the existing projection-watermark contract applies; an absent or uncertain
+  watermark is `UNKNOWN`, never fabricated freshness. [C]
+- **Measured or absent:** preserve measured values and provenance, but leave unavailable or
+  unmeasured values absent/unknown; do not derive a numeric value from narrative context. [C][P]
+
+The existing generator remains the authority for these instruction mirrors: edit the
+`agent_config/` source, regenerate, and require `python3 scripts/_gen_instructions.py --check` to
+pass. [C] Future refresh work must preserve that source-to-mirror gate and name its fallback and
+failure states before implementation. [P]
+
 ## Package planes (Stage 1 — the modular monorepo)
 
 The former flat `instrument` package is re-homed as `src/agentic_dynamics/` with eight
@@ -503,6 +528,7 @@ run_workflow(spec, *, goal, model, workdir, ..., rag_augment=None, retrieve_fn=N
   #   --thinking-budget-tokens --output-token-limit --timeout --phase-watchdog-min --no-commit
   #   --resume --signals --cap-snapshot --cap-shadow --no-fact-emit --change-analysis
   #   --change-analysis-graph --orchestrator --only-phase --prepared-step --cell-image --no-admission
+  #   --agent
   #   --campaign-budget-usd --campaign-concurrency --fork-checkpoint --parent-run-id] — see the run-workflow skill for semantics
   # rag_params.emit_self (opt-in, default OFF): after a phase commits, emit its finding into
   #   the cell's OWN scope via emit_phase_finding (best-effort — never blocks the phase)

@@ -89,6 +89,46 @@ Observe-only rails never steer: supervisor flags and quarantine marks are inform
 controller, not actions taken on its behalf. One writer per plane: the orchestrator owns the
 control database; you never write a child's outbox.
 
+## Current-state and refresh discipline
+
+Use the following read order whenever a decision depends on changing repository or control state:
+
+1. **Read the live control packet first.** [C][P] `agentic-dynamics control status --json` is
+   authoritative for runs, approvals, gates, workers, projection lag, degradation, and safe
+   actions. A chat message, a prior turn, a generated snapshot, or a worktree listing is context,
+   not current state. This prevents an interrupted or resumed session from acting on stale state.
+2. **Keep the read inside the requested scope.** [C][P] For knowledge reads, the default scope is
+   the current cell's `repository_id` (`self-<worktree>`); only an explicit, non-empty shared scope
+   widens it. An empty scope is never global. For every other read, use the run, candidate, gate,
+   or source identity returned by the current packet. This prevents convenient but unrelated facts
+   from becoming evidence for a decision.
+3. **Apply authority before recency.** [C] Read evidence in this order:
+   `POLICY > SOURCE > MEASURED > DERIVED > ADVISORY`. [P] A newer lower-authority item does not
+   silently override a higher-authority rule. Preserve lineage, supersession, tombstone reasons,
+   and evidence classes when describing what is known.
+4. **Refresh only on positive freshness evidence.** [X][C] Before an expensive refresh or rewrite,
+   distinguish "when this artifact was refreshed" from "what source position it last saw" and
+   establish that in-scope source material is newer. If no newer material is proven, do not spend,
+   rewrite, or paraphrase the artifact. Preserve unchanged prose and opaque fragments; stable IDs,
+   not positions, are the safe address for any future typed update. These are conservative patterns,
+   not permission to invent a refresh mechanism or to add a Hindsight dependency.
+5. **Treat retrieval failure as failure, not emptiness.** [X][C] A missing, unavailable, stale, or
+   failed read is a named `UNKNOWN`, `FAILING`, `STALE`, or `LAGGING` outcome as applicable. It is
+   never an empty successful result, a fabricated zero, or a reason to replace a populated artifact
+   with partial content. Preserve the last known content and watermark, report the fallback reason,
+   and retry through the documented path rather than building a bypass.
+6. **Record the uncertainty at the moment it matters.** [P][C] Put the read result, scope,
+   authority, freshness evidence, fallback or failure reason, and affected identifier in the
+   session or decision record. If the control packet itself is unavailable, say "no control
+   database" and stop. An unrecorded unknown is not evidence and must not be presented as success.
+
+Do not submit a workflow from inside a running workflow or phase. [P] A running workflow is an
+execution context, not a submission context; do not call the fleet submit path to create a nested,
+replacement, or guessed continuation. Record the blocker or requested continuation and leave that
+P1/P0 decision to the controller through the normal gate. [P] Never use a refresh recommendation,
+retrieval result, or named fallback to bypass admission, verification, review, or the permanence
+gate.
+
 ## Operating rules
 
 1. Every decision turn opens with `agentic-dynamics control status --json`. If it fails

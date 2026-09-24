@@ -87,6 +87,32 @@ tests assert `retrieve()` never returns an `authority==POLICY` candidate and ref
 `publish_event` zero times, and that knowledge modules never call `derive_actuation_record`
 (`design.md` §1.4).
 
+### 2.1 Inspiration-only external patterns
+
+The Hindsight dossier is an external design reference, not a runtime component. [X] Its useful
+patterns for this architecture are conservative document updates: keep authoritative or unchanged
+content opaque, address mutable structures by stable identifiers rather than positions, distinguish
+invalid operation shape from an unknown reference, and preserve the prior document when retrieval
+fails or produces no safe update (`docs/reviews/hindsight/source_notes.md` §§1–3). [X] The same
+dossier also identifies its deletion-blind freshness behavior as a limitation, so that behavior is
+not an adoption target (`docs/reviews/hindsight_memory_solution_dissection.md` §8).
+
+[P] This repository adopts those patterns only through its existing mechanisms: generated surfaces
+remain source-owned, knowledge records retain scope, authority, evidence, lineage, and tombstone
+reasons, retrieval keeps hard cell-scope filtering, and augmentation keeps named fallback outcomes.
+Measured values remain measured or absent; external patterns never authorize invented values,
+LLM-consolidated truth, or a bypass of admission, verification, or permanence gates. [C] The
+corresponding implementation and test seams are `agent_config/`, `knowledge/`, `reporting/`, and
+their existing gates, not an external memory service.
+
+[P] No Hindsight package, service call, SDK, MCP server, plugin, or other runtime dependency is
+adopted. The tier boundary therefore remains unchanged: `knowledge` and `reporting` stay tier-1
+planes, `control` stays tier 2, knowledge does not actuate, reporting does not steer, and the only
+permitted tier-1 → tier-2 imports remain the two observe-only adapter telemetry edges above. Any
+future typed-refresh, additional retrieval arm, or refresh-trace mechanism requires its own design,
+measurement, and gate; it must not be smuggled in as an external dependency or inferred from this
+inspiration record.
+
 ---
 
 ## 3. Dependency direction — the spine

@@ -185,7 +185,12 @@ class ConstructionRequest:
 
 @dataclass
 class AugmentedPrompt:
-    """The rendered prompt plus the auditable construction provenance."""
+    """The rendered prompt plus the auditable construction provenance.
+
+    ``fallback_reason`` is intentionally named rather than inferred from an empty
+    field or a generic boolean. A deterministic fallback is safe to execute, but
+    its cause still matters to later measurement and review.
+    """
 
     prompt: str
     prompt_plan: PromptPlan
@@ -197,6 +202,7 @@ class AugmentedPrompt:
     fallback: bool  # True when the deterministic fallback renderer was used
     repair_count: int
     validator_errors: list[str]
+    fallback_reason: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -210,6 +216,7 @@ class AugmentedPrompt:
             "fallback": self.fallback,
             "repair_count": self.repair_count,
             "validator_errors": self.validator_errors,
+            "fallback_reason": self.fallback_reason,
         }
 
 
@@ -563,39 +570,52 @@ class ModelPromptConstructor:
 
         The model gets exactly one repair call, and only for a deterministic
         validation failure; if that repair also fails, the deterministic fallback
-        renderer is used (no model-generated claims).
+        renderer is used (no model-generated claims). An injected model-call
+        failure follows the same conservative path, so a backend error cannot
+        replace the request with partial output or make the phase fail open.
         """
         evidence = trim_evidence_to_budget(request.evidence, request.input_budget_tokens)
         repair_count = 0
         fallback = False
+        fallback_reason = ""
         errors: list[str] = []
 
-        data = self._call(request, evidence, [])
-        plan = plan_from_dict(data) if data is not None else None
-        errors = (
-            validate_plan(plan, request, evidence)
-            if plan is not None
-            else ["model returned invalid JSON"]
-        )
-
-        if errors:
-            repair_count = 1
-            repaired = self._call(request, evidence, errors)
-            plan2 = plan_from_dict(repaired) if repaired is not None else None
-            errors2 = (
-                validate_plan(plan2, request, evidence)
-                if plan2 is not None
+        plan: PromptPlan | None = None
+        try:
+            data = self._call(request, evidence, [])
+            plan = plan_from_dict(data) if data is not None else None
+            errors = (
+                validate_plan(plan, request, evidence)
+                if plan is not None
                 else ["model returned invalid JSON"]
             )
-            if not errors2:
-                plan = plan2
-                errors = []
-            else:
-                fallback = True
-                errors = errors2
+
+            if errors:
+                repair_count = 1
+                repaired = self._call(request, evidence, errors)
+                plan2 = plan_from_dict(repaired) if repaired is not None else None
+                errors2 = (
+                    validate_plan(plan2, request, evidence)
+                    if plan2 is not None
+                    else ["model returned invalid JSON"]
+                )
+                if not errors2:
+                    plan = plan2
+                    errors = []
+                else:
+                    fallback = True
+                    fallback_reason = "invalid_model_output"
+                    errors = errors2
+        except Exception as exc:  # noqa: BLE001 — injected backend failures are safe fallbacks
+            fallback = True
+            fallback_reason = "constructor_call_failed"
+            errors = [f"{type(exc).__name__}: {exc}"]
+            plan = None
 
         if plan is None or errors:
             fallback = True
+            if not fallback_reason:
+                fallback_reason = "invalid_model_output"
             plan = build_deterministic_plan(request, evidence)
 
         rendered = render_prompt(plan, request, evidence)
@@ -610,6 +630,7 @@ class ModelPromptConstructor:
             fallback=fallback,
             repair_count=repair_count,
             validator_errors=errors,
+            fallback_reason=fallback_reason,
         )
 
 

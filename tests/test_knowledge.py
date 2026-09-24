@@ -284,6 +284,51 @@ def test_event_round_trip():
     assert restored.event_id == "evt-1"
 
 
+def test_knowledge_contract_preserves_provenance_lineage_and_absence():
+    """Prove the conservative boundary without a service call or numeric derivation."""
+    record = _record(
+        authority=Authority.MEASURED,
+        evidence_class="[M]",
+        supersedes="prior-knowledge-id",
+        confidence=None,
+        perturbation_strength=None,
+        energy_total_j=None,
+        energy_per_token=None,
+        region=None,
+        test_executed_success=None,
+    )
+    event = _event(
+        operation="supersede",
+        reason="superseded by a verified revision",
+        causes="observation-knowledge-id",
+        observed_at="2026-08-15T00:00:00Z",
+    )
+
+    restored_record = KnowledgeRecord.from_dict(record.to_dict())
+    restored_event = KnowledgeEvent.from_dict(event.to_dict())
+
+    # Provenance and same-entity history survive serialization exactly.
+    assert restored_record.authority is Authority.MEASURED
+    assert restored_record.evidence_class == "[M]"
+    assert restored_record.supersedes == "prior-knowledge-id"
+    assert restored_event.operation == "supersede"
+    assert restored_event.reason == "superseded by a verified revision"
+    assert restored_event.causes == "observation-knowledge-id"
+    assert restored_event.observed_at == "2026-08-15T00:00:00Z"
+
+    # Unmeasured readings stay absent rather than becoming computed zeroes.
+    assert restored_record.confidence is None
+    assert restored_record.perturbation_strength is None
+    assert restored_record.energy_total_j is None
+    assert restored_record.energy_per_token is None
+    assert restored_record.region is None
+    assert restored_record.test_executed_success is None
+    serialized = record.to_dict()
+    assert "energy_total_j" not in serialized
+    assert "energy_per_token" not in serialized
+    assert "region" not in serialized
+
+
 def test_record_serialization_encodes_authority_as_name():
     d = _record(authority=Authority.POLICY).to_dict()
     assert d["authority"] == "POLICY"

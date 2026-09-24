@@ -60,7 +60,10 @@ def test_knowledge_never_actuates():
     for path in sorted((AD / "knowledge").rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.module == "agentic_dynamics.control.actuation_ingestion":
+            if (
+                isinstance(node, ast.ImportFrom)
+                and node.module == "agentic_dynamics.control.actuation_ingestion"
+            ):
                 names = {a.name for a in node.names}
                 assert "derive_actuation_record" not in names, (
                     f"{path}: imports actuation_ingestion.derive_actuation_record"
@@ -68,3 +71,55 @@ def test_knowledge_never_actuates():
             if isinstance(node, ast.Attribute) and node.attr == "derive_actuation_record":
                 # A bare attribute reference is a call site (e.g. actuation_ingestion.derive_actuation_record(...)).
                 raise AssertionError(f"{path}: references derive_actuation_record")
+
+
+def test_canonical_corpus_names_unavailable_input_and_preserves_provenance(tmp_path, monkeypatch):
+    """The reporting door distinguishes unavailable input from a measured empty slice.
+
+    A missing manifest and an unreadable registered payload are named ``unavailable``;
+    neither is allowed to look like an empty successful measurement.  A readable payload
+    still carries the registry identity and row-level provenance that tie analysis to the
+    canonical corpus, rather than to an arbitrary result-file glob.
+    """
+    from agentic_dynamics.reporting import canonical_corpus as cc
+
+    missing = cc.load_canonical_tables("story", manifest_path=tmp_path / "missing.json")
+    assert missing.input_state == "unavailable"
+    assert missing.is_empty
+
+    empty_manifest = tmp_path / "empty.json"
+    empty_manifest.write_text('{"schema_version": "test/1", "registry": []}', encoding="utf-8")
+    empty = cc.load_canonical_tables("story", manifest_path=empty_manifest)
+    assert empty.input_state == "empty"
+    assert empty.is_empty
+
+    stories_dir = tmp_path / "stories"
+    stories_dir.mkdir()
+    bad_payload = stories_dir / "story_bad.json"
+    bad_payload.write_text("not json", encoding="utf-8")
+    unreadable_manifest = tmp_path / "unreadable.json"
+    unreadable_manifest.write_text(
+        '{"schema_version": "test/1", "registry": [{"entity_id": "e1", '
+        '"knowledge_id": "k1", "source_type": "story", "logical_locator": "bad", '
+        '"source_uri": "story:bad", "lifecycle_state": "current"}]}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
+    unreadable = cc.load_canonical_tables("story", manifest_path=unreadable_manifest)
+    assert unreadable.input_state == "unavailable"
+    assert unreadable.resolution.unreadable == 1
+    assert unreadable.stories == []
+
+    good_payload = stories_dir / "story_good.json"
+    good_payload.write_text('{"story_id": "good", "summary": {}}', encoding="utf-8")
+    good_manifest = tmp_path / "good.json"
+    good_manifest.write_text(
+        '{"schema_version": "test/1", "registry": [{"entity_id": "e2", '
+        '"knowledge_id": "k2", "source_type": "story", "logical_locator": "good", '
+        '"source_uri": "story:good", "lifecycle_state": "current"}]}',
+        encoding="utf-8",
+    )
+    good = cc.load_canonical_tables("story", manifest_path=good_manifest)
+    assert good.input_state == "available"
+    assert good.identity.registry_identity_sha256
+    assert good.stories[0]["_registry"]["knowledge_id"] == "k2"

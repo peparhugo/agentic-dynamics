@@ -57,7 +57,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 #: Repo root — ``src/agentic_dynamics/reporting/canonical_corpus.py`` -> four parents up.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
@@ -94,6 +94,11 @@ TABLE_ATTRIBUTES = {
 #: type, so a missing analysis is not an unresolved row. This is the set the
 #: :class:`ResolutionReport` counts ``expected_current``/``resolved`` over.
 TABLE_SOURCE_TYPES = {"story": "story", "review": "review", "finding": "finding"}
+
+# A lab must be able to distinguish a real zero-row measurement from an input it could not
+# read.  This is deliberately a small vocabulary: callers can render the state without
+# inferring it from a count or treating an unavailable corpus as numeric zero.
+CorpusInputState = Literal["available", "empty", "unavailable"]
 
 
 # ---------------------------------------------------------------------------
@@ -143,9 +148,13 @@ def read_manifest(manifest_path: Path | None = None) -> dict:
     if not path.exists():
         return {}
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        manifest = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return {}
+    # A syntactically valid JSON scalar/list is still not a readable canonical manifest.
+    # Keep the existing safe fallback, while letting the lab-facing state name it as
+    # unavailable rather than allowing a later ``.get`` failure or a fabricated result.
+    return manifest if isinstance(manifest, dict) else {}
 
 
 def manifest_identity(
@@ -851,6 +860,7 @@ class CanonicalTables:
     analysis: list[dict] = field(default_factory=list)
     findings: list[dict] = field(default_factory=list)
     resolution: ResolutionReport = field(default_factory=ResolutionReport)
+    input_state: CorpusInputState = "available"
 
     @property
     def input_dataset_id(self) -> str:
@@ -926,6 +936,16 @@ def load_canonical_tables(
 
     resolution = ResolutionReport.from_issues(expected_current, resolved_count, report_issues)
 
+    if not manifest or not resolution.complete:
+        # Missing/unreadable input and unresolved current rows are not empty measurements.
+        # Keep this distinction at the reporting seam so every lab can fail closed or name
+        # the unavailable state instead of silently publishing stale-looking zeroes.
+        input_state: CorpusInputState = "unavailable"
+    elif not any(payloads.get(name) for name in requested):
+        input_state = "empty"
+    else:
+        input_state = "available"
+
     return CanonicalTables(
         identity=identity,
         tables=requested,
@@ -934,4 +954,5 @@ def load_canonical_tables(
         analysis=payloads.get("analysis", []),
         findings=payloads.get("finding", []),
         resolution=resolution,
+        input_state=input_state,
     )

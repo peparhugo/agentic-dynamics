@@ -26,6 +26,11 @@ probabilistically retrieved, so retrieved text can never displace it. An
 
 Design: ``code_reviews/2026-08-15_rag-knowledge-base-proposal-review.md`` §7 (Sol's
 identity + authority contract) and the companion ``docs/rag_design.md`` §1.3 / §4.2.
+
+The conservative epistemic boundary is part of this local contract: events preserve
+their operation and reason, records preserve authority, evidence class, and lineage,
+and optional measurements remain absent when they were not observed. Identity and
+serialization are intentionally service-free and do not derive numeric observations.
 """
 
 from __future__ import annotations

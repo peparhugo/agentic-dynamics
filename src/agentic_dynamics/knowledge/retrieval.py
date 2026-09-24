@@ -45,7 +45,9 @@ from agentic_dynamics.knowledge.knowledge import Authority, compute_content_hash
 
 # ── Versioned weights (policy constants, [H]) ───────────────────
 
-WEIGHTS_VERSION = "retrieval-weights/v2"  # [H] v2 = k3 adds the intent-conditional source-type priors.
+WEIGHTS_VERSION = (
+    "retrieval-weights/v2"  # [H] v2 = k3 adds the intent-conditional source-type priors.
+)
 
 RRF_K = 60.0  # [H] rank-smoothing constant in the RRF base.
 LEXICAL_LEG_WEIGHT = 1.2  # [H] lexical leg is weighted above dense in the base.
@@ -96,8 +98,7 @@ RETRIEVAL_LEG_CAPACITY = {
     "embedding": 2,
 }
 _LEG_SLOTS = {
-    name: threading.BoundedSemaphore(capacity)
-    for name, capacity in RETRIEVAL_LEG_CAPACITY.items()
+    name: threading.BoundedSemaphore(capacity) for name, capacity in RETRIEVAL_LEG_CAPACITY.items()
 }
 REDUNDANCY_THRESHOLD = 0.92
 #: The cosine-collapse embeds only the top-K candidates (by list order — the fused list is
@@ -380,11 +381,36 @@ def build_query_plan(
 #: plus the phase objective.
 _FINDINGS_MARKERS = frozenset(
     {
-        "what", "was", "were", "did", "does", "how", "why", "whether",
-        "conclusion", "conclusions", "conclude", "concluded", "verdict", "verdicts",
-        "finding", "findings", "evidence", "determine", "determined", "determining",
-        "outcome", "outcomes", "result", "results", "distilled", "summary",
-        "resolved", "resolution", "measured", "inferred",
+        "what",
+        "was",
+        "were",
+        "did",
+        "does",
+        "how",
+        "why",
+        "whether",
+        "conclusion",
+        "conclusions",
+        "conclude",
+        "concluded",
+        "verdict",
+        "verdicts",
+        "finding",
+        "findings",
+        "evidence",
+        "determine",
+        "determined",
+        "determining",
+        "outcome",
+        "outcomes",
+        "result",
+        "results",
+        "distilled",
+        "summary",
+        "resolved",
+        "resolution",
+        "measured",
+        "inferred",
     }
 )
 
@@ -394,11 +420,33 @@ _FINDINGS_MARKERS = frozenset(
 #: are counted separately in :func:`_query_shape_scores`.
 _CODE_MARKERS = frozenset(
     {
-        "function", "functions", "class", "classes", "method", "methods",
-        "signature", "signatures", "returns", "parameter", "parameters",
-        "argument", "arguments", "implement", "implementation", "refactor",
-        "def", "identifier", "identifiers", "variable", "struct", "symbol",
-        "symbols", "calls", "call", "invoke", "invoked",
+        "function",
+        "functions",
+        "class",
+        "classes",
+        "method",
+        "methods",
+        "signature",
+        "signatures",
+        "returns",
+        "parameter",
+        "parameters",
+        "argument",
+        "arguments",
+        "implement",
+        "implementation",
+        "refactor",
+        "def",
+        "identifier",
+        "identifiers",
+        "variable",
+        "struct",
+        "symbol",
+        "symbols",
+        "calls",
+        "call",
+        "invoke",
+        "invoked",
     }
 )
 
@@ -418,9 +466,7 @@ def _query_shape_scores(plan: QueryPlan, phase_objective: str) -> tuple[int, int
     return findings, code
 
 
-def classify_query_shape(
-    plan: QueryPlan, *, phase_objective: str = ""
-) -> QueryShape:
+def classify_query_shape(plan: QueryPlan, *, phase_objective: str = "") -> QueryShape:
     """Classify the deterministic query intent: FINDINGS / CODE / NEUTRAL.
 
     A findings-shaped question is one dominated by conclusion/verdict/evidence
@@ -777,9 +823,7 @@ def fuse_candidates(
         if freshness is None:
             continue
         exact = exact_identifier_hit(c, exact_terms)
-        bucket = source_ordering_bucket(
-            source_type=c.source_type, evidence_class=c.evidence_class
-        )
+        bucket = source_ordering_bucket(source_type=c.source_type, evidence_class=c.evidence_class)
         prior = source_type_prior(bucket, query_shape)
         score = compute_fused_score(
             lexical_rank=c.lexical_rank,
@@ -794,16 +838,12 @@ def fuse_candidates(
                 else None
             ),
         )
-        scored.append(
-            replace(c, fused_score=score * prior, exact_identifier_match=exact)
-        )
+        scored.append(replace(c, fused_score=score * prior, exact_identifier_match=exact))
     scored.sort(
         key=lambda c: (
             -c.fused_score,
             ordering_tiebreak_tier(
-                source_ordering_bucket(
-                    source_type=c.source_type, evidence_class=c.evidence_class
-                ),
+                source_ordering_bucket(source_type=c.source_type, evidence_class=c.evidence_class),
                 query_shape,
             ),
         )
@@ -896,8 +936,10 @@ def _pairwise_similarities(
     if len(candidates) < 2 or embedder is None:
         return {}, "none", ""
     if timeout_s is not None and timeout_s <= 0:
-        return {}, "none", (
-            f"retrieval budget exhausted before the embedding leg ({timeout_s:g}s left)"
+        return (
+            {},
+            "none",
+            (f"retrieval budget exhausted before the embedding leg ({timeout_s:g}s left)"),
         )
     embedded = candidates[:COLLAPSE_EMBED_CAP]
     budget_label = timeout_s if timeout_s is not None else DEFAULT_RETRIEVAL_BUDGET_S
@@ -1529,7 +1571,15 @@ def retrieve(
     ``deadline_s`` bounds the whole pass (default ``FINOPS_RETRIEVAL_BUDGET_S``, 20s):
     leg waits use the remaining budget, the pool is dismissed without joining, and a leg
     that fails or exceeds the budget is NAMED in ``leg_errors`` — a degraded pass is
-    never silently pooled with a clean one.
+    never silently pooled with a clean one. A completed leg returning ``[]`` is different:
+    it is a successful empty result, so it does not receive a fabricated error. Callers
+    must use ``leg_errors`` and ``fallback_mode`` to distinguish unavailable retrieval from
+    an empty successful leg; an empty candidate list alone is not a success signal.
+
+    Scope filtering is a hard pre-fusion boundary. Candidates carrying a different,
+    non-empty ``repository_id`` are removed before fusion and therefore cannot become
+    evidence or graph-expansion seeds. An empty candidate scope remains the documented
+    unknown/legacy case handled by :func:`scope_excluded`.
 
     ``source_type_resolver`` is the k4 no-silent-empties side channel: a deterministic
     ``candidate_id -> source_type`` lookup (never an LLM) consulted when a store's
@@ -1620,9 +1670,7 @@ def retrieve(
         cid = hit.get("id", "")
         meta = hit.get("metadata") or {}
         text = hit.get("document", "")
-        source_type = _resolve_source_type(
-            meta, text, cid, resolver=source_type_resolver
-        )
+        source_type = _resolve_source_type(meta, text, cid, resolver=source_type_resolver)
         authority = _coerce_authority(meta.get("authority"))
         if not _candidate_allowed(
             source_type,
@@ -1668,9 +1716,7 @@ def retrieve(
             continue  # a foreign-ACL record never surfaces via the direct lexical leg
         cid = _canonical_id(props, hit.get("id", ""))
         text = props.get("text", "")
-        source_type = _resolve_source_type(
-            props, text, cid, resolver=source_type_resolver
-        )
+        source_type = _resolve_source_type(props, text, cid, resolver=source_type_resolver)
         authority = _coerce_authority(props.get("authority"))
         if not _candidate_allowed(
             source_type,
@@ -1805,8 +1851,7 @@ def retrieve(
         # The graph client is healthy (its search leg ran); only the neighborhood extension
         # was cut by the budget — recorded, never silent (review finding P1/P6).
         leg_errors["expansion"] = (
-            f"expansion skipped: retrieval budget {budget_s:g}s exhausted "
-            f"({remaining_s:.2f}s left)"
+            f"expansion skipped: retrieval budget {budget_s:g}s exhausted ({remaining_s:.2f}s left)"
         )
 
     if expanded_nodes is not None:
@@ -1829,13 +1874,16 @@ def retrieve(
                 # Review-4 A2: an EXPANDED neighbor must pass the same freshness/commit
                 # gate as a direct candidate. Without this, a stale SOURCE neighbor could
                 # be appended after fusion and selected, bypassing the SOURCE commit gate.
-                if freshness_multiplier(
-                    authority=authority,
-                    commit_sha=str(props.get("commit_sha", "") or ""),
-                    observed_at=props.get("observed_at"),
-                    current_commit=commit_sha,
-                    now=now,
-                ) is None:
+                if (
+                    freshness_multiplier(
+                        authority=authority,
+                        commit_sha=str(props.get("commit_sha", "") or ""),
+                        observed_at=props.get("observed_at"),
+                        current_commit=commit_sha,
+                        now=now,
+                    )
+                    is None
+                ):
                     continue
                 if not _candidate_allowed(
                     source_type,
@@ -1971,10 +2019,7 @@ def _dense_filter(filters: dict[str, Any]) -> dict[str, Any]:
                 "$or": [
                     {"commit_sha": ""},
                     {"commit_sha": commit},
-                    *[
-                        {"authority": name}
-                        for name in COMMIT_EXEMPT_AUTHORITY_NAMES
-                    ],
+                    *[{"authority": name} for name in COMMIT_EXEMPT_AUTHORITY_NAMES],
                 ]
             }
         )

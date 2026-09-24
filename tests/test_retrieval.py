@@ -1065,6 +1065,51 @@ def test_retrieve_fallback_reflects_surviving_legs(dense_store, graph_client, ex
     assert attempt.fallback_mode == expected_mode
 
 
+def test_retrieve_empty_dense_leg_is_not_marked_as_failure():
+    """A healthy dense leg returning no rows stays distinct from an unavailable leg.
+
+    The empty result is honest evidence that this leg found nothing. It must not be
+    converted into a synthetic error, while the named fallback still records that only
+    the dense leg was available for this pass.
+    """
+    attempt = retrieve(
+        "websocket reload",
+        dense_store=_FakeDenseStore([]),
+        graph_client=None,
+    )
+
+    assert attempt.fallback_mode == "dense_local_exact"
+    assert "dense" not in attempt.leg_errors
+    assert attempt.candidates == []
+    assert attempt.selected_evidence == []
+
+
+def test_retrieve_failed_dense_and_lexical_legs_are_named():
+    """Backend failures remain observable instead of masquerading as empty success.
+
+    Check each store independently: a failed dense leg leaves the lexical fallback
+    available, and a failed lexical leg leaves the dense fallback available. The two
+    outcomes have the same possible empty evidence shape but different audit state.
+    """
+    dense_failed = retrieve(
+        "websocket reload",
+        dense_store=_FakeDenseStore([], error=RuntimeError("chroma down")),
+        graph_client=_FakeGraph(lexical_hits=[_lexical_hit()]),
+    )
+    assert dense_failed.fallback_mode == "lexical_graph_only"
+    assert "dense" in dense_failed.leg_errors
+    assert "chroma down" in dense_failed.leg_errors["dense"]
+
+    lexical_failed = retrieve(
+        "websocket reload",
+        dense_store=_FakeDenseStore([_seed_hit()]),
+        graph_client=_FakeGraph(lexical_error=RuntimeError("neo4j down")),
+    )
+    assert lexical_failed.fallback_mode == "dense_local_exact"
+    assert "lexical" in lexical_failed.leg_errors
+    assert "neo4j down" in lexical_failed.leg_errors["lexical"]
+
+
 def test_retrieve_fully_down_yields_no_rag_empty_evidence():
     # Both stores raise (infra down): each leg is marked down, evidence is empty,
     # and the attempt degrades to no_rag without raising.
@@ -1078,6 +1123,37 @@ def test_retrieve_fully_down_yields_no_rag_empty_evidence():
     assert attempt.selected_evidence == []
     assert attempt.token_count == 0
     assert attempt.dedup_path == "none"  # no survivors → embeddings never attempted
+    assert set(attempt.leg_errors) >= {"dense", "lexical"}
+
+
+def test_retrieve_scope_filter_runs_before_fusion_for_both_legs():
+    """Foreign cell candidates never enter the fused candidate set.
+
+    The fake dense store intentionally ignores its backend ``where`` clause and the
+    fake graph client returns both cells. This proves the retrieval seam's local hard
+    filter, not just the optional service-side filters.
+    """
+    local_dense = _dense_hit("local-dense", "local websocket finding", authority="source")
+    local_dense["metadata"]["repository_id"] = "cell-a"
+    foreign_dense = _dense_hit("foreign-dense", "foreign websocket finding", authority="source")
+    foreign_dense["metadata"]["repository_id"] = "cell-b"
+
+    local_lexical = _knowledge_lexical_hit(cid="local-lexical", text="local lexical finding")
+    local_lexical["properties"]["repository_id"] = "cell-a"
+    foreign_lexical = _knowledge_lexical_hit(cid="foreign-lexical", text="foreign lexical finding")
+    foreign_lexical["properties"]["repository_id"] = "cell-b"
+
+    attempt = retrieve(
+        "websocket finding",
+        dense_store=_FakeDenseStore([foreign_dense, local_dense]),
+        graph_client=_FakeGraph(lexical_hits=[foreign_lexical, local_lexical]),
+        repository_id="cell-a",
+    )
+
+    candidate_ids = {candidate.id for candidate in attempt.candidates}
+    assert candidate_ids == {"local-dense", "local-lexical"}
+    assert {candidate.id for candidate in attempt.selected_evidence} <= candidate_ids
+    assert not {"foreign-dense", "foreign-lexical"} & candidate_ids
 
 
 def test_retrieve_lexical_leg_returns_knowledge_records():
@@ -1278,9 +1354,13 @@ CODE_OBJECTIVE = ""
 
 
 def test_query_shape_classifier_is_deterministic_and_named():
-    shape = classify_query_shape(build_query_plan(FINDINGS_QUERY), phase_objective=FINDINGS_OBJECTIVE)
+    shape = classify_query_shape(
+        build_query_plan(FINDINGS_QUERY), phase_objective=FINDINGS_OBJECTIVE
+    )
     assert shape is QueryShape.FINDINGS
-    again = classify_query_shape(build_query_plan(FINDINGS_QUERY), phase_objective=FINDINGS_OBJECTIVE)
+    again = classify_query_shape(
+        build_query_plan(FINDINGS_QUERY), phase_objective=FINDINGS_OBJECTIVE
+    )
     assert shape is again
     assert {s.value for s in QueryShape} == {"findings", "code", "neutral"}
     assert QueryShape.NEUTRAL.value == "neutral"
@@ -1299,9 +1379,7 @@ def test_query_shape_classifier_distinguishes_code_and_neutral():
 
 def test_source_ordering_bucket_maps_source_type_and_evidence_class():
     # A finding with measured evidence is distilled ``evidence`` content.
-    assert (
-        source_ordering_bucket(source_type="finding", evidence_class="[M]") == "evidence"
-    )
+    assert source_ordering_bucket(source_type="finding", evidence_class="[M]") == "evidence"
     # A code record is always the bare ``code`` surface, regardless of its [C] class.
     assert source_ordering_bucket(source_type="code", evidence_class="[C]") == "code"
     # A review (heuristic [H]) is distilled ``advisory`` content — it still outranks code
@@ -1318,7 +1396,9 @@ def test_source_type_priors_are_intent_conditional_and_finite():
     assert FINDINGS_QUERY_TYPE_PRIORS["evidence"] > 1.0
     assert FINDINGS_QUERY_TYPE_PRIORS["advisory"] > FINDINGS_QUERY_TYPE_PRIORS["code"]
     assert FINDINGS_QUERY_TYPE_PRIORS["code"] == 1.0
-    assert source_type_prior("evidence", QueryShape.FINDINGS) == FINDINGS_QUERY_TYPE_PRIORS["evidence"]
+    assert (
+        source_type_prior("evidence", QueryShape.FINDINGS) == FINDINGS_QUERY_TYPE_PRIORS["evidence"]
+    )
     # Code shape: code stays first at comparable relevance.
     assert CODE_QUERY_TYPE_PRIORS["code"] == 1.0
     assert CODE_QUERY_TYPE_PRIORS["evidence"] < 1.0
@@ -1578,8 +1658,11 @@ def test_k4_still_untyped_candidate_is_excluded_with_recorded_reason_when_typed_
     # selection ahead of a typed one: it is excluded from the top-K and the exclusion is recorded.
     resolver = {}  # resolves nothing — the stale record stays untyped
     typed = _typed_dense_hit(
-        "k_finding", "the control_db_evidence phase concluded records are reliable",
-        source_type="finding", authority="measured", evidence_class="[M]",
+        "k_finding",
+        "the control_db_evidence phase concluded records are reliable",
+        source_type="finding",
+        authority="measured",
+        evidence_class="[M]",
     )
     stale = _untyped_dense_hit("stale-1", "a matching but untyped stale record")
     attempt = retrieve(
@@ -1635,6 +1718,7 @@ def test_k4_lexical_leg_types_a_record_the_dense_leg_could_not():
     assert shared.source_type == "finding"  # typed by the lexical leg, never left untyped
     assert shared.id in [c.id for c in attempt.selected_evidence]
 
+
 def test_freshness_multiplier_advisory_naive_timestamp_is_utc():
     """A naive ISO timestamp must not crash ADVISORY freshness (live dense probe, 2026-09-10).
 
@@ -1688,6 +1772,7 @@ def test_direct_lexical_leg_enforces_acl_scope():
     The pre-existing leak: the lexical leg filtered only ``repository_id``, so a record with a
     matching repository but a different ACL scope was selectable.
     """
+
     def hit():
         h = _knowledge_lexical_hit(cid="foreign-acl", text="task manager api building finding")
         h["properties"]["repository_id"] = "self-a"

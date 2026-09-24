@@ -83,6 +83,11 @@ LEGACY = "legacy"
 #: — the module docstring names the apps↔scripts edges that would fail if they were gated today.
 CHECKOUT_ONLY = {"scripts", "workflows"}
 
+# Hindsight is an inspiration-only reference for conservative data handling. Keeping this guard
+# separate from the tier graph makes the architectural boundary executable without pretending that
+# an external package belongs to any repository plane.
+INSPIRATION_ONLY_IMPORT_PREFIX = "hindsight"
+
 TIER1 = PLANES
 TIER2 = {CONTROL}
 
@@ -91,17 +96,21 @@ TIER2 = {CONTROL}
 #: the two adapters publishing telemetry; ``runtime.workflow_runner`` uses the injected Router
 #: + TelemetryPublisher protocols instead of importing ``control``. Any other plane module
 #: importing ``control`` is a rec-8 violation.
-PINNED_T1_TO_T2 = frozenset({
-    ("agentic_dynamics.adapters.opencode", "agentic_dynamics.control.live"),
-    ("agentic_dynamics.adapters.claude_adapter", "agentic_dynamics.control.live"),
-})
+PINNED_T1_TO_T2 = frozenset(
+    {
+        ("agentic_dynamics.adapters.opencode", "agentic_dynamics.control.live"),
+        ("agentic_dynamics.adapters.claude_adapter", "agentic_dynamics.control.live"),
+    }
+)
 
 #: The control-plane modules whose import from ``control`` is forbidden (rule 7): control
 #: consumes facts, not arbitrary retrieved text.
-RETRIEVAL_MODULES = frozenset({
-    "agentic_dynamics.knowledge.retrieval",
-    "agentic_dynamics.knowledge.prompt_constructor",
-})
+RETRIEVAL_MODULES = frozenset(
+    {
+        "agentic_dynamics.knowledge.retrieval",
+        "agentic_dynamics.knowledge.prompt_constructor",
+    }
+)
 
 
 def _module_path(path: Path) -> str:
@@ -142,8 +151,7 @@ def _module_files() -> list[Path]:
     for surface in (SCRIPTS, WORKFLOWS):
         if surface.exists():
             files.extend(
-                p for p in surface.rglob("*.py")
-                if "archive" not in p.relative_to(surface).parts
+                p for p in surface.rglob("*.py") if "archive" not in p.relative_to(surface).parts
             )
     return files
 
@@ -165,9 +173,7 @@ def _resolve_target(import_name: str) -> str | None:
     return None
 
 
-def _resolve_relative(
-    module_parts: list[str], level: int, module: str | None
-) -> str | None:
+def _resolve_relative(module_parts: list[str], level: int, module: str | None) -> str | None:
     """Resolve a relative import to its dotted module path, or ``None`` if out of scope.
 
     ``level`` is the ``ast.ImportFrom.level`` (1 = current package, 2 = parent, …); ``module``
@@ -271,11 +277,12 @@ def test_control_does_not_import_retrieval_or_prompt_constructor():
     for src in _sources_in(TIER2):
         for target in GRAPH[src]:
             if any(
-                target == module or target.startswith(module + ".")
-                for module in RETRIEVAL_MODULES
+                target == module or target.startswith(module + ".") for module in RETRIEVAL_MODULES
             ):
                 violations.append(f"{src} -> {target}")
-    assert not violations, "control imports retrieval/prompt_constructor:\n" + "\n".join(sorted(violations))
+    assert not violations, "control imports retrieval/prompt_constructor:\n" + "\n".join(
+        sorted(violations)
+    )
 
 
 def test_tier1_to_tier2_edges_are_exactly_pinned():
@@ -298,11 +305,41 @@ def test_package_does_not_import_scripts_or_workflows():
     the nodes were never walked.
     """
     assert any(node.startswith("scripts.") for node in GRAPH), "scripts nodes missing from graph"
-    assert any(node.startswith("workflows.") for node in GRAPH), "workflows nodes missing from graph"
+    assert any(node.startswith("workflows.") for node in GRAPH), (
+        "workflows nodes missing from graph"
+    )
     _assert_no_edge(
         {CORE} | PLANES | TIER2,
         CHECKOUT_ONLY,
         reason="a package plane imports checkout-only scripts/workflows logic",
+    )
+
+
+def test_runtime_surfaces_do_not_import_hindsight():
+    """The inspiration-only boundary excludes direct Hindsight runtime dependencies.
+
+    The architecture records patterns learned from the committed dossier, but the repository must
+    remain runnable with its own mechanisms. This AST check covers the linted Python runtime
+    surfaces, including ``src/``, ``apps/``, ``scripts/``, and ``workflows/``; it intentionally
+    checks imports only, so it does not widen the existing package tier rules or require an
+    optional external dependency merely to run the guard.
+    """
+    violations: list[str] = []
+    for path in _module_files():
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            imported_roots: list[str] = []
+            if isinstance(node, ast.Import):
+                imported_roots = [alias.name.split(".", 1)[0] for alias in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                imported_roots = [node.module.split(".", 1)[0]]
+            if any(
+                root.casefold().startswith(INSPIRATION_ONLY_IMPORT_PREFIX)
+                for root in imported_roots
+            ):
+                violations.append(f"{path}: Hindsight runtime import")
+    assert not violations, "inspiration-only Hindsight dependency detected:\n" + "\n".join(
+        violations
     )
 
 
@@ -326,7 +363,9 @@ def test_apps_contain_no_domain_rules():
                     if isinstance(node.func, ast.Attribute)
                     else None
                 )
-                assert name not in markers, f"{path}: apps contain domain-rule construction {name}(...)"
+                assert name not in markers, (
+                    f"{path}: apps contain domain-rule construction {name}(...)"
+                )
 
 
 def test_graph_nodes_are_path_based_and_collision_free():
@@ -343,7 +382,9 @@ def test_graph_nodes_are_path_based_and_collision_free():
     assert "apps.control_room.routes.registry" in GRAPH
     # Distinct nodes with distinct edge sets (the service is a pure file reader; the route
     # composes the service + Flask — a merged node would have lost one of the two).
-    assert GRAPH["apps.control_room.services.registry"] != GRAPH["apps.control_room.routes.registry"]
+    assert (
+        GRAPH["apps.control_room.services.registry"] != GRAPH["apps.control_room.routes.registry"]
+    )
     # Both same-stem __init__ packages are distinct too.
     assert "apps.control_room.routes.__init__" in GRAPH
     assert "apps.control_room.services.__init__" in GRAPH

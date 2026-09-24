@@ -4,6 +4,7 @@ one-repair, deterministic fallback, and no-fork keying."""
 import json
 from dataclasses import fields
 
+from agentic_dynamics.knowledge.augment import augment_prompt
 from agentic_dynamics.knowledge.prompt_constructor import (
     DEFAULT_CONSTRUCTOR_MODEL,
     SCHEMA_VERSION,
@@ -23,7 +24,9 @@ from agentic_dynamics.knowledge.prompt_constructor import (
 )
 
 
-def _evidence(knowledge_id: str, text: str = "evidence text", authority: str = "source") -> EvidenceUnit:
+def _evidence(
+    knowledge_id: str, text: str = "evidence text", authority: str = "source"
+) -> EvidenceUnit:
     return EvidenceUnit(
         knowledge_id=knowledge_id,
         text=text,
@@ -68,6 +71,7 @@ def _valid_plan_dict(raw: str = "implement the widget") -> dict:
 
 # ── Schema validation ───────────────────────────────────────────
 
+
 def test_valid_plan_passes():
     request = _request()
     plan = plan_from_dict(_valid_plan_dict())
@@ -102,6 +106,7 @@ def test_hash_work_item_is_sha256():
 
 # ── Invented-constraint rejection ───────────────────────────────
 
+
 def test_invented_constraint_rejected():
     request = _request()
     d = _valid_plan_dict()
@@ -116,14 +121,13 @@ def test_evidence_sourced_constraint_rejected():
     # Retrieved evidence must stay evidence, never become control text.
     request = _request()
     d = _valid_plan_dict()
-    d["hard_constraints"] = [
-        {"text": "no comments", "source": "evidence", "citation": "[K:k1]"}
-    ]
+    d["hard_constraints"] = [{"text": "no comments", "source": "evidence", "citation": "[K:k1]"}]
     errors = validate_plan(plan_from_dict(d), request, request.evidence)
     assert any("control" in e or "authority escalation" in e for e in errors)
 
 
 # ── Citation validity ───────────────────────────────────────────
+
 
 def test_claim_citing_unknown_knowledge_id_rejected():
     request = _request()
@@ -152,6 +156,7 @@ def test_claim_authority_must_match_cited_evidence():
 
 # ── Tool-subset enforcement ─────────────────────────────────────
 
+
 def test_tool_privilege_expansion_rejected():
     request = _request()
     d = _valid_plan_dict()
@@ -168,6 +173,7 @@ def test_tool_subset_accepted():
 
 
 # ── One-repair flow ─────────────────────────────────────────────
+
 
 def _runner(responses: list[str]):
     call_count = {"n": 0}
@@ -214,6 +220,7 @@ def test_construct_no_repair_when_valid():
 
 # ── Deterministic fallback ──────────────────────────────────────
 
+
 def test_deterministic_fallback_has_no_model_claims():
     request = _request()
     plan = build_deterministic_plan(request, request.evidence)
@@ -227,9 +234,9 @@ def test_fallback_render_contains_verbatim_item_policy_and_evidence():
     request = _request()
     plan = build_deterministic_plan(request, request.evidence)
     rendered = render_prompt(plan, request, request.evidence)
-    assert request.raw_work_item in rendered          # verbatim, never replaced
-    assert request.pinned_policy in rendered          # pinned policy present
-    assert request.evidence[0].text in rendered       # evidence text present
+    assert request.raw_work_item in rendered  # verbatim, never replaced
+    assert request.pinned_policy in rendered  # pinned policy present
+    assert request.evidence[0].text in rendered  # evidence text present
     assert "Implement and test".lower() not in rendered.lower()  # no model guidance
 
 
@@ -241,6 +248,54 @@ def test_construct_falls_back_to_deterministic_render():
     assert result.fallback is True
     assert result.prompt_plan.evidence_claims == []
     assert result.raw_work_item_hash == hash_work_item("implement the widget")
+
+
+def test_constructor_call_failure_has_named_safe_fallback():
+    request = _request()
+
+    def fail(_prompt: str) -> str:
+        raise RuntimeError("constructor unavailable")
+
+    result = ModelPromptConstructor(run_constructor=fail).construct(request)
+
+    assert result.fallback is True
+    assert result.fallback_reason == "constructor_call_failed"
+    assert request.raw_work_item in result.prompt
+    assert request.pinned_policy in result.prompt
+    assert result.prompt.strip()
+
+
+def test_augmentation_failure_preserves_base_prompt_and_names_stage():
+    base_prompt = "the already valid executor prompt"
+    constructor_called = False
+
+    def fail_retrieve(**_kwargs):
+        raise RuntimeError("retrieval unavailable")
+
+    def should_not_construct(_request):
+        nonlocal constructor_called
+        constructor_called = True
+        raise AssertionError("a retrieval failure must not invoke construction")
+
+    outcome = augment_prompt(
+        base_prompt=base_prompt,
+        goal="test the fallback",
+        phase_def={},
+        model="test/model",
+        commit_sha="abc",
+        inherited_tools=["read"],
+        pinned_policy="policy",
+        rag_params={},
+        retrieve_fn=fail_retrieve,
+        construct_fn=should_not_construct,
+    )
+
+    assert outcome.prompt == base_prompt
+    assert outcome.fallback is True
+    assert outcome.fallback_mode == "no_rag"
+    assert outcome.fallback_reason == "retrieve_failed"
+    assert "RuntimeError: retrieval unavailable" in outcome.error
+    assert constructor_called is False
 
 
 def test_render_order_is_deterministic():
@@ -255,6 +310,7 @@ def test_render_order_is_deterministic():
 
 
 # ── No-fork keying ──────────────────────────────────────────────
+
 
 def test_construction_request_has_no_session_field():
     names = {f.name for f in fields(ConstructionRequest)}
