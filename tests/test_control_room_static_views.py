@@ -16,6 +16,7 @@ script the page does not load.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -235,5 +236,117 @@ def test_run_drawer_renders_the_job_log_blocks():
         "api/events/",
         "closeRunLogStream",
         "run-log",
+        "normalizeRunLogEvent",
+        "run-log-timestamp",
+        "run-log-id",
+        "run-log-tool",
+        "run-log-tool-input",
+        "run-log-tool-output",
+        "run-log-part-id",
+        "run-log-child-session-id",
+        "run-log-malformed",
+        "runLogEntry(event, { live: true })",
+        "renderActivityMetadata",
+        "data-activity-surface",
+        "childActivityState",
+        "cellIds",
+        "resolutionBasis",
+        'source.addEventListener("replay_complete"',
     ):
         assert anchor in app, anchor
+
+
+def test_run_drawer_follow_gate_exercises_the_server_bound_cell():
+    """The acceptance gate must click the drawer and inspect its emitted EventSource request.
+
+    The fixture's run id and log cell id are different. Requiring the gate to compare the actual
+    request with the fixture's ``logs.cell_id`` prevents a source-only or dataset-only assertion
+    from silently accepting a requested-id fallback.
+    """
+    app = (STATIC / "app.js").read_text(encoding="utf-8")
+    gate = (_ROOT / "scripts" / "verify_control_room_rendering.py").read_text(encoding="utf-8")
+    render_start = app.index("function renderRunLogs(logs)")
+    render_end = app.index("/** Toggle the drawer's live follow", render_start)
+    render_body = app[render_start:render_end]
+    assert 'follow.dataset.logFollow = logs.cell_id || ""' in render_body
+    assert "toggleRunLogStream(follow.dataset.logFollow, follow)" in render_body
+    assert "with page.expect_request(" in gate
+    assert "follow_button.click()" in gate
+    assert 'load_boards_fixture()["run_detail"]["logs"]["cell_id"]' in gate
+    assert "urlparse(follow_request.value.url).path" in gate
+    assert '"drawer-logs-follow"' in gate
+
+
+def test_run_drawer_fixture_carries_rich_event_evidence():
+    """The acceptance fixture names every rich field the drawer and live feed must preserve."""
+    fixture = json.loads(
+        (_ROOT / "apps/control_room/verification/fixtures/boards_endpoints.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    event = fixture["run_detail"]["logs"]["events"][2]
+    assert event == {
+        "ts": "2026-09-18T19:19:00Z",
+        "timestamp": "2026-09-18T19:19:00Z",
+        "class": "step_finish",
+        "text": "phase verify ok",
+        "id": "event-fixture-0003",
+        "part_id": "part-fixture-0003",
+        "tool": "pytest",
+        "tool_input": "tests/test_control_room_static_views.py",
+        "tool_output": "3 passed",
+        "child_session_id": "child-fixture-0003",
+        "malformed": False,
+    }
+
+
+def test_run_detail_fixture_carries_server_owned_child_activity_scope():
+    """The acceptance fixture binds the same child scope to drawer and transcript surfaces."""
+    fixture = json.loads(
+        (_ROOT / "apps/control_room/verification/fixtures/boards_endpoints.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    logs = fixture["run_detail"]["logs"]
+    activity = logs["child_activity"]
+    assert logs["cell_ids"] == ["fixture-job-0001"]
+    assert logs["resolution_basis"] == "by_run_id"
+    assert activity["state"] == "recorded"
+    assert activity["cell_ids"] == logs["cell_ids"]
+    assert activity["resolution_basis"] == logs["resolution_basis"]
+    assert activity["slice_bound"] == logs["slice_bound"]
+
+
+def test_transcript_liveness_uses_recorded_age_and_names_unknown_timestamp():
+    """Replay receipt time cannot turn an old or untimestamped event into LIVE evidence."""
+    core = (STATIC / "control-room-core.js").read_text(encoding="utf-8")
+    app = (STATIC / "app.js").read_text(encoding="utf-8")
+    assert "function recordedAgeSeconds(value, now = Date.now())" in core
+    assert "function recordedLiveness(value, now = Date.now(), liveWindowSeconds = 600)" in core
+    assert 'state: "unknown", age_seconds: null, label: "age unknown"' in core
+    assert '"stale"' in core
+    assert 'timestamp: "timestamp unavailable"' in core
+    assert "state.lastEventAt = Date.now()" not in app
+    receive_start = app.index("function receiveEvent(raw)")
+    receive_end = app.index("/** Append one browser-generated artifact row", receive_start)
+    receive_body = app[receive_start:receive_end]
+    assert "row.recorded_state" in receive_body
+    assert "state.streamState = row.recorded_state" in receive_body
+    assert "Date.now()" not in receive_body
+    assert 'run-log-age", "recorded age"' in app
+    assert 'if (normalized.recorded_state === "live") entry.dataset.logLive = "true"' in app
+    assert "if (options.live) normalized.live = true" not in app
+
+
+def test_child_absence_is_validated_against_the_displayed_bound():
+    """The client consumes server-owned bounded metadata and never scans a broader event tail."""
+    core = (STATIC / "control-room-core.js").read_text(encoding="utf-8")
+    app = (STATIC / "app.js").read_text(encoding="utf-8")
+    assert "function boundedActivity(source)" in core
+    assert "absence evidence is not bounded to the displayed slice" in core
+    metadata_start = app.index("function renderActivityMetadata(metadata, surface)")
+    metadata_end = app.index("/** Build one terminal row", metadata_start)
+    metadata_body = app[metadata_start:metadata_end]
+    assert "core.boundedActivity(source)" in metadata_body
+    assert "source.events" not in metadata_body
+    assert "activity.slice_bound ?? source.slice_bound" in metadata_body

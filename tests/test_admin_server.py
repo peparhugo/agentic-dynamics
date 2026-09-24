@@ -680,10 +680,12 @@ def test_event_stream_replays_in_order_then_marks_live_boundary(monkeypatch):
     assert boundary.startswith("event: replay_complete\ndata: ")
     # The boundary now names BOTH ids (2026-09-22): the resolved cell and the requested one —
     # equal for a pass-through cell, distinct when a fleet job resolves to its live phase.
-    assert json.loads(boundary.split("data: ", 1)[1]) == {
-        "cell_id": "alpha",
-        "requested": "alpha",
-    }
+    boundary_payload = json.loads(boundary.split("data: ", 1)[1])
+    assert boundary_payload["cell_id"] == "alpha"
+    assert boundary_payload["requested"] == "alpha"
+    assert boundary_payload["resolved_id"] == "alpha"
+    assert boundary_payload["resolution_basis"] == "passthrough"
+    assert boundary_payload["cell_ids"] == ["alpha"]
     assert next(iterator).decode() == "data: live\n\n"
     assert redis.pubsub_client.subscriptions == ["events:alpha"]
     response.close()
@@ -697,6 +699,7 @@ def test_event_stream_resolves_a_fleet_job_to_its_live_phase_stream(monkeypatch)
     stream and NAMES the substitution (first frame), so the Cell/Transcript panel shows the
     agent's own output; the replay boundary names both ids and the live subscription follows
     the resolved cell."""
+
     class JobAwareRedis(FakeRedis):
         def hgetall(self, key):
             if key == "fleet:jobs":
@@ -716,15 +719,20 @@ def test_event_stream_resolves_a_fleet_job_to_its_live_phase_stream(monkeypatch)
     redis = JobAwareRedis(
         logs={
             "events_log:flow:execute": [
-                json.dumps({"type": "text", "timestamp": "1790105944000",
-                            "part": {"text": "agent step"}}),
+                json.dumps(
+                    {"type": "text", "timestamp": "1790105944000", "part": {"text": "agent step"}}
+                ),
             ],
         },
     )
     redis.fleet_jobs = {
         "job-live": json.dumps(
-            {"job_id": "job-live", "spec": "workflows/repository/flow.yaml",
-             "ts": 1790105820.0, "status": "running"}
+            {
+                "job_id": "job-live",
+                "spec": "workflows/repository/flow.yaml",
+                "ts": 1790105820.0,
+                "status": "running",
+            }
         ),
     }
     monkeypatch.setattr(server, "_redis", lambda: redis)
@@ -740,6 +748,189 @@ def test_event_stream_resolves_a_fleet_job_to_its_live_phase_stream(monkeypatch)
     assert payload["cell_id"] == "flow:execute"
     assert payload["requested"] == "job-live"
     assert redis.pubsub_client.subscriptions == ["events:flow:execute"]
+    response.close()
+
+
+def test_event_stream_resolves_run_id_and_scopes_replay_and_live_delivery(monkeypatch):
+    """A run id resolves once, and that same recorded window gates replay and live events."""
+
+    class RunAwareRedis(FakeRedis):
+        def hgetall(self, key):
+            if key == "fleet:jobs":
+                return self.fleet_jobs
+            return super().hgetall(key)
+
+    def event(marker, timestamp):
+        return json.dumps({"type": "text", "timestamp": str(timestamp), "part": {"text": marker}})
+
+    redis = RunAwareRedis(
+        logs={
+            "events_log:flow:execute": [
+                event("sibling replay", 200),
+                event("selected replay", 120),
+            ]
+        },
+        messages=[
+            {"data": event("sibling live", 200)},
+            {"data": event("selected live", 130)},
+        ],
+    )
+    redis.fleet_jobs = {
+        "job-a": json.dumps(
+            {
+                "job_id": "job-a",
+                "run_id": "run-a",
+                "spec": "flow.yaml",
+                "cells": ["flow:execute"],
+                "started_at": "100",
+                "ended_at": "150",
+                "status": "completed",
+            }
+        ),
+        "job-b": json.dumps(
+            {
+                "job_id": "job-b",
+                "run_id": "run-b",
+                "spec": "flow.yaml",
+                "cells": ["flow:execute"],
+                "started_at": "200",
+                "ended_at": "250",
+                "status": "completed",
+            }
+        ),
+    }
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    response = server.app.test_client().get("/api/events/run-a", buffered=False)
+    iterator = iter(response.response)
+
+    note = next(iterator).decode()
+    assert "run-a" in note and "flow:execute" in note
+    replay = next(iterator).decode()
+    assert "selected replay" in replay
+    assert "sibling replay" not in replay
+    boundary = next(iterator).decode()
+    payload = json.loads(boundary.split("data: ", 1)[1])
+    assert payload["requested_id"] == "run-a"
+    assert payload["resolved_id"] == "flow:execute"
+    assert payload["resolution_basis"] == "by_run_id"
+    assert payload["cell_ids"] == ["flow:execute"]
+    assert payload["cell_id"] == payload["resolved_id"]
+
+    live = next(iterator).decode()
+    assert "selected live" in live
+    assert "sibling live" not in live
+    response.close()
+
+
+def test_event_stream_boundary_uses_the_same_bounded_child_activity_as_run_detail(monkeypatch):
+    """The SSE boundary reports child evidence from the same selected slice as run detail."""
+
+    class RunAwareRedis(FakeRedis):
+        def hgetall(self, key):
+            if key == "fleet:jobs":
+                return self.fleet_jobs
+            return super().hgetall(key)
+
+    def event(marker, timestamp, child_session_id=""):
+        return json.dumps(
+            {
+                "type": "text",
+                "timestamp": str(timestamp),
+                "part": {"text": marker, "child_session_id": child_session_id},
+            }
+        )
+
+    redis = RunAwareRedis(
+        logs={
+            "events_log:cell-a": [
+                event("sibling child", 200, "child-outside"),
+                event("selected child", 120, "child-inside"),
+            ]
+        }
+    )
+    redis.fleet_jobs = {
+        "job-a": json.dumps(
+            {
+                "job_id": "job-a",
+                "run_id": "run-a",
+                "cells": ["cell-a"],
+                "started_at": "100",
+                "ended_at": "150",
+            }
+        )
+    }
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    response = server.app.test_client().get("/api/events/run-a", buffered=False)
+    iterator = iter(response.response)
+    next(iterator)  # server-owned run-to-cell resolution note
+    replay = next(iterator).decode()
+    assert "selected child" in replay
+    assert "sibling child" not in replay
+    boundary = next(iterator).decode()
+    payload = json.loads(boundary.split("data: ", 1)[1])
+
+    assert payload["child_activity"] == {
+        "state": "recorded",
+        "cell_ids": ["cell-a"],
+        "resolution_basis": "by_run_id",
+        "slice_bound": 50,
+        "observed_events": 1,
+        "total_events": 1,
+        "child_session_ids": ["child-inside"],
+        "reason": "",
+    }
+    assert payload["cell_ids"] == ["cell-a"]
+    assert payload["resolution_basis"] == "by_run_id"
+    response.close()
+
+
+def test_event_stream_boundary_names_child_activity_absent_in_its_slice(monkeypatch):
+    """No explicit child event is absent in the bounded replay, not a broader claim."""
+
+    class RunAwareRedis(FakeRedis):
+        def hgetall(self, key):
+            if key == "fleet:jobs":
+                return self.fleet_jobs
+            return super().hgetall(key)
+
+    redis = RunAwareRedis(
+        logs={
+            "events_log:cell-a": [
+                json.dumps(
+                    {
+                        "type": "text",
+                        "timestamp": "120",
+                        "part": {"text": "ordinary event"},
+                    }
+                )
+            ]
+        }
+    )
+    redis.fleet_jobs = {
+        "job-a": json.dumps(
+            {
+                "job_id": "job-a",
+                "run_id": "run-a",
+                "cells": ["cell-a"],
+                "started_at": "100",
+                "ended_at": "150",
+            }
+        )
+    }
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    response = server.app.test_client().get("/api/events/run-a", buffered=False)
+    iterator = iter(response.response)
+    next(iterator)  # server-owned run-to-cell resolution note
+    next(iterator)  # ordinary replay event
+    boundary = next(iterator).decode()
+    payload = json.loads(boundary.split("data: ", 1)[1])
+
+    assert payload["child_activity"]["state"] == "absent"
+    assert "bounded retained slice" in payload["child_activity"]["reason"]
+    assert payload["slice_bound"] == 50
     response.close()
 
 

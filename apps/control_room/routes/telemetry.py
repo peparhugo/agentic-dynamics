@@ -73,7 +73,10 @@ def api_matrix() -> Response:
     try:
         r = _services.redis()
         execute = stage_summary(
-            r, _services.queue_key, STATUS_KEY, _services.results_key,
+            r,
+            _services.queue_key,
+            STATUS_KEY,
+            _services.results_key,
             batch_key=_services.batch_queue_key,
         )
         analyze = stage_summary(r, _services.analysis_queue_key, _services.analysis_status_key)
@@ -218,11 +221,15 @@ def api_status() -> Response:
 
 
 def api_events(cell_id) -> Response:
-    """Replay retained cell events, mark the boundary, then stream live data.
+    """Resolve an operator id, replay its scoped tail, mark the boundary, then stream live data.
 
     The named boundary is additive: clients listening through ``onmessage``
     continue to receive the same raw event frames, while Control Room clients
     can exclude replay from the rolling burn-rate window.
+
+    The path accepts a run id, fleet job id, or native cell id.  The server resolves that identity
+    once and applies the returned recorded time window to both retained replay and Pub/Sub events;
+    membership is never guessed by a client-side filter.
 
     Job-cell resolution (2026-09-22, operator-flagged): a WORKFLOW RUN's cell-list entry is
     its fleet job id, whose own stream carries only orchestrator milestones while the agent
@@ -230,14 +237,24 @@ def api_events(cell_id) -> Response:
     live phase stream, the stream follows THAT and a named note leads the feed — never a
     silent substitution; every other cell passes through unchanged.
     """
-    requested = cell_id
-    basis = ""
+    requested = str(cell_id or "")
     try:
         from apps.control_room.services import operations as _operations
 
-        cell_id, basis = _operations.resolve_live_cell(_services.redis(), cell_id)
-    except Exception:  # noqa: BLE001 — an unresolvable cell streams what was asked for
-        cell_id, basis = requested, ""
+        resolution = _operations.resolve_event_stream(_services.redis(), requested)
+    except Exception as exc:  # noqa: BLE001 — an unresolvable cell streams what was asked for
+        resolution = {
+            "requested_id": requested,
+            "resolved_id": requested,
+            "resolution_basis": "unavailable",
+            "cell_ids": [requested] if requested else [],
+            "run_id": "",
+            "started_at": "",
+            "ended_at": "",
+            "stream_match": "",
+            "reason": f"{type(exc).__name__}: {exc}",
+        }
+    cell_id = str(resolution["resolved_id"] or requested)
     log_key = f"{EVENT_LOG_PREFIX}{cell_id}"
     channel = f"{EVENT_CHANNEL_PREFIX}{cell_id}"
 
@@ -248,21 +265,59 @@ def api_events(cell_id) -> Response:
         pubsub = r.pubsub()
         pubsub.subscribe(channel)
         try:
-            if basis:
+            if cell_id != requested:
                 note = {
                     "type": "text",
                     "sessionID": requested,
-                    "part": {"text": f"[room] {basis}"},
+                    "part": {
+                        "text": (
+                            f"[room] {requested} -> {cell_id} ({resolution['resolution_basis']})"
+                        )
+                    },
                 }
                 yield f"data: {json.dumps(note)}\n\n"
+            bounded: list[str] = []
+            filtered: list[str] = []
+            replay_state = "recorded"
             history = r.lrange(log_key, 0, -1)
-            for payload in reversed(history):
+            filtered, scope_reason = _operations._filter_run_events(
+                list(history or []),
+                started_at=str(resolution.get("started_at") or ""),
+                ended_at=str(resolution.get("ended_at") or ""),
+            )
+            bounded = filtered[: _operations.LOGS_EVENT_LIMIT]
+            for payload in reversed(bounded):
                 yield f"data: {payload}\n\n"
         except Exception:
-            pass
+            scope_reason = "replay unavailable"
+            replay_state = "unavailable"
         yield (
             "event: replay_complete\ndata: "
-            + json.dumps({"cell_id": cell_id, "requested": requested})
+            + json.dumps(
+                {
+                    # Keep the original names for existing clients; the explicit ids and basis
+                    # make the server-owned resolution boundary inspectable to new clients.
+                    "cell_id": cell_id,
+                    "requested": requested,
+                    "requested_id": requested,
+                    "resolved_id": cell_id,
+                    "run_id": resolution.get("run_id", ""),
+                    "resolution_basis": resolution["resolution_basis"],
+                    "cell_ids": list(resolution.get("cell_ids") or []),
+                    "slice_bound": _operations.LOGS_EVENT_LIMIT,
+                    "child_activity": _operations._child_activity(
+                        bounded,
+                        state=replay_state,
+                        cell_ids=list(resolution.get("cell_ids") or []),
+                        resolution_basis=resolution["resolution_basis"],
+                        total=len(filtered),
+                        slice_limit=_operations.LOGS_EVENT_LIMIT,
+                        reason=scope_reason,
+                    ),
+                    "stream_match": resolution.get("stream_match", ""),
+                    "scope_reason": scope_reason,
+                }
+            )
             + "\n\n"
         )
         last_beat = time.time()
@@ -270,7 +325,14 @@ def api_events(cell_id) -> Response:
             while True:
                 msg = pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
                 if msg:
-                    yield f"data: {msg['data']}\n\n"
+                    live_payload = msg["data"]
+                    live_events, _live_reason = _operations._filter_run_events(
+                        [live_payload],
+                        started_at=str(resolution.get("started_at") or ""),
+                        ended_at=str(resolution.get("ended_at") or ""),
+                    )
+                    for payload in live_events:
+                        yield f"data: {payload}\n\n"
                 elif time.time() - last_beat >= _services.heartbeat_seconds:
                     yield ": ping\n\n"
                     last_beat = time.time()
@@ -330,6 +392,7 @@ def api_routing() -> Response:
     }
     return jsonify(payload)
 
+
 #: The lease counters the admission board reports beside the provider usage snapshot. Fixed
 #: rather than discovered, because a dashboard needs a stable set of rows: these are the scopes
 #: the wired entry points actually reserve against (``scripts/worker.py`` takes fleet +
@@ -346,6 +409,7 @@ ADMISSION_BOARD_SCOPES: tuple[tuple[LeaseKind, LeaseScope], ...] = (
     (LeaseKind.CONCURRENCY, LeaseScope(ScopeKind.PROVIDER, "anthropic")),
     (LeaseKind.CONCURRENCY, LeaseScope(ScopeKind.PROVIDER, "openai")),
 )
+
 
 def _admission_block() -> dict:
     """The live lease state for the admission board, or a stated unavailable reason.
@@ -416,6 +480,7 @@ def api_subscription_usage() -> Response:
             },
         }
     )
+
 
 def api_experiments() -> Response:
     """Enqueue or clear the experiment queue — the most expensive mutation.

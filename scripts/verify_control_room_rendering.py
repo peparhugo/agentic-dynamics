@@ -2507,6 +2507,12 @@ DRAWER_PROBE_JS = r"""
   const content = document.getElementById('run-detail-content');
   if (!content) return { present: false };
   const text = (content.innerText || content.textContent || '').trim();
+  const activityProbe = (node) => node ? {
+    state: node.querySelector('[data-child-activity-state]')?.dataset.childActivityState || null,
+    cellIds: node.querySelector('[data-cell-ids]')?.dataset.cellIds || null,
+    resolutionBasis: node.querySelector('[data-resolution-basis]')?.dataset.resolutionBasis || null,
+    text: (node.innerText || node.textContent || '').trim(),
+  } : null;
   const cost = content.querySelector('[data-cost-provenance]');
   const verification = {};
   content.querySelectorAll('[data-verification]').forEach((node) => {
@@ -2537,6 +2543,8 @@ DRAWER_PROBE_JS = r"""
       .map((node) => (node.innerText || node.textContent || '').trim())
       .join(' | '),
     logFollow: logFollow ? logFollow.dataset.logFollow : null,
+    drawerActivity: activityProbe(content.querySelector('[data-activity-surface="drawer"]')),
+    transcriptActivity: activityProbe(document.querySelector('[data-activity-surface="transcript"]')),
   };
 }
 """
@@ -2706,6 +2714,20 @@ def check_boards_fixtures() -> list[str]:
         )
     if not logs.get("cell_id"):
         problems.append("boards fixture: run_detail's logs case must bind a job cell id")
+    for key in ("cell_ids", "resolution_basis", "child_activity"):
+        if key not in logs:
+            problems.append(f"boards fixture: run_detail's logs must carry {key}")
+    activity = logs.get("child_activity") or {}
+    if not isinstance(logs.get("cell_ids"), list) or not logs.get("cell_ids"):
+        problems.append("boards fixture: run_detail's logs cell_ids must be a non-empty list")
+    if not logs.get("resolution_basis"):
+        problems.append("boards fixture: run_detail's logs resolution_basis must be named")
+    if activity.get("state") != "recorded":
+        problems.append("boards fixture: run_detail's child_activity must be recorded")
+    if activity.get("cell_ids") != logs.get("cell_ids"):
+        problems.append("boards fixture: child_activity cell_ids must match logs cell_ids")
+    if activity.get("resolution_basis") != logs.get("resolution_basis"):
+        problems.append("boards fixture: child_activity resolution_basis must match logs")
     unknown = fixture.get("run_detail_unknown") or {}
     if (unknown.get("cost") or {}).get("provenance") != "unknown":
         problems.append("boards fixture: run_detail_unknown must carry the unknown cost case")
@@ -2826,9 +2848,39 @@ def _boards_router(
             # which is the app's documented degraded behavior, not an error.
             route.fulfill(status=200, content_type="text/event-stream", body="data: {}\n\n")
         elif path.startswith("/api/events/"):
-            # The selected cell's replay stream (the matrix fixture selects a live cell). Same
-            # posture as /api/status: a served frame, never an abort.
-            route.fulfill(status=200, content_type="text/event-stream", body="data: {}\n\n")
+            # The selected cell's replay stream carries the same server-owned activity scope as
+            # the drawer. A boundary without this metadata would let the transcript silently
+            # disagree with the run-detail read model.
+            logs = fixture["run_detail"]["logs"]
+            first_event = logs["events"][0]
+            replay_event = {
+                "type": first_event["class"],
+                "timestamp": first_event["timestamp"],
+                "part": {
+                    "id": first_event["part_id"],
+                    "text": first_event["text"],
+                    "child_session_id": first_event["child_session_id"],
+                },
+            }
+            boundary = {
+                "cell_id": logs["cell_id"],
+                "requested": logs["cell_id"],
+                "resolved_id": logs["cell_id"],
+                "resolution_basis": logs["resolution_basis"],
+                "cell_ids": logs["cell_ids"],
+                "slice_bound": logs["slice_bound"],
+                "child_activity": logs["child_activity"],
+            }
+            body = (
+                "data: "
+                + json.dumps(replay_event, separators=(",", ":"))
+                + "\n\n"
+                + "event: replay_complete\n"
+                + "data: "
+                + json.dumps(boundary, separators=(",", ":"))
+                + "\n\n"
+            )
+            route.fulfill(status=200, content_type="text/event-stream", body=body)
         elif path.startswith("/api/runs/"):
             # Two drawer variants ride the restored-board fixture: the rich measured payload
             # (cost measured-zero, delivered knowledge, prepared step, an unknown timing) and
@@ -3688,6 +3740,11 @@ def _check_board_keyboard(
 ) -> None:
     """Enter opens the run drawer with focus inside it; Escape closes and returns focus."""
     label = "desktop/boards"
+    # The fixture deliberately uses different run and cell identifiers. Capturing the request
+    # from the real Follow live click therefore proves the browser consumes the server-owned
+    # `logs.cell_id`, rather than merely matching the drawer's displayed dataset.
+    expected_cell_id = str(load_boards_fixture()["run_detail"]["logs"]["cell_id"])
+    expected_event_path = f"/api/events/{expected_cell_id}"
     for theme in ("dark", "light"):
         records: list[dict[str, str]] = []
         context, page, console_errors = _boards_page(
@@ -3876,6 +3933,91 @@ def _check_board_keyboard(
                         "keyboard",
                         "drawer-logs-follow",
                         "the drawer must bind the live follow to the run's job cell",
+                    )
+                follow_button = page.locator(f'[data-log-follow="{expected_cell_id}"]')
+                try:
+                    # This is intentionally an interaction check: a source or data-attribute
+                    # assertion cannot prove which identifier the constructed EventSource uses.
+                    with page.expect_request(
+                        lambda request: (
+                            request.method == "GET"
+                            and urlparse(request.url).path.startswith("/api/events/")
+                        ),
+                        timeout=5000,
+                    ) as follow_request:
+                        follow_button.click()
+                    follow_path = urlparse(follow_request.value.url).path
+                except Exception as error:  # noqa: BLE001 - report the failed browser behavior
+                    _row(
+                        errors,
+                        label,
+                        "keyboard",
+                        "drawer-logs-follow",
+                        f"clicking Follow live did not issue the expected EventSource request: "
+                        f"{error}",
+                    )
+                else:
+                    if follow_path != expected_event_path:
+                        _row(
+                            errors,
+                            label,
+                            "keyboard",
+                            "drawer-logs-follow",
+                            "the EventSource request used "
+                            f"{follow_path!r}, not the server-returned cell path "
+                            f"{expected_event_path!r}",
+                        )
+                activity = drawer.get("drawerActivity") or {}
+                activity_text = activity.get("text") or ""
+                if "Child activity: recorded" not in activity_text:
+                    _row(
+                        errors,
+                        label,
+                        "keyboard",
+                        "drawer-child-activity",
+                        "the drawer must visibly render child activity as recorded",
+                    )
+                if "Cell IDs: fixture-job-0001" not in activity_text:
+                    _row(
+                        errors,
+                        label,
+                        "keyboard",
+                        "drawer-child-cells",
+                        "the drawer must visibly render the server-owned cell id list",
+                    )
+                if "Resolution basis: by_run_id" not in activity_text:
+                    _row(
+                        errors,
+                        label,
+                        "keyboard",
+                        "drawer-child-resolution",
+                        "the drawer must visibly render the server-owned resolution basis",
+                    )
+                transcript = drawer.get("transcriptActivity") or {}
+                transcript_text = transcript.get("text") or ""
+                if "Child activity: recorded" not in transcript_text:
+                    _row(
+                        errors,
+                        label,
+                        "keyboard",
+                        "transcript-child-activity",
+                        "the transcript must visibly render child activity as recorded",
+                    )
+                if "Cell IDs: fixture-job-0001" not in transcript_text:
+                    _row(
+                        errors,
+                        label,
+                        "keyboard",
+                        "transcript-child-cells",
+                        "the transcript must visibly render the server-owned cell id list",
+                    )
+                if "Resolution basis: by_run_id" not in transcript_text:
+                    _row(
+                        errors,
+                        label,
+                        "keyboard",
+                        "transcript-child-resolution",
+                        "the transcript must visibly render the server-owned resolution basis",
                     )
             if screenshots:
                 shot = out / f"boards_keyboard_drawer_{theme}_1440x900.png"

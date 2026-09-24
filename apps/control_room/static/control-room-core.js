@@ -71,6 +71,69 @@
     return null
   }
 
+  /** Convert an event's recorded timestamp to milliseconds without using receipt time as data. */
+  function timestampMillis(value) {
+    if (value === null || value === undefined || value === "") return null
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return Math.abs(value) > 1e11 ? value : value * 1000
+    }
+    const text = String(value).trim()
+    if (!text) return null
+    const numeric = Number(text)
+    if (Number.isFinite(numeric)) return Math.abs(numeric) > 1e11 ? numeric : numeric * 1000
+    const parsed = Date.parse(text)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  /** Return age from recorded evidence, or null when the event has no usable timestamp. */
+  function recordedAgeSeconds(value, now = Date.now()) {
+    const timestamp = timestampMillis(value)
+    const reference = typeof now === "number" && Number.isFinite(now) ? now : null
+    if (timestamp === null || reference === null) return null
+    return Math.max(0, Math.floor((reference - timestamp) / 1000))
+  }
+
+  /** Classify liveness from the recorded event age; an unknown age is never treated as live. */
+  function recordedLiveness(value, now = Date.now(), liveWindowSeconds = 600) {
+    const ageSeconds = recordedAgeSeconds(value, now)
+    if (ageSeconds === null) return { state: "unknown", age_seconds: null, label: "age unknown" }
+    return {
+      state: ageSeconds <= liveWindowSeconds ? "live" : "stale",
+      age_seconds: ageSeconds,
+      label: recordedAgeLabel(ageSeconds),
+    }
+  }
+
+  /** Render a recorded age without inventing a number for missing evidence. */
+  function recordedAgeLabel(ageSeconds) {
+    if (ageSeconds === null || !Number.isFinite(ageSeconds)) return "age unknown"
+    if (ageSeconds < 60) return `${Math.floor(ageSeconds)}s ago`
+    if (ageSeconds < 3600) return `${Math.floor(ageSeconds / 60)}m ago`
+    if (ageSeconds < 86400) return `${Math.floor(ageSeconds / 3600)}h ago`
+    return `${Math.floor(ageSeconds / 86400)}d ago`
+  }
+
+  /** Accept child absence only when the server names the exact bounded evidence slice. */
+  function boundedActivity(source) {
+    const envelope = source && typeof source === "object" ? source : {}
+    const candidate = envelope.child_activity && typeof envelope.child_activity === "object"
+      ? envelope.child_activity
+      : {}
+    const bound = safeNumber(candidate.slice_bound ?? envelope.slice_bound)
+    const observed = safeNumber(candidate.observed_events ?? envelope.observed_events)
+    if (
+      candidate.state === "absent"
+      && (bound === null || observed === null || observed > bound)
+    ) {
+      return {
+        ...candidate,
+        state: "unavailable",
+        reason: "absence evidence is not bounded to the displayed slice",
+      }
+    }
+    return candidate
+  }
+
   /** Extract a chartable step sample from current and legacy event shapes. */
   function extractSample(raw) {
     const parsed = parseEvent(raw)
@@ -125,11 +188,11 @@
     }
   }
 
-  /** Render a supplied timestamp in UTC, or an honest arrival marker. */
+  /** Render a supplied timestamp in UTC, or an honest unavailable marker. */
   function displayTimestamp(value) {
-    if (value === null || value === undefined || value === "") return "received now"
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return String(value)
+    const timestamp = timestampMillis(value)
+    if (timestamp === null) return "timestamp unavailable"
+    const date = new Date(timestamp)
     return `${date.toISOString().slice(11, 19)} UTC`
   }
 
@@ -152,7 +215,10 @@
         key: eventKey(cellId, parsed.raw),
         kind: "raw",
         label: "RAW",
-        timestamp: "received now",
+        timestamp: "timestamp unavailable",
+        recorded_at: null,
+        recorded_age_seconds: null,
+        recorded_state: "unknown",
         text: parsed.raw,
         detail: "",
         sessionId: "",
@@ -163,9 +229,14 @@
     const event = parsed.event
     const part = event.part && typeof event.part === "object" ? event.part : event
     const type = normalizeType(event.type)
+    const recordedAt = suppliedTimestamp(event, part)
+    const liveness = recordedLiveness(recordedAt)
     const common = {
       key: eventKey(cellId, parsed.raw),
-      timestamp: displayTimestamp(suppliedTimestamp(event, part)),
+      timestamp: displayTimestamp(recordedAt),
+      recorded_at: recordedAt,
+      recorded_age_seconds: liveness.age_seconds,
+      recorded_state: liveness.state,
       sessionId: event.sessionID || part.sessionID || "",
       sample: extractSample(event),
       detail: "",
@@ -289,6 +360,11 @@
     burnRate,
     sortCellIds,
     replaceEventSource,
+    timestampMillis,
+    recordedAgeSeconds,
+    recordedLiveness,
+    recordedAgeLabel,
+    boundedActivity,
   }
   root.ControlRoomCore = core
   if (typeof module !== "undefined" && module.exports) module.exports = core

@@ -39,7 +39,7 @@ RUN_DETAIL_SCHEMA = "control-room-run-detail/v1"
 #: The fleet job board (the supervisor's Redis key; each job record carries its ``run_id``).
 FLEET_JOBS_KEY = "fleet:jobs"
 
-#: How many retained job events the run detail's logs block carries (a bounded tail).
+#: How many retained events the run detail's logs block carries (a bounded tail).
 LOGS_EVENT_LIMIT = 50
 
 # ``RunState`` is the authority for this roster.  Keeping the order derived from the enum makes
@@ -47,9 +47,72 @@ LOGS_EVENT_LIMIT = 50
 RUN_STATE_ORDER = tuple(state.value for state in RunState)
 
 
+def _event_display_value(value: Any) -> str:
+    """Serialize rich event values without losing structured tool evidence in the read model."""
+    if value is None or value == "":
+        return ""
+    if isinstance(value, (Mapping, list, tuple)):
+        return json.dumps(value, sort_keys=True)
+    return str(value)
+
+
+def _child_activity(
+    raw_events: list[str],
+    *,
+    state: str,
+    cell_ids: list[str],
+    resolution_basis: str,
+    total: int,
+    slice_limit: int = LOGS_EVENT_LIMIT,
+    reason: str = "",
+) -> dict[str, Any]:
+    """Describe child-session evidence in exactly the selected bounded event slice.
+
+    A child is recorded only when the producer explicitly carries ``child_session_id`` on the
+    event or its part.  In particular, an empty result means ``absent`` in this slice; it does
+    not mean that the run had no children outside the retained evidence.  Keeping this helper
+    server-owned lets the run-detail and SSE read models use identical evidence and vocabulary.
+    """
+    child_session_ids: list[str] = []
+    for payload in raw_events[: max(slice_limit, 0)]:
+        try:
+            event = json.loads(payload)
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(event, Mapping):
+            continue
+        part = event.get("part") if isinstance(event.get("part"), Mapping) else {}
+        child_session_id = event.get("child_session_id") or part.get("child_session_id")
+        child_session_id = str(child_session_id or "").strip()
+        if child_session_id and child_session_id not in child_session_ids:
+            child_session_ids.append(child_session_id)
+
+    if state in {"unavailable", "unbound"}:
+        activity_state = "unavailable"
+        activity_reason = reason or f"child activity unavailable because logs are {state}"
+    elif child_session_ids:
+        activity_state = "recorded"
+        activity_reason = reason
+    else:
+        activity_state = "absent"
+        activity_reason = reason or "no child events recorded in the bounded retained slice"
+
+    return {
+        "state": activity_state,
+        "cell_ids": list(cell_ids),
+        "resolution_basis": resolution_basis or state,
+        "slice_bound": max(slice_limit, 0),
+        "observed_events": min(len(raw_events), max(slice_limit, 0)),
+        "total_events": int(total or 0),
+        "child_session_ids": child_session_ids,
+        "reason": activity_reason,
+    }
+
+
 def logs_block(
     *,
     cell_id: str,
+    cell_ids: list[str] | None = None,
     state: str,
     reason: str = "",
     raw_events: list[str] | None = None,
@@ -58,36 +121,68 @@ def logs_block(
     job_id: str = "",
     live_cell_id: str = "",
     stream_match: str = "",
+    resolution_basis: str = "",
+    slice_limit: int = LOGS_EVENT_LIMIT,
 ) -> dict[str, Any]:
-    """The run's job-log block: a NAMED state, a bounded parsed tail, no fabricated values.
+    """The run's event-log block: a NAMED state, a bounded parsed tail, no fabricated values.
 
-    States: ``recorded`` (the job's retained tail was read), ``unbound`` (no fleet job on the
-    board references this run), ``unavailable`` (the event store could not be read — the reason
-    names it). ``events`` is oldest-first for the reader; the producer stores newest-first
-    (LPUSH + LTRIM at ``EVENT_LOG_MAX``), and ``history_capped`` reports the producer's own
-    bounded-window eviction rather than implying the tail is the whole history.
+    States: ``recorded`` (the selected stream's retained tail was read), ``unbound`` (no fleet
+    job on the board references this run), ``unavailable`` (the event store could not be read —
+    the reason names it). ``events`` is oldest-first for the reader; the producer stores
+    newest-first (LPUSH + LTRIM at ``EVENT_LOG_MAX``), and ``history_capped`` reports whether the
+    run-scoped evidence itself reaches the producer's bounded window rather than implying the
+    shared stream's full tail belongs to this run.
     """
+    selected_raw_events = list(raw_events or [])[: max(slice_limit, 0)]
     events: list[dict[str, Any]] = []
-    for payload in raw_events or []:
+    for payload in selected_raw_events:
+        malformed = False
         try:
             event = json.loads(payload)
         except (TypeError, ValueError):
-            event = {"type": "event", "text": str(payload)}
+            event = {"type": "malformed", "text": str(payload)}
+            malformed = True
         if not isinstance(event, Mapping):
-            event = {"type": "event", "text": str(event)}
+            event = {"type": "malformed", "text": str(event)}
+            malformed = True
         part = event.get("part") if isinstance(event.get("part"), Mapping) else {}
+        tool_state = part.get("state") if isinstance(part.get("state"), Mapping) else {}
         text = part.get("text", event.get("text", ""))
+        timestamp = (
+            event.get("timestamp") or event.get("time") or part.get("timestamp") or part.get("time")
+        )
         events.append(
             {
-                "ts": part.get("time") or event.get("time") or None,
-                "class": str(event.get("type") or "event"),
+                # Keep both names: ``ts`` is the existing drawer contract, while ``timestamp``
+                # makes the producer's recorded field explicit to the live and replay renderers.
+                "ts": timestamp,
+                "timestamp": timestamp,
+                "class": "malformed" if malformed else str(event.get("type") or "event"),
                 "text": str(text if text is not None else ""),
                 "id": str(event.get("id") or ""),
+                "part_id": str(part.get("id") or ""),
+                "tool": str(part.get("tool") or event.get("tool") or ""),
+                "tool_input": _event_display_value(
+                    tool_state.get("input")
+                    if tool_state.get("input") is not None
+                    else event.get("tool_input") or event.get("input") or ""
+                ),
+                "tool_output": _event_display_value(
+                    tool_state.get("output")
+                    if tool_state.get("output") is not None
+                    else event.get("tool_output") or event.get("output") or ""
+                ),
+                "child_session_id": str(
+                    event.get("child_session_id") or part.get("child_session_id") or ""
+                ),
+                "malformed": malformed,
             }
         )
+    named_resolution_basis = resolution_basis or match or state
     return {
         "state": state,
         "cell_id": cell_id,
+        "cell_ids": list(cell_ids or []),
         "reason": reason,
         "events": events,
         "count": int(total or 0),
@@ -101,6 +196,17 @@ def logs_block(
         "job_id": job_id,
         "live_cell_id": live_cell_id,
         "stream_match": stream_match,
+        "resolution_basis": named_resolution_basis,
+        "slice_bound": max(slice_limit, 0),
+        "child_activity": _child_activity(
+            selected_raw_events,
+            state=state,
+            cell_ids=list(cell_ids or []),
+            resolution_basis=named_resolution_basis,
+            total=total,
+            slice_limit=slice_limit,
+            reason=reason,
+        ),
     }
 
 
@@ -110,6 +216,66 @@ def _event_epoch(value: Any) -> float | None:
     if ts is None:
         return None
     return ts / 1000.0 if ts > 1e11 else ts
+
+
+def _recorded_event_epoch(payload: Any) -> float | None:
+    """Return an event's recorded timestamp, or ``None`` when it has no usable timestamp.
+
+    The live publisher has emitted both top-level ``timestamp`` and legacy ``time`` fields, while
+    some event producers place the stamp on the nested part.  Membership in a run window is only
+    provable from one of these recorded values; an event without one is never assigned silently.
+    """
+    try:
+        event = json.loads(payload)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(event, Mapping):
+        return None
+    part = event.get("part") if isinstance(event.get("part"), Mapping) else {}
+    for candidate in (
+        event.get("timestamp"),
+        event.get("time"),
+        part.get("timestamp"),
+        part.get("time"),
+    ):
+        timestamp = _event_epoch(candidate)
+        if timestamp is not None:
+            return timestamp
+    return None
+
+
+def _filter_run_events(
+    raw_events: list[str], *, started_at: str, ended_at: str
+) -> tuple[list[str], str]:
+    """Keep only events provably inside the selected run's recorded time window.
+
+    The Redis list is a shared, bounded phase tail for some live runs, so its length and position
+    cannot establish run membership.  When the run has no recorded boundary (only possible for a
+    direct caller outside the normal run-detail path), events are retained as ``unscoped`` and the
+    reason says so.  Once either boundary is recorded, untimestamped events are excluded and the
+    reason names that treatment.
+    """
+    start = _event_epoch(started_at)
+    end = _event_epoch(ended_at)
+    if start is None and end is None:
+        return list(raw_events), "run window unavailable; retained events are unscoped"
+
+    selected: list[str] = []
+    untimestamped = 0
+    for payload in raw_events:
+        timestamp = _recorded_event_epoch(payload)
+        if timestamp is None:
+            untimestamped += 1
+            continue
+        if start is not None and timestamp < start:
+            continue
+        if end is not None and timestamp > end:
+            continue
+        selected.append(payload)
+
+    if untimestamped:
+        return selected, f"{untimestamped} untimestamped events excluded from run-scoped tail"
+    return selected, ""
 
 
 def _live_phase_cell(redis_client: Any, spec_name: str, started_at: str) -> str:
@@ -204,15 +370,153 @@ def resolve_live_cell(redis_client: Any, cell_id: str) -> tuple[str, str]:
     return phase_cell, f"job {cell_id} -> live phase stream {phase_cell}"
 
 
+def _board_row_cells(job_id: str, entry: Mapping[str, Any]) -> list[str]:
+    """Return the cell identities represented by one fleet-board row.
+
+    Current fleet rows use their hash field (the job id) as the cell identity.  Some board
+    producers also attach an explicit ``cell_id`` or a ``cells`` list when one run owns more
+    than one cell.  Accepting all three forms keeps the resolver aligned with the recorded board
+    contract without inventing cells when a row carries none.
+    """
+    values: Any = entry.get("cells")
+    if isinstance(values, Mapping):
+        values = [values[key] for key in sorted(values)]
+    elif not isinstance(values, (list, tuple)):
+        values = [entry.get("cell_id") or job_id]
+
+    cell_ids: list[str] = []
+    for value in values:
+        if isinstance(value, Mapping):
+            value = value.get("cell_id") or value.get("id")
+        value = str(value or "").strip()
+        if value and value not in cell_ids:
+            cell_ids.append(value)
+    return cell_ids or [job_id]
+
+
+def _find_board_rows(
+    entries: list[tuple[str, dict]], identity: str
+) -> list[tuple[str, dict, list[str]]]:
+    """Find every board row matching a run, job, or cell identity.
+
+    Redis hash iteration order is not a semantic ordering guarantee, so rows are ordered by their
+    stable hash identity before the union is built.  A cell identity matches its containing row;
+    a run identity matches every row for that run.  Returning all rows, rather than the first one,
+    prevents a multi-row run from losing later cells.
+    """
+    matches: list[tuple[str, dict, list[str]]] = []
+    for job_id, entry in sorted(entries, key=lambda item: str(item[0])):
+        cells = _board_row_cells(job_id, entry)
+        identities = {str(job_id), str(entry.get("job_id") or ""), str(entry.get("run_id") or "")}
+        if identity in identities or identity in cells:
+            matches.append((job_id, entry, cells))
+    return matches
+
+
+def _union_board_cells(rows: list[tuple[str, dict, list[str]]]) -> list[str]:
+    """Flatten matching board rows into a stable, duplicate-free cell list."""
+    cells: list[str] = []
+    for _job_id, _entry, row_cells in rows:
+        for cell_id in row_cells:
+            if cell_id not in cells:
+                cells.append(cell_id)
+    return cells
+
+
+def resolve_event_stream(redis_client: Any, requested_id: str) -> dict[str, Any]:
+    """Resolve an operator identifier to one event stream and its evidence boundary.
+
+    The operator may arrive with a control-db run id, a fleet job id, or a native cell id.  The
+    fleet board is the server-side identity index for all three.  Returning the complete resolution
+    in one object is intentional: replay and live delivery must not independently resolve the
+    identifier and accidentally subscribe to a different stream.
+
+    ``started_at`` and ``ended_at`` are copied from the matching board row.  An in-flight row has
+    no durable run start yet, so its accepted ``ts`` is the narrowest recorded lower boundary
+    available to the live stream.  Events outside that boundary, including untimestamped events
+    when a boundary exists, are excluded by :func:`_filter_run_events` at both delivery points.
+    """
+    requested = str(requested_id or "")
+    resolution: dict[str, Any] = {
+        "requested_id": requested,
+        "resolved_id": requested,
+        "resolution_basis": "passthrough",
+        "cell_ids": [requested] if requested else [],
+        "run_id": "",
+        "started_at": "",
+        "ended_at": "",
+        "stream_match": "",
+        "reason": "",
+    }
+    if not requested:
+        return resolution
+
+    try:
+        board = redis_client.hgetall(FLEET_JOBS_KEY) or {}
+    except Exception as exc:  # noqa: BLE001 — an unreadable index never invents a stream
+        resolution["reason"] = f"{type(exc).__name__}: {exc}"
+        return resolution
+
+    entries: list[tuple[str, dict]] = []
+    for job_id, payload in board.items():
+        try:
+            entry = json.loads(payload)
+        except (TypeError, ValueError):
+            continue
+        if isinstance(entry, Mapping):
+            entries.append((str(job_id), dict(entry)))
+
+    rows = _find_board_rows(entries, requested)
+    if not rows:
+        return resolution
+
+    job_id, entry, _row_cells = rows[0]
+    cell_ids = _union_board_cells(rows)
+    if str(entry.get("run_id") or "") == requested:
+        basis = "by_run_id"
+    elif requested == job_id or str(entry.get("job_id") or "") == requested:
+        basis = "by_job_id"
+    else:
+        basis = "by_cell_id"
+
+    resolved_id = requested if basis == "by_cell_id" else (cell_ids[0] if cell_ids else job_id)
+    run_id = str(entry.get("run_id") or "")
+    started_at = str(entry.get("started_at") or entry.get("start_at") or entry.get("ts") or "")
+    ended_at = str(entry.get("ended_at") or entry.get("completed_at") or "")
+    stream_match = ""
+    if basis == "by_job_id" and not run_id:
+        spec = str(entry.get("spec") or "")
+        spec_name = spec.rsplit("/", 1)[-1].removesuffix(".yaml") if spec else ""
+        if spec_name:
+            phase_cell = _live_phase_cell(redis_client, spec_name, started_at)
+            if phase_cell and phase_cell != resolved_id:
+                resolved_id = phase_cell
+                stream_match = "by_phase_time"
+
+    resolution.update(
+        {
+            "resolved_id": resolved_id,
+            "resolution_basis": basis,
+            "cell_ids": cell_ids,
+            "run_id": run_id,
+            "started_at": started_at,
+            "ended_at": ended_at,
+            "stream_match": stream_match,
+        }
+    )
+    return resolution
+
+
 def read_run_logs(
     redis_client: Any,
     run_id: str,
     *,
     spec_name: str = "",
     started_at: str = "",
+    ended_at: str = "",
     limit: int = LOGS_EVENT_LIMIT,
 ) -> dict[str, Any]:
-    """Resolve the run's fleet job and read its retained event tail (read-only, honest states).
+    """Resolve the run's event stream and read its run-scoped retained tail.
 
     Two match bases, both NAMED on the block (``match``):
 
@@ -225,7 +529,10 @@ def read_run_logs(
       has at most one live job, so spec + time identifies it without guessing across specs.
 
     A missing board entry is ``unbound``; any Redis failure is ``unavailable`` with the reason
-    named; the match basis is always reported, never implied.
+    named; the match basis is always reported, never implied.  The selected stream is read in
+    full, then filtered by the run's recorded ``started_at``/``ended_at`` window before the
+    bounded display tail, count, and history state are derived.  Events without a recorded
+    timestamp are excluded with a named reason because they cannot prove run membership.
     """
     try:
         board = redis_client.hgetall(FLEET_JOBS_KEY) or {}
@@ -240,13 +547,19 @@ def read_run_logs(
         if isinstance(entry, Mapping):
             entries.append((str(job_id), dict(entry)))
     cell_id = ""
+    cell_ids: list[str] = []
+    selected_job_id = ""
     match = ""
-    for job_id, entry in entries:
-        if str(entry.get("run_id") or "") == run_id:
-            cell_id, match = job_id, "by_run_id"
-            break
+    rows = _find_board_rows(entries, run_id)
+    if rows:
+        cell_ids = _union_board_cells(rows)
+        cell_id, match = cell_ids[0], "by_run_id"
+        selected_job_id = rows[0][0]
     if not cell_id and spec_name:
         cell_id, match = _match_job_by_spec_time(entries, spec_name, started_at)
+        rows = _find_board_rows(entries, cell_id) if cell_id else []
+        cell_ids = _union_board_cells(rows) if rows else ([cell_id] if cell_id else [])
+        selected_job_id = rows[0][0] if rows else cell_id
     if not cell_id:
         return logs_block(
             cell_id="",
@@ -262,21 +575,31 @@ def read_run_logs(
         stream_cell = _live_phase_cell(redis_client, spec_name, started_at)
     read_cell = stream_cell or cell_id
     try:
-        raw = redis_client.lrange(f"{EVENT_LOG_PREFIX}{read_cell}", 0, limit - 1)
-        total = int(redis_client.llen(f"{EVENT_LOG_PREFIX}{read_cell}") or 0)
+        raw = redis_client.lrange(f"{EVENT_LOG_PREFIX}{read_cell}", 0, -1)
     except Exception as exc:  # noqa: BLE001
         return logs_block(
-            cell_id=read_cell, state="unavailable", reason=f"{type(exc).__name__}: {exc}"
+            cell_id=read_cell,
+            cell_ids=cell_ids,
+            state="unavailable",
+            reason=f"{type(exc).__name__}: {exc}",
         )
+    filtered, filter_reason = _filter_run_events(
+        list(raw or []), started_at=started_at, ended_at=ended_at
+    )
+    bounded = filtered[: max(limit, 0)]
     return logs_block(
         cell_id=read_cell,
-        job_id=cell_id,
+        cell_ids=cell_ids,
+        job_id=selected_job_id or cell_id,
         live_cell_id=stream_cell,
         state="recorded",
-        raw_events=list(reversed(list(raw or []))),
-        total=total,
+        reason=filter_reason,
+        raw_events=list(reversed(bounded)),
+        total=len(filtered),
         match=match,
         stream_match="by_phase_time" if stream_cell else "",
+        resolution_basis=match,
+        slice_limit=limit,
     )
 
 
@@ -591,8 +914,8 @@ def run_detail(db: Any, run_id: str, *, redis_client: Any | None = None) -> dict
     * ``delivered_knowledge`` — per phase, what was SELECTED and DELIVERED (never "used");
     * ``prepared`` — per phase, the prepared-step reference or a named missing;
     * ``timings`` — one row per timing field actually recorded, each with a measured state;
-    * ``logs`` — the run's fleet-job event tail (recorded), or a NAMED absence. The client is
-      INJECTED by the context (which owns the accessor); a missing client is ``unavailable``.
+    * ``logs`` — the run's selected event-stream tail (recorded), or a NAMED absence. The client
+      is INJECTED by the context (which owns the accessor); a missing client is ``unavailable``.
     """
     run = db.get_run(run_id)
     if run is None:
@@ -624,5 +947,6 @@ def run_detail(db: Any, run_id: str, *, redis_client: Any | None = None) -> dict
             run_id,
             spec_name=str(detail["run"].get("spec_name") or ""),
             started_at=str(detail["run"].get("started_at") or ""),
+            ended_at=str(detail["run"].get("ended_at") or ""),
         )
     return detail

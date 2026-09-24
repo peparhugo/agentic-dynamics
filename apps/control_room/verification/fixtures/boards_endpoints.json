@@ -276,28 +276,62 @@
     "logs": {
       "state": "recorded",
       "cell_id": "fixture-job-0001",
+      "cell_ids": ["fixture-job-0001"],
       "reason": "",
       "match": "by_run_id",
+      "resolution_basis": "by_run_id",
       "count": 3,
       "history_capped": false,
+      "slice_bound": 50,
+      "child_activity": {
+        "state": "recorded",
+        "cell_ids": ["fixture-job-0001"],
+        "resolution_basis": "by_run_id",
+        "slice_bound": 50,
+        "observed_events": 3,
+        "total_events": 3,
+        "child_session_ids": ["child-fixture-0001", "child-fixture-0003"],
+        "reason": ""
+      },
       "events": [
         {
           "ts": "2026-09-18T19:18:09Z",
+          "timestamp": "2026-09-18T19:18:09Z",
           "class": "text",
           "text": "workflow control_room_followups — fixture run started",
-          "id": ""
+          "id": "",
+          "part_id": "part-fixture-0001",
+          "tool": "",
+          "tool_input": "",
+          "tool_output": "",
+          "child_session_id": "child-fixture-0001",
+          "malformed": false
         },
         {
           "ts": "2026-09-18T19:18:30Z",
+          "timestamp": "2026-09-18T19:18:30Z",
           "class": "step_finish",
           "text": "phase implement ok",
-          "id": ""
+          "id": "",
+          "part_id": "part-fixture-0002",
+          "tool": "apply_patch",
+          "tool_input": "apps/control_room/static/app.js",
+          "tool_output": "patched",
+          "child_session_id": "",
+          "malformed": false
         },
         {
           "ts": "2026-09-18T19:19:00Z",
+          "timestamp": "2026-09-18T19:19:00Z",
           "class": "step_finish",
           "text": "phase verify ok",
-          "id": ""
+          "id": "event-fixture-0003",
+          "part_id": "part-fixture-0003",
+          "tool": "pytest",
+          "tool_input": "tests/test_control_room_static_views.py",
+          "tool_output": "3 passed",
+          "child_session_id": "child-fixture-0003",
+          "malformed": false
         }
       ]
     }
@@ -361,9 +395,22 @@
     "logs": {
       "state": "unbound",
       "cell_id": "",
+      "cell_ids": [],
       "reason": "no fleet job on the board references this run",
+      "resolution_basis": "unbound",
       "count": 0,
       "history_capped": false,
+      "slice_bound": 50,
+      "child_activity": {
+        "state": "unavailable",
+        "cell_ids": [],
+        "resolution_basis": "unbound",
+        "slice_bound": 50,
+        "observed_events": 0,
+        "total_events": 0,
+        "child_session_ids": [],
+        "reason": "no fleet job on the board references this run"
+      },
       "events": []
     }
   },

@@ -29,6 +29,7 @@ from agentic_dynamics.control.control_db import (  # noqa: E402
     RunState,
 )
 from agentic_dynamics.control.control_status import build_packet  # noqa: E402
+from agentic_dynamics.control.live import EVENT_LOG_MAX  # noqa: E402
 from apps.control_room.services.operations import (  # noqa: E402
     RUN_DETAIL_SCHEMA,
     RUN_STATE_ORDER,
@@ -496,6 +497,86 @@ def test_read_run_logs_resolves_the_job_and_parses_the_retained_tail():
     assert block["events"][1]["text"] == "phase implement ok"
 
 
+def test_child_activity_is_recorded_only_inside_the_selected_bounded_window():
+    """Run detail reports child evidence from its selected slice, not a sibling event."""
+
+    def event(text: str, timestamp: int, child_session_id: str = "") -> str:
+        return json.dumps(
+            {
+                "type": "text",
+                "timestamp": str(timestamp),
+                "part": {"text": text, "child_session_id": child_session_id},
+            }
+        )
+
+    board = {
+        "job-a": json.dumps(
+            {
+                "job_id": "job-a",
+                "run_id": "run-a",
+                "cells": ["cell-a"],
+                "started_at": "100",
+                "ended_at": "150",
+            }
+        )
+    }
+    redis = _FakeRedis(
+        board=board,
+        logs={
+            "events_log:cell-a": [
+                event("sibling child", 200, "child-outside"),
+                event("selected child", 120, "child-inside"),
+            ]
+        },
+    )
+
+    block = read_run_logs(redis, "run-a", started_at="100", ended_at="150")
+
+    assert block["child_activity"] == {
+        "state": "recorded",
+        "cell_ids": ["cell-a"],
+        "resolution_basis": "by_run_id",
+        "slice_bound": 50,
+        "observed_events": 1,
+        "total_events": 1,
+        "child_session_ids": ["child-inside"],
+        "reason": "",
+    }
+    assert block["resolution_basis"] == "by_run_id"
+
+    no_child = read_run_logs(
+        _FakeRedis(
+            board=board,
+            logs={"events_log:cell-a": [event("ordinary", 120)]},
+        ),
+        "run-a",
+        started_at="100",
+        ended_at="150",
+    )
+    assert no_child["child_activity"]["state"] == "absent"
+    assert "bounded retained slice" in no_child["child_activity"]["reason"]
+
+
+def test_read_run_logs_unions_cells_across_matching_board_rows():
+    """A run spanning board rows exposes every cell in deterministic row order."""
+    board = {
+        # Deliberately insert the rows out of order: the resolver's order is by board identity.
+        "job-b": json.dumps({"job_id": "job-b", "run_id": "run-1", "cells": ["cell-b"]}),
+        "job-a": json.dumps({"job_id": "job-a", "run_id": "run-1", "cells": ["cell-a"]}),
+    }
+    redis = _FakeRedis(
+        board=board,
+        logs={"events_log:cell-a": [json.dumps({"type": "text", "part": {"text": "a"}})]},
+    )
+
+    block = read_run_logs(redis, "run-1")
+
+    assert block["cell_ids"] == ["cell-a", "cell-b"]
+    assert block["cell_id"] == "cell-a"
+    assert block["job_id"] == "job-a"
+    assert block["events"][0]["text"] == "a"
+
+
 def test_read_run_logs_names_each_absence():
     """An unbound run and an unreadable Redis are both NAMED, never an empty success."""
     unbound = read_run_logs(_FakeRedis(board={}), "run-1")
@@ -588,6 +669,53 @@ def test_read_run_logs_binds_the_live_phase_stream_for_an_in_flight_run():
     assert block["events"][1]["text"] == "write notes"
 
 
+def test_read_run_logs_filters_interleaved_runs_on_a_shared_phase_tail():
+    """A shared spec/phase list cannot leak either run's markers or its unfiltered history state."""
+
+    def event(marker: str, timestamp: int) -> str:
+        return json.dumps({"type": "text", "timestamp": str(timestamp), "part": {"text": marker}})
+
+    board = {
+        "job-a": json.dumps({"spec": "flow.yaml", "ts": 100.0, "status": "running"}),
+        "job-b": json.dumps({"spec": "flow.yaml", "ts": 200.0, "status": "running"}),
+    }
+    # Redis stores newest-first. The final 495 events make the shared producer window full, but
+    # none belongs to either selected run's recorded interval.
+    raw = [
+        event("run-b-late", 220),
+        event("run-a-late", 140),
+        event("run-b-early", 210),
+        event("run-a-early", 120),
+        json.dumps({"type": "text", "part": {"text": "no recorded timestamp"}}),
+    ]
+    raw.extend(
+        event(f"other-{index}", 900_000 + index) for index in range(EVENT_LOG_MAX - len(raw))
+    )
+    redis = _FakeRedis(board=board, logs={"events_log:flow:execute": raw})
+
+    run_a = read_run_logs(
+        redis,
+        "run-a",
+        spec_name="flow",
+        started_at="100",
+        ended_at="150",
+    )
+    run_b = read_run_logs(
+        redis,
+        "run-b",
+        spec_name="flow",
+        started_at="200",
+        ended_at="250",
+    )
+
+    assert [event["text"] for event in run_a["events"]] == ["run-a-early", "run-a-late"]
+    assert [event["text"] for event in run_b["events"]] == ["run-b-early", "run-b-late"]
+    assert run_a["count"] == run_b["count"] == 2
+    assert run_a["history_capped"] is run_b["history_capped"] is False
+    assert "untimestamped events excluded" in run_a["reason"]
+    assert "untimestamped events excluded" in run_b["reason"]
+
+
 def test_read_run_logs_keeps_the_job_tail_when_no_phase_stream_qualifies():
     """A stored phase stream whose newest event PREDATES the run is not this run's output: the
     binding falls back to the job tail (never a guessed neighbour)."""
@@ -598,7 +726,13 @@ def test_read_run_logs_keeps_the_job_tail_when_no_phase_stream_qualifies():
     }
     logs = {
         "events_log:job-live": [
-            json.dumps({"type": "step_finish", "part": {"text": "phase prior ok"}}),
+            json.dumps(
+                {
+                    "type": "step_finish",
+                    "timestamp": "1790105830000",
+                    "part": {"text": "phase prior ok"},
+                }
+            ),
         ],
         "events_log:flow:prior": [
             json.dumps({"type": "text", "timestamp": "1790105000000", "part": {"text": "old run"}}),
@@ -625,7 +759,15 @@ def test_run_detail_carries_the_run_logs_block(tmp_path):
         reason="start",
         candidate_sha="c" * 40,
     )
-    raw = [json.dumps({"type": "step_finish", "part": {"text": "phase prior ok"}})]
+    raw = [
+        json.dumps(
+            {
+                "type": "step_finish",
+                "timestamp": run.started_at,
+                "part": {"text": "phase prior ok"},
+            }
+        )
+    ]
     bound = run_detail(
         db,
         run.run_id,
@@ -636,6 +778,7 @@ def test_run_detail_carries_the_run_logs_block(tmp_path):
     assert bound["logs"]["state"] == "recorded"
     assert bound["logs"]["cell_id"] == "job-bb"
     assert bound["logs"]["events"][0]["text"] == "phase prior ok"
+    assert bound["logs"]["child_activity"]["state"] == "absent"
 
     unbound = run_detail(db, run.run_id)
     assert unbound["logs"]["state"] == "unavailable"
@@ -659,7 +802,15 @@ def test_run_detail_route_reads_the_job_logs_through_the_live_context(monkeypatc
     db.close()
 
     monkeypatch.setenv("FINOPS_CONTROL_DB", str(db_file))
-    raw = [json.dumps({"type": "step_finish", "part": {"text": "phase prior ok"}})]
+    raw = [
+        json.dumps(
+            {
+                "type": "step_finish",
+                "timestamp": run.started_at,
+                "part": {"text": "phase prior ok"},
+            }
+        )
+    ]
     monkeypatch.setattr(
         server,
         "_redis",
@@ -698,7 +849,15 @@ def test_read_run_logs_matches_an_inflight_job_by_spec_and_time():
             }
         ),
     }
-    raw = [json.dumps({"type": "step_finish", "part": {"text": "phase execute ok"}})]
+    raw = [
+        json.dumps(
+            {
+                "type": "step_finish",
+                "timestamp": "1970-01-01T00:33:31Z",
+                "part": {"text": "phase execute ok"},
+            }
+        )
+    ]
     redis = _FakeRedis(board=board, logs={"events_log:job-running": raw})
     # 1970-01-01T00:33:30Z = epoch 2010: 20s after job-running's acceptance, 1010s after job-old's.
     block = read_run_logs(

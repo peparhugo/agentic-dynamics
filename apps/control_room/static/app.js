@@ -68,12 +68,14 @@
     matrixState: "connecting",
     statusState: "connecting",
     streamState: "disconnected",
+    // This is derived from the event's recorded timestamp, not from browser receipt time.
+    recordedActivity: { state: "unknown", age_seconds: null },
     statusSource: null,
     eventSource: null,
     attached: false,
     replayMode: true,
     lastMatrixAt: null,
-    lastEventAt: null,
+    streamMetadata: null,
     firstMatrixLoaded: false,
     matrixRequestSequence: 0,
     matrixRequestInFlight: false,
@@ -1528,6 +1530,7 @@
   function renderTranscript(scrollToBottom = false) {
     const feed = $("#transcript-feed")
     feed.replaceChildren()
+    if (state.streamMetadata) feed.appendChild(renderActivityMetadata(state.streamMetadata, "transcript"))
     const design = selectedDesignSession()
     if (!state.selectedId) {
       feed.appendChild(element("div", "terminal-empty", "Select a fleet card to inspect retained events and watch live work."))
@@ -1543,6 +1546,48 @@
     }
     if (scrollToBottom && state.follow) feed.scrollTop = feed.scrollHeight
     $("#jump-live").hidden = state.follow
+  }
+
+  /** Render the server-owned child-activity scope in every activity surface. */
+  function renderActivityMetadata(metadata, surface) {
+    const source = metadata && typeof metadata === "object" ? metadata : {}
+    // Child absence is a server-owned statement about the displayed bounded slice. If that
+    // bound is missing or inconsistent, downgrade it instead of widening the claim in-browser.
+    const activity = core.boundedActivity(source)
+    const cellIds = Array.isArray(source.cell_ids)
+      ? source.cell_ids
+      : Array.isArray(activity.cell_ids)
+        ? activity.cell_ids
+        : []
+    const resolutionBasis = source.resolution_basis || activity.resolution_basis || "unavailable"
+    const block = element("section", `activity-metadata activity-metadata-${surface}`)
+    block.dataset.activitySurface = surface
+    block.appendChild(element("h3", "", "Activity scope"))
+    const stateLine = element("p", "pane-note", `Child activity: ${activity.state || "unavailable"}`)
+    stateLine.dataset.childActivityState = activity.state || "unavailable"
+    block.appendChild(stateLine)
+    const cellsLine = element(
+      "p",
+      "pane-note",
+      `Cell IDs: ${cellIds.length ? cellIds.join(", ") : "unavailable"}`,
+    )
+    cellsLine.dataset.cellIds = cellIds.join(",")
+    block.appendChild(cellsLine)
+    const resolutionLine = element("p", "pane-note", `Resolution basis: ${resolutionBasis}`)
+    resolutionLine.dataset.resolutionBasis = resolutionBasis
+    block.appendChild(resolutionLine)
+    const observed = activity.observed_events ?? source.observed_events
+    const total = activity.total_events ?? source.total_events
+    const bound = activity.slice_bound ?? source.slice_bound
+    block.appendChild(
+      element(
+        "p",
+        "pane-note",
+        `Evidence slice: ${observed ?? "unknown"} of ${total ?? "unknown"} event(s) observed; bound ${bound ?? "unknown"}`,
+      ),
+    )
+    if (activity.reason) block.appendChild(element("p", "pane-note", `Reason: ${activity.reason}`))
+    return block
   }
 
   /** Build one terminal row with collapsed, safely escaped details. */
@@ -1649,8 +1694,13 @@
     }
     const row = core.normalizeTranscriptEvent(raw, state.selectedId)
     rememberEvent(rawIdentity)
-    state.lastEventAt = Date.now()
-    state.streamState = "live"
+    state.recordedActivity = {
+      state: row.recorded_state,
+      age_seconds: row.recorded_age_seconds,
+    }
+    // A replayed old event is stale, and an event without a usable stamp is unknown. Neither
+    // may be upgraded to LIVE merely because the browser received it now.
+    state.streamState = row.recorded_state
     if (row.sessionId && !state.selectedSessionIds.includes(row.sessionId)) state.selectedSessionIds.push(row.sessionId)
     if (row.sample && !state.replayMode) recordLiveSample(state.selectedId, row.sample)
 
@@ -1764,20 +1814,26 @@
     const source = state.eventSource
     source.onopen = () => {
       if (source !== state.eventSource) return
-      state.streamState = "live"
       beginReplay()
       renderSelection()
     }
-    source.addEventListener("replay_complete", () => {
+    source.addEventListener("replay_complete", (boundary) => {
       if (source !== state.eventSource) return
+      try {
+        const metadata = JSON.parse(boundary.data || "null")
+        state.streamMetadata = metadata && typeof metadata === "object" ? metadata : null
+      } catch (_error) {
+        state.streamMetadata = null
+      }
       state.replayMode = false
       state.raceDuplicateCounts = new Map()
       for (const identity of state.replayTail) {
         state.raceDuplicateCounts.set(identity, (state.raceDuplicateCounts.get(identity) || 0) + 1)
       }
       state.raceDedupeExpiresAt = Date.now() + REPLAY_RACE_WINDOW_MS
-      state.streamState = "live"
+      if (state.rows.length === 0) state.streamState = "unknown"
       renderSelection()
+      renderTranscript(false)
     })
     source.onmessage = (event) => {
       if (source === state.eventSource && state.selectedId === selectedAtConnect) receiveEvent(event.data)
@@ -1806,6 +1862,7 @@
       state.eventSource = null
       state.selectedId = cellId
       state.selectedType = "cell"
+      state.recordedActivity = { state: "unknown", age_seconds: null }
       state.supervisorSelection = null
       state.supervisorInterrupted = false
       state.draftState = null
@@ -1816,6 +1873,7 @@
       try { window.localStorage.removeItem("control-room-selected-design") } catch (_error) {}
       state.selectedSessionIds = []
       state.rows = []
+      state.streamMetadata = null
       state.buffer = []
       state.eventLedgerCounts = new Map()
       state.eventLedgerOrder = []
@@ -1850,6 +1908,7 @@
       state.supervisorInterrupted = false
       state.selectedSessionIds = session.opencode_session_id ? [session.opencode_session_id] : []
       state.rows = []
+      state.streamMetadata = null
       state.buffer = []
       state.eventLedgerCounts = new Map()
       state.eventLedgerOrder = []
@@ -1918,6 +1977,7 @@
     state.selectedType = "supervisor"
     state.selectedSessionIds = [current.session_id]
     state.rows = []
+    state.streamMetadata = null
     state.buffer = []
     state.eventLedgerCounts = new Map()
     state.eventLedgerOrder = []
@@ -1964,6 +2024,7 @@
       state.selectedClaudeAgentId = id
       state.selectedSessionIds = []
       state.rows = []
+      state.streamMetadata = null
       state.buffer = []
       state.eventLedgerCounts = new Map()
       state.eventLedgerOrder = []
@@ -3768,16 +3829,89 @@
     runLogStreamCell = ""
   }
 
-  /** One log entry: the producer's own class and text — the client formats, never invents. */
-  function runLogEntry(event) {
+  /**
+   * Normalize replay and live payloads into the same display shape.
+   *
+   * The service already sends normalized replay rows, while EventSource sends the producer's
+   * nested event object. Keeping this adapter in one place prevents the drawer from losing rich
+   * evidence merely because an event arrived after the initial REST response.
+   */
+  function normalizeRunLogEvent(event) {
+    const source = event && typeof event === "object" && !Array.isArray(event) ? event : null
+    const part = source && source.part && typeof source.part === "object" ? source.part : {}
+    const toolState = part.state && typeof part.state === "object" ? part.state : {}
+    const firstValue = (...values) => values.find((value) => value !== undefined && value !== null && value !== "")
+    const timestamp = firstValue(
+      source && source.timestamp,
+      source && source.ts,
+      source && source.time,
+      part.timestamp,
+      part.time,
+    )
+    const liveness = core.recordedLiveness(timestamp)
+    const malformed = !source || source.malformed === true
+    return {
+      timestamp: timestamp ?? null,
+      class: malformed ? "malformed" : String(source.class || source.type || "event"),
+      text: String(firstValue(part.text, source && source.text) || ""),
+      id: String((source && source.id) || ""),
+      part_id: String((source && source.part_id) || part.id || ""),
+      tool: String((source && source.tool) || part.tool || ""),
+      tool_input: firstValue(source && source.tool_input, source && source.input, toolState.input) || "",
+      tool_output: firstValue(source && source.tool_output, source && source.output, toolState.output) || "",
+      child_session_id: String(
+        (source && source.child_session_id) || part.child_session_id || "",
+      ),
+      recorded_age_seconds: liveness.age_seconds,
+      recorded_state: liveness.state,
+      malformed,
+      live: source && source.live === true,
+    }
+  }
+
+  /** Render a rich field as visible text; absent evidence is named, never silently omitted. */
+  function runLogField(className, label, value) {
+    const rendered =
+      value === null || value === undefined || value === ""
+        ? "unavailable"
+        : typeof value === "object"
+          ? JSON.stringify(value)
+          : value
+    const field = element("span", className, `${label}: ${String(rendered)}`)
+    field.dataset.logField = label
+    return field
+  }
+
+  /** One log entry: replay and live events use the same normalized, rich evidence shape. */
+  function runLogEntry(event, options = {}) {
+    const normalized = normalizeRunLogEvent(event)
     const entry = element("li", "run-log-entry")
     entry.dataset.logEntry = ""
-    entry.dataset.logKind = String(event.class || "event")
-    if (event.live) entry.dataset.logLive = "true"
+    entry.dataset.logKind = normalized.class
+    // Delivery mode is not liveness: a replayed old event can arrive through a live SSE
+    // connection. Only the recorded timestamp may earn the LIVE marker.
+    if (normalized.recorded_state === "live") entry.dataset.logLive = "true"
+    if (options.live) entry.dataset.logDelivery = "live"
     entry.appendChild(
-      element("span", "run-log-class", String(event.class || "event").toUpperCase()),
+      element("span", "run-log-class", normalized.class.toUpperCase()),
     )
-    entry.appendChild(element("span", "run-log-text", event.text || "—"))
+    entry.appendChild(element("span", "run-log-text", normalized.text || "—"))
+    entry.appendChild(runLogField("run-log-timestamp", "timestamp", normalized.timestamp))
+    entry.appendChild(
+      runLogField("run-log-age", "recorded age", core.recordedAgeLabel(normalized.recorded_age_seconds)),
+    )
+    entry.appendChild(runLogField("run-log-liveness", "recorded liveness", normalized.recorded_state))
+    entry.appendChild(runLogField("run-log-id", "event id", normalized.id))
+    entry.appendChild(runLogField("run-log-tool", "tool", normalized.tool))
+    entry.appendChild(runLogField("run-log-tool-input", "tool input", normalized.tool_input))
+    entry.appendChild(runLogField("run-log-tool-output", "tool output", normalized.tool_output))
+    entry.appendChild(runLogField("run-log-part-id", "part id", normalized.part_id))
+    entry.appendChild(
+      runLogField("run-log-child-session-id", "child session id", normalized.child_session_id),
+    )
+    if (normalized.malformed) {
+      entry.appendChild(runLogField("run-log-malformed", "event evidence", "malformed"))
+    }
     return entry
   }
 
@@ -3789,10 +3923,11 @@
    * never an empty success. The follow subscribes to the SAME `/api/events/<cell>` stream the
    * transcript panel uses (replay + live), so the drawer and the panel can never disagree.
    *
-   * In-flight runs bind the newest live PHASE stream (the agent's own output and steps,
-   * `events_log:<spec>:<phase>`) and keep the fleet job named; finished runs show the job
-   * tail (every phase's milestone). The service names both (`job_id` / `cell_id` /
-   * `stream_match`) — the label below states which stream this is.
+   * The service resolves the selected run to its live cell and returns that binding as
+   * `logs.cell_id`. The drawer treats that server-owned value as authoritative for both the
+   * rendered control and the EventSource URL; it never reconstructs a stream from the requested
+   * run id. The service names both (`job_id` / `cell_id` / `stream_match`) — the label below
+   * states which stream this is.
    */
   function renderRunLogs(logs) {
     const block = element("section", "surface-block")
@@ -3818,6 +3953,7 @@
       ? `${stream} (bounded window — older events evicted)`
       : stream
     block.appendChild(note)
+    block.appendChild(renderActivityMetadata(logs, "drawer"))
     const feed = element("ul", "run-log")
     feed.dataset.logFeed = logs.cell_id || ""
     for (const event of logs.events || []) feed.appendChild(runLogEntry(event))
@@ -3859,18 +3995,21 @@
       try {
         event = JSON.parse(message.data)
       } catch (_error) {
-        return
+        event = { type: "malformed", text: String(message.data || "") }
       }
-      const part = event && typeof event.part === "object" && event.part ? event.part : {}
-      feed.appendChild(
-        runLogEntry({
-          class: (event && event.type) || "event",
-          text: part.text || (event && event.text) || "",
-          live: true,
-        }),
-      )
+      feed.appendChild(runLogEntry(event, { live: true }))
       while (feed.children.length > 200) feed.removeChild(feed.firstChild)
     }
+    source.addEventListener("replay_complete", (boundary) => {
+      let metadata = null
+      try {
+        metadata = JSON.parse(boundary.data || "null")
+      } catch (_error) {
+        metadata = null
+      }
+      const current = document.querySelector('#run-detail-content [data-activity-surface="drawer"]')
+      if (current && metadata) current.replaceWith(renderActivityMetadata(metadata, "drawer"))
+    })
     source.onerror = () => {
       if (runLogStreamCell !== cellId) return
       button.textContent = "Reconnecting…"
