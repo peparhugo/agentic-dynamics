@@ -159,41 +159,41 @@ workflow:
         timeout: 3600
         requires_files: [notes/plan.md, notes/sources.jsonl, notes/plan.units.json]
         expand_from_plan: notes/plan.units.json
+        # The per-unit template the runner renders (`{unit_id}` / `{unit_goal}` / `{unit_files}` /
+        # `{unit_acceptance}` — `_render_unit_prompt`). Never remove the placeholders: without
+        # them every slice receives the whole plan and becomes the whole-plan executor (the L51
+        # att6 class — u1 swept all units, its successors found nothing to do, NO_CHANGES).
         prompt: |
-          Implement the plan units from `notes/plan.units.json` — ONE concern per unit, each
-          slice confined to its declared files, each unit's own gate proving it. Small units
-          are the point: if a unit has grown past a handful of files or two concerns, split it
-          and record the split. Under the units, the goal is: the room's activity + live-feed
-          surfaces truthful and legible. (1) RUN-SCOPED
-          TRUTH: the drawer and the panel must show the SELECTED run's own events; a
-          run-scoped binding/filter must be real — if membership cannot be proven, the
-          surface names that, it never guesses. (2) FEED FIDELITY: timestamps, text, and tool
-          detail survive the normalization (`logs_block` fixes for `timestamp` / `part.id` /
-          the tool name; the drawer and the panel agree on the same run). (3) IDENTIFIER
-          RESOLUTION: the identifiers the operator actually has (run id, fleet job id, cell
-          id) all resolve to the same live stream with a NAMED first frame. (4) CHILD
-          ACTIVITY: the delegated (child) sessions' activity is published to the stream or
-          explicitly named absent on the surface. (5) ACTIVITY LEGIBILITY: the LIVE NOW /
-          phase-card surfaces show states with recorded ages (never an invented liveness), so
-          "alive" versus "stalled" is readable at a glance. Extend the fixtures + the gate's
-          assertions and the renderers; keep the parked workbench parked (never served,
-          never the primary reference). The container CANNOT run the browser profile (no
-          Playwright — register L47): run the browser-free checks
+          You are the EXECUTE phase for ONE unit of this workflow ({goal}). The runner has
+          expanded this phase into one bounded slice per unit in `notes/plan.units.json`; this
+          slice is unit `{unit_id}`.
+
+          THIS UNIT'S GOAL: {unit_goal}
+          DECLARED FILES (your entire write scope): {unit_files}
+          ACCEPTANCE: {unit_acceptance}
+
+          Implement ONLY this unit, against `notes/plan.md` and the spec context. The run's
+          overall goal: the room's activity + live-feed surfaces truthful and legible
+          (run-scoped truth; feed fidelity; identifier resolution; child activity; activity
+          liveness). Another slice owns every other unit — do NOT read or implement their work,
+          do not subsume a sibling's scope, and do not edit files outside your declared list.
+          Keep the parked workbench parked (never served, never the primary reference).
+          Rules: the container CANNOT run the browser profile (no Playwright — register L47):
+          run the browser-free checks
           (`python3 scripts/verify_control_room_rendering.py --check-fixtures`) and the five
           declared gate suites (`tests/test_control_room_operations.py`,
           `tests/test_control_room_glance_integrity.py`,
           `tests/test_control_room_build_contract.py`,
           `tests/test_control_room_static_views.py`, `tests/test_control_room_paths.py`)
-          TO FULL GREEN on your FINAL commit — if your redesign renames or moves a read that
-          a suite anchors, update that suite in the same commit; do NOT install Playwright
-          and do NOT fabricate captures — the host runs the acceptance profile against this
-          run's candidate. Commit. A unit slice must ALWAYS deliver a committed diff: if the
-          unit's work already exists (an earlier unit or the prior landed it), make the
-          smallest necessary change that PROVES the unit — add the missing test/assertion/doc
-          line — and commit; "nothing to do" is NEVER valid (a no-change slice fails the run:
-          NO_CHANGES). Keep unit scopes DISJOINT — one unit may not subsume another's work.
-          NEVER run long waits or `sleep` — a phase that burns its
-          wall with no committed deliverable FAILS (register L46/#152).
+          TO FULL GREEN on your FINAL commit — if your unit renames or moves a read that a
+          suite anchors, update that suite in the same commit; do NOT install Playwright and
+          do NOT fabricate captures — the host runs the acceptance profile against this run's
+          candidate. A unit slice must ALWAYS deliver a committed diff: if the unit's work
+          already exists (an earlier unit or the prior landed it), make the smallest necessary
+          change that PROVES the unit — add the missing test/assertion/doc line — and commit;
+          "nothing to do" is NEVER valid (a no-change slice fails the run: NO_CHANGES).
+          Commit. NEVER run long waits or `sleep` — a phase that burns its wall with no
+          committed deliverable FAILS (register L46/#152).
       - name: g_test_gate
         kind: test
         scope: implementation
