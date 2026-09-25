@@ -1,6 +1,8 @@
 """Model cost-policy guard tests — per-token pro tier is denied without explicit opt-in."""
 
+import json
 import os
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -63,3 +65,26 @@ def test_is_pro_per_token():
     assert is_pro_per_token("anything/deepseek-v4-pro")
     assert not is_pro_per_token(FLASH_MODEL)
     assert not is_pro_per_token(SUBSCRIPTION_DEFAULT)
+
+
+def test_cell_visible_config_maps_the_custom_adversary_model():
+    """The adversary alias must resolve WITHOUT the operator's user config.
+
+    Fleet cells run opencode with an EMPTY XDG config namespace (their per-attempt
+    state dir) and see only the repo's project config. A custom model alias that
+    lives solely in ``~/.config/opencode/opencode.jsonc`` is invisible in-cell — the
+    2026-09-25 att5-flash failure: the first in-cell ``openai/gpt-6-astra`` call died
+    with an opencode "Unexpected server error" (0 tokens, 12.7s) because the alias
+    could not resolve (the host resolves it; an empty-config process lists no astra).
+    ``opencode.json`` is the versioned, cell-visible home for that mapping — the same
+    entry ``model_policy`` names: "containerized fleets need the same entry in their
+    config mount".
+    """
+    config = json.loads(
+        (Path(__file__).resolve().parent.parent / "opencode.json").read_text(encoding="utf-8")
+    )
+    models = config.get("provider", {}).get("openai", {}).get("models", {})
+    assert "gpt-6-astra" in models, (
+        "opencode.json must map openai/gpt-6-astra for cells (whose XDG config is "
+        "empty): a user-level-only entry breaks every in-cell adversarial phase"
+    )

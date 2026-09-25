@@ -15,6 +15,16 @@
   "subagent_depth": 2,
   "formatter": true,
   "lsp": true,
+  "provider": {
+    "openai": {
+      "models": {
+        "gpt-6-astra": {
+          "name": "GPT-6 Astra",
+          "id": "gpt-6-astra"
+        }
+      }
+    }
+  },
   "permission": {
     "edit": "allow",
     "bash": {
