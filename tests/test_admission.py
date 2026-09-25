@@ -108,10 +108,10 @@ def capped_registry(registry: LeaseRegistry) -> LeaseRegistry:
     cap by design ("an uncapped scope admits nothing"). A fixture that quietly supplied one
     would hide the very behaviour several tests below assert.
     """
-    registry.set_cap(LeaseKind.BUDGET, ANTHROPIC, 100.0)     # window percentage points
-    registry.set_cap(LeaseKind.BUDGET, DEEPSEEK, 50.0)       # dollars
+    registry.set_cap(LeaseKind.BUDGET, ANTHROPIC, 100.0)  # window percentage points
+    registry.set_cap(LeaseKind.BUDGET, DEEPSEEK, 50.0)  # dollars
     registry.set_cap(LeaseKind.BUDGET, CAMPAIGN, 100.0)
-    registry.set_cap(LeaseKind.CONCURRENCY, FLEET, 6.0)      # the β_tokens knee
+    registry.set_cap(LeaseKind.CONCURRENCY, FLEET, 6.0)  # the β_tokens knee
     registry.set_cap(LeaseKind.CONCURRENCY, ANTHROPIC, 4.0)
     registry.set_cap(LeaseKind.CONCURRENCY, DEEPSEEK, 4.0)
     registry.set_cap(LeaseKind.CONCURRENCY, CAMPAIGN, 3.0)
@@ -228,9 +228,7 @@ def test_partial_env_block_is_an_error_not_an_absence():
 
 def test_unparseable_amount_in_the_env_block_is_an_error_never_zero():
     """The audit's collapse-to-zero, at the transport layer: a bad number refuses."""
-    env = LeaseContext(
-        run_id="r", model="m", budget_lease_id="b", expires_at=1.0
-    ).to_env()
+    env = LeaseContext(run_id="r", model="m", budget_lease_id="b", expires_at=1.0).to_env()
     env["FINOPS_ADMISSION_RESERVED_USD"] = "not-a-number"
     with pytest.raises(AdmissionContextError, match="non-numeric"):
         LeaseContext.from_env(env)
@@ -241,7 +239,7 @@ def test_bind_context_sets_both_carriers_and_restores_both():
     ctx = LeaseContext(run_id="r", model="m", budget_lease_id="b", expires_at=9e9)
     assert current_context() is None
     with bind_context(ctx):
-        assert current_context() == ctx           # the ContextVar
+        assert current_context() == ctx  # the ContextVar
         assert os.environ[BUDGET_LEASE_ENV] == "b"  # the environment
     assert current_context() is None
     assert BUDGET_LEASE_ENV not in os.environ
@@ -291,9 +289,7 @@ def test_armed_gate_refuses_an_unadmitted_call(armed):
 
 def test_armed_gate_admits_a_live_context(armed):
     """The other direction: a live admission passes the same guard."""
-    ctx = LeaseContext(
-        run_id="r", model=SUBSCRIPTION_MODEL, budget_lease_id="b", expires_at=9e9
-    )
+    ctx = LeaseContext(run_id="r", model=SUBSCRIPTION_MODEL, budget_lease_id="b", expires_at=9e9)
     with bind_context(ctx):
         assert require_admission(SUBSCRIPTION_MODEL) == ctx
 
@@ -311,9 +307,7 @@ def test_armed_gate_refuses_a_context_granted_for_another_model(armed):
     The concrete attack: hold a subscription admission (window points, no dollar cap) and use
     it to invoke a per-token model, spending real wallet dollars against a window reservation.
     """
-    ctx = LeaseContext(
-        run_id="r", model=SUBSCRIPTION_MODEL, budget_lease_id="b", expires_at=9e9
-    )
+    ctx = LeaseContext(run_id="r", model=SUBSCRIPTION_MODEL, budget_lease_id="b", expires_at=9e9)
     with bind_context(ctx), pytest.raises(AdmissionContextError, match="not transferable"):
         require_admission(PRO_MODEL)
 
@@ -324,9 +318,7 @@ def test_env_carried_context_satisfies_the_guard_in_a_child_process(armed):
     Simulated by writing the env block WITHOUT binding the ContextVar — which is exactly the
     state a freshly-exec'd subprocess is in.
     """
-    ctx = LeaseContext(
-        run_id="r", model=SUBSCRIPTION_MODEL, budget_lease_id="b", expires_at=9e9
-    )
+    ctx = LeaseContext(run_id="r", model=SUBSCRIPTION_MODEL, budget_lease_id="b", expires_at=9e9)
     with patch.dict(os.environ, ctx.to_env()):
         assert require_admission(SUBSCRIPTION_MODEL) == ctx
 
@@ -336,8 +328,13 @@ def test_env_carried_context_satisfies_the_guard_in_a_child_process(armed):
 
 def test_valid_lease_block_passes():
     ctx = LeaseContext(
-        run_id="r", model="m", budget_lease_id="b", concurrency_lease_ids=("c",),
-        reserved_cost_usd=1.0, hard_cap_usd=5.0, expires_at=9e9,
+        run_id="r",
+        model="m",
+        budget_lease_id="b",
+        concurrency_lease_ids=("c",),
+        reserved_cost_usd=1.0,
+        hard_cap_usd=5.0,
+        expires_at=9e9,
     )
     assert validate_lease_fields(ctx.to_request_fields()) == []
 
@@ -359,13 +356,13 @@ def test_partial_lease_block_is_always_an_error():
     [
         ({"reserved_cost_usd": None}, "never 0.0"),
         ({"reserved_cost_usd": "1.00"}, "never 0.0"),
-        ({"reserved_cost_usd": True}, "never 0.0"),        # bool is an int in Python
+        ({"reserved_cost_usd": True}, "never 0.0"),  # bool is an int in Python
         ({"reserved_cost_usd": float("nan")}, "never 0.0"),  # nan > cap is False → would admit
         ({"reserved_cost_usd": -1.0}, "non-negative"),
         ({"budget_lease_id": ""}, "budget_lease_id"),
         ({"hard_cap_usd": 0.0}, "positive number or None"),
-        ({"hard_cap_usd": 0.5}, "exceeds hard_cap_usd"),   # reserved 1.0 > cap 0.5
-        ({"hard_cap_usd": None}, "without a ceiling"),     # dollars reserved, no cap
+        ({"hard_cap_usd": 0.5}, "exceeds hard_cap_usd"),  # reserved 1.0 > cap 0.5
+        ({"hard_cap_usd": None}, "without a ceiling"),  # dollars reserved, no cap
         ({"expires_at": None}, "epoch seconds"),
     ],
 )
@@ -386,20 +383,28 @@ def test_malformed_lease_block_is_refused_field_by_field(bad, fragment):
 
 def test_subscription_block_may_legitimately_have_no_dollar_cap():
     """``hard_cap_usd=None`` with ``reserved_cost_usd=0.0`` is the subscription class, not a hole."""
-    assert validate_lease_fields({
-        "reserved_cost_usd": 0.0,
-        "hard_cap_usd": None,
-        "budget_lease_id": "b",
-        "concurrency_lease_id": "",
-        "expires_at": 9e9,
-    }) == []
+    assert (
+        validate_lease_fields(
+            {
+                "reserved_cost_usd": 0.0,
+                "hard_cap_usd": None,
+                "budget_lease_id": "b",
+                "concurrency_lease_id": "",
+                "expires_at": 9e9,
+            }
+        )
+        == []
+    )
 
 
 def test_lease_request_fields_are_the_work_orders_five():
     """The vocabulary is pinned: the fleet wrapper's step 6 and the controller share this list."""
     assert set(LEASE_REQUEST_FIELDS) == {
-        "reserved_cost_usd", "hard_cap_usd", "budget_lease_id",
-        "concurrency_lease_id", "expires_at",
+        "reserved_cost_usd",
+        "hard_cap_usd",
+        "budget_lease_id",
+        "concurrency_lease_id",
+        "expires_at",
     }
 
 
@@ -467,8 +472,8 @@ def test_admit_records_the_audit_line(controller: AdmissionController):
     assert record["run_id"] == "run-1"
     assert record["provider_class"] == ProviderClass.SUBSCRIPTION.value
     assert record["cost_source"] == CostSource.ESTIMATED.value
-    assert record["hard_cap_usd"] is None            # subscription: no dollar cap
-    assert record["reserved_cost_usd"] == 0.0        # subscription: zero marginal dollars
+    assert record["hard_cap_usd"] is None  # subscription: no dollar cap
+    assert record["reserved_cost_usd"] == 0.0  # subscription: zero marginal dollars
     assert record["worktree_identity"] == "wt_admission_leases"
     assert record["result_namespace"] == "self-wt_admission_leases"
     assert len(record["lease_ids"]) == 2
@@ -483,7 +488,7 @@ def test_admit_a_per_token_run_reserves_real_dollars(controller: AdmissionContro
 
 
 def test_per_token_run_with_unknown_cost_is_denied(controller: AdmissionController):
-    """"Unknown cost is never free" — the denial happens BEFORE the money is gone."""
+    """ "Unknown cost is never free" — the denial happens BEFORE the money is gone."""
     with pytest.raises(AdmissionDenied, match="cost_source=unknown"):
         controller.admit(per_token_request(amount=None, cost_source=None))
 
@@ -520,7 +525,7 @@ def test_budget_lease_is_released_when_the_concurrency_lease_fails(
 def test_all_concurrency_scopes_are_required(
     controller: AdmissionController, capped_registry: LeaseRegistry
 ):
-    """"Refuse if either fails", generalised: with several scopes, ANY failure refuses."""
+    """ "Refuse if either fails", generalised: with several scopes, ANY failure refuses."""
     capped_registry.set_cap(LeaseKind.CONCURRENCY, ANTHROPIC, 0.5)  # the second scope is full
     with pytest.raises(AdmissionDenied, match="concurrency reservation failed"):
         controller.admit(subscription_request(concurrency_scopes=(FLEET, ANTHROPIC)))
@@ -545,7 +550,7 @@ def test_uncapped_scope_admits_nothing(registry: LeaseRegistry):
 def test_model_policy_backstop_denies_the_pro_tier(controller: AdmissionController):
     """The class-level guard survives underneath the lease gate (the work order's item (e))."""
     os.environ.pop("FINOPS_ALLOW_PRO", None)
-    with pytest.raises(AdmissionDenied, match="per-token pro tier"):
+    with pytest.raises(AdmissionDenied, match="pro-tier"):
         controller.admit(per_token_request(model=PRO_MODEL))
 
 
@@ -600,9 +605,7 @@ def test_expired_leases_stop_counting_against_the_cap(
 # ── the admission's own projections ─────────────────────────────────────────────────────────
 
 
-def test_admission_expires_with_its_shortest_claim(
-    controller: AdmissionController, clock: Clock
-):
+def test_admission_expires_with_its_shortest_claim(controller: AdmissionController, clock: Clock):
     """``expires_at`` is the MINIMUM: an admission dies with whichever lease dies first."""
     admission = controller.admit(subscription_request(ttl_seconds=900))
     assert admission.expires_at == clock.now + 900
@@ -630,8 +633,10 @@ def test_verify_accepts_a_genuine_admission(controller: AdmissionController):
 def test_verify_rejects_a_forged_context(controller: AdmissionController):
     """A hand-set ``FINOPS_BUDGET_LEASE_ID`` names no lease the registry ever granted."""
     forged = LeaseContext(
-        run_id="attacker", model=SUBSCRIPTION_MODEL,
-        budget_lease_id="bud_forged", expires_at=9e9,
+        run_id="attacker",
+        model=SUBSCRIPTION_MODEL,
+        budget_lease_id="bud_forged",
+        expires_at=9e9,
     )
     with pytest.raises(AdmissionDenied, match="not outstanding"):
         controller.verify(forged)
@@ -682,9 +687,7 @@ def test_concurrency_admitted_is_inert_when_disarmed():
         assert lease is None
 
 
-def test_concurrency_admitted_reserves_and_releases_a_slot(
-    armed, capped_registry: LeaseRegistry
-):
+def test_concurrency_admitted_reserves_and_releases_a_slot(armed, capped_registry: LeaseRegistry):
     """A slot with no dollars: the honest model for work that costs CPU and not money."""
     with concurrency_admitted(FLEET, run_id="analysis:x", registry=capped_registry) as lease:
         assert lease is not None
@@ -712,7 +715,9 @@ def test_concurrency_admitted_refuses_a_full_scope(armed, capped_registry: Lease
 
 def test_phase_admission_is_inert_when_disarmed(controller: AdmissionController):
     gate = make_phase_admission(
-        spec_name="admission_leases", worktree_identity="wt", result_namespace="ns",
+        spec_name="admission_leases",
+        worktree_identity="wt",
+        result_namespace="ns",
         controller=controller,
     )
     with gate("p2_admission_controller", SUBSCRIPTION_MODEL) as admission:
@@ -725,7 +730,9 @@ def test_phase_admission_reserves_against_the_campaign_scope(
 ):
     """Per-phase reservation against the WORKFLOW's campaign lease (the work order's item (d))."""
     gate = make_phase_admission(
-        spec_name="admission_leases", worktree_identity="wt", result_namespace="ns",
+        spec_name="admission_leases",
+        worktree_identity="wt",
+        result_namespace="ns",
         controller=controller,
     )
     with gate("p2_admission_controller", SUBSCRIPTION_MODEL) as admission:
@@ -742,7 +749,9 @@ def test_phase_admission_refuses_when_the_campaign_budget_is_exhausted(
     """Five phases against one campaign budget: the run stops when the campaign is spent."""
     capped_registry.set_cap(LeaseKind.BUDGET, CAMPAIGN, 1.5)  # 1 phase at 1.0 window point fits
     gate = make_phase_admission(
-        spec_name="admission_leases", worktree_identity="wt", result_namespace="ns",
+        spec_name="admission_leases",
+        worktree_identity="wt",
+        result_namespace="ns",
         controller=controller,
     )
     # p1's lease is held while p2 is attempted — the campaign budget is shared, and that
@@ -761,7 +770,9 @@ def test_phase_admission_refusal_is_catchable_as_the_tier_zero_family(
     """``runtime`` catches ``AdmissionRefused``; it may not import ``control``'s hierarchy."""
     capped_registry.set_cap(LeaseKind.BUDGET, CAMPAIGN, 0.5)
     gate = make_phase_admission(
-        spec_name="admission_leases", worktree_identity="wt", result_namespace="ns",
+        spec_name="admission_leases",
+        worktree_identity="wt",
+        result_namespace="ns",
         controller=controller,
     )
     with pytest.raises(AdmissionRefused), gate("p1", SUBSCRIPTION_MODEL):
@@ -770,7 +781,7 @@ def test_phase_admission_refusal_is_catchable_as_the_tier_zero_family(
 
 def test_admission_denied_is_catchable_from_both_vocabularies():
     """The double inheritance is load-bearing, not decoration."""
-    assert issubclass(AdmissionDenied, AdmissionError)   # tier-2 lease family
+    assert issubclass(AdmissionDenied, AdmissionError)  # tier-2 lease family
     assert issubclass(AdmissionDenied, AdmissionRefused)  # tier-0 refusal family
 
 
