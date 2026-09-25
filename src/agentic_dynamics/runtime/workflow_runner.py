@@ -5505,7 +5505,7 @@ def run_workflow(
                         # It OUTRANKS the router (F1, live run-0fad6c313dcd): the production
                         # composition root always injects ``route_step``, and that router never
                         # reads ``phase_def`` — so a declared override was silently dead and the
-                        # world-model loop's ``run_model: openai/gpt-5.6-terra`` "DIFFERENT
+                        # world-model loop's ``run_model: openai/gpt-6-astra`` "DIFFERENT
                         # model" adversarial phase ran on the run model. A declared override is
                         # explicit intent; routing is a default.
                         model_i = str(phase_def["run_model"])

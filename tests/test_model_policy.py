@@ -18,7 +18,7 @@ from agentic_dynamics.control.model_policy import (
 
 
 def test_subscription_models_always_allowed():
-    for model in (SUBSCRIPTION_DEFAULT, "openai/gpt-5.6-sol"):
+    for model in (SUBSCRIPTION_DEFAULT, "openai/gpt-5.6-luna", "openai/gpt-6-astra"):
         ensure_model_allowed(model)
 
 
@@ -36,7 +36,16 @@ def test_flash_always_allowed():
     ensure_model_allowed(FLASH_MODEL)
 
 
-@pytest.mark.parametrize("model", [PRO_MODEL, "deepseek/deepseek-v4-pro", "provider/deepseek-v4-pro"])
+@pytest.mark.parametrize(
+    "model",
+    [
+        PRO_MODEL,
+        "deepseek/deepseek-v4-pro",
+        "provider/deepseek-v4-pro",
+        "openai/gpt-5.6-terra",
+        "openai/gpt-5.6-sol",
+    ],
+)
 def test_pro_denied_without_opt_in(model):
     with patch.dict(os.environ, {}, clear=False):
         os.environ.pop("FINOPS_ALLOW_PRO", None)
