@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-25T00:23:39.011274+00:00",
-  "n_specs": 249,
+  "generated_at": "2026-09-25T01:33:56.692026+00:00",
+  "n_specs": 250,
   "specs": [
     {
       "name": "adapter_snapshot_guard",
@@ -2049,6 +2049,26 @@
       "results_pointer": null,
       "n_runs": 0,
       "workflow_revision_id": "d8a8c3563cbc4fb2ae031473b0dc0bda2591c0f47a82aeefec90bf89dca027b8",
+      "authored_status": null
+    },
+    {
+      "name": "control_room_visual_truth",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/control_room_visual_truth.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": true,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0,
+      "workflow_revision_id": "6948ddb0653393706c84987abb42b0c845862f0eae43e40a7261672722db257b",
       "authored_status": null
     },
     {

@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-25T00:23:39.011274+00:00`  ·  249 spec(s)
-**Work remaining:** 209 open · 40 completed/retired
+Generated at: `2026-09-25T01:33:56.692026+00:00`  ·  250 spec(s)
+**Work remaining:** 210 open · 40 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -110,6 +110,7 @@ Generated at: `2026-09-25T00:23:39.011274+00:00`  ·  249 spec(s)
 | `control_room_ui_rebuild` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_ui_redesign` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_ux_repair` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `control_room_visual_truth` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_workflow_phase` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_working_slice` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `deep_architecture_review` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
