@@ -243,9 +243,9 @@ workflow:
         kind: agent
         scope: proposal_write
         timeout: 1800
-        run_model: openai/gpt-5.6-terra
+        run_model: openai/gpt-6-astra
         prompt: |
-          ADVERSARIAL REVIEW — a different model by design. Read the notes, the diffs, and
+          ADVERSARIAL REVIEW — a different model by design (2026-09-25: this adversary runs on `openai/gpt-6-astra`; the authoring cells run on `openai/gpt-5.6-luna`). Read the notes, the diffs, and
           the fixtures. Attack: does any "run-scoped" promise secretly show a mixed tail
           (seed another run's events and prove the discrimination)? is any age, liveness, or
           child-activity claim derived from data the surface cannot know (an invented age, a

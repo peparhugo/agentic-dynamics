@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-24T17:57:13.641237+00:00",
+  "generated_at": "2026-09-25T00:23:39.011274+00:00",
   "n_specs": 249,
   "specs": [
     {
@@ -1468,7 +1468,7 @@
       "latest_git_sha": null,
       "results_pointer": null,
       "n_runs": 0,
-      "workflow_revision_id": "81a9fef701108b87c20dd240ea7c77d24dd1a371a0dd5314022fdbfed930df57",
+      "workflow_revision_id": "7876cfb533c8530e971778010b7d274ac5324f7c7ce05bd875840716ffce8dfa",
       "authored_status": null
     },
     {
@@ -1708,7 +1708,7 @@
       "latest_git_sha": null,
       "results_pointer": null,
       "n_runs": 0,
-      "workflow_revision_id": "a1bc678e4e7b642e4dab0a1bbafa70661e9ce6f795903fb5fed7c192d9894622",
+      "workflow_revision_id": "c9d7929602ebd9baaedb01b3d188945a8dd697a1ead25a4229e56e5b2a767985",
       "authored_status": null
     },
     {
@@ -2730,7 +2730,7 @@
       "latest_git_sha": null,
       "results_pointer": null,
       "n_runs": 0,
-      "workflow_revision_id": "dd97a44c13f4968347d527d2bca6b92b68312156e1f3e82fb0485b91bbe08a7e",
+      "workflow_revision_id": "c0d3001f3137c8c6cf852c595579f6344964c5af101f724ac6e3f4da2b832143",
       "authored_status": null
     },
     {
