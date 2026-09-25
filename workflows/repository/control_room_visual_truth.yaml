@@ -1,0 +1,296 @@
+name: control_room_visual_truth
+question: >-
+  Make the served Control Room LEGIBLE VISUALLY at a glance — a state-colour language for the
+  recorded state vocabularies, hierarchy that kills the giant empty cards, truncation that never
+  splits a token, NAMED unknowns in place of dense dashes, and delta cues for what changed since
+  the last turn — and re-home the two control capabilities the operator named: the four TREND
+  CHARTS (spend / throughput / failure / dependency) and the two VISUALS (the evidence causal
+  ladder; the scoped dependency flow), each proven by NEW served-room render-gate classes with
+  captures the controller reviews every wave.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+factors:
+  - {name: model, levels: [deepseek/deepseek-flash]}
+design: factorial
+rules: []
+metrics: []
+comparison: null
+writeup: {format: lab_book, sections: [question, evidence]}
+stop: {budget_usd: 6.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_uncertainty}
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: true
+    plan_unit_cap: 8
+    rag:
+      emit_self: true
+      emit_report: true
+      emit_scope: agentic-dynamics
+    context:
+      domain_context: >-
+        THE DIRECTIVE (controller, 2026-09-25, verbatim): "ok while that is running can we get
+        another workflow ready with the control charts and visuals? we kinda put this on pause
+        while the agent world model was being built". The room's UI wave is the controller's
+        STANDING PRIORITY — ship it in waves, with captures the controller reviews (close
+        2026-09-25: "acceptance = NEW served-room visual checks (state colors, hierarchy,
+        truncation, delta cue) + captures the controller reviews every wave; the charts/workbench
+        question is the operator's call" — THIS directive answers the charts/workbench question:
+        charts AND visuals, for the SERVED room). This spec is that wave, resumed.
+
+        THE FINDINGS (the served room's own captures, reviewed 2026-09-24/25 — all real, quoted
+        from the close): giant empty cards; no state-color language; truncation mid-token; no
+        trends; no delta cue; dense unknowns.
+
+        THE GATE REALITY (why a NEW acceptance is the deliverable, not an afterthought):
+        `scripts/verify_control_room_rendering.py`'s acceptance profile is the five restored
+        served-room classes — navigation, loading, degraded, scrolling, keyboard — and every
+        capture the controller reviews comes from them. There are NO visual classes for the
+        served room: the parked classes (geometry / charts / visuals / style / a11y / parity /
+        live / interactions) still target the old workbench's selectors (data-region /
+        data-answer / #workbench / #selection-dock) and "can never pass against the served
+        page" (the gate file's own words). So this wave must ADD served-room visual classes to
+        the acceptance roster (PROFILE_CLASSES) — each enumerated in the report, each producing
+        captures; a run with ZERO captures is a structural FAIL. New class names must NOT
+        collide with the parked names (they coexist in the report's enumeration); propose
+        distinct served-room names (e.g. `visual-language`, `trends`, `evidence-visuals` — the
+        prior's call, named in the plan). The gate is FIXTURE-DRIVEN (no live
+        Redis/clock/network — waiver W2; `apps/control_room/verification/fixtures/
+        boards_endpoints.json` holds the deterministic wire payloads) and HOST-ONLY (the fleet
+        cells have NO Playwright — register L47: do not install it, do NOT fabricate captures;
+        `--check-fixtures` is the browser-free in-cell check; the host runs the acceptance
+        profile against this run's candidate).
+
+        THE CONSTRAINT (the controller's calls): the parked workbench (`static/parity.js`,
+        `charts.js`, `visuals.js`) STAYS PARKED — never resurface it as a surface (register
+        L25: the controller chose the served-shell integration). The served seven-board shell
+        (index.html loads control-room-core.js, keyed-list.js, board-fleet.js, shell.js,
+        detail-sheet.js, app.js, style.css) is the integration target. The parked modules are
+        ADAPTATION SOURCE ONLY: `charts.js` implements the four chart forms (spend /
+        throughput / failure / dependency) as SVG+CSS with the honesty rules; `visuals.js`
+        implements the two visuals (the attempt-scoped causal ladder, where each evidence class
+        is drawn as shape AND word; the scoped dependency-flow topology with degraded/lagging
+        nodes highlighted). The capability menu is exactly: those four charts + those two
+        visuals — re-homed INTO the served shell, or (where a capability cannot be bounded to
+        one gate) NAMED as a follow-up with the reason. No new JS runtime, no build step
+        (SVG+CSS, the parked modules' stance); do not touch the parked modules' retirement
+        (the controller's call once they go).
+
+        THE HONESTY RULES (bind every unit): a missing value is a GAP, never a zero; fewer than
+        two samples renders an explicit EMPTY state, never a blank or a fabricated mark; a
+        failed projection renders an explicit ERROR state, never an empty chart; the retained
+        window is STATED; evidence classes render as shape + word, never colour alone; unknowns
+        are NAMED (a bare dash is not a name); deltas, ages, and state colours derive only from
+        RECORDED fields — never invented, never re-derived client-side where the server owns
+        the value (L33's known debt is the precedent).
+
+        THE SCOPE FENCES: do NOT regress the five restored classes, the L33 resting surfaces
+        (`2010b0ab9`), or the L49 live-feed / run-drawer surfaces (`22e9b215a` — just
+        promoted). The L49 att7 residuals (first-cell feed selection; boundary-source
+        divergence; transcript rich-field rendering; the two in-cell behavioural gates) are a
+        SEPARATE queued unit (register §E) — do not absorb them; name any overlap as a
+        follow-up. Keep the loaded-module discipline: the served-room structural tests derive
+        their inputs from the scripts `index.html` ACTUALLY loads (test_control_room_static_
+        views.py's docstring is the precedent — a test that reads a parked module can pass
+        while the served page has lost the feature).
+
+        THE WORK (the deliverable): (1) A VISUAL LANGUAGE for the served room, applied where
+        the findings are: state colours for the recorded state vocabularies (run states /
+        attention / risk); hierarchy and density (giant empty cards collapse to dense, named
+        rows); truncation that never splits a token, with an affordance to the full value;
+        named unknowns (a distinct treatment, not a bare dash); delta cues (what changed since
+        the prior turn/epoch, from recorded fields only). (2) THE FOUR TREND CHARTS re-homed
+        into the served shell with the honesty rules and a textual/table equivalent. (3) THE
+        TWO VISUALS re-homed where the served shell can host them, or a named follow-up.
+        (4) NEW SERVED-ROOM GATE CLASSES in the acceptance roster — each: a check function, a
+        fixture-driven assertion, captures, an enumerated report row — covering the visual
+        language and the charts/visuals, so every future room wave is checked and captured.
+        (5) FIXTURE ADDITIONS that make each new class assertable — including the empty /
+        error / unknown / gap cases, so the honesty rules are PROVEN, not assumed.
+
+        ACCEPTANCE: (a) the HOST render gate `python3 scripts/verify_control_room_rendering.py
+        --profile acceptance --candidate <sha>` PASSES with ZERO failures on the FINAL commit,
+        running the EXTENDED roster (five restored classes + the new served-room visual
+        classes), with captures for the controller — zero captures is a structural FAIL;
+        `--check-fixtures` green in-cell; (b) the five declared suites green in-cell on the
+        FINAL commit; (c) `python3 -m ruff check` green on touched python paths; (d) every
+        unit's goal NAMES the assertion that would fail if its claim were false; (e) the AIO
+        runs the host gate against this run's candidate BEFORE any promote, and the controller
+        reviews the captures.
+
+        EXECUTION SHAPE: plan-units expansion (cap 8), one concern per unit, a handful of
+        files, ONE gate per unit; prefer MORE, SMALLER units; ~4 files or two concerns →
+        SPLIT; a unit that cannot be accepted independently is not a unit; unit budgets must
+        SUM to at most the spec's stop budget (`stop.budget_usd` = **$6.00**) — keep each small
+        ($0.25–$0.75); a plan summing above the ceiling is REFUSED.
+
+        RAILS (all earned): each slice implements ONLY its unit; the execute prompts keep the
+        {unit_*} placeholders (never remove them — without them every slice becomes the
+        whole-plan executor); a unit's `tests` is a list of EXISTING cell-safe pytest TARGET
+        PATHS ONLY — never an invented nodeid (declare the FILE a new test lands in), never a
+        command string or flags; the verifier runs in a read-only cell with NO Redis/Neo4j/
+        network AND base deps only (no httpx/ollama/chromadb/neo4j imports); run the full five
+        declared suites before every unit commit (per-unit gates cannot see cross-unit
+        regressions); never install Playwright in-cell and never fabricate captures (L47);
+        never attempt to submit, launch, or re-run any workflow from inside the run (L53 — the
+        socket is absent; the fleet path belongs to the AIO); write only inside the worktree
+        (L46b); stage notes explicitly (`git add -f notes/`); no long waits or sleeps (L46); a
+        unit slice must ALWAYS deliver a committed diff — "nothing to do" is NEVER valid
+        (NO_CHANGES fails the run).
+    phases:
+      - name: prior
+        kind: agent
+        scope: proposal_write
+        timeout: 1800
+        requires_deliverable: true
+        prompt: |
+          Recon for the served room's VISUAL wave. Read FAST, in this order: (1) the register
+          rows L25, L33, L43, L47, L49 in `docs/reviews/loose_ends_register.md`, and the close's
+          findings (verbatim in the domain context); (2) the render gate
+          `scripts/verify_control_room_rendering.py` — the acceptance profile + PROFILE_CLASSES,
+          `run_boards_gate`, the served-room checks (navigation/loading/degraded/scrolling/
+          keyboard), the parked classes' selectors, the capture writing, `check_fixtures()` and
+          the CLI's profile enumeration; (3) the fixtures
+          `apps/control_room/verification/fixtures/boards_endpoints.json` (shape + `_note`
+          convention); (4) the served shell's LOADED modules — `apps/control_room/static/
+          index.html` (which scripts load, the board destinations), `style.css` (tokens),
+          `shell.js` (chrome), `app.js` (the data layer; find where state / unknown / empty
+          values render), `control-room-core.js`, `detail-sheet.js`; (5) the parked modules as
+          ADAPTATION SOURCE only — `static/charts.js` (the four chart forms + honesty rules),
+          `static/visuals.js` (the causal ladder + dependency flow) — never as a surface; (6)
+          the room test suites (`tests/test_control_room_static_views.py` etc.) — what they
+          derive from the loaded page. SCOPE FENCE: you write ONLY the `notes/` files below —
+          never `apps/`, never `scripts/`, never `tests/`, never another phase's artifact; the
+          UNITS own every repository change, and a prior that lands them makes its units
+          no-ops (L49 att5's lesson). HOST ACCEPTANCE: the render gate runs `--profile
+          acceptance` against the candidate on the HOST and must fail NOWHERE; the new
+          served-room classes must be real checks over the SERVED page (fixture-driven) — not
+          renamed parked checks, not vacuous assertions. WRITE `notes/control_room_visual.md`
+          (`## Problem`, `## What Exists`, `## Gaps`, `## Sources`) with file:line anchors;
+          `notes/plan.md` (`## Files`, `## Tests`, `## Acceptance`, `## Risks`, `## Insight`)
+          — the `## Insight` section must name, per finding (giant cards / state colours /
+          truncation / unknowns / deltas / trends / visuals), the exact surface and the
+          assertion that will prove it; and — the load-bearing artifact — `notes/plan.units.json`:
+          {"units": [{"id": "u1_...", "goal": "...", "files": [...], "tests": [...],
+          "acceptance": "...", "budget_usd": ..., "depends_on": [...]}]}. The plan MUST include
+          the acceptance machinery as units: the new served-room gate classes (one concern per
+          class where possible), their fixture additions (including empty/error/unknown/gap
+          cases), and the served-room visual-language changes — one concern per unit, one gate
+          each; declare ONLY existing cell-safe targets (the five gate suites:
+          tests/test_control_room_operations.py, test_control_room_glance_integrity.py,
+          test_control_room_build_contract.py, test_control_room_static_views.py,
+          test_control_room_paths.py — plus any other EXISTING pure/monkeypatched room suite
+          you verify is cell-safe; never a live-service suite). New gate class names must not
+          collide with the parked class names. Budgets must sum to at most **$6.00** ($0.25–
+          $0.75 per unit; over the ceiling is REFUSED). Write `notes/sources.jsonl`. Commit —
+          `notes/` is gitignored, so stage explicitly (`git add -f notes/`) before committing;
+          write and COMMIT the notes EARLY, then refine. NEVER run long waits or `sleep` (L46),
+          and NEVER attempt to submit/launch/re-run any workflow from inside this run (L53).
+      - name: execute
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        requires_files: [notes/plan.md, notes/sources.jsonl, notes/plan.units.json]
+        expand_from_plan: notes/plan.units.json
+        # The per-unit template the runner renders (`{unit_id}` / `{unit_goal}` / `{unit_files}` /
+        # `{unit_acceptance}` — `_render_unit_prompt`). Never remove the placeholders: without
+        # them every slice receives the whole plan and becomes the whole-plan executor (L51
+        # att6's class; the units then find nothing to do and the run dies NO_CHANGES).
+        prompt: |
+          You are the EXECUTE phase for ONE unit of this workflow ({goal}). The runner has
+          expanded this phase into one bounded slice per unit in `notes/plan.units.json`; this
+          slice is unit `{unit_id}`.
+
+          THIS UNIT'S GOAL: {unit_goal}
+          DECLARED FILES (your entire write scope): {unit_files}
+          ACCEPTANCE: {unit_acceptance}
+
+          Implement ONLY this unit, against `notes/plan.md` and the spec context. Another slice
+          owns every other unit — do NOT read or implement their work, do not subsume a
+          sibling's scope, and do not edit files outside your declared list. The room's visual
+          honesty rules bind (missing = GAP never zero; <2 samples = explicit EMPTY; failed =
+          explicit ERROR; window stated; evidence classes as shape + word; unknowns NAMED;
+          deltas/ages only from recorded fields). The parked workbench STAYS PARKED —
+          `parity.js`/`charts.js`/`visuals.js` are adaptation source, never a served surface;
+          keep the loaded-module discipline of `index.html`.
+          Rules: the container CANNOT run the browser profile (no Playwright — register L47):
+          run the browser-free checks (`python3 scripts/verify_control_room_rendering.py
+          --check-fixtures`) and the five declared gate suites
+          (`tests/test_control_room_operations.py`, `tests/test_control_room_glance_integrity.py`,
+          `tests/test_control_room_build_contract.py`, `tests/test_control_room_static_views.py`,
+          `tests/test_control_room_paths.py`) TO FULL GREEN on your FINAL commit — if your unit
+          changes an anchor a suite derives, update that suite in the same commit; do NOT
+          install Playwright and do NOT fabricate captures — the host runs the acceptance
+          profile against this run's candidate. Run `python3 -m ruff check` on the python paths
+          you touch. A unit slice must ALWAYS deliver a committed diff: if the unit's work
+          already exists, make the smallest necessary change that PROVES the unit — add the
+          missing test/assertion/doc line — and commit; "nothing to do" is NEVER valid
+          (NO_CHANGES). Commit. NEVER run long waits or `sleep` (register L46).
+      - name: g_test_gate
+        kind: test
+        scope: implementation
+        timeout: 1800
+        requires_files: [notes/plan.md]
+        # The declared room-suite sweep (deterministic; the vetted cell-safe set from L49/L51):
+        # a plan-driven resolution once ran an earlier run's gate into a zero-target SKIP, which
+        # promotes as a forbidden phase (test_executed_success=None) — the declared list IS the
+        # acceptance contract.
+        tests:
+          - tests/test_control_room_operations.py
+          - tests/test_control_room_glance_integrity.py
+          - tests/test_control_room_build_contract.py
+          - tests/test_control_room_static_views.py
+          - tests/test_control_room_paths.py
+        prompt: |
+          The independent runner verifies the worktree against the declared room-suite targets.
+      - name: posterior
+        kind: agent
+        scope: proposal_write
+        timeout: 900
+        requires_files: [notes/control_room_visual.md, notes/plan.md]
+        prompt: |
+          Diff the plan against what landed. WRITE `notes/posterior.md` (`## Violations`,
+          `## Unknowns`, `## UPDATES`): which findings (giant cards / state colours /
+          truncation / unknowns / deltas / trends / visuals) each unit closed, with the
+          assertion or invariant that proves it; which new served-room gate classes landed and
+          what each asserts over the SERVED page; which capabilities remain un-re-homed and
+          why (named, never hidden); and the acceptance evidence that exists in-cell (there are
+          no captures here — the host runs the browser profile; `--check-fixtures` and the five
+          suites are the in-cell evidence). Commit — `notes/` is gitignored, so stage it
+          explicitly (`git add -f notes/posterior.md`) before committing. Keep every write
+          inside the worktree (never `/tmp/...`, never `../...`).
+      - name: g_adversarial
+        kind: agent
+        scope: proposal_write
+        timeout: 1800
+        run_model: openai/gpt-6-astra
+        prompt: |
+          ADVERSARIAL REVIEW — a different model by design (2026-09-25: this adversary runs on
+          `openai/gpt-6-astra`; the authoring cells run on `deepseek/deepseek-flash`). Read the
+          notes, the diffs, the gate, and the fixtures. Attack: does any visual value (state
+          colour, delta, age, trend point) come from data the surface cannot know — an invented
+          delta, a state colour applied to an UNKNOWN, a chart mark over a missing sample? Does
+          any chart or card render a BLANK where the honesty rules demand an explicit EMPTY /
+          ERROR / GAP? Is any claim [M] where nothing was measured? Do the new gate classes
+          actually exercise the SERVED page — could a class pass against an UNCHANGED page
+          (vacuous), or are they renamed parked checks targeting the workbench? Does the
+          truncation ever split a token, and is the full value reachable? Is any state colour
+          language colour-alone (an a11y violation) rather than shape + word? Did the wave
+          resurface the parked workbench or weaken the five restored classes (navigation /
+          loading / degraded / scrolling / keyboard)? Name at least one falsifier per major
+          claim. Write `notes/adversarial_review.md` with a final `## FINDING` paragraph and
+          commit it — `notes/` is gitignored, so stage the review explicitly
+          (`git add -f notes/adversarial_review.md`) before committing; the phase must record a
+          commit (a silently uncommitted review fails the promotion gate). KEEP EVERY WRITE
+          INSIDE THE WORKTREE (`/repo`): the review goes to the worktree-relative
+          `notes/adversarial_review.md`, and any scratch experiment lives under `notes/`
+          (gitignored) — never `/tmp/...`, never `../...`. An edit outside the worktree raises
+          a permission ASK that this headless cell cannot answer, and the phase stalls to its
+          timeout.
