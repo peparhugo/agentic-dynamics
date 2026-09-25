@@ -74,6 +74,7 @@ def _valid_submit_request(**overrides) -> dict:
     request.update(overrides)
     return request
 
+
 # A valid spawn request: p1_slice1_base_supervisor is authorized for "implementation"
 # (the authorization table), the mounts are the full four + D-2 + the P0-3 per-attempt state
 # namespace (/state rw) + the credential FILE mount (/auth/opencode_auth.json ro), results rw
@@ -198,8 +199,14 @@ def test_build_phase_request_mints_a_unique_state_namespace(tmp_path):
 
     # ...but they point at DIFFERENT host namespaces — never one shared pool directory.
     assert mounts_a[STATE_TARGET]["source"] != mounts_b[STATE_TARGET]["source"]
-    assert str(Path(STATE_ROOT) / "spec_x" / "p1_slice1_base_supervisor") == mounts_a[STATE_TARGET]["source"]
-    assert str(Path(STATE_ROOT) / "spec_x" / "p2_slice1_workers_live") == mounts_b[STATE_TARGET]["source"]
+    assert (
+        str(Path(STATE_ROOT) / "spec_x" / "p1_slice1_base_supervisor")
+        == mounts_a[STATE_TARGET]["source"]
+    )
+    assert (
+        str(Path(STATE_ROOT) / "spec_x" / "p2_slice1_workers_live")
+        == mounts_b[STATE_TARGET]["source"]
+    )
 
     # The XDG redirects land the CLI's writable state inside the per-attempt namespace.
     assert req_a["env"]["XDG_DATA_HOME"] == f"{STATE_TARGET}/data"
@@ -333,7 +340,10 @@ def test_broker_launch_argv_carries_mounts_network_env():
     request = {**VALID_REQUEST, "command": ["echo", "hi"]}
     mounts = build_phase_request(
         {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
-        goal="g", workdir="/tmp/wt", model="m", spec_name="spec_x",
+        goal="g",
+        workdir="/tmp/wt",
+        model="m",
+        spec_name="spec_x",
     )["mounts"]
     argv = build_launch_argv(request, docker="docker", mounts=mounts)
     joined = "\n".join(argv)
@@ -372,17 +382,28 @@ def test_fleet_command_unknown_action_refused():
 
 def test_fleet_command_drain_and_restart_valid():
     assert validate_fleet_command({"action": "drain", "service": "analysis-worker"}) == []
-    assert validate_fleet_command(
-        {"action": "restart", "service": "fleet-manager", "backoff": 5}
-    ) == []
+    assert (
+        validate_fleet_command({"action": "restart", "service": "fleet-manager", "backoff": 5})
+        == []
+    )
 
 
 def test_compose_allowlist_covers_the_ladder_services():
     # The allowlist must name the cell + supervisor + orchestrator services (the audit surface
     # for "the socket only touches these").
-    for svc in ("story-worker", "analysis-worker", "review-unit", "fleet-manager",
-                "control-room", "trigger-reviews", "campaign-wrapper", "workflow-runner",
-                "kb-neo4j", "orphan-sweep", "egress"):
+    for svc in (
+        "story-worker",
+        "analysis-worker",
+        "review-unit",
+        "fleet-manager",
+        "control-room",
+        "trigger-reviews",
+        "campaign-wrapper",
+        "workflow-runner",
+        "kb-neo4j",
+        "orphan-sweep",
+        "egress",
+    ):
         assert svc in COMPOSE_ALLOWLIST, f"{svc!r} missing from the compose allowlist"
 
 
@@ -392,7 +413,9 @@ def test_compose_allowlist_covers_the_ladder_services():
 def test_build_phase_request_resolves_scope_and_results_mode():
     req = build_phase_request(
         {"name": "p1_research_infra"},
-        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
+        goal="g",
+        workdir="/tmp/wt",
+        model="deepseek/deepseek-v4-pro",
     )
     assert req["scope"] == "research_readonly"
     results = [m for m in req["mounts"] if m["target"] == "/app/experiments/results"][0]
@@ -404,7 +427,9 @@ def test_build_phase_request_resolves_scope_and_results_mode():
 def test_build_phase_request_implementation_may_emit():
     req = build_phase_request(
         {"name": "p1_slice1_base_supervisor"},
-        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
+        goal="g",
+        workdir="/tmp/wt",
+        model="deepseek/deepseek-v4-pro",
     )
     assert req["scope"] == "implementation"
     results = [m for m in req["mounts"] if m["target"] == "/app/experiments/results"][0]
@@ -415,7 +440,9 @@ def test_build_phase_request_implementation_may_emit():
 def test_build_phase_request_without_authorization_yields_empty_scope():
     req = build_phase_request(
         {"name": "p_undeclared"},
-        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
+        goal="g",
+        workdir="/tmp/wt",
+        model="deepseek/deepseek-v4-pro",
     )
     assert req["scope"] == ""  # no declared scope + no table entry → spawn will fail at step 2
 
@@ -447,8 +474,11 @@ def test_build_phase_request_resolves_mounts_to_the_configured_paths(tmp_path):
     repo, cfg = _make_config_repo(tmp_path)
     req = build_phase_request(
         {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
-        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
-        spec_name="spec_x", path_config=cfg,
+        goal="g",
+        workdir="/tmp/wt",
+        model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x",
+        path_config=cfg,
     )
     by_target = {m["target"]: m for m in req["mounts"]}
 
@@ -458,8 +488,11 @@ def test_build_phase_request_resolves_mounts_to_the_configured_paths(tmp_path):
     assert by_target["/repo"]["source"] == str(cfg.repo_root)
     assert by_target["/repo/.git"]["source"] == str(cfg.git_dir)
     # the D-16 host-path repo alias + its .git resolve to the configured repo_root/git_dir
-    assert by_target[str(cfg.repo_root)] == {"source": str(cfg.repo_root),
-                                             "target": str(cfg.repo_root), "mode": "ro"}
+    assert by_target[str(cfg.repo_root)] == {
+        "source": str(cfg.repo_root),
+        "target": str(cfg.repo_root),
+        "mode": "ro",
+    }
     assert by_target[str(cfg.git_dir)]["mode"] == "rw"
     # the D-2 auth set + the credential file derive from the configured auth_home
     auth_targets = {str(d) for d in cfg.auth_dirs}
@@ -472,9 +505,14 @@ def test_build_phase_request_resolves_mounts_to_the_configured_paths(tmp_path):
     joined = json.dumps(req)
     assert "/home/" not in joined and "ai-finops-framework" not in joined
     # and the request validates clean under the SAME config — contract and builder agree
-    assert validate_spawn(
-        req, phase_scopes={"p1_slice1_base_supervisor": "implementation"}, path_config=cfg,
-    ) == []
+    assert (
+        validate_spawn(
+            req,
+            phase_scopes={"p1_slice1_base_supervisor": "implementation"},
+            path_config=cfg,
+        )
+        == []
+    )
 
 
 def test_build_phase_request_stamps_the_view_of_the_config_it_built_against(tmp_path):
@@ -486,8 +524,11 @@ def test_build_phase_request_stamps_the_view_of_the_config_it_built_against(tmp_
     _repo, cfg = _make_config_repo(tmp_path)
     host_req = build_phase_request(
         {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
-        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
-        spec_name="spec_x", path_config=cfg,
+        goal="g",
+        workdir="/tmp/wt",
+        model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x",
+        path_config=cfg,
     )
     assert host_req["view"] == "host"
     # the container view of the SAME host config re-roots the repo to the /app-in-container path
@@ -495,25 +536,38 @@ def test_build_phase_request_stamps_the_view_of_the_config_it_built_against(tmp_
     assert str(container_cfg.repo_root) == "/app"
     container_req = build_phase_request(
         {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
-        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
-        spec_name="spec_x", path_config=container_cfg,
+        goal="g",
+        workdir="/tmp/wt",
+        model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x",
+        path_config=container_cfg,
     )
     assert container_req["view"] == "container"
     # its alias targets are the /app paths; validating under the SAME (container) config passes,
     # so the request is coherent with the view it declares.
     alias_targets = {m["target"] for m in container_req["mounts"]} & {"/app", "/app/.git"}
     assert alias_targets == {"/app", "/app/.git"}
-    assert validate_spawn(
-        container_req,
-        phase_scopes={"p1_slice1_base_supervisor": "implementation"},
-        path_config=container_cfg,
-    ) == []
+    assert (
+        validate_spawn(
+            container_req,
+            phase_scopes={"p1_slice1_base_supervisor": "implementation"},
+            path_config=container_cfg,
+        )
+        == []
+    )
     # a verifier request built against the container config carries the container view too
     verifier_req = build_verifier_request(
-        {"name": "g3_test_gate", "kind": "test", "scope": "implementation",
-         "tests": ["tests/test_spec_x.py"]},
-        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
-        spec_name="spec_x", path_config=container_cfg,
+        {
+            "name": "g3_test_gate",
+            "kind": "test",
+            "scope": "implementation",
+            "tests": ["tests/test_spec_x.py"],
+        },
+        goal="g",
+        workdir="/tmp/wt_x",
+        model="deepseek/deepseek-v4-flash",
+        spec_name="spec_x",
+        path_config=container_cfg,
     )
     assert verifier_req["view"] == "container"
 
@@ -524,18 +578,30 @@ def test_verifier_request_uses_the_configured_paths(tmp_path):
     builders, never a literal."""
     _repo, cfg = _make_config_repo(tmp_path)
     req = build_verifier_request(
-        {"name": "g3_test_gate", "kind": "test", "scope": "implementation",
-         "tests": ["tests/test_spec_x.py"]},
-        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
-        spec_name="spec_x", path_config=cfg,
+        {
+            "name": "g3_test_gate",
+            "kind": "test",
+            "scope": "implementation",
+            "tests": ["tests/test_spec_x.py"],
+        },
+        goal="g",
+        workdir="/tmp/wt_x",
+        model="deepseek/deepseek-v4-flash",
+        spec_name="spec_x",
+        path_config=cfg,
     )
     by_target = {m["target"]: m for m in req["mounts"]}
     assert by_target[str(cfg.git_dir)]["mode"] == "ro"  # read-only candidate
     auth_targets = {str(d) for d in cfg.auth_dirs}
     assert not (set(by_target) & auth_targets)  # verifier carries no credential surface
-    assert validate_spawn(
-        req, phase_scopes={"g3_test_gate": "implementation"}, path_config=cfg,
-    ) == []
+    assert (
+        validate_spawn(
+            req,
+            phase_scopes={"g3_test_gate": "implementation"},
+            path_config=cfg,
+        )
+        == []
+    )
 
 
 def test_phase_request_references_the_run_clone_path(tmp_path):
@@ -550,19 +616,31 @@ def test_phase_request_references_the_run_clone_path(tmp_path):
 
     req = build_phase_request(
         {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
-        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
-        spec_name="spec_x", path_config=cfg, run_clone=clone_path,
+        goal="g",
+        workdir="/tmp/wt",
+        model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x",
+        path_config=cfg,
+        run_clone=clone_path,
     )
     assert req["run_clone"] == str(clone_path)
     # a request carrying the clone path still validates under the same contract
-    assert validate_spawn(
-        req, phase_scopes={"p1_slice1_base_supervisor": "implementation"}, path_config=cfg,
-    ) == []
+    assert (
+        validate_spawn(
+            req,
+            phase_scopes={"p1_slice1_base_supervisor": "implementation"},
+            path_config=cfg,
+        )
+        == []
+    )
 
     bare = build_phase_request(
         {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
-        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
-        spec_name="spec_x", path_config=cfg,
+        goal="g",
+        workdir="/tmp/wt",
+        model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x",
+        path_config=cfg,
     )
     assert "run_clone" not in bare
 
@@ -575,17 +653,30 @@ def test_verifier_request_references_the_run_clone_path(tmp_path):
     clone_path = cfg.runs_root / "run-abc" / "repo"
 
     req = build_verifier_request(
-        {"name": "g3_test_gate", "kind": "test", "scope": "implementation",
-         "tests": ["tests/test_spec_x.py"]},
-        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
-        spec_name="spec_x", path_config=cfg, run_clone=clone_path,
+        {
+            "name": "g3_test_gate",
+            "kind": "test",
+            "scope": "implementation",
+            "tests": ["tests/test_spec_x.py"],
+        },
+        goal="g",
+        workdir="/tmp/wt_x",
+        model="deepseek/deepseek-v4-flash",
+        spec_name="spec_x",
+        path_config=cfg,
+        run_clone=clone_path,
     )
     assert req["run_clone"] == str(clone_path)
     # the verifier's read-only-for-candidate contract is intact alongside the reference
     assert all(m.get("mode") == "ro" for m in req["mounts"])
-    assert validate_spawn(
-        req, phase_scopes={"g3_test_gate": "implementation"}, path_config=cfg,
-    ) == []
+    assert (
+        validate_spawn(
+            req,
+            phase_scopes={"g3_test_gate": "implementation"},
+            path_config=cfg,
+        )
+        == []
+    )
 
 
 def test_module_contract_snapshot_matches_the_default_config_contract():
@@ -604,17 +695,29 @@ def _clone_phase_request(tmp_path, *, run_id="run-abc", verifier=False, scope="i
     clone = cfg.runs_root / run_id / "repo"
     if verifier:
         req = build_verifier_request(
-            {"name": "g3_test_gate", "kind": "test", "scope": scope,
-             "tests": ["tests/test_spec_x.py"]},
-            goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
-            spec_name="spec_x", path_config=cfg, run_clone=clone,
+            {
+                "name": "g3_test_gate",
+                "kind": "test",
+                "scope": scope,
+                "tests": ["tests/test_spec_x.py"],
+            },
+            goal="g",
+            workdir="/tmp/wt_x",
+            model="deepseek/deepseek-v4-flash",
+            spec_name="spec_x",
+            path_config=cfg,
+            run_clone=clone,
         )
         phase_name = "g3_test_gate"
     else:
         req = build_phase_request(
             {"name": "p1_slice1_base_supervisor", "scope": scope},
-            goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
-            spec_name="spec_x", path_config=cfg, run_clone=clone,
+            goal="g",
+            workdir="/tmp/wt",
+            model="deepseek/deepseek-v4-pro",
+            spec_name="spec_x",
+            path_config=cfg,
+            run_clone=clone,
         )
         phase_name = "p1_slice1_base_supervisor"
     return req, cfg, clone, phase_name
@@ -635,9 +738,14 @@ def test_clone_world_phase_request_sources_the_repo_from_the_run_clone(tmp_path)
     assert source.parent.name == "run-abc"
     # a commit-capable implementation cell mounts its clone rw (commits land in ITS clone)
     assert repo_mount["mode"] == "rw"
-    assert validate_spawn(
-        req, phase_scopes={phase_name: "implementation"}, path_config=cfg,
-    ) == []
+    assert (
+        validate_spawn(
+            req,
+            phase_scopes={phase_name: "implementation"},
+            path_config=cfg,
+        )
+        == []
+    )
 
 
 def test_clone_world_request_mounts_no_shared_worktree_or_shared_git(tmp_path):
@@ -659,11 +767,19 @@ def test_clone_world_request_mounts_no_shared_worktree_or_shared_git(tmp_path):
     assert str(cfg.git_dir) not in sources
     assert str(cfg.repo_root) not in sources
     # the results/auth/state credential surface is still there (a clone cell is a real cell)
-    assert "/app/experiments/results" in targets and targets["/app/experiments/results"]["mode"] == "rw"
+    assert (
+        "/app/experiments/results" in targets
+        and targets["/app/experiments/results"]["mode"] == "rw"
+    )
     assert "/state" in targets and targets["/state"]["mode"] == "rw"
-    assert validate_spawn(
-        req, phase_scopes={phase_name: "implementation"}, path_config=cfg,
-    ) == []
+    assert (
+        validate_spawn(
+            req,
+            phase_scopes={phase_name: "implementation"},
+            path_config=cfg,
+        )
+        == []
+    )
 
 
 def test_clone_world_validation_refuses_a_request_that_would_mount_the_shared_git(tmp_path):
@@ -673,38 +789,66 @@ def test_clone_world_validation_refuses_a_request_that_would_mount_the_shared_gi
     base = dict(req)
 
     # (i) the shared /repo/.git overlay (a phase cell writing the SHARED git dir)
-    tampered = {**base, "mounts": list(base["mounts"]) + [
-        {"target": "/repo/.git", "source": str(cfg.git_dir), "mode": "rw"},
-    ]}
+    tampered = {
+        **base,
+        "mounts": list(base["mounts"])
+        + [
+            {"target": "/repo/.git", "source": str(cfg.git_dir), "mode": "rw"},
+        ],
+    }
     errors = validate_spawn(
-        tampered, phase_scopes={phase_name: "implementation"}, path_config=cfg,
+        tampered,
+        phase_scopes={phase_name: "implementation"},
+        path_config=cfg,
     )
     assert errors and any("step 3" in e and "shared" in e for e in errors), errors
 
     # (ii) the D-16 host-path .git alias (source + target = the shared git dir at its host path)
-    tampered = {**base, "mounts": list(base["mounts"]) + [
-        {"target": str(cfg.git_dir), "source": str(cfg.git_dir), "mode": "rw"},
-    ]}
+    tampered = {
+        **base,
+        "mounts": list(base["mounts"])
+        + [
+            {"target": str(cfg.git_dir), "source": str(cfg.git_dir), "mode": "rw"},
+        ],
+    }
     errors = validate_spawn(
-        tampered, phase_scopes={phase_name: "implementation"}, path_config=cfg,
+        tampered,
+        phase_scopes={phase_name: "implementation"},
+        path_config=cfg,
     )
     assert errors and any("step 3" in e and "shared" in e for e in errors), errors
 
     # (iii) a source INSIDE the shared .git masked onto an otherwise-legal target
-    tampered = {**base, "mounts": list(base["mounts"]) + [
-        {"target": "/app/experiments/results", "source": str(cfg.git_dir / "objects"), "mode": "ro"},
-    ]}
+    tampered = {
+        **base,
+        "mounts": list(base["mounts"])
+        + [
+            {
+                "target": "/app/experiments/results",
+                "source": str(cfg.git_dir / "objects"),
+                "mode": "ro",
+            },
+        ],
+    }
     errors = validate_spawn(
-        tampered, phase_scopes={phase_name: "implementation"}, path_config=cfg,
+        tampered,
+        phase_scopes={phase_name: "implementation"},
+        path_config=cfg,
     )
     assert errors and any("step 3" in e and "shared" in e for e in errors), errors
 
     # (iv) the whole shared worktree namespace mounted as /tmp is refused the same way
-    tampered = {**base, "mounts": list(base["mounts"]) + [
-        {"target": "/tmp", "source": str(cfg.worktrees_root), "mode": "rw"},
-    ]}
+    tampered = {
+        **base,
+        "mounts": list(base["mounts"])
+        + [
+            {"target": "/tmp", "source": str(cfg.worktrees_root), "mode": "rw"},
+        ],
+    }
     errors = validate_spawn(
-        tampered, phase_scopes={phase_name: "implementation"}, path_config=cfg,
+        tampered,
+        phase_scopes={phase_name: "implementation"},
+        path_config=cfg,
     )
     assert errors and any("step 3" in e and "shared" in e for e in errors), errors
 
@@ -718,13 +862,21 @@ def test_two_run_ids_produce_requests_with_distinct_clone_paths(tmp_path):
     clone_b = cfg.runs_root / "run-bbb" / "repo"
     req_a = build_phase_request(
         {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
-        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
-        spec_name="spec_x", path_config=cfg, run_clone=clone_a,
+        goal="g",
+        workdir="/tmp/wt",
+        model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x",
+        path_config=cfg,
+        run_clone=clone_a,
     )
     req_b = build_phase_request(
         {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
-        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
-        spec_name="spec_x", path_config=cfg, run_clone=clone_b,
+        goal="g",
+        workdir="/tmp/wt",
+        model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x",
+        path_config=cfg,
+        run_clone=clone_b,
     )
     assert clone_a != clone_b
     assert req_a["run_clone"] != req_b["run_clone"]
@@ -753,9 +905,14 @@ def test_verifier_request_is_read_only_against_its_clone(tmp_path):
     assert not (targets & set(AUTH_DIRS))
     assert AUTH_CRED_FILE not in targets and STATE_TARGET not in targets
     assert "/tmp" not in targets and "/repo/.git" not in targets
-    assert validate_spawn(
-        req, phase_scopes={phase_name: "implementation"}, path_config=cfg,
-    ) == []
+    assert (
+        validate_spawn(
+            req,
+            phase_scopes={phase_name: "implementation"},
+            path_config=cfg,
+        )
+        == []
+    )
 
 
 def test_clone_world_readonly_scope_mounts_its_clone_read_only(tmp_path):
@@ -765,16 +922,25 @@ def test_clone_world_readonly_scope_mounts_its_clone_read_only(tmp_path):
     clone = cfg.runs_root / "run-ro" / "repo"
     req = build_phase_request(
         {"name": "p1_research_infra", "scope": "research_readonly"},
-        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
-        spec_name="spec_x", path_config=cfg, run_clone=clone,
+        goal="g",
+        workdir="/tmp/wt",
+        model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x",
+        path_config=cfg,
+        run_clone=clone,
     )
     assert req["mount_profile"] == "repo_readonly"
     repo_mounts = [m for m in req["mounts"] if m.get("target") == "/repo"]
     assert len(repo_mounts) == 1 and repo_mounts[0]["mode"] == "ro"
     assert repo_mounts[0]["source"] == str(clone)
-    assert validate_spawn(
-        req, phase_scopes={"p1_research_infra": "research_readonly"}, path_config=cfg,
-    ) == []
+    assert (
+        validate_spawn(
+            req,
+            phase_scopes={"p1_research_infra": "research_readonly"},
+            path_config=cfg,
+        )
+        == []
+    )
 
 
 def test_legacy_request_without_run_clone_keeps_the_shared_worktree_contract(tmp_path):
@@ -784,17 +950,25 @@ def test_legacy_request_without_run_clone_keeps_the_shared_worktree_contract(tmp
     _repo, cfg = _make_config_repo(tmp_path)
     req = build_phase_request(
         {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
-        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
-        spec_name="spec_x", path_config=cfg,
+        goal="g",
+        workdir="/tmp/wt",
+        model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x",
+        path_config=cfg,
     )
     assert "run_clone" not in req
     targets = {m.get("target"): m for m in req["mounts"]}
     assert "/tmp" in targets and targets["/tmp"]["mode"] == "rw"
     assert "/repo/.git" in targets and targets["/repo/.git"]["mode"] == "rw"
     assert targets["/repo"]["source"] == str(cfg.repo_root)
-    assert validate_spawn(
-        req, phase_scopes={"p1_slice1_base_supervisor": "implementation"}, path_config=cfg,
-    ) == []
+    assert (
+        validate_spawn(
+            req,
+            phase_scopes={"p1_slice1_base_supervisor": "implementation"},
+            path_config=cfg,
+        )
+        == []
+    )
 
 
 # ── build_verifier_request — the READ-ONLY-for-candidate contract (F1/g1_verifier_mount) ──
@@ -802,7 +976,9 @@ def test_legacy_request_without_run_clone_keeps_the_shared_worktree_contract(tmp
 
 def _verifier_phase_def(**overrides) -> dict:
     phase = {
-        "name": "g3_test_gate", "kind": "test", "scope": "implementation",
+        "name": "g3_test_gate",
+        "kind": "test",
+        "scope": "implementation",
         "tests": ["tests/test_spec_x.py"],
     }
     phase.update(overrides)
@@ -812,10 +988,17 @@ def _verifier_phase_def(**overrides) -> dict:
 def _verifier_request(**overrides) -> dict:
     return build_verifier_request(
         _verifier_phase_def(),
-        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
+        goal="g",
+        workdir="/tmp/wt_x",
+        model="deepseek/deepseek-v4-flash",
         spec_name="spec_x",
-        command=["python3", "scripts/run_workflow.py", "--only-phase", "g3_test_gate",
-                 "--no-commit"],
+        command=[
+            "python3",
+            "scripts/run_workflow.py",
+            "--only-phase",
+            "g3_test_gate",
+            "--no-commit",
+        ],
         **overrides,
     )
 
@@ -866,8 +1049,7 @@ def test_verifier_request_that_would_mount_candidate_rw_fails_validation():
         errors = validate_spawn(req, phase_scopes={"g3_test_gate": "implementation"})
         assert errors, f"{tampered_target}: expected a validation refusal"
         assert any(
-            "step 3" in e and "verifier" in e and "ro" in e and tampered_target in e
-            for e in errors
+            "step 3" in e and "verifier" in e and "ro" in e and tampered_target in e for e in errors
         ), f"{tampered_target}: {errors}"
 
 
@@ -902,7 +1084,9 @@ def test_agent_phase_request_keeps_rw_candidate_mounts():
     cfg = _default_cfg()
     agent = build_phase_request(
         {"name": "p1_slice1_base_supervisor"},
-        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
+        goal="g",
+        workdir="/tmp/wt_x",
+        model="deepseek/deepseek-v4-flash",
         spec_name="spec_x",
     )
     by_target = {m.get("target"): m for m in agent["mounts"]}
@@ -930,7 +1114,9 @@ def test_verifier_request_skips_the_d18_boot_probe_agent_does_not():
     # ... while the agent (implementation) request does not carry the skip — its probe is real.
     agent = build_phase_request(
         {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
-        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
+        goal="g",
+        workdir="/tmp/wt_x",
+        model="deepseek/deepseek-v4-flash",
         spec_name="spec_x",
     )
     assert agent["env"].get("FLEET_SKIP_PROBE") in (None, "0")
@@ -943,10 +1129,17 @@ def test_verifier_request_keeps_the_in_process_suite_target():
     phase_def = _verifier_phase_def()
     req = build_verifier_request(
         phase_def,
-        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
+        goal="g",
+        workdir="/tmp/wt_x",
+        model="deepseek/deepseek-v4-flash",
         spec_name="spec_x",
-        command=["python3", "scripts/run_workflow.py", "--only-phase", "g3_test_gate",
-                 "--no-commit"],
+        command=[
+            "python3",
+            "scripts/run_workflow.py",
+            "--only-phase",
+            "g3_test_gate",
+            "--no-commit",
+        ],
     )
     cmd = " ".join(str(c) for c in req.get("command", []))
     assert "--only-phase g3_test_gate" in cmd
@@ -975,10 +1168,21 @@ def test_scope_field_bogus_fails_validation():
     from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, Workflow
 
     spec = ExperimentSpec(
-        name="s", question="q", version="1", design="factorial", factors=[],
-        workflow=Workflow.from_dict({"kind": "agent_task", "params": {"phases": [
-            {"name": "p1", "scope": "not_a_scope", "prompt": "hi"},
-        ]}}),
+        name="s",
+        question="q",
+        version="1",
+        design="factorial",
+        factors=[],
+        workflow=Workflow.from_dict(
+            {
+                "kind": "agent_task",
+                "params": {
+                    "phases": [
+                        {"name": "p1", "scope": "not_a_scope", "prompt": "hi"},
+                    ]
+                },
+            }
+        ),
     )
     errors = validate_spec(spec)
     assert any("scope" in e and "not_a_scope" in e for e in errors)
@@ -988,11 +1192,22 @@ def test_scope_field_valid_member_validates_clean():
     from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, Workflow
 
     spec = ExperimentSpec(
-        name="s", question="q", version="1", design="factorial", factors=[],
-        workflow=Workflow.from_dict({"kind": "agent_task", "params": {"phases": [
-            {"name": "p1", "scope": "implementation", "prompt": "hi"},
-            {"name": "p2", "scope": "adversarial_readonly", "prompt": "hi"},
-        ]}}),
+        name="s",
+        question="q",
+        version="1",
+        design="factorial",
+        factors=[],
+        workflow=Workflow.from_dict(
+            {
+                "kind": "agent_task",
+                "params": {
+                    "phases": [
+                        {"name": "p1", "scope": "implementation", "prompt": "hi"},
+                        {"name": "p2", "scope": "adversarial_readonly", "prompt": "hi"},
+                    ]
+                },
+            }
+        ),
     )
     assert validate_spec(spec) == []
 
@@ -1025,8 +1240,9 @@ def test_submit_is_in_the_fleet_action_vocabulary():
 
 
 def test_model_whitelist_matches_the_seven_models_in_use():
-    # AGENTS.md "Models in use" — the same seven the experiment matrix runs.
+    # AGENTS.md "Models" — the whitelist (2026-09-25: + deepseek-flash successor, + astra).
     expected = {
+        "deepseek/deepseek-flash",
         "deepseek/deepseek-v4-flash",
         "deepseek/deepseek-v4-pro",
         "anthropic/claude-haiku-4-5",
@@ -1034,6 +1250,7 @@ def test_model_whitelist_matches_the_seven_models_in_use():
         "openai/gpt-5.6-luna",
         "openai/gpt-5.6-sol",
         "openai/gpt-5.6-terra",
+        "openai/gpt-6-astra",
     }
     assert expected == MODEL_WHITELIST
 
@@ -1060,9 +1277,15 @@ def test_valid_submit_dispatch_builds_the_compose_run_argv(broker_seam):
 
 def test_build_submit_argv_is_the_reference_orchestrator_invocation():
     argv = build_submit_argv(
-        {"job_id": "abc123", "spec": "workflows/repository/x.yaml", "goal": "g",
-         "model": "anthropic/claude-sonnet-5", "workdir": "/tmp/wt_x"},
-        compose="docker-compose", compose_file="/repo/infrastructure/docker-compose.ladder.yml",
+        {
+            "job_id": "abc123",
+            "spec": "workflows/repository/x.yaml",
+            "goal": "g",
+            "model": "anthropic/claude-sonnet-5",
+            "workdir": "/tmp/wt_x",
+        },
+        compose="docker-compose",
+        compose_file="/repo/infrastructure/docker-compose.ladder.yml",
     )
     joined = " ".join(argv)
     assert "docker-compose -f /repo/infrastructure/docker-compose.ladder.yml run --rm" in joined
@@ -1093,7 +1316,9 @@ def test_submit_spec_outside_declared_spec_dirs_fails():
 
 
 def test_submit_spec_that_does_not_resolve_fails():
-    errors = validate_submit_request(_valid_submit_request(spec="workflows/repository/does_not_exist.yaml"))
+    errors = validate_submit_request(
+        _valid_submit_request(spec="workflows/repository/does_not_exist.yaml")
+    )
     assert any("does not resolve to a file" in e for e in errors)
 
 
@@ -1281,11 +1506,11 @@ def test_submit_with_a_valid_job_image_passes():
 @pytest.mark.parametrize(
     "image",
     [
-        "fleet/base",           # the ladder's own cache root — never a job's to pick directly
-        "fleet/orchestrator",   # the orchestrator's own image (socketless — the host broker holds the socket)
+        "fleet/base",  # the ladder's own cache root — never a job's to pick directly
+        "fleet/orchestrator",  # the orchestrator's own image (socketless — the host broker holds the socket)
         "fleet/supervisor",
-        "fleet/job-",           # no name after the prefix
-        "fleet/job-Bad-Name",   # uppercase — outside JOB_IMAGE_PATTERN
+        "fleet/job-",  # no name after the prefix
+        "fleet/job-Bad-Name",  # uppercase — outside JOB_IMAGE_PATTERN
         "evil/attacker-image",  # a third-party image entirely
         "fleet/job-x; rm -rf /",  # shell-metacharacter smuggling attempt
     ],
@@ -1297,9 +1522,13 @@ def test_submit_image_outside_the_job_namespace_fails(image):
 
 def test_build_submit_argv_carries_cell_image_when_present():
     argv = build_submit_argv(
-        {"spec": "workflows/repository/x.yaml", "goal": "g",
-         "model": "anthropic/claude-sonnet-5", "workdir": "/tmp/wt_x",
-         "image": "fleet/job-example"},
+        {
+            "spec": "workflows/repository/x.yaml",
+            "goal": "g",
+            "model": "anthropic/claude-sonnet-5",
+            "workdir": "/tmp/wt_x",
+            "image": "fleet/job-example",
+        },
     )
     assert "--cell-image" in argv
     assert argv[argv.index("--cell-image") + 1] == "fleet/job-example"
@@ -1308,8 +1537,12 @@ def test_build_submit_argv_carries_cell_image_when_present():
 
 def test_build_submit_argv_omits_cell_image_when_absent():
     argv = build_submit_argv(
-        {"spec": "workflows/repository/x.yaml", "goal": "g",
-         "model": "anthropic/claude-sonnet-5", "workdir": "/tmp/wt_x"},
+        {
+            "spec": "workflows/repository/x.yaml",
+            "goal": "g",
+            "model": "anthropic/claude-sonnet-5",
+            "workdir": "/tmp/wt_x",
+        },
     )
     assert "--cell-image" not in argv
     assert argv[-1] == "--orchestrator"
@@ -1366,8 +1599,14 @@ class _FakeCommandsRedis:
         return key, lst.pop()
 
     # Wave B2 claim lane: BLMOVE (claim), LREM (release), LRANGE (recovery scan).
-    def blmove(self, first: str, second: str, timeout: int | None = None,
-               src: str = "LEFT", dest: str = "RIGHT"):
+    def blmove(
+        self,
+        first: str,
+        second: str,
+        timeout: int | None = None,
+        src: str = "LEFT",
+        dest: str = "RIGHT",
+    ):
         lst = self._lists.get(first)
         if not lst:
             return None
@@ -1473,7 +1712,9 @@ def _fleet_manager_module():
 
 
 def test_consume_fleet_commands_valid_submit_reaches_running_then_completed_with_ledger(
-    _noop_spec, monkeypatch, broker_seam,
+    _noop_spec,
+    monkeypatch,
+    broker_seam,
 ):
     fleet_manager = _fleet_manager_module()
     spec_path, ledger_dir = _noop_spec
@@ -1485,8 +1726,11 @@ def test_consume_fleet_commands_valid_submit_reaches_running_then_completed_with
 
     r = _FakeCommandsRedis()
     cmd = fleet_manager._send_submit_command(
-        r, spec=_NOOP_SPEC_REL, goal="run the no-op phase",
-        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_launch_handler_test",
+        r,
+        spec=_NOOP_SPEC_REL,
+        goal="run the no-op phase",
+        model="anthropic/claude-sonnet-5",
+        workdir="/tmp/wt_launch_handler_test",
     )
     assert fleet_manager.build_board(r)["jobs"][0]["status"] == "launching"
 
@@ -1499,7 +1743,10 @@ def test_consume_fleet_commands_valid_submit_reaches_running_then_completed_with
         # wrapper selects by (Wave F7).
         this_run.write_text(json.dumps({"run_id": "run-new", "phases": []}))
         return subprocess.CompletedProcess(
-            argv, returncode=0, stdout="{}", stderr=f"ledger: {this_run}\n",
+            argv,
+            returncode=0,
+            stdout="{}",
+            stderr=f"ledger: {this_run}\n",
         )
 
     monkeypatch.setattr(subprocess, "run", fake_run)
@@ -1516,26 +1763,35 @@ def test_consume_fleet_commands_valid_submit_reaches_running_then_completed_with
     assert job["status"] == "completed"
     assert job["returncode"] == 0
     assert job["ledger"] == str(this_run)  # ITS ledger — never the pre-existing other run's
-    assert job["run_id"] == "run-new"      # ... and the run's OWN identity rides the record
+    assert job["run_id"] == "run-new"  # ... and the run's OWN identity rides the record
     import hashlib
 
     assert job["ledger_sha256"] == hashlib.sha256(this_run.read_bytes()).hexdigest()
 
 
 def test_consume_fleet_commands_nonzero_exit_marks_failed_and_files_the_dlq(
-    _noop_spec, monkeypatch, broker_seam,
+    _noop_spec,
+    monkeypatch,
+    broker_seam,
 ):
     fleet_manager = _fleet_manager_module()
     r = _FakeCommandsRedis()
     cmd = fleet_manager._send_submit_command(
-        r, spec=_NOOP_SPEC_REL, goal="run the no-op phase",
-        model="deepseek/deepseek-v4-pro", workdir="/tmp/wt_launch_handler_test",
+        r,
+        spec=_NOOP_SPEC_REL,
+        goal="run the no-op phase",
+        model="deepseek/deepseek-v4-pro",
+        workdir="/tmp/wt_launch_handler_test",
     )
 
     monkeypatch.setattr(
-        subprocess, "run",
+        subprocess,
+        "run",
         lambda argv, check=False, **kwargs: subprocess.CompletedProcess(
-            argv, returncode=1, stdout="", stderr="",
+            argv,
+            returncode=1,
+            stdout="",
+            stderr="",
         ),
     )
 
@@ -1555,7 +1811,8 @@ def test_consume_fleet_commands_nonzero_exit_marks_failed_and_files_the_dlq(
 
 
 def test_consume_fleet_commands_invalid_submit_is_refused_before_any_subprocess_call(
-    _noop_spec, monkeypatch,
+    _noop_spec,
+    monkeypatch,
 ):
     # A deliberately invalid submit (a workdir naming the story-agent Redis host service) —
     # refused at validate_fleet_command, BEFORE any docker/compose subprocess call. The board
@@ -1564,13 +1821,17 @@ def test_consume_fleet_commands_invalid_submit_is_refused_before_any_subprocess_
     r = _FakeCommandsRedis()
     fleet_manager = _fleet_manager_module()
     cmd = fleet_manager._send_submit_command(
-        r, spec=_NOOP_SPEC_REL, goal="run the no-op phase",
-        model="anthropic/claude-sonnet-5", workdir="127.0.0.1:6379",
+        r,
+        spec=_NOOP_SPEC_REL,
+        goal="run the no-op phase",
+        model="anthropic/claude-sonnet-5",
+        workdir="127.0.0.1:6379",
     )
 
     calls = []
     monkeypatch.setattr(
-        subprocess, "run",
+        subprocess,
+        "run",
         lambda *a, **k: calls.append(a) or subprocess.CompletedProcess(a, 0),
     )
 
@@ -1587,13 +1848,17 @@ def test_consume_fleet_commands_invalid_submit_is_refused_before_any_subprocess_
     assert dead[0]["job"]["job_id"] == cmd["job_id"]
 
 
-def test_consume_fleet_commands_dry_run_never_calls_subprocess(_noop_spec, monkeypatch,
-                                                               broker_seam):
+def test_consume_fleet_commands_dry_run_never_calls_subprocess(
+    _noop_spec, monkeypatch, broker_seam
+):
     r = _FakeCommandsRedis()
     fleet_manager = _fleet_manager_module()
     fleet_manager._send_submit_command(
-        r, spec=_NOOP_SPEC_REL, goal="run the no-op phase",
-        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_launch_handler_test",
+        r,
+        spec=_NOOP_SPEC_REL,
+        goal="run the no-op phase",
+        model="anthropic/claude-sonnet-5",
+        workdir="/tmp/wt_launch_handler_test",
     )
 
     calls = []
@@ -1623,11 +1888,14 @@ def test_run_identity_reads_the_runs_own_ledger_line(tmp_path):
     ledger = ledger_dir / "20260912T164142123456Z_run-new.json"
     ledger.write_text(json.dumps({"run_id": "run-new", "phases": []}))
 
-    identity = sw._run_identity("demo", {
-        "returncode": 0,
-        "stdout": '{"run_id": "run-new"}',
-        "stderr": f"some warning\nledger: {ledger}\n",
-    })
+    identity = sw._run_identity(
+        "demo",
+        {
+            "returncode": 0,
+            "stdout": '{"run_id": "run-new"}',
+            "stderr": f"some warning\nledger: {ledger}\n",
+        },
+    )
     assert identity["ledger"] == str(ledger)
     assert identity["run_id"] == "run-new"
     assert identity["ledger_sha256"] == hashlib.sha256(ledger.read_bytes()).hexdigest()
@@ -1642,9 +1910,14 @@ def test_run_identity_is_empty_when_the_output_names_no_ledger(tmp_path):
     ledger_dir.mkdir(parents=True)
     (ledger_dir / "20260912T164142123456Z_run-someone-else.json").write_text("{}")
 
-    identity = sw._run_identity("demo", {
-        "returncode": 0, "stdout": "{}", "stderr": "no ledger line here",
-    })
+    identity = sw._run_identity(
+        "demo",
+        {
+            "returncode": 0,
+            "stdout": "{}",
+            "stderr": "no ledger line here",
+        },
+    )
     assert identity == {"ledger": "", "run_id": "", "ledger_sha256": ""}
 
 
@@ -1663,7 +1936,9 @@ def test_run_identity_rejects_a_ledger_outside_the_specs_directory(tmp_path):
 
 
 def test_two_concurrent_same_spec_dispatches_keep_distinct_result_associations(
-    _noop_spec, monkeypatch, broker_seam,
+    _noop_spec,
+    monkeypatch,
+    broker_seam,
 ):
     """The identity-recovery contract, pinned against true concurrency.
 
@@ -1695,7 +1970,10 @@ def test_two_concurrent_same_spec_dispatches_keep_distinct_result_associations(
         ledger = ledger_dir / f"20260912T164142123456Z_{job_id}.json"
         ledger.write_text(json.dumps({"run_id": f"run-{job_id}", "phases": []}))
         return subprocess.CompletedProcess(
-            argv, returncode=0, stdout="{}", stderr=f"ledger: {ledger}\n",
+            argv,
+            returncode=0,
+            stdout="{}",
+            stderr=f"ledger: {ledger}\n",
         )
 
     monkeypatch.setattr(subprocess, "run", fake_run)
@@ -1709,9 +1987,12 @@ def test_two_concurrent_same_spec_dispatches_keep_distinct_result_associations(
     assert second["ledger"].endswith("_job-noop-2.json")
     assert first["run_id"] == "run-job-noop-1"
     assert second["run_id"] == "run-job-noop-2"
-    assert first["ledger_sha256"] == hashlib.sha256(
-        (ledger_dir / "20260912T164142123456Z_job-noop-1.json").read_bytes()
-    ).hexdigest()
+    assert (
+        first["ledger_sha256"]
+        == hashlib.sha256(
+            (ledger_dir / "20260912T164142123456Z_job-noop-1.json").read_bytes()
+        ).hexdigest()
+    )
     assert first["ledger_sha256"] != second["ledger_sha256"]
 
 
@@ -1724,8 +2005,9 @@ def test_recovery_requeues_a_control_action_in_one_atomic_move():
     from scripts.fleet import spawn_wrapper as sw
 
     r = _FakeCommandsRedis()
-    raw = json.dumps({"action": "scale", "service": "workflow-runner", "count": 2,
-                      "ts": 0.0, "nonce": "n"})
+    raw = json.dumps(
+        {"action": "scale", "service": "workflow-runner", "count": 2, "ts": 0.0, "nonce": "n"}
+    )
     r.lpush(sw.PROCESSING_KEY, raw)
 
     tally = sw._recover_processing(r, _fleet_manager_module(), _fake_dlq())
@@ -1741,8 +2023,7 @@ def test_recovery_interrupted_before_the_move_loses_nothing():
     later recovery pass moves it. The command is never absent from both lanes."""
     from scripts.fleet import spawn_wrapper as sw
 
-    raw = json.dumps({"action": "drain", "service": "workflow-runner",
-                      "ts": 0.0, "nonce": "n"})
+    raw = json.dumps({"action": "drain", "service": "workflow-runner", "ts": 0.0, "nonce": "n"})
 
     class _DownMidMove(_FakeCommandsRedis):
         def eval(self, script, numkeys, *args):
@@ -1798,15 +2079,24 @@ def test_armed_verifier_spawn_needs_no_lease_block(tmp_path, monkeypatch):
 
     _repo, cfg = _make_config_repo(tmp_path)
     req = build_verifier_request(
-        {"name": "g3_test_gate", "kind": "test", "scope": "implementation",
-         "tests": ["tests/test_spec_x.py"]},
-        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
-        spec_name="spec_x", path_config=cfg,
+        {
+            "name": "g3_test_gate",
+            "kind": "test",
+            "scope": "implementation",
+            "tests": ["tests/test_spec_x.py"],
+        },
+        goal="g",
+        workdir="/tmp/wt_x",
+        model="deepseek/deepseek-v4-flash",
+        spec_name="spec_x",
+        path_config=cfg,
     )
     assert "verifier" in req  # the marker is the exemption's key, not the absence of fields
     monkeypatch.setattr(sw, "admission_required", lambda: True)
     errors = validate_spawn(
-        req, phase_scopes={"g3_test_gate": "implementation"}, path_config=cfg,
+        req,
+        phase_scopes={"g3_test_gate": "implementation"},
+        path_config=cfg,
     )
     assert errors == []
 
@@ -1818,15 +2108,24 @@ def test_armed_verifier_with_a_partial_lease_block_still_refuses(tmp_path, monke
 
     _repo, cfg = _make_config_repo(tmp_path)
     req = build_verifier_request(
-        {"name": "g3_test_gate", "kind": "test", "scope": "implementation",
-         "tests": ["tests/test_spec_x.py"]},
-        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
-        spec_name="spec_x", path_config=cfg,
+        {
+            "name": "g3_test_gate",
+            "kind": "test",
+            "scope": "implementation",
+            "tests": ["tests/test_spec_x.py"],
+        },
+        goal="g",
+        workdir="/tmp/wt_x",
+        model="deepseek/deepseek-v4-flash",
+        spec_name="spec_x",
+        path_config=cfg,
     )
     req["reserved_cost_usd"] = 0.6
     monkeypatch.setattr(sw, "admission_required", lambda: True)
     errors = validate_spawn(
-        req, phase_scopes={"g3_test_gate": "implementation"}, path_config=cfg,
+        req,
+        phase_scopes={"g3_test_gate": "implementation"},
+        path_config=cfg,
     )
     assert any("partial lease block" in e for e in errors)
 
@@ -1839,12 +2138,18 @@ def test_armed_non_verifier_spawn_still_requires_the_lease_block(tmp_path, monke
     _repo, cfg = _make_config_repo(tmp_path)
     req = build_phase_request(
         {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
-        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
-        spec_name="spec_x", image="fleet/base", path_config=cfg,
+        goal="g",
+        workdir="/tmp/wt_x",
+        model="deepseek/deepseek-v4-flash",
+        spec_name="spec_x",
+        image="fleet/base",
+        path_config=cfg,
     )
     monkeypatch.setattr(sw, "admission_required", lambda: True)
     errors = validate_spawn(
-        req, phase_scopes={"p1_slice1_base_supervisor": "implementation"}, path_config=cfg,
+        req,
+        phase_scopes={"p1_slice1_base_supervisor": "implementation"},
+        path_config=cfg,
     )
     assert any("lease block missing" in e for e in errors)
 
@@ -1855,27 +2160,31 @@ def test_submit_extended_fields_are_type_validated():
     base = _valid_submit_request()
 
     bad_digest = dict(base, spec_sha256="not-hex")
-    assert any("spec_sha256 must be a 64-character hex" in e
-               for e in validate_submit_request(bad_digest))
+    assert any(
+        "spec_sha256 must be a 64-character hex" in e for e in validate_submit_request(bad_digest)
+    )
 
     bad_resume = dict(base, resume="yes")
-    assert any("resume must be a boolean" in e
-               for e in validate_submit_request(bad_resume))
+    assert any("resume must be a boolean" in e for e in validate_submit_request(bad_resume))
 
     orphan_parent = dict(base, parent_run_id="run-1")
-    assert any("resume must be true" in e
-               for e in validate_submit_request(orphan_parent))
+    assert any("resume must be true" in e for e in validate_submit_request(orphan_parent))
 
     bad_admission = dict(base, admission={"required": "yes"})
-    assert any("admission.required must be a boolean" in e
-               for e in validate_submit_request(bad_admission))
+    assert any(
+        "admission.required must be a boolean" in e for e in validate_submit_request(bad_admission)
+    )
 
     bad_budget = dict(base, admission={"required": True, "campaign_budget_usd": -1})
-    assert any("campaign_budget_usd" in e
-               for e in validate_submit_request(bad_budget))
+    assert any("campaign_budget_usd" in e for e in validate_submit_request(bad_budget))
 
-    good = dict(base, spec_sha256="a" * 64, resume=True, parent_run_id="run-1",
-                admission={"required": True, "campaign_budget_usd": 20.0})
+    good = dict(
+        base,
+        spec_sha256="a" * 64,
+        resume=True,
+        parent_run_id="run-1",
+        admission={"required": True, "campaign_budget_usd": 20.0},
+    )
     assert validate_submit_request(good) == []
 
 
@@ -1891,11 +2200,17 @@ def test_submit_execution_settings_are_type_validated():
     assert any("execution.thinking_budget_tokens" in e for e in validate_submit_request(bad_budget))
     bad_nocommit = dict(base, execution={"no_commit": "yes"})
     assert any("execution.no_commit" in e for e in validate_submit_request(bad_nocommit))
-    good = dict(base, execution={
-        "backend": "opencode", "thinking_effort": "high",
-        "thinking_budget_tokens": 12000, "output_token_limit": 64000,
-        "timeout_seconds": 2400, "no_commit": False,
-    })
+    good = dict(
+        base,
+        execution={
+            "backend": "opencode",
+            "thinking_effort": "high",
+            "thinking_budget_tokens": 12000,
+            "output_token_limit": 64000,
+            "timeout_seconds": 2400,
+            "no_commit": False,
+        },
+    )
     assert validate_submit_request(good) == []
 
 
@@ -1903,11 +2218,13 @@ def test_submit_admission_reserve_and_cap_are_type_validated():
     """A malformed reserve/cap refuses with the rest of the submit; a positive reserve passes."""
     base = _valid_submit_request()
     bad_reserve = dict(base, admission={"required": True, "reserve_usd": 0})
-    assert any("reserve_usd must be a positive number" in e
-               for e in validate_submit_request(bad_reserve))
+    assert any(
+        "reserve_usd must be a positive number" in e for e in validate_submit_request(bad_reserve)
+    )
     bad_cap = dict(base, admission={"required": True, "hard_cap_usd": -1})
-    assert any("hard_cap_usd must be a non-negative number" in e
-               for e in validate_submit_request(bad_cap))
+    assert any(
+        "hard_cap_usd must be a non-negative number" in e for e in validate_submit_request(bad_cap)
+    )
     good = dict(base, admission={"required": True, "reserve_usd": 0.6, "hard_cap_usd": 1.0})
     assert validate_submit_request(good) == []
 
@@ -1976,9 +2293,13 @@ def aio_env(tmp_path, monkeypatch):
 
     monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(tmp_path))
     monkeypatch.setattr(
-        sw, "_aio_budget_verdict",
+        sw,
+        "_aio_budget_verdict",
         lambda session_id: {
-            "verdict": "OK", "reason": "", "backend_available": True, "measured": True,
+            "verdict": "OK",
+            "reason": "",
+            "backend_available": True,
+            "measured": True,
         },
     )
     return tmp_path
@@ -1986,9 +2307,7 @@ def aio_env(tmp_path, monkeypatch):
 
 def test_a_bound_aio_submit_passes_the_binding_gate(aio_env):
     binding_id = _bound_store(aio_env)
-    errors = validate_submit_request(
-        _aio_request(aio=_aio_block(binding_id=binding_id))
-    )
+    errors = validate_submit_request(_aio_request(aio=_aio_block(binding_id=binding_id)))
     assert errors == []
 
 
@@ -1997,9 +2316,13 @@ def test_an_aio_submit_without_a_store_is_refused(tmp_path, monkeypatch):
 
     monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(tmp_path / "absent"))
     monkeypatch.setattr(
-        sw, "_aio_budget_verdict",
+        sw,
+        "_aio_budget_verdict",
         lambda session_id: {
-            "verdict": "OK", "reason": "", "backend_available": True, "measured": True,
+            "verdict": "OK",
+            "reason": "",
+            "backend_available": True,
+            "measured": True,
         },
     )
     errors = validate_submit_request(_aio_request(aio=_aio_block(binding_id="0" * 64)))
@@ -2032,8 +2355,11 @@ def test_a_stale_task_revision_is_refused_and_the_current_one_passes(aio_env):
 
     _bound_store(aio_env)
     updated = si.update_binding_context(
-        "ses_aio", context={"work_unit": "v2"}, expected_version=1,
-        artifact_dir=aio_env, publish=False,
+        "ses_aio",
+        context={"work_unit": "v2"},
+        expected_version=1,
+        artifact_dir=aio_env,
+        publish=False,
     )
     binding = updated.binding or {}
     auth_id = si.binding_authorization_id(binding)
@@ -2055,8 +2381,11 @@ def test_progress_recording_does_not_advance_the_authorization(aio_env):
 
     auth_id = _bound_store(aio_env)
     updated = si.update_binding_context(
-        "ses_aio", context={"next_action": "observe job X"}, expected_version=1,
-        artifact_dir=aio_env, publish=False,
+        "ses_aio",
+        context={"next_action": "observe job X"},
+        expected_version=1,
+        artifact_dir=aio_env,
+        publish=False,
     )
     binding = updated.binding or {}
     assert si.binding_authorization_id(binding) == auth_id  # stable
@@ -2078,15 +2407,16 @@ def test_capacity_verdicts_are_advisory_at_the_gate(aio_env, monkeypatch):
     binding_id = _bound_store(aio_env)
     for verdict in ("OK", "WARN", "COMPACT", "CLOSE", "UNJUDGED"):
         monkeypatch.setattr(
-            sw, "_aio_budget_verdict",
+            sw,
+            "_aio_budget_verdict",
             lambda session_id, v=verdict: {
-                "verdict": v, "reason": "measured reason",
-                "backend_available": True, "measured": True,
+                "verdict": v,
+                "reason": "measured reason",
+                "backend_available": True,
+                "measured": True,
             },
         )
-        errors = validate_submit_request(
-            _aio_request(aio=_aio_block(binding_id=binding_id))
-        )
+        errors = validate_submit_request(_aio_request(aio=_aio_block(binding_id=binding_id)))
         assert errors == [], f"{verdict} must not block: {errors}"
         assert sw.aio_capacity_report("ses_aio") == {
             "verdict": verdict,
@@ -2103,10 +2433,13 @@ def test_the_capacity_report_reports_unmeasurable_honestly(aio_env, monkeypatch)
     from scripts.fleet import spawn_wrapper as sw
 
     monkeypatch.setattr(
-        sw, "_aio_budget_verdict",
+        sw,
+        "_aio_budget_verdict",
         lambda session_id: {
-            "verdict": "UNJUDGED", "reason": "db unavailable",
-            "backend_available": False, "measured": False,
+            "verdict": "UNJUDGED",
+            "reason": "db unavailable",
+            "backend_available": False,
+            "measured": False,
         },
     )
     assert sw.aio_capacity_report("ses_aio") == {
@@ -2211,8 +2544,15 @@ def _capacity_env(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config-home"))
 
 
-def _canonical_session_db(path, *, sid: str = "ses_aio", turns: int = 1, context: int = 10,
-                          pending_only: bool = False, model: str = "deepseek-v4-flash") -> None:
+def _canonical_session_db(
+    path,
+    *,
+    sid: str = "ses_aio",
+    turns: int = 1,
+    context: int = 10,
+    pending_only: bool = False,
+    model: str = "deepseek-v4-flash",
+) -> None:
     """A real opencode-shaped session db (production schema + the ACTIVE model), not a mock."""
     import json as _json
     import sqlite3
@@ -2229,7 +2569,10 @@ def _canonical_session_db(path, *, sid: str = "ses_aio", turns: int = 1, context
     if pending_only:
         con.execute(
             "INSERT INTO message VALUES (?, 1, ?)",
-            (sid, _json.dumps({"role": "assistant", "tokens": {"total": 0, "input": 0, "output": 0}})),
+            (
+                sid,
+                _json.dumps({"role": "assistant", "tokens": {"total": 0, "input": 0, "output": 0}}),
+            ),
         )
     else:
         for i in range(turns - 1):
@@ -2239,15 +2582,19 @@ def _canonical_session_db(path, *, sid: str = "ses_aio", turns: int = 1, context
             )
         con.execute(
             "INSERT INTO message VALUES (?, ?, ?)",
-            (sid, turns, _json.dumps(
-                {"role": "assistant", "tokens": {"total": context, "input": context}}
-            )),
+            (
+                sid,
+                turns,
+                _json.dumps({"role": "assistant", "tokens": {"total": context, "input": context}}),
+            ),
         )
     con.commit()
     con.close()
 
 
-def _valid_bound_request(tmp_path, monkeypatch, *, db_name: str | None, **store_kwargs) -> tuple[dict, str]:
+def _valid_bound_request(
+    tmp_path, monkeypatch, *, db_name: str | None, **store_kwargs
+) -> tuple[dict, str]:
     from agentic_dynamics.knowledge import session_ingestion as si
 
     store = tmp_path / "kb"
@@ -2375,9 +2722,17 @@ def test_a_completed_compaction_moves_the_report_to_the_post_compaction_state(
     con = _sqlite3.connect(db)
     con.execute(
         "INSERT INTO message VALUES ('ses_aio', 99000, ?)",
-        (_json.dumps({"role": "assistant", "summary": True, "mode": "compaction",
-                      "finish": "stop",
-                      "tokens": {"total": 975_000, "input": 975_000}}),),
+        (
+            _json.dumps(
+                {
+                    "role": "assistant",
+                    "summary": True,
+                    "mode": "compaction",
+                    "finish": "stop",
+                    "tokens": {"total": 975_000, "input": 975_000},
+                }
+            ),
+        ),
     )
     con.execute(
         "INSERT INTO message VALUES ('ses_aio', 99500, ?)",
@@ -2435,9 +2790,7 @@ def test_actor_aio_without_a_block_is_refused():
 
 
 def test_an_aio_block_without_the_actor_is_an_inconsistent_declaration():
-    errors = validate_submit_request(
-        _valid_submit_request(aio=_aio_block(binding_id="0" * 64))
-    )
+    errors = validate_submit_request(_valid_submit_request(aio=_aio_block(binding_id="0" * 64)))
     assert any("inconsistent declaration" in e for e in errors)
 
 
@@ -2502,7 +2855,9 @@ def test_both_cross_project_binding_cases_are_refused_before_launch(aio_env, tmp
     for project in ("github.com/org/proj-a", "github.com/org/proj-b"):
         binding_id = _bound_store(aio_env, project=project)
         errors = sw._validate_aio_binding(
-            _aio_block(binding_id=binding_id), repo_root=proj_a, workdir=str(proj_b),
+            _aio_block(binding_id=binding_id),
+            repo_root=proj_a,
+            workdir=str(proj_b),
         )
         assert any("DIFFERENT project" in e for e in errors), project
         for slot in (aio_env / "aio-bindings").glob("*.json"):
@@ -2526,7 +2881,9 @@ def test_a_linked_worktree_accepts_origin_and_canonical_name_bindings(aio_env, t
     for project in ("github.com/org/proj-a", "proj-a"):
         binding_id = _bound_store(aio_env, project=project)
         errors = sw._validate_aio_binding(
-            _aio_block(binding_id=binding_id), repo_root=proj_a, workdir=str(worktree),
+            _aio_block(binding_id=binding_id),
+            repo_root=proj_a,
+            workdir=str(worktree),
         )
         assert errors == [], project
         for slot in (aio_env / "aio-bindings").glob("*.json"):
@@ -2535,7 +2892,9 @@ def test_a_linked_worktree_accepts_origin_and_canonical_name_bindings(aio_env, t
     # A foreign project name still refuses on the same linked worktree.
     binding_id = _bound_store(aio_env, project="some-unrelated-project")
     errors = sw._validate_aio_binding(
-        _aio_block(binding_id=binding_id), repo_root=proj_a, workdir=str(worktree),
+        _aio_block(binding_id=binding_id),
+        repo_root=proj_a,
+        workdir=str(worktree),
     )
     assert any("does not match the submitted project" in e for e in errors)
 
@@ -2638,7 +2997,11 @@ class _RecordingVerifierExecutor:
     def execute(self, request):
         self.calls.append(request.phase_name)
         return StepResult(
-            ok=True, state="ok", exit_code=0, tests_passed=1, tests_total=1,
+            ok=True,
+            state="ok",
+            exit_code=0,
+            tests_passed=1,
+            tests_total=1,
             test_executed_success=True,
         )
 
@@ -2683,8 +3046,14 @@ def test_the_validator_and_the_runner_agree_on_the_deterministic_fixture(tmp_pat
     workdir = tmp_path / "wd"
     workdir.mkdir()
     result = run_workflow(
-        spec, goal="g", model="deepseek/deepseek-v4-flash", workdir=workdir,
-        step_executor=agent, verifier_executor=verifier, commit=False, publish=False,
+        spec,
+        goal="g",
+        model="deepseek/deepseek-v4-flash",
+        workdir=workdir,
+        step_executor=agent,
+        verifier_executor=verifier,
+        commit=False,
+        publish=False,
     )
     assert result.ok is True
     assert agent.calls == [], "the deterministic path made an agent call"
@@ -2705,8 +3074,14 @@ def test_a_kind_task_spec_would_take_the_agents_branch(tmp_path):
     workdir = tmp_path / "wd"
     workdir.mkdir()
     run_workflow(
-        spec, goal="g", model="deepseek/deepseek-v4-flash", workdir=workdir,
-        step_executor=agent, verifier_executor=verifier, commit=False, publish=False,
+        spec,
+        goal="g",
+        model="deepseek/deepseek-v4-flash",
+        workdir=workdir,
+        step_executor=agent,
+        verifier_executor=verifier,
+        commit=False,
+        publish=False,
     )
     assert agent.calls == ["deterministic_check"], "kind: task must reach the agent branch"
 
@@ -2753,7 +3128,9 @@ def test_a_binding_cannot_ride_the_shared_name_across_projects(aio_env, tmp_path
     repo_b = _git_project(tmp_path / "b", "review-pr76", "git@github.com:org-b/review-pr76.git")
     binding_id = _bound_store(aio_env, project="review-pr76")  # the shared NAME
     errors = sw._validate_aio_binding(
-        _aio_block(binding_id=binding_id), repo_root=repo_a, workdir=str(repo_b),
+        _aio_block(binding_id=binding_id),
+        repo_root=repo_a,
+        workdir=str(repo_b),
     )
     assert any("DIFFERENT project" in e for e in errors)
 
@@ -2777,7 +3154,8 @@ def _clone_provenance(path: Path) -> str:
     """The clone's stamped project provenance ('' when unstamped)."""
     proc = subprocess.run(
         ["git", "-C", str(path), "config", "--get", "agentic-dynamics.project"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     return proc.stdout.strip() if proc.returncode == 0 else ""
 
@@ -2796,7 +3174,9 @@ def _continuation_fixture(tmp_path, monkeypatch, canonical: Path, *, stamped: bo
 
     spec_src = (
         Path(__file__).resolve().parent.parent
-        / "workflows" / "repository" / "fleet_job_submission.yaml"
+        / "workflows"
+        / "repository"
+        / "fleet_job_submission.yaml"
     )
     spec_dst = canonical / "workflows" / "repository" / "fleet_job_submission.yaml"
     spec_dst.parent.mkdir(parents=True, exist_ok=True)
@@ -2831,11 +3211,13 @@ def _continuation_fixture(tmp_path, monkeypatch, canonical: Path, *, stamped: bo
     ledger_dir = canonical / "experiments" / "results" / "workflows" / "demo"
     ledger_dir.mkdir(parents=True)
     (ledger_dir / "20260916T000000000000Z_run-parent.json").write_text(
-        json.dumps({
-            "run_id": "run-parent",
-            "git_sha": candidate,
-            "phases": [{"phase": "build", "status": "ok"}],
-        }),
+        json.dumps(
+            {
+                "run_id": "run-parent",
+                "git_sha": candidate,
+                "phases": [{"phase": "build", "status": "ok"}],
+            }
+        ),
         encoding="utf-8",
     )
     fleet_dir = str(Path(__file__).resolve().parent.parent / "scripts" / "fleet")
@@ -2864,9 +3246,7 @@ def test_a_prepared_continuation_passes_the_aio_boundary_with_an_origin(
     an independent repo with a local origin path. Through the REAL AIO validation boundary it
     must present the canonical project's identity (via its stamped/aligned provenance), not
     read as a DIFFERENT project."""
-    canonical = _git_project(
-        tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git"
-    )
+    canonical = _git_project(tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git")
     fm, cfg, clone = _continuation_fixture(tmp_path, monkeypatch, canonical)
     prepared, note, errors = fm.prepare_workspace(
         spec="demo", goal="g", model="m", resume=True, parent_run_id="run-parent"
@@ -2882,9 +3262,7 @@ def test_a_prepared_continuation_passes_the_aio_boundary_with_an_origin(
     assert validation_errors == [], validation_errors
 
 
-def test_a_prepared_continuation_passes_the_aio_boundary_local_only(
-    aio_env, tmp_path, monkeypatch
-):
+def test_a_prepared_continuation_passes_the_aio_boundary_local_only(aio_env, tmp_path, monkeypatch):
     """The provenance channel without an origin: a local-only canonical repo's clone carries
     the stamped common git dir and still agrees at the real boundary."""
     canonical = _local_only_repo(tmp_path, "canonical")
@@ -2932,9 +3310,7 @@ def test_a_pre_fix_clone_is_verified_and_stamped_then_passes_the_boundary(
     """Round-5 finding (2026-09-16): a parent clone created BEFORE the provenance stamp
     (local origin, no stamp) must still continue — preparation verifies it by SHARED HISTORY
     and stamps it (candidate commits untouched), and the real AIO boundary then passes."""
-    canonical = _git_project(
-        tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git"
-    )
+    canonical = _git_project(tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git")
     fm, cfg, clone = _continuation_fixture(tmp_path, monkeypatch, canonical, stamped=False)
     # The fixture really is the pre-fix shape: local origin, no provenance stamp.
     assert _clone_provenance(clone) == ""
@@ -3003,9 +3379,7 @@ def test_a_foreign_fork_with_shared_history_is_never_stamped(aio_env, tmp_path, 
     """Round-6 finding (2026-09-16): a FORK shares the canonical root commit but has its own
     origin. Preparation must NOT stamp it — the explicit origin conflict refuses first, and
     shared ancestry may only corroborate a relationship, never establish identity."""
-    canonical = _git_project(
-        tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git"
-    )
+    canonical = _git_project(tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git")
     fm, cfg, _clone = _continuation_fixture(tmp_path, monkeypatch, canonical)
     fork = _fork_of(canonical, tmp_path, "fork", "git@github.com:other/agentic-dynamics.git")
 
@@ -3029,8 +3403,9 @@ def test_a_foreign_fork_with_shared_history_is_never_stamped(aio_env, tmp_path, 
     # Through PREPARATION: the fork clone + its ledger refuses (and stays unstamped).
     ledger_dir = canonical / "experiments" / "results" / "workflows" / "demo"
     (ledger_dir / "20260916T000000000000Z_run-fork.json").write_text(
-        json.dumps({"run_id": "run-fork", "git_sha": head,
-                    "phases": [{"phase": "build", "status": "ok"}]}),
+        json.dumps(
+            {"run_id": "run-fork", "git_sha": head, "phases": [{"phase": "build", "status": "ok"}]}
+        ),
         encoding="utf-8",
     )
     prepared, _note, prep_errors = fm.prepare_workspace(
@@ -3043,7 +3418,9 @@ def test_a_foreign_fork_with_shared_history_is_never_stamped(aio_env, tmp_path, 
     binding_id = _bound_store(aio_env)
     validation_errors = validate_submit_request(
         _valid_submit_request(
-            actor="aio", aio=_aio_block(binding_id=binding_id), workdir=str(fork_clone),
+            actor="aio",
+            aio=_aio_block(binding_id=binding_id),
+            workdir=str(fork_clone),
         ),
         repo_root=canonical,
         path_config=cfg,
@@ -3060,13 +3437,9 @@ def test_a_container_local_repo_origin_is_established_by_record_and_mapping(
     # The container view must not be a GIT repository on this host, or the resolved-path
     # branch (correctly) takes precedence over the container-view channel.
     assert not (Path("/repo") / ".git").exists(), "the container view must not be a repo here"
-    canonical = _git_project(
-        tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git"
-    )
+    canonical = _git_project(tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git")
     fm, cfg, clone = _continuation_fixture(tmp_path, monkeypatch, canonical, stamped=False)
-    subprocess.run(
-        ["git", "-C", str(clone), "remote", "set-url", "origin", "/repo"], check=True
-    )
+    subprocess.run(["git", "-C", str(clone), "remote", "set-url", "origin", "/repo"], check=True)
     assert _clone_provenance(clone) == ""
 
     errors = fm._ensure_clone_provenance(clone, canonical, parent_run_id="run-parent")
@@ -3082,15 +3455,11 @@ def test_a_container_local_repo_origin_is_established_by_record_and_mapping(
     assert validation_errors == [], validation_errors
 
 
-def test_a_two_step_local_origin_chain_resolves_to_the_canonical_identity(
-    tmp_path, monkeypatch
-):
+def test_a_two_step_local_origin_chain_resolves_to_the_canonical_identity(tmp_path, monkeypatch):
     """A local-path origin chain (a clone of a clone of the canonical repo) resolves through
     to the project URL — accepted with the canonical stamp. A fork anywhere in the chain
     would end at the fork's URL and refuse (the fork test above)."""
-    canonical = _git_project(
-        tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git"
-    )
+    canonical = _git_project(tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git")
     fm, cfg, _clone = _continuation_fixture(tmp_path, monkeypatch, canonical)
     intermediate = tmp_path / "intermediate"
     subprocess.run(
@@ -3114,9 +3483,7 @@ def test_a_stale_canonical_stamp_never_overrides_a_foreign_remote_origin(
     """Round-7 finding (2026-09-16): the PREVIOUS ancestry-only upgrader could write a
     canonical provenance stamp onto a fork clone. An explicitly conflicting REMOTE origin
     must defeat that stale stamp — in preparation AND at the submission validator."""
-    canonical = _git_project(
-        tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git"
-    )
+    canonical = _git_project(tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git")
     fm, cfg, _clone = _continuation_fixture(tmp_path, monkeypatch, canonical)
 
     # The contradictory artifact: a clone of the canonical whose ORIGIN names the fork,
@@ -3129,8 +3496,15 @@ def test_a_stale_canonical_stamp_never_overrides_a_foreign_remote_origin(
     )
     stale = "origin:git@github.com:peparhugo/agentic-dynamics.git"
     subprocess.run(
-        ["git", "-C", str(fork_stamped), "remote", "set-url", "origin",
-         "git@github.com:other/agentic-dynamics.git"],
+        [
+            "git",
+            "-C",
+            str(fork_stamped),
+            "remote",
+            "set-url",
+            "origin",
+            "git@github.com:other/agentic-dynamics.git",
+        ],
         check=True,
     )
     subprocess.run(
@@ -3147,7 +3521,9 @@ def test_a_stale_canonical_stamp_never_overrides_a_foreign_remote_origin(
     binding_id = _bound_store(aio_env)
     validation_errors = validate_submit_request(
         _valid_submit_request(
-            actor="aio", aio=_aio_block(binding_id=binding_id), workdir=str(fork_stamped),
+            actor="aio",
+            aio=_aio_block(binding_id=binding_id),
+            workdir=str(fork_stamped),
         ),
         repo_root=canonical,
         path_config=cfg,
@@ -3164,9 +3540,7 @@ def test_a_foreign_local_origin_with_a_stale_stamp_refuses_the_broker_dry_run(
     explicit-workdir dry run (the reviewer's `ok: true` surface)."""
     import launch_broker
 
-    canonical = _git_project(
-        tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git"
-    )
+    canonical = _git_project(tmp_path, "canonical", "git@github.com:peparhugo/agentic-dynamics.git")
     fork = _git_project(tmp_path, "fork-src", "git@github.com:other/agentic-dynamics.git")
     fm, cfg, _clone = _continuation_fixture(tmp_path, monkeypatch, canonical)
 
@@ -3196,7 +3570,9 @@ def test_a_foreign_local_origin_with_a_stale_stamp_refuses_the_broker_dry_run(
     binding_id = _bound_store(aio_env)
     errors = validate_submit_request(
         _valid_submit_request(
-            actor="aio", aio=_aio_block(binding_id=binding_id), workdir=str(workdir),
+            actor="aio",
+            aio=_aio_block(binding_id=binding_id),
+            workdir=str(workdir),
         ),
         repo_root=canonical,
         path_config=cfg,
@@ -3209,8 +3585,9 @@ def test_a_foreign_local_origin_with_a_stale_stamp_refuses_the_broker_dry_run(
     ).stdout.strip()
     ledger_dir = canonical / "experiments" / "results" / "workflows" / "demo"
     (ledger_dir / "20260916T000000000000Z_run-fork.json").write_text(
-        json.dumps({"run_id": "run-fork", "git_sha": head,
-                    "phases": [{"phase": "build", "status": "ok"}]}),
+        json.dumps(
+            {"run_id": "run-fork", "git_sha": head, "phases": [{"phase": "build", "status": "ok"}]}
+        ),
         encoding="utf-8",
     )
     prepared, _note, prep_errors = fm.prepare_workspace(
@@ -3238,9 +3615,7 @@ def test_a_foreign_local_origin_with_a_stale_stamp_refuses_the_broker_dry_run(
         },
     }
     with pytest.raises(launch_broker.LaunchRequestError) as exc:
-        launch_broker.submit_run(
-            command, repo_root=canonical, path_config=cfg, dry_run=True
-        )
+        launch_broker.submit_run(command, repo_root=canonical, path_config=cfg, dry_run=True)
     assert "DIFFERENT project" in str(exc.value)
 
 
@@ -3267,14 +3642,12 @@ def test_the_shared_identity_rule_covers_the_verdict_channels(tmp_path):
         check=True,
     )
     subprocess.run(
-        ["git", "-C", str(same), "remote", "set-url", "origin",
-         "git@github.com:org/proj.git"],
+        ["git", "-C", str(same), "remote", "set-url", "origin", "git@github.com:org/proj.git"],
         check=True,
     )
     assert bc.identity_verdict(canonical, same)[0] == "match"
     subprocess.run(
-        ["git", "-C", str(same), "remote", "set-url", "origin",
-         "git@github.com:other/proj.git"],
+        ["git", "-C", str(same), "remote", "set-url", "origin", "git@github.com:other/proj.git"],
         check=True,
     )
     assert bc.identity_verdict(canonical, same)[0] == "conflict"
@@ -3287,15 +3660,11 @@ def test_the_shared_identity_rule_covers_the_verdict_channels(tmp_path):
     )
     assert bc.identity_verdict(canonical, chain)[0] == "match"  # origin = canonical path
     fork = _git_project(tmp_path, "fork-src", "git@github.com:other/proj-fork.git")
-    subprocess.run(
-        ["git", "-C", str(chain), "remote", "set-url", "origin", str(fork)], check=True
-    )
+    subprocess.run(["git", "-C", str(chain), "remote", "set-url", "origin", str(fork)], check=True)
     assert bc.identity_verdict(canonical, chain)[0] == "conflict"
 
     # An unresolvable local origin (the container view) and a missing origin → unknown.
-    subprocess.run(
-        ["git", "-C", str(chain), "remote", "set-url", "origin", "/repo"], check=True
-    )
+    subprocess.run(["git", "-C", str(chain), "remote", "set-url", "origin", "/repo"], check=True)
     assert bc.identity_verdict(canonical, chain)[0] == "unknown"
     subprocess.run(["git", "-C", str(chain), "remote", "remove", "origin"], check=True)
     assert bc.identity_verdict(canonical, chain)[0] == "unknown"
@@ -3306,9 +3675,7 @@ def test_a_binding_lacking_the_run_workflow_capability_is_refused(aio_env):
     a capability-poorer binding refuses by name (the vector is data, never inferred)."""
     from agentic_dynamics.knowledge import session_ingestion as si
 
-    binding_id = _bound_store(
-        aio_env, capabilities=si.mint_capabilities("not-a-granted-role")
-    )
+    binding_id = _bound_store(aio_env, capabilities=si.mint_capabilities("not-a-granted-role"))
     errors = validate_submit_request(_aio_request(aio=_aio_block(binding_id=binding_id)))
     assert any("capability vector" in e and "run_workflow" in e for e in errors), errors
 
