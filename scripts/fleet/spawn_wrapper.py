@@ -398,6 +398,9 @@ FLEET_ACTIONS: frozenset[str] = frozenset({"scale", "drain", "restart", "submit"
 #: closed vocabulary here for the same reason ``SCOPE_VOCABULARY`` is closed.
 MODEL_WHITELIST: frozenset[str] = frozenset(
     {
+        # 2026-09-25 (operator: "I want to run on deepseek flash"): the retired
+        # deepseek-v4-flash's SUCCESSOR; the volume model going forward.
+        "deepseek/deepseek-flash",
         "deepseek/deepseek-v4-flash",
         "deepseek/deepseek-v4-pro",
         "anthropic/claude-haiku-4-5",
@@ -405,6 +408,8 @@ MODEL_WHITELIST: frozenset[str] = frozenset(
         "openai/gpt-5.6-luna",
         "openai/gpt-5.6-sol",
         "openai/gpt-5.6-terra",
+        # The designated adversarial-review model (operator, 2026-09-25).
+        "openai/gpt-6-astra",
     }
 )
 
