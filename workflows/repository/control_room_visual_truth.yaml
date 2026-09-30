@@ -3,10 +3,12 @@ question: >-
   Make the served Control Room LEGIBLE VISUALLY at a glance — a state-colour language for the
   recorded state vocabularies, hierarchy that kills the giant empty cards, truncation that never
   splits a token, NAMED unknowns in place of dense dashes, and delta cues for what changed since
-  the last turn — and re-home the two control capabilities the operator named: the four TREND
-  CHARTS (spend / throughput / failure / dependency) and the two VISUALS (the evidence causal
-  ladder; the scoped dependency flow), each proven by NEW served-room render-gate classes with
-  captures the controller reviews every wave.
+  the last turn — and re-home the two VISUALS (the evidence causal ladder; the scoped dependency
+  flow), each proven by served-room render-gate classes with captures the controller reviews
+  every wave. STAGE 1 of the visual wave (controller decision 2026-09-30): the four production
+  TREND CHARTS are DEFERRED to a stage-2 spec — their full data-provenance chain (writer →
+  storage → service → renderer → gate) is its own unit of work; stage 1 UNSERVES the chart
+  mounts and retires their gate classes from the acceptance roster, keeping their code intact.
 version: "0.1"
 artifact_kind: workflow
 intent: mutate
@@ -44,6 +46,19 @@ workflow:
         truncation, delta cue) + captures the controller reviews every wave; the charts/workbench
         question is the operator's call" — THIS directive answers the charts/workbench question:
         charts AND visuals, for the SERVED room). This spec is that wave, resumed.
+
+        STAGED DELIVERY (controller, 2026-09-30): the wave is SPLIT. STAGE 1 (this spec)
+        delivers the visual language + the two visuals + the served-room gate classes + the
+        provenance and gate-soundness repairs. The four production TREND CHARTS are DEFERRED:
+        their chain-level audit (cost/token/retry provenance through writer → parser →
+        executor → DB → service → renderer, panel/scale semantics, history sequences, gate
+        geometry soundness) becomes its own stage-2 spec. In stage 1 the charts are UNSERVED
+        (mounts removed from the served shell; modules kept in-tree for stage 2), their gate
+        classes retired from the active acceptance roster, and the remaining attempt-6 review
+        items that belong to stage 1 (the F8 provenance family: per-field cost/token/retry
+        measurement provenance through the writers and every served total consumer; the
+        Console scoping: the expected-500 allowance bound to the injected request) are the
+        REQUIRED repairs — with every credited repair preserved.
 
         THE FINDINGS (the served room's own captures, reviewed 2026-09-24/25 — all real, quoted
         from the close): giant empty cards; no state-color language; truncation mid-token; no
@@ -106,24 +121,34 @@ workflow:
         attention / risk); hierarchy and density (giant empty cards collapse to dense, named
         rows); truncation that never splits a token, with an affordance to the full value;
         named unknowns (a distinct treatment, not a bare dash); delta cues (what changed since
-        the prior turn/epoch, from recorded fields only). (2) THE FOUR TREND CHARTS re-homed
-        into the served shell with the honesty rules and a textual/table equivalent. (3) THE
-        TWO VISUALS re-homed where the served shell can host them, or a named follow-up.
-        (4) NEW SERVED-ROOM GATE CLASSES in the acceptance roster — each: a check function, a
+        the prior turn/epoch, from recorded fields only). (2) THE FOUR TREND CHARTS — DEFERRED
+        to stage 2: stage 1 removes the chart mounts from the served shell (the trend modules
+        may stay in-tree, UNLOADED by index.html; do NOT delete them) and retires the trend
+        gate classes from the active acceptance roster. (3) THE TWO VISUALS re-homed where the
+        served shell can host them, or a named follow-up.
+        (4) SERVED-ROOM GATE CLASSES in the acceptance roster — each: a check function, a
         fixture-driven assertion, captures, an enumerated report row — covering the visual
-        language and the charts/visuals, so every future room wave is checked and captured.
+        language and the two visuals (the retired trend classes are NOT re-asserted in stage
+        1).
         (5) FIXTURE ADDITIONS that make each new class assertable — including the empty /
         error / unknown / gap cases, so the honesty rules are PROVEN, not assumed.
 
         ACCEPTANCE: (a) the HOST render gate `python3 scripts/verify_control_room_rendering.py
         --profile acceptance --candidate <sha>` PASSES with ZERO failures on the FINAL commit,
-        running the EXTENDED roster (five restored classes + the new served-room visual
-        classes), with captures for the controller — zero captures is a structural FAIL;
-        `--check-fixtures` green in-cell; (b) the five declared suites green in-cell on the
+        running the EXTENDED roster (five restored classes + the served-room visual-language /
+        token-safety / deltas / evidence-ladder / dependency-flow classes — the trend classes
+        retired for stage 1), with captures for the controller — zero captures is a structural
+        FAIL; `--check-fixtures` green in-cell; (b) the five declared suites green in-cell on the
         FINAL commit; (c) `python3 -m ruff check` green on touched python paths; (d) every
         unit's goal NAMES the assertion that would fail if its claim were false; (e) the AIO
         runs the host gate against this run's candidate BEFORE any promote, and the controller
-        reviews the captures.
+        reviews the captures. The stage-1 REQUIRED repairs are the attempt-6 review's F8 family
+        (per-field measurement provenance for cost, tokens, and retries from the actual writers,
+        through the runtime evidence seam and EVERY served total consumer — a genuinely measured
+        zero distinguishable from an unmeasured default, and cumulative totals carrying their
+        coverage) and the Console scoping (the expected-500 allowance bound to the injected
+        request/endpoint/time window; unrelated console errors and page exceptions must still
+        fail).
 
         EXECUTION SHAPE: plan-units expansion (cap 8), one concern per unit, a handful of
         files, ONE gate per unit; prefer MORE, SMALLER units; ~4 files or two concerns →
