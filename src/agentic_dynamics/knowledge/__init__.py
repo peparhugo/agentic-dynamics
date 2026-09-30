@@ -2,7 +2,8 @@
 
 Ownership: canonical identity + authority contract (``knowledge``), durable stream transport
 (``knowledge_stream``), the record factory, deterministic retrieval, prompt construction, the
-RAG seam (``augment``), the Neo4j/Chroma stores (``graph``/``embeddings``), and the ingestion
+RAG seam (``augment``), the context-layer routing vocabulary + per-phase record
+(``context_layers``), the Neo4j/Chroma stores (``graph``/``embeddings``), and the ingestion
 producers (knowledge/code/quality/policy/story/review/ledger/session/spec/decision/wave_verdict/belief/belief_update/belief_seeds/reflection)
 and the scoreboard aggregation (``scoreboard`` — the self-knowledge layer's s5 measured rows,
 recomputed from the ``wave-verdict`` records).
@@ -18,6 +19,7 @@ from . import (
     belief_seeds,
     belief_update,
     code_ingestion,
+    context_layers,
     decision_ingestion,
     embeddings,
     graph,
@@ -45,6 +47,7 @@ __all__ = [
     "belief_seeds",
     "belief_update",
     "code_ingestion",
+    "context_layers",
     "decision_ingestion",
     "embeddings",
     "graph",

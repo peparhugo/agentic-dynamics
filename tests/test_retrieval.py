@@ -11,16 +11,40 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from agentic_dynamics.knowledge.knowledge import Authority
+from agentic_dynamics.knowledge.context_layers import (
+    CONTEXT_ROUTE_LAYER_KEYS,
+    CONTEXT_ROUTE_RECORD_KEYS,
+    CONTEXT_ROUTE_SCHEMA,
+    LAYER_SELF,
+    LAYER_STATUS_EMPTY,
+    LAYER_STATUS_EXCLUDED,
+    LAYER_STATUS_NAMED_ABSENT,
+    LAYER_STATUS_SET,
+    LAYER_STATUS_UNKNOWN,
+    UNRESOLVED_UNCLASSIFIED_MIXED_REASON,
+    UNRESOLVED_UNCLASSIFIED_WITHHELD_ONLY_REASON,
+    UNRESOLVED_WITHHELD_REASON,
+    LayerRoute,
+    build_context_route_record,
+    classify_phase_role,
+    layer_source_types,
+    resolve_phase_layers,
+    shared_history_scopes,
+)
+from agentic_dynamics.knowledge.knowledge import SOURCE_TYPES, Authority
 from agentic_dynamics.knowledge.retrieval import (
     ADVISORY_FRESH_30D,
     ADVISORY_FRESH_90D,
     AUTHORITY_MULTIPLIER,
     CODE_QUERY_TYPE_PRIORS,
     CONFLICT_MULTIPLIER,
+    DENSE_SEARCH_INCOMPLETE_KEY,
     EXACT_COMMIT_MULTIPLIER,
     FINDINGS_QUERY_TYPE_PRIORS,
     RELATIONSHIP_WEIGHTS,
+    SOURCE_TYPE_EXCLUDED_REASON,
+    SOURCE_TYPE_METADATA_ERROR_KEY,
+    SOURCE_TYPE_RESOLVER_ERROR_KEY,
     UNTYPED_EXCLUDED_REASON,
     WEIGHTS_VERSION,
     Candidate,
@@ -28,6 +52,7 @@ from agentic_dynamics.knowledge.retrieval import (
     FallbackMode,
     QueryShape,
     _dense_filter,
+    acl_excluded,
     build_evidence_cards,
     build_query_plan,
     classify_query_shape,
@@ -1719,6 +1744,764 @@ def test_k4_lexical_leg_types_a_record_the_dense_leg_could_not():
     assert shared.id in [c.id for c in attempt.selected_evidence]
 
 
+# ── u3/F3: a throwing resolver is a NAMED diagnostic, not a clean absence ──
+#
+# Before the repair ``_resolve_source_type`` caught every Exception and returned "", so a
+# resolver that FAILED (artifact store offline, resolver bug) was indistinguishable from one
+# that authoritatively returned None. F3 separates them: a raise records a named diagnostic on
+# the attempt's leg_errors, a clean None records nothing, and the phase never fails either way.
+
+
+def test_f3_throwing_resolver_records_named_diagnostic_and_retrieval_returns():
+    """F3 (u3): a resolver that RAISES is recorded, never swallowed into a silent empty.
+
+    The phase stays safe — retrieval still returns and the candidate stays untyped (then
+    excluded from the top-K when a typed alternative exists) — but the failure is a NAMED
+    diagnostic on the attempt record, so an auditor can tell it from an authoritative empty.
+    """
+
+    def _boom(cid):
+        raise RuntimeError("durable artifact store offline")
+
+    typed = _typed_dense_hit(
+        "k_finding",
+        "the control_db_evidence phase concluded per-phase records are reliable evidence",
+        source_type="finding",
+        authority="measured",
+        evidence_class="[M]",
+    )
+    stale = _untyped_dense_hit("stale-throw", "a matching but untyped stale record")
+    attempt = retrieve(
+        "control db evidence finding",
+        dense_store=_FakeDenseStore([stale, typed]),
+        source_type_resolver=_boom,
+    )
+
+    # The pass returned (this line executes) and the failure is named with its cause.
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY in attempt.leg_errors
+    assert "RuntimeError" in attempt.leg_errors[SOURCE_TYPE_RESOLVER_ERROR_KEY]
+    assert "durable artifact store offline" in attempt.leg_errors[SOURCE_TYPE_RESOLVER_ERROR_KEY]
+    # The failing candidate is NAMED, so the recorded cause is attributable (not an anonymous
+    # "something failed"): the auditor can see which record the resolver could not type.
+    assert "'stale-throw'" in attempt.leg_errors[SOURCE_TYPE_RESOLVER_ERROR_KEY]
+    # The candidate remained untyped and the existing untyped-exclusion gate still applied.
+    stale_cand = next(c for c in attempt.candidates if c.id == "stale-throw")
+    assert stale_cand.source_type == ""
+    assert {"id": "stale-throw", "reason": UNTYPED_EXCLUDED_REASON} in attempt.untyped_excluded
+    # The diagnostic survives into the audit dict the ledger reads (never a host-only value).
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY in attempt.to_dict()["leg_errors"]
+
+
+def test_f3_clean_absence_resolver_leaves_diagnostic_unset():
+    """F3 (u3): an authoritative None is CLEAN absence — it must not set the diagnostic.
+
+    Same evidence shape as the throwing case, but the resolver returns None. The candidate
+    stays untyped and is excluded, yet NO ``source_type_resolver`` diagnostic is recorded,
+    which is what makes a resolver failure distinguishable from an authoritative empty.
+    """
+    attempt = retrieve(
+        "control db evidence finding",
+        dense_store=_FakeDenseStore(
+            [
+                _untyped_dense_hit("stale-none", "a matching but untyped stale record"),
+                _typed_dense_hit(
+                    "k_finding",
+                    "the control_db_evidence phase concluded per-phase records are reliable",
+                    source_type="finding",
+                    authority="measured",
+                    evidence_class="[M]",
+                ),
+            ]
+        ),
+        source_type_resolver=lambda cid: None,
+    )
+
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY not in attempt.leg_errors
+    stale_cand = next(c for c in attempt.candidates if c.id == "stale-none")
+    assert stale_cand.source_type == ""  # still untyped — clean absence, not a typed miss
+    assert {"id": "stale-none", "reason": UNTYPED_EXCLUDED_REASON} in attempt.untyped_excluded
+
+
+def test_f3_empty_and_valid_resolver_returns_leave_diagnostic_unset():
+    """F3 (u3): only a RAISE is a failure — an empty or valid return is never diagnosed.
+
+    The prior test covers an authoritative ``None``. This closes the literal
+    ``None``/**empty** clause by running (a) a whitespace-only return, which is still a
+    clean absence, and (b) a valid typed return, a successful resolution. Neither may set
+    :data:`SOURCE_TYPE_RESOLVER_ERROR_KEY`, so a successful or empty typing can never be
+    confused with a resolver that failed.
+    """
+    typed = _typed_dense_hit(
+        "k_finding",
+        "the control_db_evidence phase concluded per-phase records are reliable",
+        source_type="finding",
+        authority="measured",
+        evidence_class="[M]",
+    )
+
+    # (a) An authoritative whitespace-only return is clean absence, not a failure.
+    empty_attempt = retrieve(
+        "control db evidence finding",
+        dense_store=_FakeDenseStore(
+            [
+                _untyped_dense_hit("stale-empty", "a matching but untyped stale record"),
+                typed,
+            ]
+        ),
+        source_type_resolver=lambda cid: "   ",
+    )
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY not in empty_attempt.leg_errors
+    empty_cand = next(c for c in empty_attempt.candidates if c.id == "stale-empty")
+    assert empty_cand.source_type == ""  # clean absence, never a fabricated type
+    assert {
+        "id": "stale-empty",
+        "reason": UNTYPED_EXCLUDED_REASON,
+    } in empty_attempt.untyped_excluded
+
+    # (b) A valid typed return is a successful resolution, not a diagnosed failure.
+    valid_attempt = retrieve(
+        "control db evidence finding",
+        dense_store=_FakeDenseStore(
+            [
+                _untyped_dense_hit("stale-valid", "a matching but untyped stale record"),
+                typed,
+            ]
+        ),
+        source_type_resolver=lambda cid: "decision",
+    )
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY not in valid_attempt.leg_errors
+    valid_cand = next(c for c in valid_attempt.candidates if c.id == "stale-valid")
+    assert valid_cand.source_type == "decision"  # resolvable typing is not a failure
+    assert valid_attempt.untyped_excluded == []
+
+
+# ── R2: the PRODUCTION resolver's read/parse failure is a named diagnostic, not absence ──
+#
+# The F3 tests above inject a THROWING callable, so they exercise retrieval's diagnostic but
+# never the production resolver that retrieval binds in ``default_retrieve_fn``. That
+# resolver caught every artifact-read/JSON failure, returned ``None``, and CACHED it — so a
+# store outage read exactly like an authoritative empty (the astra R2 finding). This test
+# binds the REAL ``_durable_source_type_resolver()`` to the real ``retrieve`` and drives it
+# with an unreadable artifact, a malformed artifact, and a genuinely absent artifact.
+
+
+def test_production_resolver_unreadable_and_malformed_artifacts_are_named_not_absence(
+    tmp_path, monkeypatch
+):
+    """R2: the production resolver raises on unreadable/malformed artifacts; absence is clean.
+
+    Falsifier for the exact production defect: with the REAL resolver bound to a tmp artifact
+    dir, (a) a directory occupying the artifact path (unreadable) and (b) invalid JSON
+    (malformed) each set :data:`SOURCE_TYPE_RESOLVER_ERROR_KEY` on the attempt while
+    ``retrieve`` still returns; (c) a genuinely absent artifact sets nothing. The failure is
+    also NOT memoised: once an artifact becomes readable the same resolver types it, which a
+    cached ``None`` would have prevented.
+    """
+    from agentic_dynamics.knowledge.augment import _durable_source_type_resolver
+
+    monkeypatch.setattr("agentic_dynamics.core.paths.KB_ARTIFACT_DIR", tmp_path)
+
+    # (a) UNREADABLE: a directory occupies the artifact path, so Path.open() raises.
+    (tmp_path / "unreadable.json").mkdir()
+    # (b) MALFORMED: the artifact exists but is not valid JSON.
+    (tmp_path / "malformed.json").write_text("{not valid json", encoding="utf-8")
+    # (c) ABSENT: no file at all for ``absent``.
+
+    resolver = _durable_source_type_resolver()
+    typed = _typed_dense_hit(
+        "k_finding",
+        "the control_db_evidence phase concluded per-phase records are reliable",
+        source_type="finding",
+        authority="measured",
+        evidence_class="[M]",
+    )
+
+    def _attempt(cid):
+        return retrieve(
+            "control db evidence finding",
+            dense_store=_FakeDenseStore(
+                [_untyped_dense_hit(cid, "a matching but untyped stale record"), typed]
+            ),
+            source_type_resolver=resolver,
+        )
+
+    # (a) An unreadable artifact is a NAMED operational failure, and the pass returns.
+    unreadable = _attempt("unreadable")
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY in unreadable.leg_errors
+    assert "unreadable" in unreadable.leg_errors[SOURCE_TYPE_RESOLVER_ERROR_KEY]
+    # The diagnostic survives into the audit dict the phase record reads (never host-only).
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY in unreadable.to_dict()["leg_errors"]
+
+    # (b) A malformed artifact is the same named failure, attributed to its candidate.
+    malformed = _attempt("malformed")
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY in malformed.leg_errors
+    assert "malformed" in malformed.leg_errors[SOURCE_TYPE_RESOLVER_ERROR_KEY]
+
+    # (c) A genuinely absent artifact is clean absence: no diagnostic (distinguishable).
+    absent = _attempt("absent")
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY not in absent.leg_errors
+    absent_cand = next(c for c in absent.candidates if c.id == "absent")
+    assert absent_cand.source_type == ""
+
+    # Not memoised as absence: repair the artifact and the SAME resolver now types it. A
+    # cached ``None`` (the pre-repair defect) would keep returning a clean empty forever.
+    (tmp_path / "unreadable.json").rmdir()
+    (tmp_path / "unreadable.json").write_text('{"source_type": "decision"}', encoding="utf-8")
+    fixed = _attempt("unreadable")
+    fixed_cand = next(c for c in fixed.candidates if c.id == "unreadable")
+    assert fixed_cand.source_type == "decision"
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY not in fixed.leg_errors
+
+    # The same failure reaches the PHASE RECORD, not only the attempt: ``augment_prompt``
+    # copies ``attempt.leg_errors`` onto the outcome, and the context-route record it builds
+    # carries them. This closes the review's literal "attempt AND phase record" clause.
+    import types
+
+    from agentic_dynamics.knowledge.augment import augment_prompt
+
+    phase_outcome = augment_prompt(
+        base_prompt="control db evidence finding",
+        goal="goal",
+        phase_def={"name": "execute", "kind": "agent"},
+        model="m",
+        commit_sha="rev",
+        inherited_tools=["read"],
+        pinned_policy="",
+        rag_params={},
+        retrieve_fn=lambda **_kwargs: _attempt("malformed"),
+        construct_fn=lambda _request: types.SimpleNamespace(
+            prompt="AUG",
+            fallback=False,
+            fallback_reason="",
+            evidence_ids=[],
+            constructor_attempt_id="c",
+            versions={},
+            token_counts={},
+            cost_usd=0.0,
+        ),
+    )
+    assert phase_outcome.context_route is not None
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY in phase_outcome.context_route["leg_errors"]
+
+
+# ── R2a: an OBSTRUCTED artifact store must not read as clean absence (the astra repair) ──
+#
+# ``Path.exists()`` is not an authoritative absence test: when a parent path component is a
+# regular file (``<file>/<id>.json`` is ENOTDIR) ``exists()`` swallows the ``OSError`` and
+# returns ``False``, so the production resolver cached ``None`` and an outage read exactly
+# like a genuinely missing record. The repair stats the store directory explicitly, so an
+# obstruction is a named ``source_type_resolver`` diagnostic while a missing store directory
+# and a missing record in a valid directory stay clean absence.
+
+
+def test_production_resolver_obstructed_store_is_named_not_absence(tmp_path, monkeypatch):
+    """R2a: an obstructed artifact store is a NAMED diagnostic, never a cached absence.
+
+    Falsifier for the exact production defect: with ``KB_ARTIFACT_DIR`` pointing at a
+    REGULAR FILE, ``<file>/<id>.json`` is ENOTDIR. The repaired resolver stats the store
+    directory and raises the typed :class:`SourceTypeResolutionError`, so an untyped
+    candidate yields :data:`SOURCE_TYPE_RESOLVER_ERROR_KEY` on the attempt, in its audit
+    dict, and on the phase record built by ``augment_prompt`` — while the pass still returns
+    the base prompt safely. The failure is NOT memoised: once the store is a valid directory
+    holding the artifact, the SAME resolver types the id. A genuinely absent artifact in a
+    valid directory sets NO diagnostic. Reverting to ``Path.exists()`` makes the obstructed
+    case return clean absence and the first assertion fail.
+    """
+    from agentic_dynamics.knowledge.augment import (
+        _durable_source_type_resolver,
+        augment_prompt,
+    )
+
+    # OBSTRUCTED: the store path itself is a regular file, so every child is ENOTDIR.
+    obstructed = tmp_path / "artifact-store-is-a-file"
+    obstructed.write_text("not a directory", encoding="utf-8")
+    monkeypatch.setattr("agentic_dynamics.core.paths.KB_ARTIFACT_DIR", obstructed)
+
+    resolver = _durable_source_type_resolver()
+    typed = _typed_dense_hit(
+        "k_finding",
+        "the control_db_evidence phase concluded per-phase records are reliable",
+        source_type="finding",
+        authority="measured",
+        evidence_class="[M]",
+    )
+
+    def _attempt(cid):
+        return retrieve(
+            "control db evidence finding",
+            dense_store=_FakeDenseStore(
+                [_untyped_dense_hit(cid, "a matching but untyped stale record"), typed]
+            ),
+            source_type_resolver=resolver,
+        )
+
+    # The pass returned (this line executes) and the obstruction is a NAMED diagnostic.
+    obstructed_attempt = _attempt("obstructed")
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY in obstructed_attempt.leg_errors
+    assert "obstructed" in obstructed_attempt.leg_errors[SOURCE_TYPE_RESOLVER_ERROR_KEY]
+    assert "not a directory" in obstructed_attempt.leg_errors[SOURCE_TYPE_RESOLVER_ERROR_KEY]
+    # The diagnostic survives into the audit dict the phase record reads (never host-only).
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY in obstructed_attempt.to_dict()["leg_errors"]
+    # The candidate stayed untyped; an obstructed store never fabricates a type.
+    obstructed_cand = next(c for c in obstructed_attempt.candidates if c.id == "obstructed")
+    assert obstructed_cand.source_type == ""
+
+    # The failure also reaches the PHASE RECORD, and a failing pass safely returns the base
+    # prompt instead of blocking (the seam's invariant).
+    def _raise_construct(_request):
+        raise RuntimeError("constructor offline")
+
+    phase_outcome = augment_prompt(
+        base_prompt="BASE PROMPT PRESERVED",
+        goal="goal",
+        phase_def={"name": "execute", "kind": "agent"},
+        model="m",
+        commit_sha="rev",
+        inherited_tools=["read"],
+        pinned_policy="",
+        rag_params={},
+        retrieve_fn=lambda **_kwargs: _attempt("obstructed"),
+        construct_fn=_raise_construct,
+    )
+    assert phase_outcome.context_route is not None
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY in phase_outcome.context_route["leg_errors"]
+    assert phase_outcome.prompt == "BASE PROMPT PRESERVED"
+    assert phase_outcome.fallback is True
+
+    # NOT MEMOISED: repoint the store at a valid directory holding the artifact and the SAME
+    # resolver now types it — a cached ``None`` (the pre-repair defect) could never recover.
+    valid = tmp_path / "valid-store"
+    valid.mkdir()
+    (valid / "obstructed.json").write_text('{"source_type": "decision"}', encoding="utf-8")
+    monkeypatch.setattr("agentic_dynamics.core.paths.KB_ARTIFACT_DIR", valid)
+
+    repaired_attempt = _attempt("obstructed")
+    repaired_cand = next(c for c in repaired_attempt.candidates if c.id == "obstructed")
+    assert repaired_cand.source_type == "decision"
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY not in repaired_attempt.leg_errors
+
+    # CLEAN ABSENCE: a genuinely absent artifact in a valid directory sets NO diagnostic.
+    absent_attempt = _attempt("absent")
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY not in absent_attempt.leg_errors
+    absent_cand = next(c for c in absent_attempt.candidates if c.id == "absent")
+    assert absent_cand.source_type == ""
+
+
+# ── A9-R2a: an OBSTRUCTED individual ARTIFACT lookup must be classified, not absence ──
+#
+# The A8-R2a repair classified an obstructed STORE directory but still tested the individual
+# artifact with ``Path.exists()``. That method follows a symlink and swallows the ``OSError``
+# when the link's TARGET is obstructed — a parent component of the target is a regular file,
+# so resolving the link is ENOTDIR (errno 20) — returning ``False`` for an outage exactly as
+# for a genuinely missing record. This unit stats the individual artifact and CLASSIFIES the
+# result: ENOENT is clean, memoised absence; any other ``OSError`` raises the typed failure
+# and never touches the cache, so a repaired store is visible to the same resolver instance.
+
+
+def test_production_resolver_obstructed_artifact_symlink_is_named_not_absence(
+    tmp_path, monkeypatch
+):
+    """A9-R2a: an ENOTDIR artifact symlink is a NAMED diagnostic, never a cached absence.
+
+    Falsifier for the exact production defect: with a VALID store directory holding a flat
+    64-hex knowledge id whose ``<id>.json`` symlink targets a child of a regular file,
+    ``os.stat(<artifact>)`` raises ``NotADirectoryError``. The repaired resolver raises the
+    typed :class:`SourceTypeResolutionError`, so an untyped candidate yields
+    :data:`SOURCE_TYPE_RESOLVER_ERROR_KEY` on the attempt, in its audit dict, and on the
+    phase record built by ``augment_prompt`` — while the base prompt is returned. The failure
+    is NOT memoised: once the symlink is replaced by a valid artifact the SAME resolver types
+    the id. A genuinely missing artifact in the valid store sets NO diagnostic. Reverting to
+    ``Path.exists()`` makes the obstructed case return clean absence and the first assertion
+    fail.
+    """
+    from agentic_dynamics.knowledge.augment import (
+        _durable_source_type_resolver,
+        augment_prompt,
+    )
+
+    store = tmp_path / "store"
+    store.mkdir()
+    monkeypatch.setattr("agentic_dynamics.core.paths.KB_ARTIFACT_DIR", store)
+
+    # A flat 64-hex knowledge id (the resolver's own id shape), whose artifact symlink's
+    # target is a child of a REGULAR FILE — following it is ENOTDIR, which ``Path.exists()``
+    # reports as ``False``.
+    blocked_id = "a" * 64
+    missing_id = "b" * 64
+    target_parent = tmp_path / "regular-file"
+    target_parent.write_text("not a directory", encoding="utf-8")
+    (store / f"{blocked_id}.json").symlink_to(target_parent / "child.json")
+
+    resolver = _durable_source_type_resolver()
+    typed = _typed_dense_hit(
+        "k_finding",
+        "the control_db_evidence phase concluded per-phase records are reliable",
+        source_type="finding",
+        authority="measured",
+        evidence_class="[M]",
+    )
+
+    def _attempt(cid):
+        return retrieve(
+            "control db evidence finding",
+            dense_store=_FakeDenseStore(
+                [_untyped_dense_hit(cid, "a matching but untyped stale record"), typed]
+            ),
+            source_type_resolver=resolver,
+        )
+
+    # The pass returned (this line executes) and the obstruction is a NAMED diagnostic that
+    # names the artifact and the stat error.
+    obstructed = _attempt(blocked_id)
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY in obstructed.leg_errors
+    diagnostic = obstructed.leg_errors[SOURCE_TYPE_RESOLVER_ERROR_KEY]
+    assert blocked_id in diagnostic
+    assert "NotADirectoryError" in diagnostic
+    # The diagnostic survives into the audit dict the phase record reads (never host-only).
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY in obstructed.to_dict()["leg_errors"]
+    obstructed_cand = next(c for c in obstructed.candidates if c.id == blocked_id)
+    assert obstructed_cand.source_type == ""
+
+    # The failure also reaches the PHASE RECORD while the base prompt is safely returned (the
+    # seam's never-blocks invariant).
+    def _raise_construct(_request):
+        raise RuntimeError("constructor offline")
+
+    phase_outcome = augment_prompt(
+        base_prompt="BASE PROMPT PRESERVED",
+        goal="goal",
+        phase_def={"name": "execute", "kind": "agent"},
+        model="m",
+        commit_sha="rev",
+        inherited_tools=["read"],
+        pinned_policy="",
+        rag_params={},
+        retrieve_fn=lambda **_kwargs: _attempt(blocked_id),
+        construct_fn=_raise_construct,
+    )
+    assert phase_outcome.context_route is not None
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY in phase_outcome.context_route["leg_errors"]
+    assert phase_outcome.prompt == "BASE PROMPT PRESERVED"
+    assert phase_outcome.fallback is True
+
+    # NOT MEMOISED: replace the obstructed symlink with a valid artifact and the SAME resolver
+    # types the id — a cached ``None`` (the pre-repair defect) could never recover.
+    (store / f"{blocked_id}.json").unlink()
+    (store / f"{blocked_id}.json").write_text('{"source_type": "decision"}', encoding="utf-8")
+    repaired = _attempt(blocked_id)
+    repaired_cand = next(c for c in repaired.candidates if c.id == blocked_id)
+    assert repaired_cand.source_type == "decision"
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY not in repaired.leg_errors
+
+    # CLEAN ABSENCE: a genuinely missing artifact in the valid store sets NO diagnostic.
+    absent = _attempt(missing_id)
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY not in absent.leg_errors
+    absent_cand = next(c for c in absent.candidates if c.id == missing_id)
+    assert absent_cand.source_type == ""
+
+
+def test_production_resolver_missing_store_directory_is_clean_absence(tmp_path, monkeypatch):
+    """R2a: a MISSING artifact-store directory stays clean absence, not a diagnosed failure.
+
+    The obstruction repair distinguishes a store path that does not exist at all (no durable
+    layer created yet) from one that exists but is not a directory. Only the latter is an
+    operational failure; a missing store is the ordinary "no durable artifact to type from"
+    case and must remain a clean, memoised ``None`` with no diagnostic.
+    """
+    from agentic_dynamics.knowledge.augment import _durable_source_type_resolver
+
+    monkeypatch.setattr("agentic_dynamics.core.paths.KB_ARTIFACT_DIR", tmp_path / "does-not-exist")
+    resolver = _durable_source_type_resolver()
+    typed = _typed_dense_hit(
+        "k_finding",
+        "the control_db_evidence phase concluded per-phase records are reliable",
+        source_type="finding",
+        authority="measured",
+        evidence_class="[M]",
+    )
+    attempt = retrieve(
+        "control db evidence finding",
+        dense_store=_FakeDenseStore(
+            [_untyped_dense_hit("missing-store", "a matching but untyped stale record"), typed]
+        ),
+        source_type_resolver=resolver,
+    )
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY not in attempt.leg_errors
+    cand = next(c for c in attempt.candidates if c.id == "missing-store")
+    assert cand.source_type == ""
+
+
+# ── R2b: a MALFORMED source_type FIELD is a named diagnostic, not absence or a fake type ──
+#
+# The production resolver coerced the artifact field with ``str(rec.get("source_type") or "")``.
+# That collapses every falsy JSON value to clean absence (``[]`` and ``false`` became ``""``)
+# and FABRICATES a type string from any truthy non-string (``{"bad": 1}`` became
+# ``"{'bad': 1}"``). The repair validates the field's TYPE: missing/``null``/empty-string stay
+# clean absence; a string is normalized; any other JSON type raises the typed
+# ``SourceTypeResolutionError``, which retrieval records as a named diagnostic while the pass
+# continues, and which is never memoised.
+
+
+def test_production_resolver_malformed_source_type_field_is_named_not_absent(tmp_path, monkeypatch):
+    """R2b: list/bool/dict ``source_type`` values are named diagnostics with safe continuation.
+
+    Falsifier for the exact production defect: with the REAL resolver bound to a tmp artifact
+    dir, ``{"source_type": []}``, ``{"source_type": false}`` and ``{"source_type": {"bad": 1}}``
+    each set :data:`SOURCE_TYPE_RESOLVER_ERROR_KEY` while ``retrieve`` still returns, and each
+    candidate stays untyped (never ``"[]"`` / ``"false"`` / ``"{'bad': 1}"``). The failure is NOT
+    memoised: rewriting the artifact with a real string type makes the SAME resolver type it. A
+    missing field, an explicit ``null`` and a whitespace-only string remain clean absence with
+    no diagnostic. Reverting to ``str(rec.get("source_type") or "")`` makes the malformed
+    assertions fail: the list/bool collapse to clean absence and the dict fabricates a string.
+    """
+    from agentic_dynamics.knowledge.augment import (
+        _durable_source_type_resolver,
+        augment_prompt,
+    )
+
+    monkeypatch.setattr("agentic_dynamics.core.paths.KB_ARTIFACT_DIR", tmp_path)
+
+    # MALFORMED fields: each is a real JSON type the artifact never meant as a type string.
+    malformed = {
+        "listy": ("list", '{"source_type": []}'),
+        "booly": ("bool", '{"source_type": false}'),
+        "dicty": ("dict", '{"source_type": {"bad": 1}}'),
+    }
+    for cid, (_type_name, payload) in malformed.items():
+        (tmp_path / f"{cid}.json").write_text(payload, encoding="utf-8")
+    # CLEAN ABSENCE: a missing field, an explicit null, and a whitespace-only string.
+    (tmp_path / "missing-field.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "null-field.json").write_text('{"source_type": null}', encoding="utf-8")
+    (tmp_path / "blank-field.json").write_text('{"source_type": "   "}', encoding="utf-8")
+
+    resolver = _durable_source_type_resolver()
+    typed = _typed_dense_hit(
+        "k_finding",
+        "the control_db_evidence phase concluded per-phase records are reliable",
+        source_type="finding",
+        authority="measured",
+        evidence_class="[M]",
+    )
+
+    def _attempt(cid):
+        return retrieve(
+            "control db evidence finding",
+            dense_store=_FakeDenseStore(
+                [_untyped_dense_hit(cid, "a matching but untyped stale record"), typed]
+            ),
+            source_type_resolver=resolver,
+        )
+
+    # Each malformed field is a NAMED diagnostic naming the offending type, and the candidate
+    # stays untyped — never a fabricated string.
+    fabricated = {"[]", "false", "{'bad': 1}"}
+    for cid, (type_name, _payload) in malformed.items():
+        attempt = _attempt(cid)
+        assert SOURCE_TYPE_RESOLVER_ERROR_KEY in attempt.leg_errors, cid
+        diagnostic = attempt.leg_errors[SOURCE_TYPE_RESOLVER_ERROR_KEY]
+        assert "non-string source_type" in diagnostic
+        assert f"of type {type_name}" in diagnostic
+        # The diagnostic survives into the audit dict the phase record reads.
+        assert SOURCE_TYPE_RESOLVER_ERROR_KEY in attempt.to_dict()["leg_errors"]
+        cand = next(c for c in attempt.candidates if c.id == cid)
+        assert cand.source_type == ""
+        assert cand.source_type not in fabricated
+
+    # Clean absence stays silent in all three shapes (missing, null, blank string).
+    for cid in ("missing-field", "null-field", "blank-field"):
+        attempt = _attempt(cid)
+        assert SOURCE_TYPE_RESOLVER_ERROR_KEY not in attempt.leg_errors, cid
+        cand = next(c for c in attempt.candidates if c.id == cid)
+        assert cand.source_type == ""
+
+    # The diagnostic also reaches the PHASE RECORD while a failing pass safely returns the
+    # base prompt (the seam's never-blocks invariant).
+    def _raise_construct(_request):
+        raise RuntimeError("constructor offline")
+
+    phase_outcome = augment_prompt(
+        base_prompt="BASE PROMPT PRESERVED",
+        goal="goal",
+        phase_def={"name": "execute", "kind": "agent"},
+        model="m",
+        commit_sha="rev",
+        inherited_tools=["read"],
+        pinned_policy="",
+        rag_params={},
+        retrieve_fn=lambda **_kwargs: _attempt("listy"),
+        construct_fn=_raise_construct,
+    )
+    assert phase_outcome.context_route is not None
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY in phase_outcome.context_route["leg_errors"]
+    assert phase_outcome.prompt == "BASE PROMPT PRESERVED"
+    assert phase_outcome.fallback is True
+
+    # NOT MEMOISED: rewrite the malformed artifact as a real type and the SAME resolver types
+    # it — a cached clean absence (the pre-repair ``[]``/``false`` collapse) could never recover.
+    (tmp_path / "listy.json").write_text('{"source_type": "decision"}', encoding="utf-8")
+    repaired = _attempt("listy")
+    repaired_cand = next(c for c in repaired.candidates if c.id == "listy")
+    assert repaired_cand.source_type == "decision"
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY not in repaired.leg_errors
+
+
+# ── A9-R2b: a malformed PROJECTED source_type METADATA field is named, never fabricated ──
+#
+# The A8-R2b repair validated the DURABLE artifact's ``source_type`` field, but the store's
+# PROJECTED metadata — the Chroma/Neo4j property that reaches ``retrieve`` directly — was still
+# coerced by ``_source_type`` with ``str(metadata.get("source_type", "") or "")``. That
+# FABRICATED a type string from a truthy non-string (``{"bad": 1}`` → ``"{'bad': 1}"``) and
+# silently collapsed ``[]``/``false`` to clean absence, which was then laundered through the
+# authoritative resolver as if the field were legitimately missing. This unit validates the
+# projected field's JSON TYPE in ``_resolve_source_type``: an absent key, an explicit ``None``
+# and a string keep today's behaviour; any present non-string records
+# :data:`SOURCE_TYPE_METADATA_ERROR_KEY`, leaves the candidate UNTYPED, and does NOT consult the
+# resolver (a malformed projection is not an authoritative absence).
+
+
+def test_projected_source_type_non_string_is_named_not_fabricated():
+    """A9-R2b: dict/list/bool/number projected ``source_type`` values are named diagnostics.
+
+    Falsifier for the exact projected-metadata defect: with the REAL ``retrieve`` and a fake
+    dense store, a hit whose metadata carries ``{"source_type": {"bad": 1}}``, a nonempty list,
+    ``[]``, ``False`` or a number must leave ``candidate.source_type == ""`` with
+    :data:`SOURCE_TYPE_METADATA_ERROR_KEY` on the attempt, in its audit dict, and on the
+    ``augment_prompt`` phase record — and the authoritative resolver must NOT be consulted
+    (it would otherwise type the candidate, laundering the malformation as absence). Reverting
+    the type validation fabricates ``"{'bad': 1}"`` / ``"['code']"`` or silently erases
+    ``[]``/``false`` and fails these assertions.
+    """
+    from agentic_dynamics.knowledge.augment import augment_prompt
+
+    typed = _typed_dense_hit(
+        "k_finding",
+        "the control_db_evidence phase concluded per-phase records are reliable",
+        source_type="finding",
+        authority="measured",
+        evidence_class="[M]",
+    )
+    malformed = {
+        "dicty": {"bad": 1},
+        "listy": ["code"],
+        "emptylisty": [],
+        "booly": False,
+        "inty": 7,
+    }
+    # A resolver that WOULD type any candidate it is handed. Recording its calls proves a
+    # malformed projection is never laundered as authoritative absence.
+    resolver_calls: list[str] = []
+
+    def _resolver(cid: str) -> str:
+        resolver_calls.append(cid)
+        return "decision"
+
+    def _attempt(cid: str, value):
+        hit = _dense_hit(cid, "a matching projected stale record", authority="source")
+        hit["metadata"]["source_type"] = value
+        return retrieve(
+            "control db evidence finding",
+            dense_store=_FakeDenseStore([hit, typed]),
+            source_type_resolver=_resolver,
+        )
+
+    for cid, value in malformed.items():
+        attempt = _attempt(cid, value)
+        # The malformation is a NAMED diagnostic that attributes the candidate, and it survives
+        # into the audit dict the phase record reads (never a host-only value).
+        assert SOURCE_TYPE_METADATA_ERROR_KEY in attempt.leg_errors, cid
+        diagnostic = attempt.leg_errors[SOURCE_TYPE_METADATA_ERROR_KEY]
+        assert cid in diagnostic, cid
+        assert SOURCE_TYPE_METADATA_ERROR_KEY in attempt.to_dict()["leg_errors"], cid
+        # The candidate stayed untyped — never a fabricated string.
+        cand = next(c for c in attempt.candidates if c.id == cid)
+        assert cand.source_type == "", cid
+        assert cand.source_type != str(value).strip().lower(), cid
+        # The malformed field is NOT handed to the resolver as if absent.
+        assert cid not in resolver_calls, cid
+
+    # The diagnostic also reaches the PHASE RECORD while a failing pass safely returns the
+    # base prompt (the seam's never-blocks invariant).
+    def _raise_construct(_request):
+        raise RuntimeError("constructor offline")
+
+    phase_outcome = augment_prompt(
+        base_prompt="BASE PROMPT PRESERVED",
+        goal="goal",
+        phase_def={"name": "execute", "kind": "agent"},
+        model="m",
+        commit_sha="rev",
+        inherited_tools=["read"],
+        pinned_policy="",
+        rag_params={},
+        retrieve_fn=lambda **_kwargs: _attempt("dicty", {"bad": 1}),
+        construct_fn=_raise_construct,
+    )
+    assert phase_outcome.context_route is not None
+    assert SOURCE_TYPE_METADATA_ERROR_KEY in phase_outcome.context_route["leg_errors"]
+    assert phase_outcome.prompt == "BASE PROMPT PRESERVED"
+    assert phase_outcome.fallback is True
+
+
+def test_projected_source_type_valid_and_absent_controls_are_distinct():
+    """A9-R2b controls: a valid projected type resolves; a genuinely absent field stays clean.
+
+    The malformed diagnostic must not swallow the two legitimate shapes. (a) A valid projected
+    string (``Code``) is normalized to ``code`` with NO diagnostic and the resolver is never
+    consulted. (b) A genuinely absent projected field (and an explicit ``None``, and a
+    whitespace-only string) stays clean absence with NO diagnostic while the authoritative
+    resolver IS still consulted. These are the distinct controls that make the malformed case
+    meaningful: storage metadata, not only durable JSON.
+    """
+    typed = _typed_dense_hit(
+        "k_finding",
+        "the control_db_evidence phase concluded per-phase records are reliable",
+        source_type="finding",
+        authority="measured",
+        evidence_class="[M]",
+    )
+
+    def _must_not_run(_cid: str) -> str:
+        raise AssertionError("the resolver must not be consulted for a valid projected type")
+
+    # (a) A VALID projected string type resolves (normalized) with no diagnostic, and no resolver.
+    valid_hit = _dense_hit("projected-code", "a projected code signature", authority="source")
+    valid_hit["metadata"]["source_type"] = "Code"
+    valid = retrieve(
+        "control db evidence finding",
+        dense_store=_FakeDenseStore([valid_hit]),
+        source_type_resolver=_must_not_run,
+    )
+    assert SOURCE_TYPE_METADATA_ERROR_KEY not in valid.leg_errors
+    assert SOURCE_TYPE_RESOLVER_ERROR_KEY not in valid.leg_errors
+    valid_cand = next(c for c in valid.candidates if c.id == "projected-code")
+    assert valid_cand.source_type == "code"
+
+    # (b) A genuinely ABSENT projected field, an explicit None and a blank string are clean
+    # absence: no diagnostic, and the authoritative resolver is STILL consulted.
+    for cid, build in (
+        ("projected-absent", lambda m: None),
+        ("projected-none", lambda m: m.__setitem__("source_type", None)),
+        ("projected-blank", lambda m: m.__setitem__("source_type", "   ")),
+    ):
+        hit = _dense_hit(cid, "a matching untyped projected record", authority="source")
+        build(hit["metadata"])
+        calls: list[str] = []
+
+        def _resolver(resolved_cid: str, _calls=calls) -> None:
+            _calls.append(resolved_cid)
+            return None
+
+        attempt = retrieve(
+            "control db evidence finding",
+            dense_store=_FakeDenseStore([hit, typed]),
+            source_type_resolver=_resolver,
+        )
+        assert SOURCE_TYPE_METADATA_ERROR_KEY not in attempt.leg_errors, cid
+        assert calls == [cid], cid  # the authoritative resolver was still consulted
+        cand = next(c for c in attempt.candidates if c.id == cid)
+        assert cand.source_type == "", cid
+
+
 def test_freshness_multiplier_advisory_naive_timestamp_is_utc():
     """A naive ISO timestamp must not crash ADVISORY freshness (live dense probe, 2026-09-10).
 
@@ -1797,3 +2580,928 @@ def test_direct_lexical_leg_enforces_acl_scope():
         acl_scope="private-b",
     )
     assert {c.id for c in admitted.candidates} == {"foreign-acl"}
+
+
+# ── Context layers (register L60, unit u1) ─────────────────────
+#
+# The gate for ``knowledge/context_layers.py``: the deterministic phase-kind -> layer
+# mapping, the explicit-only shared-scope parser, the registered source-type material,
+# and the single record builder's stable schema + closed status set with a NAMED absence
+# for a failed layer. These tests are pure vocabulary + arithmetic — no store, no network.
+
+
+def test_context_layers_phase_kind_mapping_is_exact():
+    """The routing rule: planning/implementation -> L1; L2 always; verification/review differ."""
+    planning = resolve_phase_layers("prior", "agent")
+    implementation = resolve_phase_layers("execute", "agent")
+    verification = resolve_phase_layers("g_test_gate", "test")
+    review = resolve_phase_layers("g_adversarial", "agent")
+
+    # L1 structure is the planning/implementation need.
+    assert "L1" in planning.layers
+    assert planning.role == "planning"
+    assert "L1" in implementation.layers
+    assert implementation.role == "implementation"
+
+    # Verification/review resolve differently: history but no structure.
+    assert verification.role == "verification"
+    assert review.role == "review"
+    assert "L2" in verification.layers and "L1" not in verification.layers
+    assert "L2" in review.layers and "L1" not in review.layers
+
+    # L3 outcomes land at planning moments, and only there unless a risk hint forces it.
+    assert "L3" in planning.layers
+    assert "L3" not in implementation.layers
+    assert "L3" in resolve_phase_layers("execute", "agent", {"risk": True}).layers
+
+    # Every phase resolves L2 history at open — even an unrecognised one.
+    for name, kind in (
+        ("prior", "agent"),
+        ("execute", "agent"),
+        ("g_test_gate", "test"),
+        ("g_adversarial", "agent"),
+        ("mystery_phase", "agent"),
+    ):
+        assert "L2" in resolve_phase_layers(name, kind).layers
+
+    # L4 self is NEVER resolved for a cell phase: recorded prohibited, absent from layers.
+    for route in (planning, implementation, verification, review):
+        assert LAYER_SELF in route.prohibited
+        assert LAYER_SELF not in route.layers
+
+
+def test_context_layers_resolver_is_deterministic():
+    """Identical inputs yield an equal route (no clock, no RNG, no store)."""
+    first = resolve_phase_layers(
+        "execute", "agent", {"risk": True, "shared_history_scopes": ["s1"]}
+    )
+    second = resolve_phase_layers(
+        "execute", "agent", {"risk": True, "shared_history_scopes": ["s1"]}
+    )
+    assert first == second
+    assert first is not second  # distinct objects, identical value (frozen dataclass)
+    assert classify_phase_role("prior", "agent") == classify_phase_role("prior", "agent")
+
+
+def test_shared_history_scopes_is_explicit_only():
+    """Explicit repository ids only; absent means empty; empty never means global."""
+    assert shared_history_scopes({}) == []
+    assert shared_history_scopes(None) == []
+    assert shared_history_scopes({"shared_history_scopes": []}) == []
+    # Strips, de-dupes (first-seen), and drops empties.
+    assert shared_history_scopes(
+        {"shared_history_scopes": [" repo-a ", "repo-b", "repo-a", ""]}
+    ) == ["repo-a", "repo-b"]
+    # Aliases are honoured; a bare string is one scope.
+    assert shared_history_scopes({"shared_scopes": ["repo-c"]}) == ["repo-c"]
+    assert shared_history_scopes({"shared_repository_ids": "repo-d"}) == ["repo-d"]
+    # The explicit global wildcards are refused — a cell can never widen to the whole KB.
+    assert shared_history_scopes({"shared_history_scopes": ["*", "global", "all"]}) == []
+
+
+def test_layer_source_types_names_only_registered_types():
+    """Every mapped source type is a member of the one KB vocabulary (knowledge.SOURCE_TYPES)."""
+    assert layer_source_types(["L1"]) == ("code",)
+    assert layer_source_types([]) == ()
+    mapped = layer_source_types(["L2", "L3", "L4", "L1"])
+    assert mapped  # the union is nonempty
+    assert set(mapped).issubset(set(SOURCE_TYPES))
+    # A single string is one layer id, not an iterable of characters.
+    assert layer_source_types("L1") == ("code",)
+
+
+def test_build_context_route_record_stable_schema_and_named_absent():
+    """The single builder owns the stable keys and names a failed layer's absence."""
+    route = resolve_phase_layers("execute", "agent")
+    record = build_context_route_record(
+        "execute",
+        route,
+        None,  # no attempt -> a failed retrieval must be a NAMED absence, never a zero
+        {"fallback": True, "fallback_reason": "retrieve_failed", "fallback_mode": "no_rag"},
+        shared_scopes=[],
+    )
+    assert set(record) == set(CONTEXT_ROUTE_RECORD_KEYS)
+    assert record["schema"] == CONTEXT_ROUTE_SCHEMA
+    assert record["route_status"] == "resolved"
+    assert record["shared_scopes"] == []
+    by_layer = {entry["layer"]: entry for entry in record["layers"]}
+    assert set(by_layer) >= {"L0", "L1", "L2", LAYER_SELF}
+    assert by_layer["L0"]["status"] == "served"
+    assert by_layer["L1"]["status"] == LAYER_STATUS_NAMED_ABSENT
+    assert by_layer["L2"]["status"] == LAYER_STATUS_NAMED_ABSENT
+    assert by_layer[LAYER_SELF]["status"] == LAYER_STATUS_EXCLUDED
+    # The closed status set holds for every disposition the builder emits.
+    assert all(entry["status"] in LAYER_STATUS_SET for entry in record["layers"])
+    # The per-layer entry schema is stable too.
+    assert all(set(entry) == set(CONTEXT_ROUTE_LAYER_KEYS) for entry in record["layers"])
+
+
+def test_build_context_route_record_serves_attributes_and_excludes_l4():
+    """Served items map to their layer; L4 content is excluded, never served."""
+    route = resolve_phase_layers("execute", "agent")
+    record = build_context_route_record(
+        "execute",
+        route,
+        {"selected_evidence": [], "leg_errors": {}},
+        {
+            "selected_evidence": [
+                {"id": "k-code", "source_type": "code"},
+                {"id": "k-belief", "source_type": "belief"},
+            ],
+            "fallback": False,
+            "fallback_mode": "full",
+            "retrieval_leg_errors": {},
+        },
+        shared_scopes=["shared-repo"],
+    )
+    by_layer = {entry["layer"]: entry for entry in record["layers"]}
+    assert by_layer["L1"]["status"] == "served"
+    assert by_layer["L1"]["evidence_ids"] == ["k-code"]
+    assert by_layer["L2"]["status"] == "empty"  # clean pass, nothing matched
+    assert by_layer[LAYER_SELF]["status"] == LAYER_STATUS_EXCLUDED
+    assert by_layer[LAYER_SELF]["evidence_ids"] == ["k-belief"]
+    assert record["served_count"] == 1  # the L4 item is excluded, never counted served
+    assert record["shared_scopes"] == ["shared-repo"]
+
+
+def test_build_context_route_record_unknown_route_records_unclassified():
+    """An unroutable request records its served items as UNKNOWN, with a layer disposition."""
+    record = build_context_route_record(
+        "mystery_phase",
+        None,
+        {"selected_evidence": [], "leg_errors": {}},
+        {"selected_evidence": [{"id": "k-untyped", "source_type": ""}]},
+        shared_scopes=[],
+    )
+    assert record["route_status"] == "unknown"
+    assert record["role"] == "unknown"
+    assert record["served_count"] == 0
+    assert record["unclassified"] == [
+        {
+            "id": "k-untyped",
+            "source_type": "untyped",
+            "status": LAYER_STATUS_UNKNOWN,
+            "reason": "unroutable request: no layer resolved",
+        }
+    ]
+    by_layer = {entry["layer"]: entry for entry in record["layers"]}
+    assert by_layer["unclassified"]["status"] == LAYER_STATUS_UNKNOWN
+    assert by_layer["unclassified"]["evidence_ids"] == ["k-untyped"]
+
+
+def test_build_context_route_record_explicit_unknown_sentinel_is_unknown_and_named():
+    """R4: the explicit ``LayerRoute.unknown()`` sentinel records ``unknown`` + a reason.
+
+    The public UNKNOWN sentinel resolves NO layers, exactly like ``None``, so both must
+    record ``route_status == "unknown"`` with a NAMED routing reason (never a silent
+    "resolved"). A route that DID resolve the L2 floor keeps its real material and stays
+    ``resolved`` even when its role is unknown — the two cases must not conflate. A served
+    non-self item under the sentinel is recorded ``unclassified``/``unknown`` with
+    ``served_count == 0``, so no item is ever served without a resolved layer.
+    """
+    sentinel = build_context_route_record(
+        "execute",
+        LayerRoute.unknown("execute", "agent"),
+        {"selected_evidence": [], "leg_errors": {}},
+        {"selected_evidence": [{"id": "k-code", "source_type": "code"}]},
+        shared_scopes=[],
+    )
+    assert sentinel["route_status"] == "unknown"
+    assert sentinel["routing_reason"]  # a NAMED reason, never an empty success
+    assert sentinel["served_count"] == 0
+    assert [item["id"] for item in sentinel["unclassified"]] == ["k-code"]
+    by_layer = {entry["layer"]: entry for entry in sentinel["layers"]}
+    assert by_layer["unclassified"]["evidence_ids"] == ["k-code"]
+    assert by_layer["unclassified"]["status"] == LAYER_STATUS_UNKNOWN
+    assert set(sentinel) == set(CONTEXT_ROUTE_RECORD_KEYS)
+
+    none_route = build_context_route_record(
+        "execute",
+        None,
+        {"selected_evidence": [], "leg_errors": {}},
+        {"selected_evidence": []},
+        shared_scopes=[],
+    )
+    assert none_route["route_status"] == "unknown"
+    assert none_route["routing_reason"]  # the same named default as the sentinel
+
+    # An unknown ROLE that still resolved the L2 floor is resolved, not the sentinel.
+    floor = resolve_phase_layers("mystery_phase", "agent")
+    assert set(floor.layers) == {"L2"}
+    floor_record = build_context_route_record(
+        "mystery_phase", floor, None, {"fallback": False}, shared_scopes=[]
+    )
+    assert floor_record["route_status"] == "resolved"
+
+
+def test_build_context_route_record_routing_reason_survives_fallback():
+    """A8-R4: a competing fallback never erases the routing diagnosis.
+
+    Both unresolved forms — the explicit ``LayerRoute.unknown()`` sentinel and ``None`` —
+    must serialize BOTH the named routing reason (``routing_reason``) AND the outcome's
+    retrieval/constructor failure (``fallback_reason``). The old
+    ``route_unresolved and not fallback_reason`` gating dropped the routing reason whenever
+    a fallback existed; this gate refuses that regression. A route that resolved the L2
+    floor has no routing failure, so ``routing_reason`` stays empty while ``fallback_reason``
+    keeps the retrieval failure.
+    """
+    sentinel = LayerRoute.unknown("execute", "agent")
+    unresolved_forms = ((None, "routing unresolved"), (sentinel, sentinel.reason))
+    for route, expected_reason in unresolved_forms:
+        for failure in ("retrieve_failed", "construct_failed"):
+            record = build_context_route_record(
+                "execute",
+                route,
+                {"selected_evidence": [], "leg_errors": {}},
+                {
+                    "selected_evidence": [],
+                    "fallback": True,
+                    "fallback_mode": "no_rag",
+                    "fallback_reason": failure,
+                },
+                shared_scopes=[],
+            )
+            # BOTH diagnoses coexist; the fallback does not erase the routing reason.
+            assert record["fallback_reason"] == failure
+            assert record["routing_reason"] == expected_reason
+            assert record["route_status"] == "unknown"
+            assert set(record) == set(CONTEXT_ROUTE_RECORD_KEYS)
+
+    # A resolved L2-floor route has no routing failure: ``routing_reason`` is empty even
+    # when retrieval failed, while ``fallback_reason`` keeps the retrieval failure.
+    floor = resolve_phase_layers("mystery_phase", "agent")
+    assert set(floor.layers) == {"L2"}
+    floor_record = build_context_route_record(
+        "mystery_phase",
+        floor,
+        {"selected_evidence": [], "leg_errors": {}},
+        {
+            "selected_evidence": [],
+            "fallback": True,
+            "fallback_mode": "no_rag",
+            "fallback_reason": "retrieve_failed",
+        },
+        shared_scopes=[],
+    )
+    assert floor_record["routing_reason"] == ""
+    assert floor_record["fallback_reason"] == "retrieve_failed"
+    assert set(floor_record) == set(CONTEXT_ROUTE_RECORD_KEYS)
+
+
+def test_build_context_route_record_withheld_only_summary_is_truthful():
+    """A9-R1-note: the synthetic ``unclassified`` layer's reason matches what was listed.
+
+    An unresolved route records a synthetic ``unclassified``/``unknown`` layer. Its
+    reason must be truthful about the ITEMS it lists: a withheld-only record
+    (``served_count == 0``, no served-but-unattributable item) must never claim served
+    evidence; a MIXED record names both dispositions. The item-level reasons,
+    ``evidence_ids`` and ``served_count`` are the unchanged controls — this gate changes
+    only the layer-level summary.
+
+    Falsifier: with the single hardcoded ``served evidence carries no layer disposition``
+    string, the withheld-only assertion fails.
+    """
+    # Withheld-only: one untyped item withheld before construction; nothing served.
+    withheld_only = build_context_route_record(
+        "mystery_phase",
+        None,
+        {"selected_evidence": [], "leg_errors": {}},
+        {"selected_evidence": []},
+        shared_scopes=[],
+        withheld_evidence=[{"id": "k-untyped", "source_type": ""}],
+    )
+    assert withheld_only["route_status"] == "unknown"
+    assert withheld_only["served_count"] == 0
+    withholding_layer = {e["layer"]: e for e in withheld_only["layers"]}["unclassified"]
+    assert withholding_layer["status"] == LAYER_STATUS_UNKNOWN
+    assert withholding_layer["reason"] == UNRESOLVED_UNCLASSIFIED_WITHHELD_ONLY_REASON
+    # Truthful: it names the withhold and never claims served evidence.
+    assert "served evidence carries no layer disposition" not in withholding_layer["reason"]
+    assert "no evidence was served" in withholding_layer["reason"]
+    assert "withheld before construction" in withholding_layer["reason"]
+    assert withholding_layer["evidence_ids"] == ["k-untyped"]
+    # The item-level disposition is the unchanged control.
+    assert withheld_only["unclassified"] == [
+        {
+            "id": "k-untyped",
+            "source_type": "untyped",
+            "status": LAYER_STATUS_UNKNOWN,
+            "reason": UNRESOLVED_WITHHELD_REASON,
+        }
+    ]
+
+    # MIXED: one served-but-unattributable item plus one withheld item names BOTH.
+    mixed = build_context_route_record(
+        "mystery_phase",
+        None,
+        {"selected_evidence": [], "leg_errors": {}},
+        {"selected_evidence": [{"id": "k-code", "source_type": "code"}]},
+        shared_scopes=[],
+        withheld_evidence=[{"id": "k-untyped", "source_type": ""}],
+    )
+    assert mixed["served_count"] == 0
+    mixed_unclassified = {e["layer"]: e for e in mixed["layers"]}["unclassified"]
+    assert mixed_unclassified["reason"] == UNRESOLVED_UNCLASSIFIED_MIXED_REASON
+    assert "served evidence carries no layer disposition" in mixed_unclassified["reason"]
+    assert "withheld before construction" in mixed_unclassified["reason"]
+    assert set(mixed_unclassified["evidence_ids"]) == {"k-code", "k-untyped"}
+    # The item-level reasons stay distinct and unchanged.
+    item_reasons = {item["id"]: item["reason"] for item in mixed["unclassified"]}
+    assert item_reasons["k-code"] == "unroutable request: no layer resolved"
+    assert item_reasons["k-untyped"] == UNRESOLVED_WITHHELD_REASON
+
+
+# ── u2: source-type prefilter + requested ∪ shared scope union ──
+#
+# The gate for the u2 slice of `retrieval.py` (the F2 repair):
+#   * the dense where-expression's repository clause is the requested scope UNION the
+#     explicit shared scope ids (never a single equality when a shared scope exists), so a
+#     declared shared decision stays retrievable through the dense leg;
+#   * the local hard scope pre-filter keeps shared-scope candidates and STILL drops a
+#     foreign private (non-requested, non-shared) scope;
+#   * a non-empty `source_types` prefilter restricts fusion to the resolved layers' material
+#     and records every dropped candidate; an empty set is the identity (unrouted pass).
+# These tests are store-free/network-free: the fakes are scripted in-memory stores.
+
+
+def _where_matches(metadata: dict, where: dict | None) -> bool:
+    """Evaluate the subset of Chroma's where grammar that :func:`_dense_filter` emits.
+
+    Supports a bare equality clause, ``$or``, and ``$and`` — exactly the shapes the filter
+    produces. This lets a test prove a candidate in a requested-or-shared repository stays
+    retrievable through the dense leg's OWN where-expression, not merely through retrieve's
+    local hard filter.
+    """
+    if not where:
+        return True
+    if "$and" in where:
+        return all(_where_matches(metadata, clause) for clause in where["$and"])
+    if "$or" in where:
+        return any(_where_matches(metadata, clause) for clause in where["$or"])
+    return all(metadata.get(key) == value for key, value in where.items())
+
+
+class _WhereAwareDenseStore:
+    """Dense store that APPLIES the where-expression it is handed (Chroma-shaped).
+
+    ``_FakeDenseStore`` deliberately ignores ``where`` to prove retrieve's local filter; this
+    store honours it, so the positive shared-retrievability assertion also exercises the
+    store-side union clause — and would fail if the clause regressed to a single equality.
+    """
+
+    def __init__(self, hits):
+        self._hits = hits
+        self.where = None
+
+    def search(self, query, *, top_k=40, where=None):
+        self.where = where
+        return [h for h in self._hits if _where_matches(h.get("metadata") or {}, where)]
+
+
+def test_dense_filter_repository_union_over_requested_and_shared():
+    """The repository clause is a $or over requested ∪ shared; a lone scope stays historical."""
+    # Requested only → the pre-existing single equality (back-compat).
+    assert _dense_filter({"repository_id": "cell-a"}) == {"repository_id": "cell-a"}
+    # Requested ∪ explicit shared → a $or over BOTH ids, never a single equality.
+    assert _dense_filter({"repository_id": "cell-a", "shared_repository_ids": ["cell-b"]}) == {
+        "$or": [{"repository_id": "cell-a"}, {"repository_id": "cell-b"}]
+    }
+    # The union de-dupes and drops the requested id from the shared list.
+    assert _dense_filter(
+        {"repository_id": "cell-a", "shared_repository_ids": ["cell-a", "cell-b", ""]}
+    ) == {"$or": [{"repository_id": "cell-a"}, {"repository_id": "cell-b"}]}
+    # No repository scope (requested empty, no shared) → no repository condition at all.
+    assert _dense_filter({"shared_repository_ids": []}) == {}
+
+
+def test_retrieve_shared_scope_union_keeps_shared_and_excludes_foreign():
+    """F2: shared scope stays retrievable (where + local filter); a foreign private scope does not."""
+    requested = _dense_hit("requested", "websocket finding from the requested cell")
+    requested["metadata"]["repository_id"] = "cell-a"
+    shared = _dense_hit("shared", "websocket finding from a declared shared cell")
+    shared["metadata"]["repository_id"] = "cell-b"
+    foreign = _dense_hit("foreign", "websocket finding from a foreign private cell")
+    foreign["metadata"]["repository_id"] = "cell-c"
+
+    # Part 1 — the store HONOURS the where-expression retrieve hands it. The dense leg's
+    # clause must be the union, or the shared hit never reaches retrieve at all.
+    aware = _WhereAwareDenseStore([foreign, requested, shared])
+    attempt = retrieve(
+        "websocket finding",
+        dense_store=aware,
+        repository_id="cell-a",
+        shared_repository_ids=["cell-b"],
+    )
+    assert aware.where == {"$or": [{"repository_id": "cell-a"}, {"repository_id": "cell-b"}]}
+    assert attempt.filters["shared_repository_ids"] == ["cell-b"]
+    aware_ids = {c.id for c in attempt.candidates}
+    assert "requested" in aware_ids
+    assert "shared" in aware_ids  # positive: the declared shared scope stays retrievable
+    assert "foreign" not in aware_ids  # negative: a foreign private scope stays excluded
+
+    # Part 2 — a store that IGNORES its where clause still cannot leak the foreign scope: the
+    # local hard pre-filter keeps shared and drops foreign on its own. This is the assertion
+    # that fails if `scope_excluded` regresses to a single requested-scope equality.
+    local = retrieve(
+        "websocket finding",
+        dense_store=_FakeDenseStore([foreign, requested, shared]),
+        repository_id="cell-a",
+        shared_repository_ids=["cell-b"],
+    )
+    local_ids = {c.id for c in local.candidates}
+    assert {"requested", "shared"} <= local_ids
+    assert "foreign" not in local_ids
+
+    # A pass with no shared scope is unchanged: the foreign scope is still excluded.
+    plain = retrieve(
+        "websocket finding",
+        dense_store=_FakeDenseStore([foreign, requested, shared]),
+        repository_id="cell-a",
+    )
+    assert {c.id for c in plain.candidates} == {"requested"}
+
+
+def test_retrieve_source_types_prefilter_restricts_selected_evidence():
+    """A non-empty source_types set restricts fusion and records every dropped candidate."""
+    code = _dense_hit("k-code", "build_step_graph function reference")
+    code["metadata"]["source_type"] = "code"
+    finding = _dense_hit("k-finding", "build_step_graph measured finding", authority="measured")
+    finding["metadata"]["source_type"] = "finding"
+
+    filtered = retrieve(
+        "build_step_graph implementation",
+        dense_store=_FakeDenseStore([code, finding]),
+        source_types=["code"],
+    )
+    assert {c.id for c in filtered.candidates} == {"k-code"}
+    # The prefilter restricts SELECTED evidence, not merely the fused pool: the excluded
+    # finding can never be served even when the token budget would admit it.
+    assert {c.id for c in filtered.selected_evidence} == {"k-code"}
+    assert filtered.query_plan.source_types == ("code",)
+    assert filtered.filters["source_types"] == ["code"]
+    # The excluded candidate is RECORDED with its type and the named reason (never silent).
+    assert filtered.source_type_excluded == [
+        {
+            "id": "k-finding",
+            "source_type": "finding",
+            "reason": SOURCE_TYPE_EXCLUDED_REASON,
+        }
+    ]
+    assert filtered.to_dict()["source_type_excluded"] == filtered.source_type_excluded
+
+    # An empty set is the identity — the pre-existing, unrouted path keeps every type.
+    unfiltered = retrieve(
+        "build_step_graph implementation",
+        dense_store=_FakeDenseStore([code, finding]),
+    )
+    assert {c.id for c in unfiltered.candidates} == {"k-code", "k-finding"}
+    assert {c.id for c in unfiltered.selected_evidence} == {"k-code", "k-finding"}
+    assert unfiltered.source_type_excluded == []
+
+
+def test_build_query_plan_records_source_types_prefilter():
+    """The plan normalises the type set (lower-cased, de-duped, empties dropped)."""
+    plan = build_query_plan("x", source_types=["Code", " code ", "", None])
+    assert plan.source_types == ("code",)
+    # Absent / None / empty all mean the identity prefilter (no narrowing).
+    assert build_query_plan("x").source_types == ()
+    assert build_query_plan("x", source_types=None).source_types == ()
+    assert build_query_plan("x", source_types=[]).source_types == ()
+    # A bare string is one type, and retrieve threads it onto the plan it builds.
+    assert retrieve("x", source_types="Code").query_plan.source_types == ("code",)
+
+
+def test_shared_repository_ids_refuses_the_global_wildcards():
+    """Explicit shared scopes only: the global wildcards never widen a cell into the whole KB."""
+    attempt = retrieve(
+        "websocket finding",
+        dense_store=_FakeDenseStore([_dense_hit("k", "websocket finding")]),
+        repository_id="cell-a",
+        shared_repository_ids=["*", "global", "all", "cell-b", "cell-b"],
+    )
+    assert attempt.filters["shared_repository_ids"] == ["cell-b"]
+
+
+# ── u2/F2/R3: the AUTHORIZED shared ACL contract ──
+#
+# The repository union alone is not enough: the normal runner config defaults ``acl_scope``
+# to the private cell scope (``workflow_runner._resolve_rag_params``), so the dense clause
+# becomes ``(repository=cell-a OR repository=cell-b) AND acl_scope=cell-a`` and the shared
+# decision — which carries its OWN ACL — is still hidden at the store boundary. An EXPLICIT
+# shared repository scope authorizes that scope's own ACL namespace (the cell convention sets
+# ``repository_id == acl_scope``), so the authorized ACL set is requested ∪ shared. The
+# assertions below fail if the ACL clause regresses to a single requested equality; a foreign
+# private ACL stays excluded and no wildcard can enter the authorized set.
+
+
+def test_dense_filter_acl_union_over_requested_and_authorized_shared():
+    """The ACL clause is requested ∪ authorized shared; a lone ACL stays the historical equality."""
+    # Lone requested ACL → the pre-existing single equality (back-compat).
+    assert _dense_filter({"acl_scope": "cell-a"}) == {"acl_scope": "cell-a"}
+    # Requested ACL ∪ explicit shared scope → a $or over BOTH ACLs, never an equality.
+    assert _dense_filter({"repository_id": "cell-a", "acl_scope": "cell-a"}) == {
+        "$and": [{"repository_id": "cell-a"}, {"acl_scope": "cell-a"}]
+    }
+    assert _dense_filter(
+        {"repository_id": "cell-a", "acl_scope": "cell-a", "shared_repository_ids": ["cell-b"]}
+    ) == {
+        "$and": [
+            {"$or": [{"repository_id": "cell-a"}, {"repository_id": "cell-b"}]},
+            {"$or": [{"acl_scope": "cell-a"}, {"acl_scope": "cell-b"}]},
+        ]
+    }
+    # No requested ACL → the ACL clause stays omitted entirely (ACL-free pass unchanged).
+    assert _dense_filter({"repository_id": "cell-a", "shared_repository_ids": ["cell-b"]}) == {
+        "$or": [{"repository_id": "cell-a"}, {"repository_id": "cell-b"}]
+    }
+
+
+def test_acl_excluded_authorized_shared_acl_contract():
+    """Authorized shared ACLs are eligible; a foreign private ACL is excluded; empty is legacy."""
+    # Historical single requested ACL.
+    assert acl_excluded("cell-a", "cell-a") is False
+    assert acl_excluded("cell-c", "cell-a") is True
+    # The explicit shared repository scope authorizes its OWN ACL namespace.
+    assert acl_excluded("cell-b", "cell-a", shared_acl_scopes=["cell-b"]) is False
+    assert acl_excluded("cell-c", "cell-a", shared_acl_scopes=["cell-b"]) is True
+    # An empty candidate ACL is unknown/legacy and stays eligible.
+    assert acl_excluded("", "cell-a", shared_acl_scopes=["cell-b"]) is False
+    # Wildcards never enter the authorized shared set.
+    assert acl_excluded("all", "cell-a", shared_acl_scopes=["*", "global", "all"]) is True
+    # No requested ACL disables the filter (historical behavior preserved).
+    assert acl_excluded("cell-c", "") is False
+
+
+def test_retrieve_authorized_shared_acl_decision_reaches_evidence():
+    """Under the NORMAL private-ACL config + an explicit shared-history hint, a shared decision
+    carrying its OWN ACL reaches selection, while a foreign private ACL is excluded.
+
+    This is the R3 gate: a regression of the dense ACL clause to a single requested equality
+    would exclude ``k-shared-decision`` at the store boundary and fail the positive assertion.
+    """
+    code = _dense_hit("k-code", "websocket code signature", authority="source")
+    code["metadata"].update(
+        {"repository_id": "cell-a", "acl_scope": "cell-a", "source_type": "code"}
+    )
+    requested = _dense_hit("k-req-decision", "websocket decision from the private cell")
+    requested["metadata"].update(
+        {"repository_id": "cell-a", "acl_scope": "cell-a", "source_type": "decision"}
+    )
+    shared = _dense_hit("k-shared-decision", "websocket decision from a declared shared cell")
+    shared["metadata"].update(
+        {"repository_id": "cell-b", "acl_scope": "cell-b", "source_type": "decision"}
+    )
+    foreign = _dense_hit("k-foreign-decision", "websocket decision from a foreign cell")
+    foreign["metadata"].update(
+        {"repository_id": "cell-c", "acl_scope": "cell-c", "source_type": "decision"}
+    )
+
+    aware = _WhereAwareDenseStore([code, requested, shared, foreign])
+    attempt = retrieve(
+        "websocket decision",
+        dense_store=aware,
+        repository_id="cell-a",
+        acl_scope="cell-a",
+        shared_repository_ids=["cell-b"],
+        source_types=["decision"],
+    )
+    # The dense clause is the repository union AND the AUTHORIZED-ACL union: an ACL equality
+    # to the private cell scope would hide the shared decision at the store boundary.
+    assert aware.where == {
+        "$and": [
+            {"$or": [{"repository_id": "cell-a"}, {"repository_id": "cell-b"}]},
+            {"$or": [{"acl_scope": "cell-a"}, {"acl_scope": "cell-b"}]},
+        ]
+    }
+    assert attempt.filters["acl_scope"] == "cell-a"
+    assert attempt.filters["shared_repository_ids"] == ["cell-b"]
+    ids = {c.id for c in attempt.candidates}
+    assert {"k-req-decision", "k-shared-decision"} <= ids  # positive shared serving
+    assert "k-foreign-decision" not in ids  # negative foreign private ACL
+    assert "k-code" not in ids  # the source_types prefilter narrowed fusion
+    assert {c.id for c in attempt.selected_evidence} == {"k-req-decision", "k-shared-decision"}
+
+
+# ── A10-R2: the dense store's KNOWN incomplete-search signal is a NAMED diagnostic ──────
+#
+# The production dense store expands candidates in bounded rounds and sets an explicit
+# ``incomplete`` state when the scan hits its cap before exhausting the scoped corpus
+# (neo4j_vectors.Neo4jVectorStore.search_with_stats). If the retrieval seam ignored that
+# signal, a capped scan returning no scoped hits would look exactly like a genuinely empty
+# scoped corpus: the affected layer would record a clean ``empty`` instead of a named
+# absence, and an auditor could not tell that scoped candidates went unexamined. The repair
+# consumes the store's PER-CALL ``search_with_stats`` result (falling back to the legacy
+# shared ``last_search_incomplete`` for a pre-refactor store) and records the named
+# ``dense_search_incomplete`` diagnostic on the attempt, its audit dict, and the phase record
+# built by ``augment_prompt``. The two bounded follow-ups (top-K crowding; shared
+# graph-neighbor expansion) are deliberately NOT addressed here.
+
+
+class _CappedDenseStore:
+    """A deterministic dense double exposing the A10-R2 per-call contract.
+
+    ``stats`` is returned verbatim from ``search_with_stats`` so the test can script a capped
+    scan (``incomplete`` true, ``scanned`` at the cap) or an exhausted scan
+    (``incomplete`` false) with no store, network, or external service. Setting
+    ``shared_incomplete`` also plants a (possibly stale) shared attribute, so a test can show
+    the per-call result is preferred when both signals exist.
+    """
+
+    def __init__(self, hits, stats, *, shared_incomplete=None):
+        self._hits = hits
+        self._stats = stats
+        if shared_incomplete is not None:
+            self.last_search_incomplete = shared_incomplete
+
+    def search_with_stats(self, query, *, top_k=40, where=None):
+        return list(self._hits), dict(self._stats)
+
+
+class _LegacyIncompleteDenseStore:
+    """A pre-refactor store: no per-call method, only the shared ``last_search_incomplete``."""
+
+    last_search_incomplete = True
+
+    def search(self, query, *, top_k=40, where=None):
+        return []
+
+
+class _NoOpEmbedder:
+    """Constructible embedder stand-in so the optional embedding leg records no failure.
+
+    A host without the optional ``ollama`` package would otherwise add an unrelated
+    ``embedding`` leg error on every ``retrieve`` call, which would mask the clean-empty
+    control's layer disposition.
+    """
+
+    def embed(self, text):
+        return [0.0]
+
+
+class _ZeroCorpusResult:
+    """Iterable result for the A11-R2 fake driver (mirrors the Neo4j Result protocol)."""
+
+    def __init__(self, rows):
+        self._rows = rows
+
+    def __iter__(self):
+        return iter(self._rows)
+
+
+class _ZeroCorpusTx:
+    def __init__(self, session, timeout=None):
+        self._session = session
+
+    def run(self, cypher, **params):
+        return _ZeroCorpusResult(self._session.respond(cypher, params))
+
+    def close(self):
+        pass
+
+
+class _ZeroCorpusSession:
+    """A fake Neo4j session: successful ``count()==0`` and no vector rows (A11-R2 fixture).
+
+    Only the two production queries the real store issues are answered: the count seam
+    returns the KNOWN ZERO and every vector query returns no rows. Recording the calls lets
+    the gate prove the REAL store's ``count()`` path ran rather than a scripted double.
+    """
+
+    def __init__(self):
+        self.calls = []
+
+    def respond(self, cypher, params):
+        self.calls.append((cypher, params))
+        if "count(k) AS n" in cypher:
+            return [{"n": 0}]  # the production count() of a genuinely empty scoped corpus
+        return []  # no embedded rows exist at this scope
+
+    def begin_transaction(self, timeout=None):
+        return _ZeroCorpusTx(self, timeout)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+class _ZeroCorpusClient:
+    """The store client shim exposing ``_driver.session()`` and ``close()``."""
+
+    def __init__(self, session):
+        self._driver = self
+        self._session = session
+
+    def session(self):
+        return self._session
+
+    def close(self):
+        pass
+
+
+def _known_zero_store():
+    """Build the REAL ``Neo4jVectorStore`` over a fake driver: ``count()==0``, no rows.
+
+    ``_corpus_count = -1`` forces the first filtered search to run the production ``count()``
+    against the fake session, so the gate exercises the real exhaustion arithmetic — not a
+    hand-scripted stats dict.
+    """
+    from agentic_dynamics.knowledge.neo4j_vectors import Neo4jVectorStore
+
+    store = Neo4jVectorStore.__new__(Neo4jVectorStore)
+    session = _ZeroCorpusSession()
+    store._client = _ZeroCorpusClient(session)
+    store._embedder = _NoOpEmbedder()
+    store.dimensions = 1
+    store.timeout_s = 5.0
+    store.last_search_stats = {}
+    store.last_search_incomplete = False
+    store._corpus_count = -1
+    return store, session
+
+
+def _phase_record_for(retrieve_fn, route):
+    """Run the real ``augment_prompt`` seam over ``retrieve_fn`` and return the outcome.
+
+    The constructor echoes the base prompt, so ``outcome.prompt`` proves the base prompt was
+    preserved while the retrieval diagnostic rides the record. The construction SUCCEEDS (not
+    a fallback), so the layer disposition is driven by ``leg_errors`` rather than erased by a
+    competing fallback reason.
+    """
+    import types
+
+    from agentic_dynamics.knowledge.augment import augment_prompt
+
+    def _echo_construct(request):
+        return types.SimpleNamespace(
+            prompt=request.raw_work_item,
+            fallback=False,
+            fallback_reason="",
+            evidence_ids=[],
+            constructor_attempt_id="c",
+            versions={},
+            token_counts={},
+            cost_usd=0.0,
+        )
+
+    return augment_prompt(
+        base_prompt="BASE PROMPT PRESERVED",
+        goal="goal",
+        phase_def={"name": "execute", "kind": "agent"},
+        model="m",
+        commit_sha="rev",
+        inherited_tools=["read"],
+        pinned_policy="",
+        rag_params={},
+        retrieve_fn=retrieve_fn,
+        construct_fn=_echo_construct,
+        route=route,
+    )
+
+
+def test_dense_capped_scan_is_named_incomplete_not_clean_empty(monkeypatch):
+    """A10-R2: a capped dense scan names ``dense_search_incomplete`` on attempt AND record.
+
+    Falsifier: if the dense leg ignored the store's signal, ``leg_errors`` would not carry
+    the key and the routed layer's reason could not name it (the old production defect).
+    """
+    monkeypatch.setattr("agentic_dynamics.knowledge.embeddings.EmbeddingClient", _NoOpEmbedder)
+    route = resolve_phase_layers("execute", "agent")
+    store = _CappedDenseStore(
+        [], {"incomplete": True, "scanned": 256, "corpus": 4096, "returned": 0}
+    )
+
+    def _retrieve_fn(**_kwargs):
+        return retrieve(
+            "implement the projection resolver",
+            dense_store=store,
+            graph_client=_FakeGraph(lexical_hits=[]),
+        )
+
+    attempt = _retrieve_fn()
+    assert DENSE_SEARCH_INCOMPLETE_KEY in attempt.leg_errors
+    assert DENSE_SEARCH_INCOMPLETE_KEY in attempt.to_dict()["leg_errors"]
+    assert "scanned=256" in attempt.leg_errors[DENSE_SEARCH_INCOMPLETE_KEY]
+    assert "corpus=4096" in attempt.leg_errors[DENSE_SEARCH_INCOMPLETE_KEY]
+
+    outcome = _phase_record_for(_retrieve_fn, route)
+    assert outcome.context_route is not None
+    assert DENSE_SEARCH_INCOMPLETE_KEY in outcome.context_route["leg_errors"]
+    by_layer = {entry["layer"]: entry for entry in outcome.context_route["layers"]}
+    assert by_layer["L1"]["status"] == LAYER_STATUS_NAMED_ABSENT
+    assert by_layer["L1"]["status"] != LAYER_STATUS_EMPTY
+    assert DENSE_SEARCH_INCOMPLETE_KEY in by_layer["L1"]["reason"]
+    # A real construction ran (not a fallback) and the base prompt is preserved.
+    assert outcome.fallback is False
+    assert outcome.prompt == "BASE PROMPT PRESERVED"
+
+
+def test_dense_exhausted_empty_scan_is_clean_empty_control(monkeypatch):
+    """Control: an exhausted genuinely-empty scan records NO diagnostic and stays ``empty``.
+
+    This distinguishes the KNOWN-incomplete signal from a clean absence: the dense leg
+    returned, the corpus really was exhausted, and no diagnostic is fabricated.
+    """
+    monkeypatch.setattr("agentic_dynamics.knowledge.embeddings.EmbeddingClient", _NoOpEmbedder)
+    route = resolve_phase_layers("execute", "agent")
+    store = _CappedDenseStore([], {"incomplete": False, "scanned": 40, "corpus": 40, "returned": 0})
+
+    def _retrieve_fn(**_kwargs):
+        return retrieve(
+            "implement the projection resolver",
+            dense_store=store,
+            graph_client=_FakeGraph(lexical_hits=[]),
+        )
+
+    attempt = _retrieve_fn()
+    assert DENSE_SEARCH_INCOMPLETE_KEY not in attempt.leg_errors
+
+    outcome = _phase_record_for(_retrieve_fn, route)
+    assert outcome.context_route is not None
+    assert DENSE_SEARCH_INCOMPLETE_KEY not in outcome.context_route["leg_errors"]
+    by_layer = {entry["layer"]: entry for entry in outcome.context_route["layers"]}
+    assert by_layer["L1"]["status"] == LAYER_STATUS_EMPTY
+
+
+def test_dense_legacy_shared_incomplete_is_named_fallback(monkeypatch):
+    """A pre-refactor store (no per-call method) still names it via ``last_search_incomplete``.
+
+    The production shape before A10-R2 carried the signal on the store instance; that signal
+    must not be silently re-lost by the refactor.
+    """
+    monkeypatch.setattr("agentic_dynamics.knowledge.embeddings.EmbeddingClient", _NoOpEmbedder)
+
+    def _retrieve_fn(**_kwargs):
+        return retrieve(
+            "implement the projection resolver",
+            dense_store=_LegacyIncompleteDenseStore(),
+            graph_client=_FakeGraph(lexical_hits=[]),
+        )
+
+    attempt = _retrieve_fn()
+    assert DENSE_SEARCH_INCOMPLETE_KEY in attempt.leg_errors
+
+
+def test_dense_per_call_signal_preferred_over_stale_shared_state(monkeypatch):
+    """The per-call ``search_with_stats`` result outranks a stale shared instance flag."""
+    monkeypatch.setattr("agentic_dynamics.knowledge.embeddings.EmbeddingClient", _NoOpEmbedder)
+    # The store carries a STALE shared ``last_search_incomplete`` true, while THIS call's
+    # per-call stats say the scan exhausted. The per-call result must win: no diagnostic.
+    store = _CappedDenseStore(
+        [],
+        {"incomplete": False, "scanned": 40, "corpus": 40, "returned": 0},
+        shared_incomplete=True,
+    )
+
+    def _retrieve_fn(**_kwargs):
+        return retrieve(
+            "implement the projection resolver",
+            dense_store=store,
+            graph_client=_FakeGraph(lexical_hits=[]),
+        )
+
+    attempt = _retrieve_fn()
+    assert DENSE_SEARCH_INCOMPLETE_KEY not in attempt.leg_errors
+
+
+def test_dense_known_zero_corpus_is_clean_empty_not_incomplete(monkeypatch):
+    """A11-R2: the REAL production store's known-zero scoped corpus is a clean empty scan.
+
+    The production store (fake driver/embedder, a successful ``count()==0``) must report
+    ``corpus == 0`` and ``incomplete is False``; carried through the real ``retrieve()``
+    (nonempty repository filter, healthy empty lexical leg) and the real ``augment_prompt()``,
+    there is NO ``dense_search_incomplete`` diagnostic and the routed L1 layer is a clean
+    ``empty`` (never ``named_absent``), with the base prompt preserved.
+
+    Falsifier: reverting the ``neo4j_vectors`` exhaustion hunk reports ``corpus`` ``None`` and
+    ``incomplete`` ``True`` at the measured zero, so this test's no-diagnostic and clean
+    ``empty`` assertions fail (pre-fix: L1 ``named_absent``).
+    """
+    monkeypatch.setattr("agentic_dynamics.knowledge.embeddings.EmbeddingClient", _NoOpEmbedder)
+    store, session = _known_zero_store()
+    route = resolve_phase_layers("execute", "agent")
+
+    def _retrieve_fn(**_kwargs):
+        return retrieve(
+            "implement the projection resolver",
+            dense_store=store,
+            graph_client=_FakeGraph(lexical_hits=[]),
+            repository_id="agentic-dynamics",
+        )
+
+    attempt = _retrieve_fn()
+    # The REAL store's count() ran and measured a known zero (not a scripted double).
+    assert store._corpus_count == 0
+    assert any("count(k) AS n" in cypher for cypher, _params in session.calls)
+    assert DENSE_SEARCH_INCOMPLETE_KEY not in attempt.leg_errors
+    assert DENSE_SEARCH_INCOMPLETE_KEY not in attempt.to_dict()["leg_errors"]
+
+    outcome = _phase_record_for(_retrieve_fn, route)
+    assert outcome.context_route is not None
+    assert DENSE_SEARCH_INCOMPLETE_KEY not in outcome.context_route["leg_errors"]
+    by_layer = {entry["layer"]: entry for entry in outcome.context_route["layers"]}
+    assert by_layer["L1"]["status"] == LAYER_STATUS_EMPTY
+    assert by_layer["L1"]["status"] != LAYER_STATUS_NAMED_ABSENT
+    assert outcome.fallback is False
+    assert outcome.prompt == "BASE PROMPT PRESERVED"

@@ -233,9 +233,7 @@ class Neo4jVectorStore:
         docs = list(documents or ["" for _ in ids])
         vectors = embeddings if embeddings is not None else [self._embedder.embed(d) for d in docs]
         if len(vectors) != len(ids):
-            raise Neo4jVectorStoreError(
-                f"embedding count {len(vectors)} != id count {len(ids)}"
-            )
+            raise Neo4jVectorStoreError(f"embedding count {len(vectors)} != id count {len(ids)}")
         rows = []
         for i, (kid, vec) in enumerate(zip(ids, vectors, strict=True)):
             row: dict[str, Any] = {"id": kid, "vec": vec, "text": docs[i] if i < len(docs) else ""}
@@ -254,10 +252,8 @@ class Neo4jVectorStore:
         set_parts = [f"k.{EMBEDDING_PROP} = row.vec", "k.text = coalesce(k.text, row.text)"]
         for keep in _METADATA_KEYS + ("pattern_payload",):
             set_parts.append(f"k.{keep} = coalesce(row.{keep}, k.{keep})")
-        cypher = (
-            "UNWIND $rows AS row "
-            "MERGE (k:Knowledge {knowledge_id: row.id}) "
-            "SET " + ", ".join(set_parts)
+        cypher = "UNWIND $rows AS row MERGE (k:Knowledge {knowledge_id: row.id}) SET " + ", ".join(
+            set_parts
         )
         for start in range(0, len(rows), DEFAULT_BATCH):
             self._run_write(cypher, {"rows": rows[start : start + DEFAULT_BATCH]})
@@ -268,8 +264,7 @@ class Neo4jVectorStore:
         if not ids:
             return
         self._run_write(
-            "UNWIND $ids AS id MATCH (k:Knowledge {knowledge_id: id}) REMOVE k."
-            + EMBEDDING_PROP,
+            "UNWIND $ids AS id MATCH (k:Knowledge {knowledge_id: id}) REMOVE k." + EMBEDDING_PROP,
             {"ids": list(ids)},
         )
 
@@ -284,22 +279,37 @@ class Neo4jVectorStore:
             + " ORDER BY score DESC LIMIT $limit"
         )
 
-    def search(
+    def search_with_stats(
         self,
         query: str,
+        *,
         top_k: int = 10,
+        where: dict[str, Any] | None = None,
         filter_model: str | None = None,
         filter_strategy: str | None = None,
-        where: dict[str, Any] | None = None,
-    ) -> list[dict[str, Any]]:
-        """Semantic search, scope-aware by BOUNDED CANDIDATE EXPANSION.
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """Semantic search, scope-aware by BOUNDED CANDIDATE EXPANSION, with PER-CALL stats.
 
         Each round asks the vector index for the global nearest ``k``; the scope predicate
         filters them. ``k`` grows by ``EXPANSION_FACTOR`` until the scoped set is full, the
         index is exhausted (fewer rows than requested), or ``EXPANSION_CAP`` global rows were
-        scanned. A capped search with fewer than ``top_k`` scoped hits sets
-        ``last_search_incomplete`` — the caller can tell "no relevant evidence" from "the
-        scan bound was reached" (review P1).
+        scanned. A capped search with fewer than ``top_k`` scoped hits reports
+        ``stats["incomplete"]`` — the caller can tell "no relevant evidence" from "the scan
+        bound was reached" (review P1).
+
+        A10-R2: the stats dict is computed from LOCALS and returned alongside the hits, so a
+        caller never has to read the store's shared ``last_search_stats`` /
+        ``last_search_incomplete`` to learn whether THIS call was truncated. ``search()``
+        still assigns those shared attributes for the legacy CLI callers, but a concurrent or
+        re-entrant caller gets this call's own answer, not whatever the last search left.
+
+        A11-R2: the corpus bound is ``int | None`` — a filtered search captures the
+        ``count()`` result, and a KNOWN ZERO (a successful ``count() == 0`` under a scope
+        predicate) is a fully exhausted corpus, not an unknown one. The expansion loop stops
+        at ``scanned >= total`` whenever ``total is not None`` and ``stats["corpus"]`` reports
+        the measured total (a known ``0`` stays ``0``, never coerced to ``None``); only an
+        UNFILTERED search (no predicate) leaves ``corpus`` ``None`` because no scope bound
+        exists.
         """
         merged: dict[str, Any] = dict(where) if where else {}
         if filter_model:
@@ -317,7 +327,9 @@ class Neo4jVectorStore:
         # once per store instance; embedding counts move slowly).
         if pred and self._corpus_count < 0:
             self._corpus_count = self.count()
-        total = self._corpus_count if pred else 0
+        # A11-R2: ``total`` is the sound scoped bound when a predicate exists; without one
+        # there is no scope to bound against, so the count is genuinely None (unknown).
+        total: int | None = self._corpus_count if pred else None
         k = max(limit, EXPANSION_FACTOR)
         scanned = 0
         hits: list[dict[str, Any]] = []
@@ -330,22 +342,56 @@ class Neo4jVectorStore:
             if len(hits) >= limit:
                 full = True
                 break
-            if scanned >= EXPANSION_CAP or (total and scanned >= total):
-                break  # the cap — or the whole embedded corpus — is scanned
+            # A11-R2: a KNOWN total (including a measured ZERO) establishes exhaustion as
+            # soon as the scan has covered it — zero is a real bound, not a falsy no-op.
+            if total is not None and scanned >= total:
+                break  # the whole embedded scoped corpus is scanned
+            if scanned >= EXPANSION_CAP:
+                break  # the expansion cap
             if not pred and len(rows) < scanned:
                 break  # unfiltered: a short page is the index's own exhaustion
             k = min(scanned * EXPANSION_FACTOR, EXPANSION_CAP)
-        self.last_search_stats = {
+        stats = {
             "scanned": scanned,
             "returned": len(hits),
             "limit": limit,
-            "corpus": total or None,
+            # A11-R2: report the measured bound; a known zero stays 0, and only an
+            # unfiltered search (no predicate) reports None (unknown count).
+            "corpus": total,
             # Explicit incomplete state (review P1): the scan hit the cap while the corpus
-            # may still hold scoped candidates deeper in the ranking.
-            "incomplete": (not full) and scanned >= EXPANSION_CAP and (not total or total > scanned),
+            # may still hold scoped candidates deeper in the ranking. A KNOWN total that was
+            # reached (``total <= scanned``) is complete even at zero.
+            "incomplete": (not full)
+            and scanned >= EXPANSION_CAP
+            and (total is None or total > scanned),
         }
-        self.last_search_incomplete = bool(self.last_search_stats["incomplete"])
-        return hits[:limit]
+        return hits[:limit], stats
+
+    def search(
+        self,
+        query: str,
+        top_k: int = 10,
+        filter_model: str | None = None,
+        filter_strategy: str | None = None,
+        where: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """List-returning wrapper around :meth:`search_with_stats` (back-compat).
+
+        Delegates the search and preserves the pre-A10-R2 surface: the ``list`` return the
+        existing callers (and the CLI at ``:504``) expect, plus the shared
+        ``last_search_stats`` / ``last_search_incomplete`` assignment. Callers that need
+        THIS call's truncation state should prefer :meth:`search_with_stats`.
+        """
+        hits, stats = self.search_with_stats(
+            query,
+            top_k=top_k,
+            where=where,
+            filter_model=filter_model,
+            filter_strategy=filter_strategy,
+        )
+        self.last_search_stats = dict(stats)
+        self.last_search_incomplete = bool(stats["incomplete"])
+        return hits
 
     @staticmethod
     def _hit(rec: Any) -> dict[str, Any]:
@@ -368,7 +414,8 @@ class Neo4jVectorStore:
     def eligible_remaining(self) -> int:
         """Nodes eligible for embedding that still lack one (the migration's remainder)."""
         rows = self._run_read(
-            "MATCH (k:Knowledge) WHERE k." + EMBEDDING_PROP
+            "MATCH (k:Knowledge) WHERE k."
+            + EMBEDDING_PROP
             + " IS NULL AND k.text IS NOT NULL AND k.text <> '' RETURN count(k) AS n",
             {},
         )
@@ -388,7 +435,9 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def backfill(*, limit: int = 0, batch: int = 16, source_type: str = "", log: Any = print) -> dict[str, Any]:
+def backfill(
+    *, limit: int = 0, batch: int = 16, source_type: str = "", log: Any = print
+) -> dict[str, Any]:
     """Embed Knowledge nodes that lack an embedding — bounded, resumable, measurable.
 
     Embedding and write time are measured separately (review: perf) because the database
@@ -481,26 +530,38 @@ def main(argv: list[str] | None = None) -> int:
     if args.backfill:
         result = backfill(limit=args.limit, batch=args.batch, source_type=args.source_type)
         if result["failed"]:
-            print(f"BACKFILL FAILED: {result['skipped']} records unprocessed; "
-                  f"eligible_remaining={result['remaining']}")
+            print(
+                f"BACKFILL FAILED: {result['skipped']} records unprocessed; "
+                f"eligible_remaining={result['remaining']}"
+            )
             return 1
         if not args.limit and result["remaining"] > 0:
-            print(f"BACKFILL INCOMPLETE: eligible_remaining={result['remaining']} "
-                  "(re-run to continue)")
+            print(
+                f"BACKFILL INCOMPLETE: eligible_remaining={result['remaining']} "
+                "(re-run to continue)"
+            )
             return 1
-        print(f"backfill: embedded={result['embedded']} "
-              f"with_embedding={result['total']} eligible_remaining={result['remaining']} "
-              + ("(requested batch completed)" if args.limit else "(all eligible indexed)"))
+        print(
+            f"backfill: embedded={result['embedded']} "
+            f"with_embedding={result['total']} eligible_remaining={result['remaining']} "
+            + ("(requested batch completed)" if args.limit else "(all eligible indexed)")
+        )
         return 0
     store = Neo4jVectorStore()
     if args.count:
-        print(f"nodes with embedding: {store.count()} | eligible_remaining: {store.eligible_remaining()}")
+        print(
+            f"nodes with embedding: {store.count()} | eligible_remaining: {store.eligible_remaining()}"
+        )
         return 0
     if args.search:
-        hits = store.search(args.query, top_k=5, where={"repository_id": "agentic-dynamics", "acl_scope": "public"})
+        hits = store.search(
+            args.query, top_k=5, where={"repository_id": "agentic-dynamics", "acl_scope": "public"}
+        )
         for hit in hits:
-            print(f"{hit['distance']:.4f}  {hit['id'][:16]}  "
-                  f"{hit['metadata'].get('source_type')}  {hit['id']}")
+            print(
+                f"{hit['distance']:.4f}  {hit['id'][:16]}  "
+                f"{hit['metadata'].get('source_type')}  {hit['id']}"
+            )
         print(f"search stats: {store.last_search_stats}")
         return 0
     ap.print_help()

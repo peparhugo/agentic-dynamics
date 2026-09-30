@@ -3973,3 +3973,819 @@ def test_wall_burned_phase_without_a_deliverable_fails(tmp_path):
     assert phase.status == "failed"
     assert "TIMEOUT" in (phase.error or "")
     assert result.ok is False
+
+
+# ── Context-route ledger contract (world models L60, unit 5) ─────────────────────────────────
+
+
+def test_phase_result_context_route_is_named_absence_when_unrouted():
+    """u5 (L60/F5): ``to_dict`` ALWAYS carries ``context_route``.
+
+    A phase that computed no route must serialize an explicit NAMED ABSENCE — never a dropped
+    key (indistinguishable from an old ledger) and never a fabricated empty success (an empty
+    record with ``route_status == "resolved"``, which reads as a clean retrieval that matched
+    nothing). The structural boundary F5 records: the run that introduced the recorder is
+    executed by the pre-recorder runner, so its agent phases serialize exactly this absence.
+    """
+    from agentic_dynamics.knowledge.context_layers import CONTEXT_ROUTE_RECORD_KEYS
+    from agentic_dynamics.runtime.workflow_runner import PhaseResult
+
+    phase = PhaseResult(phase="implement", kind="agent", status="ok")
+    assert phase.context_route is None  # nothing computed yet — this unit only serializes
+
+    ledger = phase.to_dict()
+    assert "context_route" in ledger  # never a dropped key
+    absence = ledger["context_route"]
+    assert set(absence) == set(CONTEXT_ROUTE_RECORD_KEYS)  # the schema's stable keys, exactly
+    assert absence["schema"] == "context-route/v1"
+    assert absence["route_status"] == "unknown"  # NOT "resolved" — no fabricated clean pass
+    assert absence["fallback_reason"] == "context_route_not_computed"
+    assert absence["layers"] == []  # nothing was resolved
+    assert absence["served_count"] == 0
+
+    # Round-trip: the named absence survives reconstruction — the key is part of the dataclass,
+    # not an in-memory-only view.
+    rebuilt = PhaseResult(**ledger)
+    assert rebuilt.context_route == absence
+
+
+def test_phase_result_context_route_record_round_trips_layer_statuses():
+    """u5 (L60): a computed record round-trips through JSON with its layer statuses intact."""
+    from agentic_dynamics.knowledge.context_layers import (
+        build_context_route_record,
+        resolve_phase_layers,
+    )
+    from agentic_dynamics.runtime.workflow_runner import PhaseResult
+
+    # A resolved implementation route: L1 structure + L2 history, with L4 self prohibited.
+    route = resolve_phase_layers("implement", "agent")
+    record = build_context_route_record("implement", route, None, None, shared_scopes=[])
+    statuses = {layer["layer"]: layer["status"] for layer in record["layers"]}
+    assert statuses["L1"] == "named_absent"
+    assert statuses["L2"] == "named_absent"
+    assert statuses["L4"] == "excluded"
+
+    phase = PhaseResult(phase="implement", kind="agent", status="ok")
+    phase.context_route = record
+
+    ledger = phase.to_dict()
+    assert ledger["context_route"] == record  # emitted verbatim, never re-derived
+
+    # JSON is how the run ledger is persisted; the record must survive it byte-for-byte.
+    reloaded = json.loads(json.dumps(ledger))
+    rebuilt = PhaseResult(**reloaded)
+    assert rebuilt.context_route == record
+    rebuilt_statuses = {
+        layer["layer"]: layer["status"] for layer in rebuilt.context_route["layers"]
+    }
+    assert rebuilt_statuses == statuses
+
+
+def test_phase_result_context_route_legacy_ledger_parses_and_upgrades_to_named_absence():
+    """u5 (L60/F5): an OLD ledger row (no ``context_route`` key) parses unchanged.
+
+    The field was ADDED without renaming or removing any existing key, so a consumer reading a
+    pre-field on-disk ledger must still find the row usable: ``.get("context_route")`` yields a
+    clean absence (``None``), never a ``KeyError`` — the row "parses unchanged". Re-serializing
+    that legacy row through the CURRENT dataclass materializes the explicit named absence, which
+    is what makes a missing record AUDITABLE rather than silently dropped. This is the F5
+    structural boundary: the recorder run serializes the absence, the follow-up run (on the
+    promoted tree) is the first live evidence of a populated record.
+    """
+    from agentic_dynamics.runtime.workflow_runner import (
+        CONTEXT_ROUTE_ABSENCE_REASON,
+        PhaseResult,
+    )
+
+    # A hand-written pre-field ledger row: the stable columns an old on-disk ledger carried,
+    # and conspicuously NOT ``context_route``.
+    legacy_row = {
+        "phase": "implement",
+        "kind": "agent",
+        "status": "ok",
+        "model": "deepseek/deepseek-flash",
+        "duration_s": 1.5,
+    }
+    # The run ledger is JSONL on disk: it must parse without the new key and without error.
+    parsed = json.loads(json.dumps(legacy_row))
+    assert "context_route" not in parsed  # the old shape genuinely lacks the key
+    assert parsed.get("context_route") is None  # a consumer reads absence, not a KeyError
+
+    rebuilt = PhaseResult(**parsed)
+    assert rebuilt.context_route is None  # the absent field defaults; nothing is fabricated
+
+    # Re-serializing UPGRADES the legacy row to the current contract: the key is present and
+    # names the absence — never omitted (indistinguishable from an old ledger) and never a
+    # fabricated empty success (an empty record with ``route_status == "resolved"``).
+    upgraded = rebuilt.to_dict()
+    assert "context_route" in upgraded
+    absence = upgraded["context_route"]
+    assert absence["fallback_reason"] == CONTEXT_ROUTE_ABSENCE_REASON
+    assert absence["route_status"] == "unknown"
+    assert absence["layers"] == []
+
+
+# ── Context-route end-to-end wiring (world models L60, unit 6 — F1/F5) ───────────────────────
+
+
+def test_real_phase_route_reaches_retrieval_and_ledger(tmp_path):
+    """u6 (L60/F1/F5): the runner resolves the REAL phase route END-TO-END, no injected route.
+
+    The att6 defect was that ``LayerRoute`` was built but never threaded into
+    ``augment_prompt``/``retrieve`` — the route gate asserted a helper, not the route. This
+    test drives a REAL phase (``implement``) through ``run_workflow`` with NO route injected:
+
+    * the captured ``retrieve_fn`` kwargs prove the resolved layer material reached the ONE
+      retrieval path — the ``implement`` call carried a nonempty ``source_types`` prefilter
+      including ``code`` (L1 structure), while the unrecognised ``scope`` phase's call did NOT
+      (the route is per-phase, not a fixed label); and
+    * ``PhaseResult.to_dict()['context_route']`` is nonempty, ``route_status == "resolved"``,
+      with one disposition per resolved layer (L1 ``served``, L4 ``excluded``); and
+    * the LEDGER record and the RETRIEVAL shape are bound to the SAME route for EACH phase:
+      the implementation record's L1 ``source_types`` are exactly the structure term the
+      dense leg was handed, and the unknown-role ``scope`` record carries no L1 disposition
+      while the code candidate the fake leg still returned is recorded ``unclassified``
+      (never served) — three views of one routing decision.
+
+    A cosmetic route label, an assertion on a helper rather than the route, or a record that
+    disagrees with the retrieval it drove, all fail here.
+    """
+    from agentic_dynamics.knowledge.context_layers import LAYER_STATUSES
+
+    spec = load_spec(SPEC)
+    seen: list[dict] = []
+
+    class _TypedEvidence:
+        """A served candidate carrying its real ``source_type`` (attribution observable)."""
+
+        def __init__(self, cid, text, source_type):
+            self.id = cid
+            self.text = text
+            self.authority = "source"
+            self.source_type = source_type
+            self.content_hash = f"ch:{cid}"
+            self.token_count = len(text.split())
+
+        def citation(self):
+            return f"[K:{self.id}@abc:loc]"
+
+    def retrieve_fn(**kwargs):
+        seen.append(kwargs)
+        return _FakeAttempt([_TypedEvidence("k1", "code evidence", "code")])
+
+    def construct_fn(request):
+        return _FakeAugmented("AUG")
+
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        rag_augment=True,
+        retrieve_fn=retrieve_fn,
+        construct_fn=construct_fn,
+        run_agentic_fn=lambda *a, **k: _fake_agent(),
+    )
+
+    # An applicable agent phase: ``implement`` classifies as role=implementation, so the real
+    # deterministic route resolves L1 structure (+ the L2 history floor) for it.
+    implement = next(p for p in result.phases if p.phase == "implement")
+    record = implement.to_dict()["context_route"]
+    assert record  # nonempty — a computed record, never a dropped/empty key
+    assert record["schema"] == "context-route/v1"
+    assert record["route_status"] == "resolved"  # NOT "unknown"/absence
+    assert record["role"] == "implementation"
+    statuses = {layer["layer"]: layer["status"] for layer in record["layers"]}
+    assert {"L0", "L1", "L2", "L4"} <= set(statuses)  # one disposition per resolved layer
+    assert all(status in LAYER_STATUSES for status in statuses.values())
+    assert statuses["L1"] == "served"  # the code evidence was attributed to structure
+    assert statuses["L4"] == "excluded"  # self layer is never served to a cell phase
+    assert record["served_count"] >= 1
+
+    # The ledger record is not merely nonzero: its L1 source types are what the ONE
+    # retrieval path was actually shaped with. The implementation route named ``code`` as
+    # L1 structure, and the dense leg received that same structure term — so a route
+    # rendered as a label (a record present but retrieval unshaped), or a record built from
+    # a different route than the one retrieval ran, cannot satisfy this binding.
+    l1_entry = next(layer for layer in record["layers"] if layer["layer"] == "L1")
+    assert "code" in l1_entry["source_types"]
+    assert set(l1_entry["source_types"]) <= set(seen[2]["source_types"])
+
+    # F1 falsifier: the route reached retrieval. The plain dict order is the phase order
+    # (scope, ux_design, implement are the three agent phases; verify is kind=test and is
+    # bypassed). ``scope`` is role=unknown -> L2 only, so it must NOT get structure; the
+    # implementation phase MUST.
+    assert len(seen) == 3
+    assert "code" not in seen[0]["source_types"]  # unknown role: no L1 structure
+    assert "code" in seen[2]["source_types"]  # implementation role: L1 structure served
+
+    # Per-phase, not a fixed label: the unrecognised ``scope`` phase resolves the L2 history
+    # floor only, and its ledger record is INDEPENDENTLY nonempty/resolved with NO L1
+    # disposition. Because the fake dense leg ignores the prefilter and still returns a
+    # ``code`` candidate, that candidate is un-routable to ``scope`` and must be recorded
+    # ``unclassified`` at ``unknown`` status — never served, never a fabricated zero. This
+    # ties route -> retrieval -> record together per phase.
+    scope = next(p for p in result.phases if p.phase == "scope")
+    scope_record = scope.to_dict()["context_route"]
+    assert scope_record["route_status"] == "resolved"  # the L2 floor IS real material
+    assert all(layer["layer"] != "L1" for layer in scope_record["layers"])
+    assert scope_record["served_count"] == 0  # the code candidate is not routable here
+    assert any(item["id"] == "k1" for item in scope_record["unclassified"])
+
+
+# ── Shared-history scope end-to-end (world models L60, unit 7 — F1/F2) ───────────────────────
+
+
+def _where_matches(metadata, where):
+    """Evaluate the subset of Chroma's where grammar that ``_dense_filter`` emits (u7).
+
+    Supports the exact clause shapes the filter produces — a bare equality, ``$or``, and
+    ``$and`` — so a test can prove a shared-scope decision stays retrievable through the dense
+    leg's OWN where-expression, not merely through retrieve's local hard filter.
+    """
+    if not where:
+        return True
+    if "$and" in where:
+        return all(_where_matches(metadata, clause) for clause in where["$and"])
+    if "$or" in where:
+        return any(_where_matches(metadata, clause) for clause in where["$or"])
+    return all(metadata.get(key) == value for key, value in where.items())
+
+
+class _WhereAwareDenseStore:
+    """Dense store that APPLIES the where-expression it is handed (Chroma-shaped, u7).
+
+    A store that ignores ``where`` would only exercise retrieve's local filter; this one
+    honours the clause, so the positive shared-retrievability assertion also exercises the
+    store-side union clause and would fail if the clause regressed to a single equality.
+    """
+
+    def __init__(self, hits):
+        self._hits = hits
+        self.where = None
+
+    def search(self, query, *, top_k=40, where=None):
+        self.where = where
+        return [h for h in self._hits if _where_matches(h.get("metadata") or {}, where)]
+
+
+def _scope_dense_hit(
+    cid,
+    text,
+    *,
+    repository_id="",
+    source_type="code",
+    acl_scope=None,
+    authority="source",
+):
+    """A dense hit carrying the repository scope + source type the union filter operates on.
+
+    ``acl_scope`` is opt-in (``None`` leaves the key OFF the metadata, preserving the
+    historical ACL-free probes byte-for-byte); a normal-runner probe supplies it so the
+    dense where-expression's authorized-ACL clause has something real to match against.
+    """
+    metadata = {
+        "authority": authority,
+        "source_type": source_type,
+        "repository_id": repository_id,
+        "content_hash": f"hash:{cid}",
+    }
+    if acl_scope is not None:
+        metadata["acl_scope"] = acl_scope
+    return {"id": cid, "document": text, "metadata": metadata, "distance": 0.1}
+
+
+def test_resolve_rag_params_carries_explicit_shared_history_scopes(tmp_path):
+    """u7 (L60/F1): ``_resolve_rag_params`` carries + normalizes an EXPLICIT shared list.
+
+    The canonical ``shared_history_scopes`` key is ALWAYS present in the resolved config: an
+    explicit list is preserved (aliases collapsed onto the canonical key, wildcards and empty
+    entries refused) and an absent list defaults to ``[]`` — an empty list never means global.
+    This is what makes the shared scope reach the phase-route builder and retrieve at all.
+    """
+    from agentic_dynamics.runtime.workflow_runner import _resolve_rag_params
+
+    spec = load_spec(SPEC)
+
+    explicit = _resolve_rag_params(
+        spec,
+        {"shared_history_scopes": [" cell-shared ", "cell-shared", "*", ""]},
+        wd=tmp_path,
+        rag_augment=True,
+    )
+    assert explicit["shared_history_scopes"] == ["cell-shared"]  # normalized, wildcard refused
+
+    # The alias form is carried onto the canonical key the route + retrieval read.
+    aliased = _resolve_rag_params(
+        spec, {"shared_scopes": ["cell-x"]}, wd=tmp_path, rag_augment=True
+    )
+    assert aliased["shared_history_scopes"] == ["cell-x"]
+
+    # Absent -> [] (the key is present and non-global, never omitted).
+    defaulted = _resolve_rag_params(spec, None, wd=tmp_path, rag_augment=True)
+    assert defaulted["shared_history_scopes"] == []
+
+
+def test_shared_scope_union_reaches_dense_filter_end_to_end(tmp_path):
+    """u7 (L60/F1/F2): a run configured with shared scopes builds the requested ∪ shared dense
+    clause, keeps the shared decision retrievable, and still excludes a foreign private scope.
+
+    The runner resolves the REAL phase route from ``rag_params`` (no injected route) and
+    threads the shared scope through ``augment_prompt`` into the ONE ``retrieve`` path. The
+    where-aware store below honours the where-expression it is handed, so the positive
+    assertion would fail if ``_dense_filter`` regressed to a single requested-scope equality;
+    the local hard pre-filter keeps the foreign private scope out regardless of the store.
+    """
+    import functools
+
+    from agentic_dynamics.knowledge.retrieval import retrieve
+
+    spec = load_spec(SPEC)
+    # The cell's own scope is the "requested" arm; ``cell-b`` is the explicit shared arm. An
+    # explicit ``repository_id`` is supplied so the run does not default ``acl_scope`` to the
+    # cell scope (which would add an ACL equality clause and test a different dimension); the
+    # shared scope is still carried solely by ``shared_history_scopes``.
+    requested_scope = cell_scope(tmp_path)
+    requested_hit = _scope_dense_hit(
+        "k-requested", "websocket reload protocol", repository_id=requested_scope
+    )
+    shared_hit = _scope_dense_hit("k-shared", "shared websocket decision", repository_id="cell-b")
+    foreign_hit = _scope_dense_hit("k-foreign", "foreign websocket finding", repository_id="cell-c")
+    store = _WhereAwareDenseStore([requested_hit, shared_hit, foreign_hit])
+
+    served: list[list[str]] = []
+
+    def construct_fn(request):
+        served.append([unit.knowledge_id for unit in request.evidence])
+        return _FakeAugmented("AUG")
+
+    run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        rag_augment=True,
+        retrieve_fn=functools.partial(retrieve, dense_store=store, graph_client=None),
+        construct_fn=construct_fn,
+        rag_params={
+            "repository_id": requested_scope,
+            "shared_history_scopes": ["cell-b"],
+            "emit_self": False,
+        },
+        run_agentic_fn=lambda *a, **k: _fake_agent(),
+    )
+
+    # F2 positive-1: the dense leg received the requested ∪ shared UNION clause. A single
+    # requested-scope equality here would hide the shared decision at the store boundary.
+    assert store.where == {"$or": [{"repository_id": requested_scope}, {"repository_id": "cell-b"}]}
+
+    # The implementation phase is the third agent phase (scope, ux_design, implement); the
+    # real route resolved L1 structure for it, so the code candidates are eligible.
+    implement_ids = served[2]
+    assert "k-shared" in implement_ids  # F2 positive-2: the shared decision stayed retrievable
+    assert "k-foreign" not in implement_ids  # F2 negative: a foreign private scope is excluded
+
+
+def test_shared_decision_served_under_default_private_acl(tmp_path):
+    """u7 (L60/F1/F2, R3): a genuine shared DECISION reaches construction under the NORMAL
+    runner configuration — ``_resolve_rag_params`` defaults ``acl_scope`` to the private cell
+    scope — so the shared-history gate no longer side-steps the ACL contract.
+
+    The prior e2e probe supplied an explicit ``repository_id`` precisely to AVOID that default,
+    and its "shared decision" was ``source_type="code"`` — it proved shared *structure* under an
+    ACL-free config, not a shared *decision* under the normal one (the astra R3/F1-F2 finding).
+
+    Here ONLY the explicit shared-history hint is passed. ``_resolve_rag_params`` therefore
+    defaults both ``repository_id`` and ``acl_scope`` to the private cell scope, and the dense
+    where-expression must carry BOTH unions: the requested ∪ shared REPOSITORY clause and the
+    requested-ACL ∪ shared-ACL clause. The second is the F2/R3 repair: an explicitly shared
+    repository scope authorizes that scope's own ACL namespace, so a shared decision carrying
+    its own non-empty ACL is no longer hidden by an equality to the private cell ACL. A
+    foreign private record (its own repository AND its own foreign ACL) is the negative
+    control. The where-aware store honours the clause it is handed, so a regression of either
+    union to a single equality makes the positive assertion fail at the store boundary.
+    """
+    import functools
+
+    from agentic_dynamics.knowledge.retrieval import retrieve
+
+    spec = load_spec(SPEC)
+    private_scope = cell_scope(tmp_path)
+    shared_scope = "cell-b"
+
+    # A GENUINE shared decision: source_type ``decision`` (L2 history), in an explicitly shared
+    # repository, carrying its OWN non-empty ACL (the shared scope's namespace).
+    shared_decision = _scope_dense_hit(
+        "k-shared-decision",
+        "shared decision: use the websocket reload protocol",
+        repository_id=shared_scope,
+        acl_scope=shared_scope,
+        source_type="decision",
+        authority="measured",
+    )
+    # Negative control: a foreign private decision — its own repository AND a foreign ACL.
+    foreign_decision = _scope_dense_hit(
+        "k-foreign-decision",
+        "foreign private decision: not for sharing",
+        repository_id="cell-c",
+        acl_scope="cell-c",
+        source_type="decision",
+        authority="measured",
+    )
+    # The private cell's own structure, eligible for the implementation phase's L1 layer.
+    local_code = _scope_dense_hit(
+        "k-local-code",
+        "local code: websocket reload handler",
+        repository_id=private_scope,
+        acl_scope=private_scope,
+        source_type="code",
+    )
+    store = _WhereAwareDenseStore([shared_decision, foreign_decision, local_code])
+
+    served: list[list[str]] = []
+
+    class _CapturingAugmented(_FakeAugmented):
+        """A deterministic constructor that emits EXACTLY the evidence it received."""
+
+        def __init__(self, prompt, evidence_ids):
+            super().__init__(prompt)
+            self.evidence_ids = list(evidence_ids)
+
+    def construct_fn(request):
+        ids = [unit.knowledge_id for unit in request.evidence]
+        served.append(ids)
+        return _CapturingAugmented("AUG", ids)
+
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        rag_augment=True,
+        retrieve_fn=functools.partial(retrieve, dense_store=store, graph_client=None),
+        construct_fn=construct_fn,
+        # NO repository_id / acl_scope: the runner must default them to the private cell scope.
+        rag_params={"shared_history_scopes": [shared_scope], "emit_self": False},
+        run_agentic_fn=lambda *a, **k: _fake_agent(),
+    )
+
+    # Positive union (F2): the dense leg was handed the requested ∪ shared repository clause
+    # AND the requested-ACL ∪ shared-ACL clause. Asserting both dimensions means a regression
+    # of EITHER union to a single equality fails the gate — the exact astra R3 counterexample
+    # (repository union AND acl_scope=private) is now impossible.
+    where = store.where
+    assert isinstance(where, dict) and "$and" in where, where
+    repo_clauses = [
+        clause
+        for clause in where["$and"]
+        if "$or" in clause and all("repository_id" in term for term in clause["$or"])
+    ]
+    acl_clauses = [
+        clause
+        for clause in where["$and"]
+        if "$or" in clause and all("acl_scope" in term for term in clause["$or"])
+    ]
+    assert repo_clauses, where
+    assert {term["repository_id"] for term in repo_clauses[0]["$or"]} == {
+        private_scope,
+        shared_scope,
+    }
+    assert acl_clauses, where
+    assert {term["acl_scope"] for term in acl_clauses[0]["$or"]} == {private_scope, shared_scope}
+
+    # The implementation phase (third agent phase) resolves the L2 history floor plus L1
+    # structure, so the shared DECISION is eligible and the local code is too.
+    implement_ids = served[2]
+    assert "k-shared-decision" in implement_ids  # F2 positive: the shared decision was served
+    assert "k-local-code" in implement_ids  # L1 structure for the implementation phase
+    assert "k-foreign-decision" not in implement_ids  # foreign private ACL + repository excluded
+
+    # The record is not merely resolved: the L2 history disposition names the served shared
+    # decision, and the shared scope is recorded on the route — so the ledger shows what the
+    # union actually served, not just that a union clause was built.
+    implement = next(p for p in result.phases if p.phase == "implement")
+    record = implement.to_dict()["context_route"]
+    assert record["route_status"] == "resolved"
+    assert shared_scope in record["shared_scopes"]
+    l2_entry = next(layer for layer in record["layers"] if layer["layer"] == "L2")
+    assert l2_entry["status"] == "served"
+    assert "k-shared-decision" in l2_entry["evidence_ids"]
+    assert "k-foreign-decision" not in l2_entry["evidence_ids"]
+
+
+# ── Declared phase scope outranks the name/kind substring classifier (world models L60, u1 — A10-R1) ──
+
+
+def test_expanded_implementation_phase_declared_scope_outranks_name(tmp_path):
+    """u1 (L60/A10-R1): a phase's DECLARED ``scope`` beats the name/kind substring classifier.
+
+    The att10 astra finding: the ``execute`` phase declares ``scope: implementation`` and expands
+    via ``expand_from_plan``; the generated unit slice inherits that scope (``_unit_slice_def``),
+    but the unit name ``execute__u2_projected_source_type_validated`` carries the incidental
+    ``validat`` substring. ``classify_phase_role`` searches the whole name for verification
+    markers BEFORE implementation markers, so on the pre-fix wiring the expanded implementation
+    phase lost L1 structure (role ``verification``, no ``code`` in the retrieval prefilter).
+
+    This gate drives the REAL ``run_workflow`` on an inline ``agent_task`` spec whose ``execute``
+    phase declares ``scope: implementation`` + ``expand_from_plan``, with a captured
+    ``retrieve_fn``. It would fail on the pre-fix wiring because ``classify_phase_role`` returns
+    verification for the expanded unit (no ``code``) and the serialized route says
+    ``verification`` — reverting the declared-scope pass fails both assertions. The genuine
+    verification agent phase is the negative L1 control: even though both phases resolve L2
+    history, only the declared implementation scope may pull ``code`` (L1 structure).
+    """
+    # A real git worktree: the expanded unit slice declares ``requires_deliverable``, so each
+    # agent phase must leave a tree change (the fake agent writes one file per call).
+    _git_init(tmp_path)
+    # The plan names the exact unit the finding used: an implementation goal whose id carries
+    # the verification-looking ``validated`` word.
+    _write_units(
+        tmp_path,
+        {"units": [_unit("u2_projected_source_type_validated", goal="project the source type")]},
+    )
+
+    phases = [
+        {
+            "name": "execute",
+            "kind": "agent",
+            "scope": "implementation",
+            "expand_from_plan": "notes/plan.units.json",
+            "prompt": "unit {unit_id}: {unit_goal}",
+        },
+        # A genuine verification agent phase. NOTE: the per-step execution SCOPE_VOCABULARY
+        # (research_readonly / implementation / review_readonly / proposal_write /
+        # adversarial_readonly) is a DIFFERENT closed vocabulary from the routing ROLE values
+        # (planning / implementation / verification / review / unknown); there is no
+        # ``scope: verification``. The routing resolver therefore reads a declared execution
+        # scope as a role hint ONLY when the string coincides with a role (``implementation``)
+        # and otherwise falls through to the name classifier — which classifies this named
+        # ``verify`` phase as role ``verification``. This is the negative L1 control: a genuine
+        # verification phase, however expressed, must stay L1-free.
+        {
+            "name": "verify",
+            "kind": "agent",
+            "prompt": "verify the delivered work",
+        },
+    ]
+    spec = ExperimentSpec(
+        name="u1_declared_scope_synth",
+        question="q",
+        version="1",
+        workflow=Workflow(
+            kind="agent_task",
+            params={"language": "python", "phases": phases},
+        ),
+        factors=[Factor("model", ["m"])],
+        design="factorial",
+    )
+
+    seen: list[dict] = []
+
+    class _TypedEvidence:
+        """A served candidate carrying its real ``source_type`` (attribution observable)."""
+
+        def __init__(self, cid, text, source_type):
+            self.id = cid
+            self.text = text
+            self.authority = "source"
+            self.source_type = source_type
+            self.content_hash = f"ch:{cid}"
+            self.token_count = len(text.split())
+
+        def citation(self):
+            return f"[K:{self.id}@abc:loc]"
+
+    def retrieve_fn(**kwargs):
+        seen.append(kwargs)
+        return _FakeAttempt([_TypedEvidence("k1", "code evidence", "code")])
+
+    def construct_fn(request):
+        return _FakeAugmented("AUG")
+
+    deliveries: list[int] = []
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        """A fake agent that writes a fresh file (the deliverable gate needs a tree change)."""
+        deliveries.append(1)
+        (Path(workdir) / f"delivered_{len(deliveries)}.txt").write_text("x\n")
+        return _fake_agent()
+
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        rag_augment=True,
+        retrieve_fn=retrieve_fn,
+        construct_fn=construct_fn,
+        run_agentic_fn=agent,
+    )
+
+    # The expanded agent phase is reached under its generated name (the test gate for the unit is
+    # ``kind: test`` and bypasses the augmentation seam, so exactly the two agent phases call
+    # retrieve_fn, in phase order: the expanded execute slice, then the verification phase).
+    expanded_name = "execute__u2_projected_source_type_validated"
+    expanded = next(p for p in result.phases if p.phase == expanded_name)
+    assert len(seen) == 2  # the unit's test gate does not retrieve
+
+    # (a) The declared implementation scope reached the ONE retrieval path: the expanded slice's
+    # callback received ``code`` (L1 structure). On the pre-fix classifier this is verification
+    # and ``code`` is absent — the finding's exact regression.
+    assert "code" in seen[0]["source_types"]
+    # (b) The serialized route is the phase's declared semantics, resolved (not a label, not a
+    # named absence): role implementation with a real L1 disposition.
+    record = expanded.to_dict()["context_route"]
+    assert record["route_status"] == "resolved"
+    assert record["role"] == "implementation"
+    l1_entry = next(layer for layer in record["layers"] if layer["layer"] == "L1")
+    assert "code" in l1_entry["source_types"]
+
+    # Negative L1 control: the genuine verification phase (name-classified — the execution scope
+    # vocabulary has no ``verification`` value) must stay L1-free: no ``code`` prefilter,
+    # serialized role verification. This passes under both wirings, so it isolates the DECLARED
+    # implementation scope as the thing that changed the expanded slice's route, not a blanket
+    # "every agent phase gets L1".
+    verify = next(p for p in result.phases if p.phase == "verify")
+    verify_record = verify.to_dict()["context_route"]
+    assert verify_record["route_status"] == "resolved"  # the L2 history floor is real material
+    assert verify_record["role"] == "verification"
+    assert "code" not in seen[1]["source_types"]
+    assert all(layer["layer"] != "L1" for layer in verify_record["layers"])
+
+
+# ── Declared execution scope -> routing role translation (world models L60, u1 — A11-R1) ─────
+
+
+def _scope_synth_spec(phases: list[dict]) -> ExperimentSpec:
+    """A minimal ``agent_task`` spec with inline agent phases (no deliverables, no gates)."""
+    return ExperimentSpec(
+        name="u1_scope_translation_synth",
+        question="q",
+        version="1",
+        workflow=Workflow(kind="agent_task", params={"language": "python", "phases": phases}),
+        factors=[Factor("model", ["m"])],
+        design="factorial",
+    )
+
+
+class _ScopeTypedEvidence:
+    """A retrieved candidate carrying its real ``source_type`` (attribution observable)."""
+
+    def __init__(self, cid, text, source_type):
+        self.id = cid
+        self.text = text
+        self.authority = "source"
+        self.source_type = source_type
+        self.content_hash = f"ch:{cid}"
+        self.token_count = len(text.split())
+
+    def citation(self):
+        return f"[K:{self.id}@abc:loc]"
+
+
+def test_declared_non_implementation_scope_translates_to_routing_role(tmp_path):
+    """u1 (L60/A11-R1): a DECLARED non-implementation scope reaches the routing vocabulary.
+
+    The att11 astra finding: the execution-scope vocabulary (``SCOPE_VOCABULARY``) and the
+    routing-role vocabulary are different closed sets. ``workflow_runner`` used to pass the
+    declared scope through and unconditionally DELETE the explicit ``role``/``phase_role``
+    hints for every nonempty scope, so ``review_readonly`` / ``research_readonly`` /
+    ``adversarial_readonly`` — which name no routing role — were silently re-classified by the
+    incidental phase NAME. ``execution_scope_role`` now TRANSLATES the declared scope, and the
+    names below deliberately supply no role semantics:
+
+    (a)  ``scope=review_readonly`` + name ``collect``        -> role ``review``   (NO ``code``)
+    (a2) ``scope=adversarial_readonly`` + name ``inspect``   -> role ``review``   (NO ``code``)
+    (b)  ``scope=research_readonly`` + name ``gather``       -> role ``planning`` (``code``)
+
+    Reverting the runner translation hunk name-classifies all three as ``unknown`` (no ``code``
+    for any), failing (a)/(a2)/(b). The existing
+    ``test_expanded_implementation_phase_declared_scope_outranks_name`` remains the
+    declared-implementation positive control (declared implementation still outranks the
+    incidental ``validat`` name and any run-global hint).
+    """
+    seen: list[dict] = []
+
+    def retrieve_fn(**kwargs):
+        seen.append(kwargs)
+        return _FakeAttempt([_ScopeTypedEvidence("k1", "code evidence", "code")])
+
+    def construct_fn(request):
+        return _FakeAugmented("AUG")
+
+    spec = _scope_synth_spec(
+        [
+            {"name": "collect", "kind": "agent", "scope": "review_readonly", "prompt": "collect"},
+            {
+                "name": "inspect",
+                "kind": "agent",
+                "scope": "adversarial_readonly",
+                "prompt": "inspect",
+            },
+            {"name": "gather", "kind": "agent", "scope": "research_readonly", "prompt": "gather"},
+        ]
+    )
+
+    result = run_workflow(
+        spec,
+        goal="g",
+        model="m",
+        workdir=tmp_path,
+        commit=False,
+        rag_augment=True,
+        retrieve_fn=retrieve_fn,
+        construct_fn=construct_fn,
+        run_agentic_fn=lambda *a, **k: _fake_agent(),
+    )
+
+    assert len(seen) == 3  # one real retrieve per agent phase, in phase order
+    by_phase = {p.phase: p for p in result.phases}
+
+    # (a) review_readonly -> role review, L2 history only (no L1 structure).
+    collect = by_phase["collect"].to_dict()["context_route"]
+    assert collect["route_status"] == "resolved"
+    assert collect["role"] == "review"
+    assert "code" not in seen[0]["source_types"]
+
+    # (a2) adversarial_readonly -> role review, L2 history only (no L1 structure).
+    inspect = by_phase["inspect"].to_dict()["context_route"]
+    assert inspect["route_status"] == "resolved"
+    assert inspect["role"] == "review"
+    assert "code" not in seen[1]["source_types"]
+
+    # (b) research_readonly -> role planning, L1 structure IS requested.
+    gather = by_phase["gather"].to_dict()["context_route"]
+    assert gather["route_status"] == "resolved"
+    assert gather["role"] == "planning"
+    assert "code" in seen[2]["source_types"]
+
+
+def test_unmapped_declared_scope_retains_explicit_role_hint(tmp_path):
+    """u1 (L60/A11-R1): an UNMAPPED declared scope RETAINS an explicit role/phase_role hint.
+
+    ``proposal_write`` is deliberately UNMAPPED in ``EXECUTION_SCOPE_ROLES``: assembling a
+    proposal is an execution envelope, not an evidence-routing role. For such a scope the runner
+    must NOT discard the phase's explicit semantic hint (the att11 regression) and must NOT
+    inject the scope as a role. The name ``build_notes`` name-classifies as ``implementation``
+    (it contains the ``build`` marker), so retention is directly observable: the serialized role
+    is the HINT, never the name-derived ``implementation``.
+
+    Both hint keys are exercised — ``role`` (run 1, ``review``) and ``phase_role`` (run 2,
+    ``planning``). Pre-fix the runner deleted both keys for the nonempty ``proposal_write``
+    scope, so both runs would record ``implementation`` and fail. The ``review`` run also proves
+    the retained hint SHAPES retrieval (review resolves L2 only -> no ``code``), so retention is
+    semantic, not a cosmetic record label.
+    """
+    seen: list[dict] = []
+
+    def retrieve_fn(**kwargs):
+        seen.append(kwargs)
+        return _FakeAttempt([_ScopeTypedEvidence("k1", "code evidence", "code")])
+
+    def construct_fn(request):
+        return _FakeAugmented("AUG")
+
+    def _run(rag_params: dict, workdir):
+        return run_workflow(
+            _scope_synth_spec(
+                [
+                    {
+                        "name": "build_notes",
+                        "kind": "agent",
+                        "scope": "proposal_write",
+                        "prompt": "build the notes",
+                    }
+                ]
+            ),
+            goal="g",
+            model="m",
+            workdir=workdir,
+            commit=False,
+            rag_augment=True,
+            retrieve_fn=retrieve_fn,
+            construct_fn=construct_fn,
+            rag_params=rag_params,
+            run_agentic_fn=lambda *a, **k: _fake_agent(),
+        )
+
+    # Run 1: explicit ``role`` hint. A review route is L2-only, so no ``code`` is requested.
+    run1_dir = tmp_path / "run1"
+    run1_dir.mkdir()
+    result1 = _run({"role": "review"}, run1_dir)
+    record1 = next(p for p in result1.phases if p.phase == "build_notes").to_dict()["context_route"]
+    assert record1["route_status"] == "resolved"
+    assert record1["role"] == "review"  # retained hint, NOT the name-derived implementation
+    assert "code" not in seen[0]["source_types"]
+
+    # Run 2: explicit ``phase_role`` hint — the other hint key resolves planning (L1 requested).
+    run2_dir = tmp_path / "run2"
+    run2_dir.mkdir()
+    result2 = _run({"phase_role": "planning"}, run2_dir)
+    record2 = next(p for p in result2.phases if p.phase == "build_notes").to_dict()["context_route"]
+    assert record2["route_status"] == "resolved"
+    assert record2["role"] == "planning"  # retained hint, NOT the name-derived implementation
+    assert "code" in seen[1]["source_types"]

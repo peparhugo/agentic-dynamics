@@ -5,6 +5,16 @@ import json
 from dataclasses import fields
 
 from agentic_dynamics.knowledge.augment import augment_prompt
+from agentic_dynamics.knowledge.context_layers import (
+    LAYER_SELF,
+    LAYER_STATUS_EXCLUDED,
+    LAYER_STATUS_NAMED_ABSENT,
+    LAYER_STATUS_SERVED,
+    UNRESOLVED_WITHHELD_REASON,
+    LayerRoute,
+    resolve_layer_route,
+    resolve_phase_layers,
+)
 from agentic_dynamics.knowledge.prompt_constructor import (
     DEFAULT_CONSTRUCTOR_MODEL,
     SCHEMA_VERSION,
@@ -22,6 +32,7 @@ from agentic_dynamics.knowledge.prompt_constructor import (
     render_prompt,
     validate_plan,
 )
+from agentic_dynamics.knowledge.retrieval import SOURCE_TYPE_RESOLVER_ERROR_KEY
 
 
 def _evidence(
@@ -355,3 +366,332 @@ def test_default_model_is_cheapest_flash():
 def test_parse_model_json_tolerates_fences():
     assert parse_model_json('```json\n{"a": 1}\n```') == {"a": 1}
     assert parse_model_json("not json") is None
+
+
+# ── u4: layer-route → retrieval shaping + per-phase context_route ──
+#
+# The gate for the u4 slice (F4 repair): `augment_prompt` with a REAL route emits
+# `AugmentationOutcome.context_route` with one honest disposition per resolved layer; a
+# layer whose leg failed is `named_absent`, never an empty `served`; every served item
+# carries a layer; prohibited self-layer (L4) content is excluded; an UNKNOWN/unroutable
+# request records its served items as unclassified and serves nothing. These tests use
+# only local test doubles — no store, no network, no optional deps.
+
+
+class _FakeCandidate:
+    """A `Candidate`-shaped double carrying exactly the fields the seam reads."""
+
+    def __init__(self, cid: str, source_type: str = "code") -> None:
+        self.id = cid
+        self.text = f"text for {cid}"
+        self.authority = "source"
+        self.commit_sha = "abc"
+        self.source_type = source_type
+        self.locator = f"loc:{cid}"
+        self.content_hash = ""
+        self.token_count = 1
+        self.pattern_payload = None
+
+    def citation(self) -> str:
+        return f"[K:{self.id}@abc:{self.locator}]"
+
+
+class _FakeAttempt:
+    """A `RetrievalAttempt`-shaped double."""
+
+    def __init__(
+        self,
+        selected: list[_FakeCandidate],
+        *,
+        leg_errors: dict[str, str] | None = None,
+        fallback_mode: str = "full",
+    ) -> None:
+        self.selected_evidence = selected
+        self.leg_errors = leg_errors or {}
+        self.fallback_mode = fallback_mode
+        self.retrieval_attempt_id = "ret-1"
+
+
+class _FakeConstructed:
+    """An `AugmentedPrompt`-shaped double naming the evidence the worker received."""
+
+    def __init__(self, evidence_ids: list[str], *, fallback: bool = False) -> None:
+        self.prompt = "AUGMENTED PROMPT"
+        self.fallback = fallback
+        self.fallback_reason = "" if not fallback else "constructor_fallback"
+        self.evidence_ids = evidence_ids
+        self.constructor_attempt_id = "con-1"
+        self.versions: dict[str, str] = {}
+        self.token_counts: dict[str, int] = {}
+        self.cost_usd = 0.0
+
+
+def test_resolve_layer_route_maps_layers_to_retrieval_shaping():
+    """The shaping carries the route's source types, shared ids, and L3 pattern projection."""
+    planning = resolve_phase_layers("prior", "agent")  # L1 + L2 + L3
+    shape = resolve_layer_route(planning, goal="what happened before?", base_prompt="plan it")
+    assert shape.source_types == planning.source_types
+    assert "code" in shape.source_types  # L1 structure material
+    assert "story" in shape.source_types  # L2 history material
+    assert "pattern" in shape.source_types  # L3 outcomes material
+    assert shape.pattern_projection is True  # L3 resolved -> pattern records stay eligible
+    assert shape.shared_repository_ids == ()
+    assert shape.intent == "outcomes"
+
+    implementation = resolve_phase_layers("execute", "agent")  # L1 + L2, no L3
+    shape_i = resolve_layer_route(implementation, goal="build it", base_prompt="code")
+    assert shape_i.pattern_projection is False
+    assert "code" in shape_i.source_types
+
+    # An absent/unknown route is the identity shape — the pre-existing retrieval path.
+    unknown = resolve_layer_route(None)
+    assert unknown.source_types == ()
+    assert unknown.shared_repository_ids == ()
+    assert unknown.pattern_projection is False
+    assert unknown.intent == "unknown"
+
+
+def _shaped_augment(route, *, retrieve_fn, construct_fn, shared_scopes=None):
+    return augment_prompt(
+        base_prompt="implement the widget",
+        goal="build a widget",
+        phase_def={"name": "execute", "kind": "agent"},
+        model="deepseek/deepseek-flash",
+        commit_sha="abc1234",
+        inherited_tools=["read", "edit"],
+        pinned_policy="policy",
+        rag_params={"repository_id": "self-wt"},
+        retrieve_fn=retrieve_fn,
+        construct_fn=construct_fn,
+        route=route,
+        shared_scopes=shared_scopes,
+    )
+
+
+def test_augment_emits_context_route_with_one_disposition_per_layer():
+    """A real route yields a layer disposition; served ids carry a layer; L4 is refused."""
+    route = resolve_phase_layers("execute", "agent")
+    seen: dict[str, object] = {}
+    received: dict[str, list[str]] = {}
+
+    def retrieve_fn(**kwargs):
+        seen.update(kwargs)
+        return _FakeAttempt(
+            [_FakeCandidate("k-code", "code"), _FakeCandidate("k-belief", "belief")]
+        )
+
+    def construct_fn(request):
+        # A deterministic constructor renders EXACTLY the evidence it receives, so the test
+        # can prove whether the prohibited belief ever reached construction or the prompt.
+        received["ids"] = [unit.knowledge_id for unit in request.evidence]
+        received["texts"] = [unit.text for unit in request.evidence]
+        constructed = _FakeConstructed(list(received["ids"]))
+        constructed.prompt = "AUGMENTED PROMPT\n" + "\n".join(received["texts"])
+        return constructed
+
+    outcome = _shaped_augment(
+        route, retrieve_fn=retrieve_fn, construct_fn=construct_fn, shared_scopes=["shared-1"]
+    )
+
+    # R1: the valid belief candidate is refused BEFORE construction — its id and text are
+    # absent from the constructor input AND from the final prompt.
+    assert "k-belief" not in received["ids"]
+    assert "text for k-belief" not in received["texts"]
+    assert "k-belief" not in outcome.prompt
+    assert "text for k-belief" not in outcome.prompt
+    assert "k-code" in received["ids"]
+
+    assert outcome.context_route is not None
+    record = outcome.context_route
+    assert record["schema"] == "context-route/v1"
+    assert record["route_status"] == "resolved"
+    assert record["shared_scopes"] == ["shared-1"]
+
+    by_layer = {entry["layer"]: entry for entry in record["layers"]}
+    # One disposition per resolved layer (L3 was not resolved for an implementation phase).
+    assert {"L0", "L1", "L2"} <= set(by_layer)
+    assert by_layer["L1"]["status"] == LAYER_STATUS_SERVED
+    assert by_layer["L1"]["evidence_ids"] == ["k-code"]
+    # L2 history resolved but nothing matched on a clean pass: empty, never served.
+    assert by_layer["L2"]["status"] == "empty"
+    # The refused self-layer content is recorded excluded with its id and never counted served.
+    assert by_layer[LAYER_SELF]["status"] == LAYER_STATUS_EXCLUDED
+    assert by_layer[LAYER_SELF]["evidence_ids"] == ["k-belief"]
+    assert record["served_count"] == 1
+
+    # The route actually shaped retrieval: source types were threaded, shared scope too.
+    assert "code" in seen["source_types"]
+    assert "story" in seen["source_types"]
+    assert list(seen["shared_repository_ids"]) == ["shared-1"]
+
+
+def test_augment_refuses_l4_before_construction_on_unrouted_paths():
+    """R1: under an ABSENT or explicit-UNKNOWN route, a self candidate never reaches the
+    constructor input or the final prompt; its id is recorded excluded; the base prompt and
+    the raw work item are preserved, and nothing is served."""
+    for route in (None, LayerRoute.unknown("execute", "agent")):
+        received: dict[str, object] = {}
+
+        def retrieve_fn(**_kwargs):
+            return _FakeAttempt([_FakeCandidate("k-belief", "belief")])
+
+        def construct_fn(request, received=received):
+            received["ids"] = [unit.knowledge_id for unit in request.evidence]
+            received["raw"] = request.raw_work_item
+            constructed = _FakeConstructed(list(received["ids"]))
+            constructed.prompt = "AUGMENTED PROMPT\n" + "\n".join(
+                unit.text for unit in request.evidence
+            )
+            return constructed
+
+        outcome = _shaped_augment(route, retrieve_fn=retrieve_fn, construct_fn=construct_fn)
+
+        # The belief never reached the constructor, and its text is not in the final prompt.
+        assert received["ids"] == []
+        assert "text for k-belief" not in outcome.prompt
+        assert "k-belief" not in outcome.prompt
+        # The base prompt (raw work item) still reached construction unchanged.
+        assert received["raw"] == "implement the widget"
+
+        record = outcome.context_route
+        assert record is not None
+        assert record["served_count"] == 0
+        by_layer = {entry["layer"]: entry for entry in record["layers"]}
+        assert by_layer[LAYER_SELF]["status"] == LAYER_STATUS_EXCLUDED
+        assert by_layer[LAYER_SELF]["evidence_ids"] == ["k-belief"]
+
+
+def test_augment_names_layer_absent_on_leg_failure():
+    """A failed leg is a NAMED absence for the layer, never an empty success."""
+    route = resolve_phase_layers("execute", "agent")
+
+    def retrieve_fn(**_kwargs):
+        return _FakeAttempt([], leg_errors={"dense": "connection refused"})
+
+    def construct_fn(_request):
+        return _FakeConstructed([])
+
+    outcome = _shaped_augment(route, retrieve_fn=retrieve_fn, construct_fn=construct_fn)
+
+    record = outcome.context_route
+    assert record is not None
+    by_layer = {entry["layer"]: entry for entry in record["layers"]}
+    assert by_layer["L1"]["status"] == LAYER_STATUS_NAMED_ABSENT
+    assert by_layer["L2"]["status"] == LAYER_STATUS_NAMED_ABSENT
+    assert by_layer["L1"]["status"] != LAYER_STATUS_SERVED
+    assert record["leg_errors"] == {"dense": "connection refused"}
+    assert record["served_count"] == 0
+
+
+def test_augment_unknown_route_records_unclassified_never_served():
+    """An unroutable request records its served items as UNKNOWN; nothing is served unclassified."""
+
+    def retrieve_fn(**_kwargs):
+        return _FakeAttempt([_FakeCandidate("k-code", "code")])
+
+    def construct_fn(_request):
+        return _FakeConstructed(["k-code"])
+
+    outcome = _shaped_augment(None, retrieve_fn=retrieve_fn, construct_fn=construct_fn)
+
+    record = outcome.context_route
+    assert record is not None
+    assert record["route_status"] == "unknown"
+    assert record["role"] == "unknown"
+    assert record["served_count"] == 0
+    assert [item["id"] for item in record["unclassified"]] == ["k-code"]
+    by_layer = {entry["layer"]: entry for entry in record["layers"]}
+    assert by_layer["unclassified"]["status"] == "unknown"
+
+
+def test_augment_always_populates_context_route_on_retrieve_failure():
+    """Even the no-rag fallback carries a context_route record and preserves base_prompt."""
+
+    def fail_retrieve(**_kwargs):
+        raise RuntimeError("retrieval unavailable")
+
+    def should_not_construct(_request):
+        raise AssertionError("a retrieval failure must not invoke construction")
+
+    outcome = _shaped_augment(
+        resolve_phase_layers("execute", "agent"),
+        retrieve_fn=fail_retrieve,
+        construct_fn=should_not_construct,
+    )
+
+    assert outcome.prompt == "implement the widget"
+    assert outcome.fallback is True
+    assert outcome.context_route is not None
+    assert outcome.context_route["served_count"] == 0
+    by_layer = {entry["layer"]: entry for entry in outcome.context_route["layers"]}
+    assert by_layer["L1"]["status"] == LAYER_STATUS_NAMED_ABSENT
+
+
+def test_augment_withholds_untyped_evidence_on_unresolved_route():
+    """A8-R1: on a route that resolved NO layers, untyped evidence never reaches the
+    constructor input or the final prompt; it is recorded as an honest withheld/unknown
+    disposition while typed items keep their unclassified-but-served behavior; the base
+    prompt is preserved.
+
+    Falsifier for the exact defect: an untyped candidate (``source_type=""``) plus a typed
+    ``code`` candidate and a ``source_type_resolver`` leg error, under BOTH ``route=None``
+    and ``LayerRoute.unknown(...)``. The deterministic constructor renders EXACTLY the
+    evidence it receives, so the absence assertion proves the withhold. Removing the
+    withhold would leave the untyped candidate in ``request.evidence`` and the prompt.
+    """
+    for route in (None, LayerRoute.unknown("execute", "agent")):
+        received: dict[str, object] = {}
+
+        def retrieve_fn(**_kwargs):
+            return _FakeAttempt(
+                [_FakeCandidate("k-untyped", ""), _FakeCandidate("k-code", "code")],
+                leg_errors={
+                    SOURCE_TYPE_RESOLVER_ERROR_KEY: "resolver raised for candidate 'k-untyped'"
+                },
+            )
+
+        def construct_fn(request, received=received):
+            # Render EXACTLY the evidence this constructor RECEIVES, so the assertions can
+            # prove whether the untyped candidate ever reached construction or the prompt.
+            received["ids"] = [unit.knowledge_id for unit in request.evidence]
+            received["texts"] = [unit.text for unit in request.evidence]
+            constructed = _FakeConstructed(list(received["ids"]))
+            constructed.prompt = (
+                "AUGMENTED PROMPT\n"
+                + str(request.raw_work_item)
+                + "\n"
+                + "\n".join(received["texts"])
+            )
+            return constructed
+
+        outcome = _shaped_augment(route, retrieve_fn=retrieve_fn, construct_fn=construct_fn)
+
+        # The untyped candidate never reached the constructor input...
+        assert "k-untyped" not in received["ids"]
+        assert "text for k-untyped" not in received["texts"]
+        # ...nor the final prompt; the typed candidate may still be served.
+        assert "k-untyped" not in outcome.prompt
+        assert "text for k-untyped" not in outcome.prompt
+        assert "k-code" in received["ids"]
+        assert "text for k-code" in outcome.prompt
+        # The base prompt is preserved, never replaced by the augmentation.
+        assert "implement the widget" in outcome.prompt
+
+        record = outcome.context_route
+        assert record is not None
+        assert record["route_status"] == "unknown"
+        assert record["served_count"] == 0
+        # The withheld id is recorded with an honest unknown/withheld disposition naming it.
+        withheld = [item for item in record["unclassified"] if item["id"] == "k-untyped"]
+        assert len(withheld) == 1
+        assert withheld[0]["status"] == "unknown"
+        assert withheld[0]["reason"] == UNRESOLVED_WITHHELD_REASON
+        assert "withheld" in withheld[0]["reason"]
+        # The typed item keeps its unclassified-but-served behavior; nothing is silently dropped.
+        assert "k-code" in [item["id"] for item in record["unclassified"]]
+        # The synthetic unclassified layer entry lists every unclassified/withheld id.
+        by_layer = {entry["layer"]: entry for entry in record["layers"]}
+        assert by_layer["unclassified"]["status"] == "unknown"
+        assert set(by_layer["unclassified"]["evidence_ids"]) == {"k-untyped", "k-code"}
+        # The resolver diagnostic survives in the record alongside the withhold.
+        assert SOURCE_TYPE_RESOLVER_ERROR_KEY in record["leg_errors"]

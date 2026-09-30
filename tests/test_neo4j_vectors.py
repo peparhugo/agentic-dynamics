@@ -160,6 +160,7 @@ def test_search_returns_the_chroma_shaped_hit_contract_with_timestamps():
 
 def test_search_expands_until_the_scoped_set_fills():
     """Other scopes dominating the global ranking must not starve the scoped result."""
+
     def responder(cypher, params):
         k = params["k"]
         if k < 64:
@@ -187,6 +188,43 @@ def test_search_is_complete_when_the_corpus_is_exhausted():
     store = _store(_FakeSession(lambda cypher, params: []), corpus=10)
     assert store.search("q", top_k=3, where={"repository_id": "agentic-dynamics"}) == []
     assert store.last_search_incomplete is False
+
+
+def test_scoped_search_known_zero_corpus_is_exhausted_not_incomplete():
+    """A11-R2: a successful ``count() == 0`` under a scope predicate is a KNOWN zero corpus.
+
+    Pre-fix the exhaustion check ``total and scanned >= total`` treated the measured zero as
+    unknown: it expanded to the cap, reported ``corpus=None``, and declared the search
+    incomplete — a fabricated bounded scan for a genuinely empty scope. The known zero must
+    stay 0 and the scan must be reported complete.
+    """
+
+    def responder(cypher, params):
+        if "count(k) AS n" in cypher:
+            return [{"n": 0}]  # the production count() of an empty scoped corpus
+        return []  # no embedded rows exist at this scope
+
+    store = _store(_FakeSession(responder), corpus=-1)  # -1 => the real count() runs
+    hits, stats = store.search_with_stats(
+        "q", top_k=40, where={"repository_id": "agentic-dynamics"}
+    )
+    assert hits == []
+    assert stats["corpus"] == 0  # a known zero, never coerced to None
+    assert stats["incomplete"] is False  # fully exhausted, not a bounded scan
+    assert store._corpus_count == 0
+
+
+def test_unfiltered_search_reports_unknown_corpus_count():
+    """Control: an UNFILTERED search has no scope predicate, so the count is UNKNOWN.
+
+    This keeps the known-zero repair from turning every absent bound into a zero: a
+    genuinely unknown count must remain ``None``, distinct from the measured scoped zero.
+    """
+    store = _store(_FakeSession(lambda cypher, params: [_row(1)]), corpus=0)
+    hits, stats = store.search_with_stats("q", top_k=10)
+    assert len(hits) == 1
+    assert stats["corpus"] is None
+    assert stats["incomplete"] is False
 
 
 def test_unfiltered_short_page_is_the_index_exhaustion():

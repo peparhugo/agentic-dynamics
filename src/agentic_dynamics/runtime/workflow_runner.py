@@ -143,6 +143,13 @@ from agentic_dynamics.knowledge.augment import (
     default_construct_fn,
     default_retrieve_fn,
 )
+from agentic_dynamics.knowledge.context_layers import (
+    CONTEXT_ROUTE_SCHEMA,
+    execution_scope_role,
+    resolve_phase_layers,
+    shared_history_scopes,
+)
+from agentic_dynamics.knowledge.context_layers import ROLE_UNKNOWN as CONTEXT_ROLE_UNKNOWN
 from agentic_dynamics.measurement.commit_analysis import _read_commit_files
 from agentic_dynamics.measurement.efficiency import split_cost
 from agentic_dynamics.measurement.lsp_diagnostics import new_error_count, run_diagnostics
@@ -208,6 +215,46 @@ def _verifier_refused_error(phase_name: str) -> str:
         f"fail-closed, never a skip). Inject a DockerVerifierExecutor under --orchestrator, "
         f"or run the phase in-process (no step executor injected)."
     )
+
+
+#: The named-absence reason a phase carries on the ledger when it computed NO context route
+#: (``PhaseResult.context_route is None``). A distinct, greppable string — deliberately not an
+#: empty value and not a ``context-route/v1`` record with ``route_status == "resolved"`` — so
+#: an auditor can tell "this phase never had a route" from "the route ran and matched nothing".
+#: The structural boundary the world-models unit records: the run introducing the recorder is
+#: executed by the pre-recorder runner and so serializes THIS absence; the follow-up run on the
+#: promoted main is the live evidence of a populated record (register L60, F5). [C]
+CONTEXT_ROUTE_ABSENCE_REASON = "context_route_not_computed"
+
+
+def _context_route_absence(phase_name: str, phase_kind: str) -> dict[str, Any]:
+    """The NAMED ABSENCE a phase serializes when no context route was computed.
+
+    ``to_dict`` ALWAYS emits the ``context_route`` key, so a consumer can distinguish a
+    missing record from an old ledger that predates the field (which simply lacks the key and
+    parses unchanged). When the field is ``None`` the reason is stated explicitly rather than
+    fabricating a clean empty pass: ``layers`` is empty (nothing was resolved),
+    ``route_status`` is ``"unknown"`` (never ``"resolved"``), and ``fallback_reason`` names
+    the absence. The schema string is reused from
+    :mod:`agentic_dynamics.knowledge.context_layers` — the single owner of the record schema —
+    so a schema bump cannot silently diverge; the record carries exactly that schema's stable
+    top-level keys.
+    """
+    return {
+        "schema": CONTEXT_ROUTE_SCHEMA,
+        "phase": str(phase_name or ""),
+        "phase_kind": str(phase_kind or ""),
+        "role": CONTEXT_ROLE_UNKNOWN,
+        "route_status": "unknown",
+        "shared_scopes": [],
+        "layers": [],
+        "unclassified": [],
+        "served_count": 0,
+        "fallback_mode": "",
+        "fallback_reason": CONTEXT_ROUTE_ABSENCE_REASON,
+        "routing_reason": "",
+        "leg_errors": {},
+    }
 
 
 def _now() -> str:
@@ -307,6 +354,17 @@ class PhaseResult:
     augmentation_cost_usd: float = 0.0
     augmentation_latency_ms: float = 0.0
     fallback_mode: str = ""
+    #: ADDED key (world models, register L60 unit 5 — never renames an existing key): the
+    #: per-phase ``context-route/v1`` record — the layers resolved for this phase, one honest
+    #: disposition per layer (:data:`agentic_dynamics.knowledge.context_layers.LAYER_STATUSES`),
+    #: which retrieval legs failed, and the named fallback. Copied VERBATIM from the augmentation
+    #: outcome's ``context_route`` by the routing unit; this unit owns only the ledger contract.
+    #: ``None`` means "no route was computed". ``to_dict`` ALWAYS emits the key: a ``None``
+    #: serializes an explicit NAMED ABSENCE (:func:`_context_route_absence`) — never a dropped
+    #: key, which would be indistinguishable from an old ledger, and never a fabricated empty
+    #: success, which would read as a clean retrieval that matched nothing. Old ledgers lack the
+    #: key and parse unchanged via ``.get("context_route")``.
+    context_route: dict[str, Any] | None = None
     #: Run-inspection slice: the prepared-step reference for this phase — the CLONE-RELATIVE
     #: path of the ``prepared-step/v1`` transport the parent wrote for a sibling child, and
     #: the sha256 of the exact prompt in it. Empty for a locally-executed phase (no transport
@@ -411,6 +469,15 @@ class PhaseResult:
             "augmentation_cost_usd": self.augmentation_cost_usd,
             "augmentation_latency_ms": self.augmentation_latency_ms,
             "fallback_mode": self.fallback_mode,
+            # ADDED key (world models, register L60 unit 5 — never renames an existing key):
+            # ALWAYS present. A computed record is emitted verbatim; a phase that computed no
+            # route emits the named absence, so the key can never be read as a dropped record
+            # nor the absence as a fabricated empty success. Old ledgers simply lack the key.
+            "context_route": (
+                self.context_route
+                if self.context_route is not None
+                else _context_route_absence(self.phase, self.kind)
+            ),
             # ADDED keys (run-inspection slice — never renames an existing key): the
             # prepared-step transport reference. Old ledgers lack them; consumers read them
             # via ``.get(...)`` and render a named absence.
@@ -1442,6 +1509,20 @@ def _resolve_rag_params(
     Pure w.r.t. retrieval — no Redis, no Chroma, no constructor built here.
     """
     resolved = dict(rag_params or spec.workflow.params.get("rag", {}) or {})
+
+    # F1/F2 (world models L60, unit 7): carry an EXPLICIT ``shared_history_scopes`` list into
+    # the resolved config. The explicit kwarg's list wins when declared (it already rode
+    # through the dict copy); otherwise the spec's ``workflow.params.rag`` value is carried;
+    # absent means the cell's OWN scope only. The key is ALWAYS present and normalized to one
+    # canonical list — an empty list never means global (the helper refuses the ``*`` /
+    # ``global`` / ``all`` wildcards and collapses the aliases ``shared_scopes`` /
+    # ``shared_repository_ids``). Normalizing here means the phase-route builder, the augment
+    # seam, and the retrieval filter all read the SAME list, so the union the dense
+    # where-expression and the hard scope pre-filter apply cannot disagree with the route. A
+    # routing/shared-scope failure therefore stays NAMED (or explicitly empty), never a
+    # silently widened scope.
+    resolved["shared_history_scopes"] = shared_history_scopes(resolved)
+
     if rag_augment and not str(resolved.get("repository_id", "")).strip():
         scope = cell_scope(wd)
         resolved["repository_id"] = scope
@@ -5548,6 +5629,50 @@ def run_workflow(
                     if rag_augment:
                         pre_commit = _git_head(wd)
                         pr.pre_phase_commit = pre_commit
+                        # F1 (world models L60, register L60 unit 6): resolve the REAL phase
+                        # route from the phase's OWN name/kind plus the resolved rag_params —
+                        # never an injected/labelled route. ``resolve_phase_layers`` is the
+                        # deterministic design §6 rule (planning/implementation -> L1 structure,
+                        # every phase -> L2 history, L4 self prohibited for a cell phase); it
+                        # consumes the explicit spec hints in ``rag_params`` (role/layers/risk)
+                        # and parses ``shared_history_scopes`` into the route. The resolved route
+                        # is threaded into ``augment_prompt``, which maps it to the ONE existing
+                        # ``retrieve()`` path (source-type prefilter + shared-scope union) and
+                        # builds the per-layer record. So the routing is not a label: it reaches
+                        # retrieval, and the outcome's record lands on the ledger below.
+                        #
+                        # A10-R1 / A11-R1 (world models L60, unit u1): the phase's DECLARED
+                        # ``scope`` is phase semantics and MUST outrank the name/kind substring
+                        # classifier — but the execution-scope vocabulary and this module's
+                        # routing-role vocabulary are DIFFERENT closed sets, so the scope is
+                        # TRANSLATED, never passed through. ``execution_scope_role`` maps
+                        # implementation/review_readonly/adversarial_readonly/research_readonly
+                        # to a routing role and deliberately leaves ``proposal_write`` unmapped.
+                        # A plan-expanded unit inherits its declaring phase's ``scope`` (e.g.
+                        # ``execute__u2_projected_source_type_validated`` carries
+                        # ``scope: implementation``), but ``classify_phase_role`` sees the
+                        # incidental ``validat`` substring in the generated name and would strip
+                        # L1 structure from a genuine implementation phase.
+                        #
+                        # When the declared scope TRANSLATES to a routing role, that role is the
+                        # phase's own declared semantics: it is fed as the highest-priority role
+                        # hint AND any run-global ``role``/``phase_role`` override is dropped, so
+                        # declared semantics outrank both the global overlay and the incidental
+                        # name/kind substring. When the declared scope has NO routing-role
+                        # semantics (deliberately unmapped such as ``proposal_write``, or
+                        # absent), the scope is NOT injected as a role and any explicit
+                        # ``role``/``phase_role`` hint is RETAINED — the compatible semantic
+                        # signal survives instead of being discarded and silently replaced by
+                        # name classification.
+                        phase_hints = dict(rag_params)
+                        declared_scope = str(phase_def.get("scope") or "").strip()
+                        scope_role = execution_scope_role(declared_scope)
+                        if scope_role:
+                            phase_hints["scope"] = scope_role
+                            phase_hints.pop("role", None)
+                            phase_hints.pop("phase_role", None)
+                        phase_route = resolve_phase_layers(name, kind, hints=phase_hints)
+                        phase_shared_scopes = shared_history_scopes(rag_params)
                         outcome = augment_prompt(
                             base_prompt=prompt,
                             goal=goal,
@@ -5560,6 +5685,8 @@ def run_workflow(
                             retrieve_fn=retrieve_fn or default_retrieve_fn(),
                             construct_fn=construct_fn
                             or default_construct_fn(rag_params, run_agent),
+                            route=phase_route,
+                            shared_scopes=phase_shared_scopes,
                         )
                         prompt = outcome.prompt
                         pr.raw_prompt_hash = outcome.raw_prompt_hash
@@ -5573,6 +5700,12 @@ def run_workflow(
                         pr.augmentation_cost_usd = outcome.cost_usd
                         pr.augmentation_latency_ms = outcome.latency_ms
                         pr.fallback_mode = outcome.fallback_mode
+                        # F5 emission: copy the context-route/v1 record the seam built (one
+                        # honest disposition per resolved layer, unroutable items named) onto the
+                        # phase row so ``to_dict`` carries it into the run ledger. ``augment_prompt``
+                        # ALWAYS populates the record (a ``None`` would serialize the explicit
+                        # named absence via ``_context_route_absence`` — measured-or-absent).
+                        pr.context_route = outcome.context_route
 
                     # Commit-prefix enforcement (cap_runner_hardening p3): record the worktree
                     # HEAD before the agent runs, so after the phase the runner can list exactly

@@ -82,6 +82,13 @@ class AugmentationOutcome:
     #: degraded phase is distinguishable from a seam that never ran — the ledger records
     #: the error instead of erasing it. Empty when the augmentation completed.
     error: str = ""
+    #: The per-phase context-route record (``context-route/v1``) built by the SINGLE builder
+    #: in ``knowledge/context_layers`` — one honest disposition per resolved layer, plus the
+    #: unroutable/unclassified items. ALWAYS populated by the seam (an unresolved route is an
+    #: explicit ``route_status == "unknown"`` record, never a missing key), so the runner can
+    #: copy it into the ledger verbatim. ``None`` only when a caller constructs the outcome
+    #: directly without running the seam.
+    context_route: dict[str, Any] | None = None
 
 
 def _evidence_from_attempt(attempt: Any) -> list[Any]:
@@ -134,6 +141,8 @@ def augment_prompt(
     rag_params: dict[str, Any],
     retrieve_fn: Callable[..., Any],
     construct_fn: Callable[..., Any],
+    route: Any = None,
+    shared_scopes: Any = None,
 ) -> AugmentationOutcome:
     """Run ``retrieve -> construct -> render`` between ``route_step`` and ``run_agent``.
 
@@ -143,7 +152,32 @@ def augment_prompt(
     publish knowledge, create an admission, or retry a failed paid call. ``retrieve_fn``
     returns a ``RetrievalAttempt``-shaped object; ``construct_fn`` maps a
     ``ConstructionRequest`` to an ``AugmentedPrompt``.
+
+    ``route`` is the optional resolved :class:`~agentic_dynamics.knowledge.context_layers.LayerRoute`
+    for this phase (the design §6 layer routing). When present it is mapped by
+    :func:`~agentic_dynamics.knowledge.context_layers.resolve_layer_route` to the source-type
+    prefilter, explicit shared repository ids, and pattern projection that shape the ONE
+    existing ``retrieve`` path — no parallel retrieval and no new store. ``shared_scopes`` is
+    the explicit shared-scope list (empty never means global); it is unioned with the route's
+    own scopes for both retrieval and the record. Every pass (success OR fallback) populates
+    ``outcome.context_route`` from the single ``build_context_route_record`` builder, so the
+    ledger always carries one honest disposition per resolved layer (F4). Prohibited L4
+    self-layer evidence is filtered OUT before ``construct_fn`` (R1), and the refused ids ride
+    the record's L4 ``excluded`` disposition — so a belief id or its text can never reach the
+    constructor input or the final prompt. On a route that resolved NO layers (A8-R1), evidence
+    that maps to no layer is withheld from construction too: untyped content can never reach
+    the constructor input or the final prompt, and its id is recorded with an honest
+    ``unknown``/withheld disposition. The base prompt is preserved in every case.
     """
+    from agentic_dynamics.knowledge.context_layers import (
+        LAYER_SELF,
+        build_context_route_record,
+        layer_for_source_type,
+        normalize_shared_scopes,
+        resolve_layer_route,
+        route_resolved,
+        self_layer_prohibited,
+    )
     from agentic_dynamics.knowledge.prompt_constructor import (
         DEFAULT_CONSTRUCTOR_MODEL,
         ConstructionRequest,
@@ -156,8 +190,25 @@ def augment_prompt(
         fallback_mode="no_rag",
         raw_prompt_hash=hash_work_item(base_prompt),
     )
+    # The layer shaping is computed ONCE and threaded into retrieval; an absent route is the
+    # identity shape, so a caller that does not route changes nothing about retrieval. The
+    # shared ids are the union of the explicit keyword scopes and the route's own scopes, so
+    # retrieval and the record agree (empty never means global).
+    shape = resolve_layer_route(route, goal=goal, base_prompt=base_prompt)
+    shared_ids = normalize_shared_scopes(shared_scopes, route)
+    # R1: L4 self content is refused BEFORE construction, not labelled after it. The same
+    # shared rule owns the decision here and in the record builder, so the two can never
+    # disagree. ``excluded_evidence`` is initialised here so the ``finally`` record always
+    # has it, even when retrieval raises before any evidence is seen.
+    l4_prohibited = self_layer_prohibited(route)
+    excluded_evidence: list[dict[str, str]] = []
+    # A8-R1: evidence withheld BEFORE construction on an unresolved route. Initialised here
+    # (not inside the try) so the ``finally`` record builder always receives it, even when
+    # retrieval raises before any evidence is seen.
+    withheld_evidence: list[dict[str, str]] = []
     t0 = time.time()
     stage = "retrieve"
+    attempt: Any = None
     try:
         # 1. retrieve (deterministic; may degrade but not raise on missing legs)
         attempt = retrieve_fn(
@@ -166,10 +217,14 @@ def augment_prompt(
             commit_sha=commit_sha,
             repository_id=str(rag_params.get("repository_id", "")),
             acl_scope=str(rag_params.get("acl_scope", "")),
+            source_types=shape.source_types,
+            shared_repository_ids=tuple(shared_ids),
             executor_context_tokens=int(rag_params.get("executor_context_tokens", 200_000)),
             remaining_input_tokens=int(rag_params.get("remaining_input_tokens", 200_000)),
             rag_token_limit=int(rag_params.get("rag_token_limit", 8000)),
-            pattern_projection=bool(rag_params.get("pattern_projection", False)),
+            pattern_projection=(
+                bool(rag_params.get("pattern_projection", False)) or shape.pattern_projection
+            ),
         )
         if attempt is None:
             raise RuntimeError("retrieve returned no attempt")
@@ -182,6 +237,43 @@ def augment_prompt(
         # 2. construct (one bounded model call + deterministic renderer)
         stage = "construct"
         evidence = _evidence_from_attempt(attempt)
+        # R1 pre-construction filter: when L4 is prohibited (absent route, the explicit
+        # unknown sentinel, or any ordinary cell route), drop every self-layer item from
+        # the constructor input. A refused item must never influence the final prompt; its
+        # id is recorded on the L4 ``excluded`` disposition via ``excluded_evidence``.
+        if l4_prohibited:
+            kept: list[Any] = []
+            for unit in evidence:
+                if layer_for_source_type(getattr(unit, "source_type", "")) == LAYER_SELF:
+                    excluded_evidence.append(
+                        {
+                            "id": str(getattr(unit, "knowledge_id", "") or ""),
+                            "source_type": str(getattr(unit, "source_type", "") or ""),
+                        }
+                    )
+                    continue
+                kept.append(unit)
+            evidence = kept
+        # A8-R1 pre-construction withhold: on a route that resolved NO layers, an item with
+        # no resolvable layer (``layer_for_source_type`` returns "") cannot be attributed to
+        # any layer. Leave it OUT of constructor input — and therefore out of the final
+        # prompt — and hand its {id, source_type} to the record builder as an honest
+        # withheld/unknown disposition. Typed non-L4 items keep their existing
+        # unclassified-but-served behavior; the base prompt is always preserved.
+        if not route_resolved(route):
+            kept_typed: list[Any] = []
+            for unit in evidence:
+                source_type = str(getattr(unit, "source_type", "") or "")
+                if not layer_for_source_type(source_type):
+                    withheld_evidence.append(
+                        {
+                            "id": str(getattr(unit, "knowledge_id", "") or ""),
+                            "source_type": source_type,
+                        }
+                    )
+                    continue
+                kept_typed.append(unit)
+            evidence = kept_typed
         constructor_model = str(rag_params.get("constructor_model", DEFAULT_CONSTRUCTOR_MODEL))
         request = ConstructionRequest(
             raw_work_item=base_prompt,
@@ -248,7 +340,49 @@ def augment_prompt(
         outcome.error = f"{type(exc).__name__}: {exc}"
     finally:
         outcome.latency_ms = round((time.time() - t0) * 1000.0, 2)
+        # The record is built over the FINAL outcome state (success or fallback) so the
+        # ledger always carries a per-layer disposition. The builder is the single owner of
+        # the schema; if it ever raises, fall back to an explicit named-absence record
+        # rather than dropping the key — the seam must never block the phase (F4/F5).
+        try:
+            outcome.context_route = build_context_route_record(
+                phase_def,
+                route,
+                attempt,
+                outcome,
+                shared_scopes=shared_scopes,
+                excluded_evidence=excluded_evidence,
+                withheld_evidence=withheld_evidence,
+            )
+        except Exception as exc:  # noqa: BLE001 — recording must never block the phase
+            outcome.context_route = {
+                "schema": "context-route/v1",
+                "phase": str((phase_def or {}).get("name", "") or ""),
+                "phase_kind": str((phase_def or {}).get("kind", "") or ""),
+                "role": "unknown",
+                "route_status": "unknown",
+                "shared_scopes": [],
+                "layers": [],
+                "unclassified": [],
+                "served_count": 0,
+                "fallback_mode": outcome.fallback_mode,
+                "fallback_reason": f"context_route_record_failed: {type(exc).__name__}: {exc}",
+                "routing_reason": "",
+                "leg_errors": {},
+            }
     return outcome
+
+
+class SourceTypeResolutionError(RuntimeError):
+    """Raised when a durable source-type artifact EXISTS but cannot be read or parsed.
+
+    R2 distinction (the astra repair): a genuinely ABSENT artifact is clean, authoritative
+    absence and is memoised as ``None``; an unreadable or malformed artifact is an
+    OPERATIONAL FAILURE that must surface through retrieval's ``source_type_resolver``
+    diagnostic, never be cached as clean absence. The retrieval caller
+    (``retrieval._resolve_source_type``) catches this typed error, records the named
+    diagnostic on the attempt's ``leg_errors``, and lets the pass continue safely.
+    """
 
 
 def _durable_source_type_resolver() -> Callable[[str], str | None]:
@@ -260,29 +394,145 @@ def _durable_source_type_resolver() -> Callable[[str], str | None]:
     whose durable ``kb/<knowledge_id>.json`` artifact still carries the record's real type).
     The resolver reads that authoritative artifact deterministically (never an LLM) so the
     store-metadata gap is closed at query time instead of minting an untyped candidate.
-    Results are memoised per knowledge_id (bounded by the untyped population actually seen);
-    a missing/unreadable artifact returns ``None`` (the candidate then stays untyped and the
-    retrieval gate excludes it from the top-K with a recorded reason).
+
+    R2 (the production defect the prior F3 injected-throw tests bypassed): the two failure
+    modes are now separated instead of both collapsing to a cached ``None``.
+    * a genuinely ABSENT artifact in a valid store directory is clean absence — ``None``,
+      memoised, because there is no durable record to type from;
+    * a readable artifact with no ``source_type`` is also clean absence — ``None``, memoised;
+    * an UNREADABLE or MALFORMED artifact raises :class:`SourceTypeResolutionError` and is
+      NEVER memoised, so a store outage can never masquerade as an authoritative empty.
+
+    R2b (the astra repair): the ``source_type`` FIELD is type-validated, not coerced. The
+    former ``str(rec.get("source_type") or "")`` treated any falsy JSON value as clean
+    absence and stringified any truthy one, so ``[]``/``false`` silently became absent and
+    ``{"bad": 1}`` fabricated the type string ``"{'bad': 1}"``. A missing field and an
+    explicit ``null`` remain clean absence; a string is stripped/lower-cased (an empty
+    string is clean absence); any OTHER JSON type (list, bool, dict, number) raises the
+    typed failure and is never cached, so a malformed field is a named diagnostic with safe
+    continuation instead of a fake type or a fake absence.
+
+    R2a (the astra repair): ``Path.exists()`` is NOT an authoritative absence test. When a
+    parent path component of ``<store>/<knowledge_id>.json`` is a regular file (ENOTDIR) —
+    e.g. ``KB_ARTIFACT_DIR`` itself points at a file — ``Path.exists()`` swallows the
+    ``OSError`` and returns ``False``, so an OBSTRUCTED store read exactly like a clean
+    absence. The resolver stats the store directory EXPLICITLY instead: a MISSING store
+    directory is clean absence, but a store path that exists and is not a directory (or
+    whose parent is a regular file) raises the typed failure, which retrieval records as a
+    named ``source_type_resolver`` diagnostic while the pass continues. The store directory
+    is read at CALL time (not captured at construction), so a repaired store is visible to
+    the same resolver instance and an obstruction is never memoised.
+
+    R2a residual (the att10 repair): the SAME ``Path.exists()`` defect hid on the individual
+    artifact. A valid store directory can hold a flat ``<64-hex>.json`` symlink whose TARGET
+    is a child of a regular file (ENOTDIR, errno 20); ``Path.exists()`` follows the link,
+    swallows the ``OSError``, and returns ``False``, so an obstructed artifact read exactly
+    like an authoritative absence and was CACHED as one. The lookup now stats the individual
+    artifact and CLASSIFIES the result: ``FileNotFoundError`` (ENOENT — a genuinely missing
+    artifact or a dangling symlink) is clean, memoised absence; any other ``OSError``
+    (ENOTDIR, ``PermissionError``, …) raises the typed failure and never touches the cache;
+    a path that stats successfully falls through to ``open()``. So a repaired store is
+    visible to the SAME resolver instance, and an obstructed artifact is a named diagnostic,
+    never a cached empty.
     """
     import json as _json
+    import stat as _stat
 
-    from agentic_dynamics.core.paths import KB_ARTIFACT_DIR
+    from agentic_dynamics.core import paths as _paths
 
     cache: dict[str, str | None] = {}
 
     def _resolve(knowledge_id: str) -> str | None:
         if knowledge_id in cache:
             return cache[knowledge_id]
-        resolved: str | None = None
+        # R2a: read the store directory at CALL time so a config/store repair is visible to
+        # the same resolver instance; the path is never captured at construction.
+        store_dir = _paths.KB_ARTIFACT_DIR
+        path = store_dir / f"{knowledge_id}.json"
+        # ``exists()`` cannot distinguish a genuinely absent record from an obstructed store
+        # (a non-directory parent makes every child stat raise ENOTDIR, which ``exists()``
+        # reports as ``False``). Stat the directory explicitly and classify by mode.
         try:
-            path = KB_ARTIFACT_DIR / f"{knowledge_id}.json"
-            if path.exists():
-                with path.open(encoding="utf-8") as fh:
-                    rec = _json.load(fh)
-                st = str(rec.get("source_type") or "").strip().lower()
-                resolved = st or None
-        except Exception:  # noqa: BLE001 — a resolver miss must never fail retrieval
-            resolved = None
+            store_stat = os.stat(store_dir)
+        except FileNotFoundError:
+            # No artifact store created/configured: there is no durable record to type from.
+            # This is clean, authoritative absence and the one path memoised as ``None``.
+            cache[knowledge_id] = None
+            return None
+        except OSError as exc:
+            # ENOTDIR (a parent component is a regular file) or any other stat failure is an
+            # OPERATIONAL failure, not absence. Raise typed and never touch the cache.
+            raise SourceTypeResolutionError(
+                f"source_type resolver could not stat artifact store {store_dir!r} for "
+                f"{knowledge_id!r}: {type(exc).__name__}: {exc}"
+            ) from exc
+        if not _stat.S_ISDIR(store_stat.st_mode):
+            # The store path exists but is not a directory (e.g. a regular file occupying
+            # the store path): an OBSTRUCTED store, never clean absence.
+            raise SourceTypeResolutionError(
+                f"source_type resolver artifact store {store_dir!r} is not a directory "
+                f"(mode {_stat.S_IFMT(store_stat.st_mode):#o}) for {knowledge_id!r}"
+            )
+        # R2a residual: ``Path.exists()`` is not an authoritative absence test EITHER. It
+        # follows the artifact symlink and swallows the ``OSError`` when the TARGET is
+        # obstructed — a target whose parent component is a regular file is ENOTDIR (errno
+        # 20) — returning ``False`` exactly as it does for a genuinely missing record.
+        # ``os.stat(path)`` lets us CLASSIFY the lookup instead: only ``FileNotFoundError``
+        # (ENOENT, a missing artifact or a dangling symlink) is clean, memoised absence; any
+        # OTHER ``OSError`` is an operational failure that raises typed and never touches the
+        # cache, so a repaired store is visible to this same resolver instance. A path that
+        # stats successfully (including a directory occupying the artifact path) falls
+        # through to ``open()``, whose failure the existing handler already classes as typed.
+        try:
+            os.stat(path)
+        except FileNotFoundError:
+            # The store directory is valid and the artifact is genuinely absent: clean,
+            # authoritative absence, memoised as ``None``.
+            cache[knowledge_id] = None
+            return None
+        except OSError as exc:
+            # ENOTDIR (an obstructed symlink target), PermissionError, or any other non-ENOENT
+            # stat failure is an OPERATIONAL failure, not absence. Raise typed and never touch
+            # the cache, so the failure is never memoised and a repaired artifact is visible.
+            raise SourceTypeResolutionError(
+                f"source_type resolver could not stat artifact {path!r} for "
+                f"{knowledge_id!r}: {type(exc).__name__}: {exc}"
+            ) from exc
+        try:
+            with path.open(encoding="utf-8") as fh:
+                rec = _json.load(fh)
+            if not isinstance(rec, dict):
+                raise ValueError(f"artifact root is {type(rec).__name__}, not a JSON object")
+        except Exception as exc:  # noqa: BLE001 — operational failure is NOT absence
+            # R2: an unreadable/malformed artifact is an operational failure, not a clean
+            # empty. Raise a typed error so retrieval's diagnostic records it under
+            # ``source_type_resolver`` while the pass continues — and crucially do NOT
+            # touch ``cache``, so the failure is never memoised as authoritative absence.
+            raise SourceTypeResolutionError(
+                f"source_type resolver could not read artifact for {knowledge_id!r}: "
+                f"{type(exc).__name__}: {exc}"
+            ) from exc
+        # R2b: validate the ``source_type`` field TYPE instead of coercing it. JSON can hold a
+        # list/bool/dict/number here; ``str(rec.get("source_type") or "")`` silently turned
+        # ``[]`` and ``false`` into clean absence (via their falsiness) and FABRICATED the
+        # string ``"{'bad': 1}"`` from a dict — a type the artifact never declared. A missing
+        # field or an explicit ``null`` is clean absence; a string is stripped/lower-cased and
+        # an empty string is clean absence; any other JSON type raises the typed failure, which
+        # is NEVER cached, so the malformation surfaces as a named ``source_type_resolver``
+        # diagnostic while the pass continues.
+        field = rec.get("source_type")
+        if field is None:
+            resolved: str | None = None
+        elif isinstance(field, str):
+            resolved = field.strip().lower() or None
+        else:
+            raise SourceTypeResolutionError(
+                f"source_type resolver artifact for {knowledge_id!r} has a non-string "
+                f"source_type of type {type(field).__name__} ({field!r}); refusing to "
+                "fabricate a type"
+            )
+        # A readable artifact with no source_type is clean absence and IS memoised (only
+        # the operational-failure paths above skip the cache).
         cache[knowledge_id] = resolved
         return resolved
 

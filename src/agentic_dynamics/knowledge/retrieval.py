@@ -197,6 +197,52 @@ UNTYPED_EXCLUDED_REASON = (
     "never participates in selection ahead of a typed one)"
 )
 
+#: The u2 source-type prefilter reason (F2 repair): the phase's resolved layer route named an
+#: explicit type set, and this candidate's ``source_type`` is outside it, so the candidate never
+#: entered fusion. Recorded (never silent) because a routed pass that narrows material must be
+#: auditable; an unrouted pass (empty type set) is the identity and records nothing. This is the
+#: prefilter twin of :data:`UNTYPED_EXCLUDED_REASON`: k4 excludes the untyped from *selection*
+#: when typed material exists; u2 excludes the off-route from *fusion* when a route exists. [C]
+SOURCE_TYPE_EXCLUDED_REASON = (
+    "source_type outside the resolved layer route's type set; excluded before fusion "
+    "(u2 source-type prefilter)"
+)
+
+#: The F3 repair's named diagnostic: a ``source_type_resolver`` that RAISED is recorded under
+#: this ``leg_errors`` key, so a resolver FAILURE (durable-artifact store offline, a bug in the
+#: resolver) is distinguishable from an authoritative ``None``/empty return (a clean absence —
+#: the record genuinely has no type). Before this repair both collapsed to ``""``: a throwing
+#: resolver was swallowed into a clean absence, which is exactly the silent-empty the k4 rule
+#: forbids. The candidate still stays untyped and the phase is never failed (the resolver is
+#: best-effort), so this key widens ``leg_errors`` from "legs down" to "named causes of a
+#: degraded pass" — a failure is recorded, never fabricated, and an honest empty stays silent.
+SOURCE_TYPE_RESOLVER_ERROR_KEY = "source_type_resolver"
+
+#: The A9-R2b repair's named diagnostic: a PROJECTED store-metadata ``source_type`` whose JSON
+#: type is not a string (dict, nonempty OR empty list, bool, number) is MALFORMED, not a type.
+#: Before the repair ``_source_type`` coerced the field with ``str(...)``, which FABRICATED a
+#: type string from a truthy non-string (``{"bad": 1}`` → ``"{'bad': 1}"``) and silently
+#: collapsed ``[]``/``false`` to clean absence, then handed the collapsed field to the
+#: authoritative resolver as if it were legitimately missing. The projected field is storage
+#: METADATA (the Chroma/Neo4j property that reaches ``retrieve`` directly), distinct from the
+#: durable artifact field that A8-R2b validated. A malformed value is recorded under this key
+#: and the candidate is left UNTYPED; the resolver is NOT consulted, so a malformed projection
+#: can never become a fabricated type nor be laundered as an authoritative absence. [M]
+SOURCE_TYPE_METADATA_ERROR_KEY = "source_type_metadata"
+
+#: The A10-R2 repair's named diagnostic: the dense store's KNOWN incomplete-search signal —
+#: a bounded candidate expansion that hit :data:`~agentic_dynamics.knowledge.neo4j_vectors.
+#: EXPANSION_CAP` before exhausting the possible scoped corpus — is carried into
+#: ``leg_errors`` under this key. Before the repair the dense leg ignored the store's
+#: ``search``-side signal entirely, so a capped scan that returned zero scoped hits looked
+#: exactly like a genuinely empty scoped corpus: the affected layer recorded a clean
+#: ``empty`` instead of a named absence. The reason names the scanned count and the corpus
+#: bound, so an auditor can see HOW MUCH of the scoped corpus went unexamined. The per-call
+#: ``search_with_stats`` result is preferred; the legacy shared ``last_search_incomplete``
+#: attribute is read only as a named fallback for a store without the per-call method, so
+#: the pre-refactor production shape is not re-lost. [M]
+DENSE_SEARCH_INCOMPLETE_KEY = "dense_search_incomplete"
+
 
 class QueryShape(str, Enum):
     """The deterministic query-intent shape that conditions the source-type ordering signal.
@@ -260,6 +306,12 @@ class QueryPlan:
     dense_query: str
     lexical_query: str
     pattern_projection: bool = False
+    #: The explicit source-type prefilter the phase's layer route resolved (L1..L3). An
+    #: empty tuple is the identity — NO prefilter, the pre-existing retrieval path. A
+    #: non-empty tuple restricts fusion to exactly these ``source_type`` values (the
+    #: resolved layers' positive material). Absence is not a prohibition: an unrouted phase
+    #: keeps every type eligible, while a routed phase is bounded to its layers. [C]
+    source_types: tuple[str, ...] = ()
 
     @property
     def exact_terms(self) -> list[str]:
@@ -289,11 +341,36 @@ def _estimate_tokens(text: str) -> int:
     return max(1, len(text.split()))
 
 
+def _normalize_source_types(source_types: Any) -> tuple[str, ...]:
+    """Normalise an explicit source-type prefilter to a lower-cased, de-duped tuple.
+
+    The input may be any iterable of strings, a bare string (one type), or ``None``. Empty
+    entries are dropped and duplicates collapse in first-seen order, so the result is
+    deterministic for a given input. An EMPTY result means *no prefilter* — the identity
+    shaping of the pre-existing retrieval path — never "match nothing": an absent route is
+    not a prohibition (measured-or-absent, [C]).
+    """
+    if source_types is None:
+        return ()
+    if isinstance(source_types, str):
+        raw: tuple[Any, ...] = (source_types,)
+    else:
+        try:
+            raw = tuple(source_types)
+        except TypeError:
+            return ()
+    normalized = _dedupe_in_order(
+        [str(item).strip().lower() for item in raw if str(item or "").strip()]
+    )
+    return tuple(normalized)
+
+
 def build_query_plan(
     raw_work_item: str,
     phase_objective: str = "",
     *,
     pattern_projection: bool = False,
+    source_types: Any = (),
 ) -> QueryPlan:
     """Extract a deterministic query plan from a raw work item (no LLM).
 
@@ -302,6 +379,10 @@ def build_query_plan(
     queries. The dense query is the raw item plus the phase objective truncated at
     ``DENSE_QUERY_MAX_TOKENS``; the lexical query ORs the exact terms followed by
     the remaining normalized (lower-cased) terms.
+
+    ``source_types`` is the optional phase-shaping prefilter (u2/F2): the resolved context
+    layers' source-type set, threaded onto the plan so the retrieval pass fuses only that
+    positive material. Its default ``()`` is the identity — the pre-existing retrieval path.
     """
     quoted = _QUOTED_RE.findall(raw_work_item)
     file_paths = _FILE_PATH_RE.findall(raw_work_item)
@@ -364,6 +445,7 @@ def build_query_plan(
         dense_query=dense_query,
         lexical_query=lexical_query,
         pattern_projection=pattern_projection,
+        source_types=_normalize_source_types(source_types),
     )
 
 
@@ -753,29 +835,145 @@ def exact_identifier_hit(candidate: Candidate, exact_terms: list[str]) -> bool:
     return False
 
 
-def scope_excluded(candidate_repository_id: str, requested_scope: str) -> bool:
+def _normalize_shared_repository_ids(shared_repository_ids: Any) -> tuple[str, ...]:
+    """Normalise explicit shared repository ids; default empty, never global.
+
+    Accepts a bare string (one id) or any iterable. Entries are stripped, empty entries
+    dropped, duplicates collapsed first-seen, and the explicit global wildcards ``*`` /
+    ``global`` / ``all`` REFUSED — a cell can never widen its scope to the whole KB by
+    accident ([P], mirroring ``context_layers.shared_history_scopes``). An empty result
+    means "the cell's own scope only", never "every scope". [C]
+    """
+    if shared_repository_ids is None:
+        return ()
+    if isinstance(shared_repository_ids, str):
+        raw: tuple[Any, ...] = (shared_repository_ids,)
+    else:
+        try:
+            raw = tuple(shared_repository_ids)
+        except TypeError:
+            return ()
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        scope = str(item or "").strip()
+        if not scope or scope.lower() in {"*", "global", "all"} or scope in seen:
+            continue
+        seen.add(scope)
+        out.append(scope)
+    return tuple(out)
+
+
+def _repository_scope_union(requested_scope: Any, shared_repository_ids: Any) -> list[str]:
+    """The dense where-expression's repository set: requested ∪ explicit shared ids.
+
+    Ordered, de-duplicated, empties dropped; ``requested_scope`` first so a single-scope
+    pass keeps its historical equality clause. Shared ids are normalised by
+    :func:`_normalize_shared_repository_ids`, so global wildcards cannot enter the union.
+    This helper is the ONE definition of the repository union — the dense where-expression
+    and the local hard pre-filter both read from it, so they cannot disagree. [C]
+    """
+    union: list[str] = []
+    requested = str(requested_scope or "").strip()
+    if requested:
+        union.append(requested)
+    for scope in _normalize_shared_repository_ids(shared_repository_ids):
+        if scope not in union:
+            union.append(scope)
+    return union
+
+
+def _acl_scope_union(requested_acl: Any, shared_acl_scopes: Any) -> list[str]:
+    """The allowed ACL set: requested ACL ∪ AUTHORIZED shared ACL scopes.
+
+    The cell convention sets ``repository_id == acl_scope`` (see ``workflow_runner``'s
+    ``ChangeInput`` and ``_resolve_rag_params``), so an EXPLICITLY shared repository scope
+    authorizes that scope's OWN ACL namespace. Without this arm the normal runner config —
+    which defaults ``acl_scope`` to the private cell scope — would combine the repository
+    union with an *equality* to that one ACL and therefore hide precisely the shared records
+    the union exposes (the F2/R3 gap). This delegates to the ONE scope-union definition, so
+    the repository clause and the authorized-ACL clause can never disagree, and the shared
+    ids are already normalised (``*`` / ``global`` / ``all`` refused — never a wildcard). [C]
+    """
+    return _repository_scope_union(requested_acl, shared_acl_scopes)
+
+
+def _source_type_allowed(source_type: str, allowed: tuple[str, ...]) -> bool:
+    """Return True when a candidate's ``source_type`` passes the resolved-layer prefilter.
+
+    An empty ``allowed`` is the identity — every type (including an untyped record) is
+    eligible, preserving the pre-existing retrieval path. A non-empty ``allowed`` is a HARD
+    prefilter: only the resolved layers' positive material enters fusion. An untyped record
+    (empty ``source_type``) is NOT a member, so a routed phase never fuses material it
+    cannot attribute to a layer. [C]
+    """
+    if not allowed:
+        return True
+    return str(source_type or "").strip().lower() in allowed
+
+
+def scope_excluded(
+    candidate_repository_id: str,
+    requested_scope: str,
+    *,
+    shared_repository_ids: Any = (),
+) -> bool:
     """Return True when a candidate is hard-excluded by the requested repository scope.
 
     Mirrors the commit pre-filter: the requested scope is the cell's ``repository_id``. A
     candidate carrying a *different, non-empty* scope is excluded — another cell's knowledge
     must never surface, even when its text is near-identical. An *empty* candidate scope is
     treated as unknown/legacy and stays eligible (back-compatible): it is unscoped data, not
-    "global". An empty requested scope disables the filter (no exclusion).
+    "global".
+
+    ``shared_repository_ids`` is the EXPLICIT shared-scope union arm (the F2 repair): a
+    candidate in the requested scope OR any explicitly shared scope stays eligible, so a
+    phase that declared shared history can retrieve it. A foreign private scope (non-empty,
+    neither requested nor shared) is still excluded — the union never widens to "all". The
+    filter is disabled only when the requested scope is empty AND no shared scope is named.
     """
-    return bool(
-        requested_scope and candidate_repository_id and candidate_repository_id != requested_scope
-    )
+    candidate = str(candidate_repository_id or "").strip()
+    requested = str(requested_scope or "").strip()
+    shared = set(_normalize_shared_repository_ids(shared_repository_ids))
+    if not requested and not shared:
+        return False
+    if not candidate:
+        return False
+    if requested and candidate == requested:
+        return False
+    return candidate not in shared
 
 
-def acl_excluded(candidate_acl: str, requested_acl: str) -> bool:
+def acl_excluded(
+    candidate_acl: str,
+    requested_acl: str,
+    *,
+    shared_acl_scopes: Any = (),
+) -> bool:
     """Return True when a candidate is hard-excluded by the requested ACL scope.
 
     The lexical leg's mirror of :func:`scope_excluded`: a candidate carrying a different,
     non-empty ``acl_scope`` never surfaces; an empty candidate scope is unknown/legacy and
     stays eligible; an empty requested scope disables the filter. Closes the pre-existing
     direct-lexical ACL leak (review-5 F3).
+
+    ``shared_acl_scopes`` is the EXPLICIT authorized-shared arm (the F2/R3 repair): an
+    explicitly shared repository scope authorizes that scope's own ACL namespace, so a
+    candidate whose ACL is the requested ACL OR any authorized shared ACL stays eligible while
+    a FOREIGN private ACL is still excluded. Shared scopes are normalised by
+    :func:`_normalize_shared_repository_ids` (wildcards refused), so the ACL contract can never
+    widen to the whole KB. The arm is inert unless a requested ACL is present — an unrouted,
+    ACL-free pass keeps its historical behavior exactly.
     """
-    return bool(requested_acl and candidate_acl and candidate_acl != requested_acl)
+    requested = str(requested_acl or "").strip()
+    if not requested:
+        return False
+    candidate = str(candidate_acl or "").strip()
+    if not candidate:
+        return False
+    # The requested ACL is authorized too, so the union is the full allowed set. A candidate
+    # in neither the requested ACL nor an authorized shared ACL is foreign and is excluded.
+    return candidate not in set(_acl_scope_union(requested, shared_acl_scopes))
 
 
 def graph_boost(seed_score: float, depth: int, relationship: str) -> float:
@@ -1054,15 +1252,21 @@ class RetrievalAttempt:
     cache_status: str
     fallback_mode: str
     dedup_path: str = ""  # "embedding" | "none" — which redundancy-collapse leg ran
-    #: Named causes for legs that failed or exceeded the declared retrieval budget
-    #: ({"dense"|"lexical"|"embedding": reason}). Empty when every attempted leg returned;
-    #: a degraded pass is never silent.
+    #: Named causes for legs that failed, exceeded the declared retrieval budget, or could not
+    #: be typed ({"dense"|"lexical"|"embedding"|"expansion": reason}, plus
+    #: :data:`SOURCE_TYPE_RESOLVER_ERROR_KEY` when the source-type resolver raised). Empty when
+    #: every attempted leg returned; a degraded pass is never silent.
     leg_errors: dict[str, str] = field(default_factory=dict)
     # k4 no-silent-empties: candidates excluded from the top-K because their source_type was
     # empty after both the store metadata and the resolver were consulted, while a typed
     # candidate existed. Each entry is {"id", "reason"} — the exclusion is recorded, never
     # silent (hard rule 4). Empty when nothing was excluded (all-typed or all-untyped pool).
     untyped_excluded: list[dict[str, Any]] = field(default_factory=list)
+    # u2 source-type prefilter: candidates dropped BEFORE fusion because their source_type
+    # was outside the resolved layer route's type set, when a route shaped the pass. Each
+    # entry is {"id", "source_type", "reason"} — the narrowing is recorded, never silent.
+    # Empty when no prefilter ran (an unrouted pass is the identity).
+    source_type_excluded: list[dict[str, Any]] = field(default_factory=list)
     weights_version: str = WEIGHTS_VERSION
     timestamp: str = ""
 
@@ -1158,6 +1362,7 @@ class RetrievalAttempt:
             "leg_errors": self.leg_errors,
             "fallback_mode": self.fallback_mode,
             "untyped_excluded": self.untyped_excluded,
+            "source_type_excluded": self.source_type_excluded,
             "weights_version": self.weights_version,
             "timestamp": self.timestamp,
         }
@@ -1423,8 +1628,17 @@ def _pattern_payload(value: Any, text: str) -> dict[str, Any] | None:
 
 
 def _source_type(metadata: dict[str, Any], text: str = "") -> str:
-    """Resolve a lower-case source type, recognizing only an explicit pattern payload fallback."""
-    source_type = str(metadata.get("source_type", "") or "").lower()
+    """Resolve a lower-case source type, recognizing only an explicit pattern payload fallback.
+
+    A9-R2b — the projected ``source_type`` field is storage METADATA and its JSON type is
+    validated by :func:`_resolve_source_type` before this coercion. Here only a genuine string
+    is normalized (trimmed + lower-cased; empty/whitespace counts as absent), so a malformed
+    non-string can never be ``str()``-FABRICATED into a type string. An absent key and an
+    explicit ``None`` are both absence, and the explicit ``pattern_payload`` fallback still
+    applies to them.
+    """
+    raw = metadata.get("source_type")
+    source_type = raw.strip().lower() if isinstance(raw, str) else ""
     if not source_type and metadata.get("pattern_payload") is not None:
         source_type = "pattern"
     return source_type
@@ -1455,6 +1669,7 @@ def _resolve_source_type(
     cid: str,
     *,
     resolver: Callable[[str], str | None] | None = None,
+    leg_errors: dict[str, str] | None = None,
 ) -> str:
     """Resolve a candidate's ``source_type``, consulting an authoritative resolver when the
     store metadata is silent.
@@ -1466,13 +1681,55 @@ def _resolve_source_type(
     untyped record that could outrank a typed one. The resolver is deterministic and
     best-effort: a missing/raising resolver leaves the type empty, and the selection gate
     then excludes the candidate with a recorded reason when a typed candidate exists.
+
+    F3 (u3) — failure is not absence: when a resolver RAISES, the failure is recorded under
+    :data:`SOURCE_TYPE_RESOLVER_ERROR_KEY` in ``leg_errors`` (the caller's attempt ledger),
+    while the candidate still stays untyped and the pass still returns. A resolver that
+    authoritatively returns ``None``/empty records NOTHING: that is a clean absence. The two
+    cases are therefore distinguishable in the attempt record instead of both collapsing to
+    an empty string (the pre-repair silent-empty). ``leg_errors`` is optional: a direct
+    caller that passes none simply does not collect the diagnostic.
+
+    A9-R2b — the projected field's JSON TYPE is validated first. An ABSENT key, an explicit
+    ``None`` and a string keep today's behaviour (a nonempty string type is used; an absent
+    value falls through to the authoritative resolver / ``pattern_payload`` fallback). A
+    PRESENT non-string (dict, nonempty OR empty list, bool, number) is MALFORMED: it records
+    :data:`SOURCE_TYPE_METADATA_ERROR_KEY` and returns an untyped candidate WITHOUT consulting
+    the resolver — a malformed projection must not be laundered as authoritative absence, and
+    :func:`_source_type` must never ``str()``-fabricate a type from it.
+
+    The diagnostic names the candidate the resolver failed on, so an auditor can attribute
+    the failure without re-running retrieval. An authoritative empty (``None``, ``""`` or
+    whitespace) is a clean absence and records NOTHING — only a raise sets the key.
     """
+    raw = metadata.get("source_type")
+    if raw is not None and not isinstance(raw, str):
+        # A9-R2b: present-but-non-string projected metadata is MALFORMED storage, not a type.
+        # Record the named diagnostic (first cause kept, like the resolver failure below) and
+        # leave the candidate untyped. Return BEFORE the resolver, so the malformed field is
+        # never treated as an absent one the authoritative side channel may fill in.
+        if leg_errors is not None:
+            leg_errors.setdefault(
+                SOURCE_TYPE_METADATA_ERROR_KEY,
+                f"projected source_type metadata is not a string for candidate {cid!r}: "
+                f"got {type(raw).__name__} {raw!r}; candidate left untyped",
+            )
+        return ""
     source_type = _source_type(metadata, text)
     if source_type or resolver is None:
         return source_type
     try:
         resolved = resolver(cid)
-    except Exception:  # noqa: BLE001 — a resolver failure must never fail retrieval
+    except Exception as exc:  # noqa: BLE001 — a resolver failure must never fail retrieval
+        if leg_errors is not None:
+            # ``setdefault``: the first failure is kept so a swarm of per-candidate raises
+            # cannot overwrite the cause with identical noise; a deterministic resolver
+            # raises the same way for every cid it touches. The failing candidate is named
+            # so the recorded cause is attributable, never an anonymous "something failed".
+            leg_errors.setdefault(
+                SOURCE_TYPE_RESOLVER_ERROR_KEY,
+                f"source_type resolver raised {type(exc).__name__} for candidate {cid!r}: {exc}",
+            )
         return source_type
     resolved = (resolved or "").strip().lower()
     return resolved if resolved else source_type
@@ -1549,6 +1806,8 @@ def retrieve(
     commit_sha: str = "",
     repository_id: str = "",
     acl_scope: str = "",
+    source_types: Any = (),
+    shared_repository_ids: Any = (),
     executor_context_tokens: int = 200_000,
     remaining_input_tokens: int = 200_000,
     rag_token_limit: int = DEFAULT_RAG_TOKEN_LIMIT,
@@ -1579,7 +1838,21 @@ def retrieve(
     Scope filtering is a hard pre-fusion boundary. Candidates carrying a different,
     non-empty ``repository_id`` are removed before fusion and therefore cannot become
     evidence or graph-expansion seeds. An empty candidate scope remains the documented
-    unknown/legacy case handled by :func:`scope_excluded`.
+    unknown/legacy case handled by :func:`scope_excluded`. ``shared_repository_ids`` is the
+    EXPLICIT shared-scope union arm (u2/F2): a candidate in the requested scope OR any
+    declared shared scope stays eligible, while a foreign private scope is still excluded.
+    The same union shapes the dense leg's where-expression, so the store-side and local
+    boundaries agree. The explicit shared scopes ALSO authorize their own ACL namespace
+    (R3): the dense ACL clause and :func:`acl_excluded` accept the requested ACL ∪ the shared
+    scopes, so a shared record carrying its own ACL is not hidden by an equality to the
+    private cell ACL. A foreign private ACL is still excluded and the shared ids never widen
+    to a wildcard.
+
+    ``source_types`` is the resolved layer route's phase-shaping prefilter (u2/F2): when
+    non-empty, only candidates whose ``source_type`` is in that set enter fusion; an empty
+    value is the identity (the pre-existing path). Every dropped candidate is recorded on
+    ``source_type_excluded`` with a reason — a routed pass that narrows material is never
+    silent (measured-or-absent).
 
     ``source_type_resolver`` is the k4 no-silent-empties side channel: a deterministic
     ``candidate_id -> source_type`` lookup (never an LLM) consulted when a store's
@@ -1587,6 +1860,10 @@ def retrieve(
     typed from the authoritative durable layer instead of entering selection untyped.
     A candidate that remains untyped after resolution is excluded from the top-K with a
     recorded reason whenever a typed candidate exists (see ``UNTYPED_EXCLUDED_REASON``).
+    A resolver that RAISES is itself a named cause, not a silent empty (F3/u3): the first
+    failure is recorded in ``leg_errors`` under :data:`SOURCE_TYPE_RESOLVER_ERROR_KEY`
+    while the pass still returns, so an auditor can distinguish a resolver failure from an
+    authoritative ``None``/empty return (which records nothing).
     """
     t0 = time.monotonic()
     budget_s = (
@@ -1595,26 +1872,59 @@ def retrieve(
         else float(os.environ.get(RETRIEVAL_BUDGET_ENV, DEFAULT_RETRIEVAL_BUDGET_S))
     )
     leg_errors: dict[str, str] = {}
+    normalized_source_types = _normalize_source_types(source_types)
+    shared_scope_ids = _normalize_shared_repository_ids(shared_repository_ids)
     plan = build_query_plan(
         raw_work_item,
         phase_objective=phase_objective,
         pattern_projection=pattern_projection,
+        source_types=normalized_source_types,
     )
     filters: dict[str, Any] = {
         "repository_id": repository_id,
         "commit_sha": commit_sha,
         "acl_scope": acl_scope,
+        "source_types": list(normalized_source_types),
+        "shared_repository_ids": list(shared_scope_ids),
     }
     requested_acl = str(filters.get("acl_scope", ""))
 
     dense_hits: list[dict[str, Any]] = []
     lexical_hits: list[dict[str, Any]] = []
+    # A10-R2: the dense leg's per-call truncation stats. Populated only when a dense search
+    # actually returned, so an absent/down dense leg records NO incomplete diagnostic (its
+    # failure is already named under ``"dense"``).
+    dense_stats: dict[str, Any] = {}
     dense_ok = dense_store is not None
     lexical_ok = graph_client is not None
     graph_ok = graph_client is not None
 
     def _dense_leg():
-        return dense_store.search(plan.dense_query, top_k=top_k, where=_dense_filter(filters))
+        """Run the dense store, preserving its incomplete-search signal.
+
+        Prefer the store's per-call ``search_with_stats`` (A10-R2) — its stats describe THIS
+        call, not whatever the last call left on shared mutable state. A store without the
+        method (or a legacy double) falls back to ``search()``; we then read its shared
+        ``last_search_stats`` / ``last_search_incomplete`` so the pre-refactor production
+        shape is still named rather than re-lost. Returns ``(hits, stats)`` either way.
+        """
+        search_with_stats = getattr(dense_store, "search_with_stats", None)
+        if callable(search_with_stats):
+            hits, stats = search_with_stats(
+                plan.dense_query, top_k=top_k, where=_dense_filter(filters)
+            )
+            return list(hits or []), dict(stats or {})
+        hits = dense_store.search(plan.dense_query, top_k=top_k, where=_dense_filter(filters))
+        # Legacy shape: the store carries the signal on itself. ``last_search_incomplete`` is
+        # the pre-refactor attribute; ``last_search_stats`` is the richer dict.
+        stats: dict[str, Any] = {}
+        shared_stats = getattr(dense_store, "last_search_stats", None)
+        if isinstance(shared_stats, dict):
+            stats = dict(shared_stats)
+        legacy_incomplete = getattr(dense_store, "last_search_incomplete", None)
+        if isinstance(legacy_incomplete, bool) and "incomplete" not in stats:
+            stats["incomplete"] = legacy_incomplete
+        return list(hits or []), stats
 
     def _lexical_leg():
         # The lexical leg queries the *knowledge* full-text index (Knowledge.text),
@@ -1655,9 +1965,28 @@ def retrieve(
             else:
                 lexical_ok = False
         elif name == "dense":
-            dense_hits = handle["value"] or []
+            value = handle["value"]
+            # The per-call contract returns ``(hits, stats)``; a legacy list return is kept
+            # intact for any store (or double) that predates ``search_with_stats``.
+            if isinstance(value, tuple) and len(value) == 2:
+                dense_hits, dense_stats = value[0] or [], dict(value[1] or {})
+            else:
+                dense_hits = value or []
         else:
             lexical_hits = handle["value"] or []
+
+    # A10-R2: the dense store's KNOWN incomplete-search signal becomes a NAMED diagnostic.
+    # A bounded expansion that reached the cap before exhausting the scoped corpus may still
+    # hold scoped candidates deeper in the ranking, so the pass must not be read as a clean
+    # empty. The diagnostic's reason names the scanned count against the corpus bound, so an
+    # auditor sees how much of the scoped corpus went unexamined.
+    if dense_stats.get("incomplete"):
+        scanned = dense_stats.get("scanned")
+        corpus = dense_stats.get("corpus")
+        leg_errors[DENSE_SEARCH_INCOMPLETE_KEY] = (
+            "dense search clipped by bounded expansion before exhausting the scoped corpus "
+            f"(scanned={scanned}, corpus={corpus}); scoped candidates may remain unexamined"
+        )
 
     candidates: list[Candidate] = []
     ranks: dict[str, dict[str, int | None]] = {}
@@ -1670,7 +1999,9 @@ def retrieve(
         cid = hit.get("id", "")
         meta = hit.get("metadata") or {}
         text = hit.get("document", "")
-        source_type = _resolve_source_type(meta, text, cid, resolver=source_type_resolver)
+        source_type = _resolve_source_type(
+            meta, text, cid, resolver=source_type_resolver, leg_errors=leg_errors
+        )
         authority = _coerce_authority(meta.get("authority"))
         if not _candidate_allowed(
             source_type,
@@ -1712,11 +2043,20 @@ def retrieve(
     lexical_rank = 0
     for hit in lexical_hits:
         props = hit.get("properties") or {}
-        if acl_excluded(str(props.get("acl_scope", "") or ""), requested_acl):
-            continue  # a foreign-ACL record never surfaces via the direct lexical leg
+        # A foreign-ACL record never surfaces via the direct lexical leg; a candidate in an
+        # authorized shared ACL (the explicit shared repository scope) does — that is the
+        # F2/R3 shared-history serving path.
+        if acl_excluded(
+            str(props.get("acl_scope", "") or ""),
+            requested_acl,
+            shared_acl_scopes=shared_scope_ids,
+        ):
+            continue
         cid = _canonical_id(props, hit.get("id", ""))
         text = props.get("text", "")
-        source_type = _resolve_source_type(props, text, cid, resolver=source_type_resolver)
+        source_type = _resolve_source_type(
+            props, text, cid, resolver=source_type_resolver, leg_errors=leg_errors
+        )
         authority = _coerce_authority(props.get("authority"))
         if not _candidate_allowed(
             source_type,
@@ -1775,10 +2115,41 @@ def retrieve(
 
     # Scope isolation (HARD pre-filter): the cell's repository_id must never leak another
     # cell's knowledge, even when the two scopes hold near-identical text. Applied before
-    # fusion so an excluded candidate can never become a graph-expansion seed.
+    # fusion so an excluded candidate can never become a graph-expansion seed. The explicit
+    # shared-scope union (u2/F2) is the second arm: a candidate in a declared shared scope
+    # stays eligible, while a foreign private scope is still dropped.
     requested_scope = str(filters.get("repository_id", ""))
-    if requested_scope:
-        candidates = [c for c in candidates if not scope_excluded(c.repository_id, requested_scope)]
+    if requested_scope or shared_scope_ids:
+        candidates = [
+            c
+            for c in candidates
+            if not scope_excluded(
+                c.repository_id, requested_scope, shared_repository_ids=shared_scope_ids
+            )
+        ]
+
+    # Source-type prefilter (u2/F2): only the resolved layer route's positive material enters
+    # fusion. An empty type set is the identity — an unrouted pass is byte-identical to the
+    # pre-existing path. A non-empty set drops every candidate outside it and RECORDS the
+    # drop, so a routed pass that narrows material is never silent. Applied AFTER both legs
+    # so a cross-leg-typed candidate is filtered on its resolved type, and BEFORE fusion so
+    # no dropped candidate can become a graph-expansion seed.
+    source_type_excluded: list[dict[str, Any]] = []
+    if normalized_source_types:
+        allowed_types = set(normalized_source_types)
+        kept: list[Candidate] = []
+        for c in candidates:
+            if (c.source_type or "").strip().lower() in allowed_types:
+                kept.append(c)
+            else:
+                source_type_excluded.append(
+                    {
+                        "id": c.id,
+                        "source_type": c.source_type or "untyped",
+                        "reason": SOURCE_TYPE_EXCLUDED_REASON,
+                    }
+                )
+        candidates = kept
 
     # Fuse, content-hash dedupe, then cosine-redundancy collapse (conflicts survive).
     # The k3 source-type ordering signal is conditioned on the deterministic query shape:
@@ -1869,6 +2240,7 @@ def retrieve(
                     props.get("text", ""),
                     cid,
                     resolver=source_type_resolver,
+                    leg_errors=leg_errors,
                 )
                 authority = _coerce_authority(props.get("authority"))
                 # Review-4 A2: an EXPANDED neighbor must pass the same freshness/commit
@@ -1899,10 +2271,32 @@ def retrieve(
                 )
                 if source_type == "pattern" and payload is None:
                     continue
-                if scope_excluded(props.get("repository_id", ""), requested_scope):
-                    continue  # another cell's neighbor never surfaces via expansion
-                if acl_excluded(str(props.get("acl_scope", "") or ""), requested_acl):
-                    continue  # a foreign-ACL neighbor never surfaces via expansion
+                # An expanded neighbor is part of the same pass, so it obeys the same
+                # route prefilter (u2/F2): a source type outside the resolved layer set
+                # never surfaces through expansion, or the prefilter would be bypassable.
+                if not _source_type_allowed(source_type, normalized_source_types):
+                    source_type_excluded.append(
+                        {
+                            "id": cid,
+                            "source_type": source_type or "untyped",
+                            "reason": SOURCE_TYPE_EXCLUDED_REASON,
+                        }
+                    )
+                    continue
+                if scope_excluded(
+                    props.get("repository_id", ""),
+                    requested_scope,
+                    shared_repository_ids=shared_scope_ids,
+                ):
+                    continue  # a foreign private neighbor never surfaces via expansion
+                # A foreign-ACL neighbor never surfaces via expansion; a neighbor whose ACL is
+                # an authorized shared scope does (the F2/R3 shared-history serving path).
+                if acl_excluded(
+                    str(props.get("acl_scope", "") or ""),
+                    requested_acl,
+                    shared_acl_scopes=shared_scope_ids,
+                ):
+                    continue
                 origin = node.get("origin_seed") or ""
                 seed_score = seed_scores.get(origin)
                 if seed_score is None or seed_score <= 0:
@@ -1987,6 +2381,7 @@ def retrieve(
         leg_errors=leg_errors,
         fallback_mode=fallback.value,
         untyped_excluded=untyped_excluded,
+        source_type_excluded=source_type_excluded,
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
     return attempt
@@ -2006,12 +2401,35 @@ def _dense_filter(filters: dict[str, Any]) -> dict[str, Any]:
     per authority) are deliberate — the authority values are the exact strings
     persisted by ``scripts/kb_worker.py`` (``record.authority.name``), and Chroma's
     ``$or`` matches them directly.
+
+    The repository clause is the requested scope UNION the explicit shared scope ids
+    (u2/F2): a single scope stays the historical equality, while a requested-plus-shared
+    pass becomes a ``$or`` over both ids — a declared shared repository stays retrievable
+    from the dense leg. A foreign private scope is not in the union and is thereby excluded.
+
+    The ACL clause (u2/F2, R3) is the requested ACL UNION the authorized shared ACL scopes —
+    the SAME explicit shared ids, because the cell convention sets ``repository_id ==
+    acl_scope`` and an explicitly shared repository authorizes its own ACL namespace. A
+    single ACL stays the historical equality; a requested-plus-shared pass becomes a ``$or``
+    over both, so a shared decision carrying its OWN ACL is no longer hidden by an equality
+    to the private cell ACL. Without a requested ACL the clause is omitted entirely, so an
+    ACL-free pass is byte-identical to the pre-existing filter.
     """
     conditions: list[dict[str, Any]] = []
-    if filters.get("repository_id"):
-        conditions.append({"repository_id": filters["repository_id"]})
-    if filters.get("acl_scope"):
-        conditions.append({"acl_scope": filters["acl_scope"]})
+    repository_scope = _repository_scope_union(
+        filters.get("repository_id"), filters.get("shared_repository_ids")
+    )
+    if len(repository_scope) == 1:
+        conditions.append({"repository_id": repository_scope[0]})
+    elif len(repository_scope) > 1:
+        conditions.append({"$or": [{"repository_id": scope} for scope in repository_scope]})
+    requested_acl = str(filters.get("acl_scope") or "").strip()
+    if requested_acl:
+        acl_scopes = _acl_scope_union(requested_acl, filters.get("shared_repository_ids"))
+        if len(acl_scopes) == 1:
+            conditions.append({"acl_scope": acl_scopes[0]})
+        else:
+            conditions.append({"$or": [{"acl_scope": scope} for scope in acl_scopes]})
     commit = filters.get("commit_sha")
     if commit:
         conditions.append(
