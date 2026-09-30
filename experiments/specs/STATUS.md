@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-25T01:33:56.692026+00:00`  ·  250 spec(s)
-**Work remaining:** 210 open · 40 completed/retired
+Generated at: `2026-09-30T20:05:49.639111+00:00`  ·  251 spec(s)
+**Work remaining:** 211 open · 40 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -189,6 +189,7 @@ Generated at: `2026-09-25T01:33:56.692026+00:00`  ·  250 spec(s)
 | `retrieval_activation` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `retrieval_activation_augment_proof` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `retrieval_fusion_quality` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `retrieval_serving` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `retry_observational_analysis` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `routing_follow_up` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `routing_kb_dispatch` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
