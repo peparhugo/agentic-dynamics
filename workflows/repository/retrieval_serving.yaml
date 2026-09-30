@@ -1,0 +1,234 @@
+name: retrieval_serving
+question: >-
+  Make the PROMOTED retrieval seam actually SERVE in production. The first live per-phase
+  record (the R5 probe, ledger 20260930T195030140315Z_run-20fead9fa6d8) shows its truth:
+  role resolved, honest dispositions — and served_count 0. Three root causes are visible in
+  that record and the code: the prompt constructor calls a RETIRED model id
+  (`DEFAULT_CONSTRUCTOR_MODEL = "deepseek/deepseek-v4-flash"` — the L39 class) and fails as
+  `constructor_call_failed`; the dense leg cannot construct in cells because `EmbeddingClient`
+  imports the optional `ollama` package and needs a reachable embedder endpoint; and a fresh
+  cell's private scope legitimately holds nothing, so the serving policy for what a phase may
+  retrieve BEYOND its private scope needs its first explicit, recorded design. Fix all three
+  with named diagnostics preserved, prove them with gates, and leave the seam measurably
+  serving wherever material exists — and honestly named where it does not.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+factors:
+  - {name: model, levels: [deepseek/deepseek-flash]}
+design: factorial
+rules: []
+metrics: []
+comparison: null
+writeup: {format: lab_book, sections: [question, evidence]}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_uncertainty}
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: true
+    plan_unit_cap: 8
+    rag:
+      emit_self: true
+      emit_report: true
+      emit_scope: agentic-dynamics
+    context:
+      domain_context: >-
+        THE EVIDENCE (the first live record, ledger 20260930T195030140315Z_run-20fead9fa6d8,
+        phase implement): route_status resolved, role implementation (the scope translation
+        WORKED); L0 served ("base prompt preserved"); L1 named_absent — reason "dense:
+        RuntimeError: dense store construction failed: ModuleNotFoundError: No module named
+        'ollama'; embedding: embedder unavailable"; L2 named_absent (same dense reason); L4
+        excluded; served_count 0; fallback_mode lexical_graph_only; fallback_reason
+        constructor_call_failed; leg_errors {dense, embedding}. The recorder is HONEST —
+        this unit makes the seam CAPABLE.
+
+        THE THREE ROOT CAUSES: (1) THE RETIRED CONSTRUCTOR PIN — `knowledge/prompt_constructor.py`
+        sets `DEFAULT_CONSTRUCTOR_MODEL = "deepseek/deepseek-v4-flash"`, a RETIRED id (the
+        register L39 class: fresh provider processes refuse it), so the constructor's model
+        call throws and every augmented phase falls back to `constructor_call_failed` plus a
+        deterministic plan. Re-point it to the volume model (`deepseek/deepseek-flash` — the
+        L39 sweep direction: volume = deepseek-flash, adversary = openai/gpt-6-astra, pro-tier
+        stays denied) and sweep sibling retired pins in the touched modules, with a test that
+        PINS the live id. (2) THE EMBEDDER PATH — `knowledge/embeddings.py:EmbeddingClient`
+        imports the optional `ollama` package and calls a local service (default
+        http://127.0.0.1:11434, model bge-m3). In cells the import fails (base deps) and no
+        endpoint is provisioned, so the dense leg (retrieval.py:2174-2176) is dead. Make the
+        embedder path CELL-VIABLE: no import-time hard dependency on optional packages (a
+        stdlib-HTTP client to the same Ollama REST API is the likely shape; `import ollama`
+        may remain as an OPTIONAL transport), an env-configurable endpoint (OLLAMA_HOST
+        honored), and a NAMED "embedder-unreachable" diagnostic that is distinct from module
+        absence and from clean absence. The AIO handles the fleet-side provisioning (cell
+        env/image/network) separately — the CODE must demand it explicitly rather than die on
+        an import. (3) THE SERVING SCOPE POLICY — a fresh cell's private scope
+        (self-<worktree>) is EMPTY by design (the two-channel rule), so even a healthy seam
+        serves nothing for a brand-new worktree unless shared scopes are granted. Define the
+        FIRST honest serving-scope grants per phase role (for example: what a run's later
+        phases may retrieve of the same lineage's emitted findings; what project-level
+        knowledge — register/spec/decision records — may reach an implementation phase) as
+        EXPLICIT, RECORDED scopes through the promoted `shared_scopes` machinery and the
+        context_route record — never as silent global visibility. Propose the policy in the
+        plan and implement the bounded first grants the evidence supports; anything broader
+        is the controller's call, named as a follow-up.
+
+        WHAT GOOD LOOKS LIKE: the constructor resolves (or fails only for a named,
+        non-retired cause); the dense leg either works where an embedder is reachable or
+        degrades with the NAMED unreachable diagnostic (never a module-missing traceback); a
+        phase with legitimately available material records served>0 with evidence ids; a
+        phase without material records NAMED absence; the record schema stays
+        `context-route/v1` — same fields, same honesty rules.
+
+        FENCES: `context_layer_routing` is PROMOTED ON MAIN (`4719410dd`) — do not regress
+        its behavior (scope translation, unmapped-evidence withholding, both-diagnoses
+        preservation, known-zero cleanliness, the incomplete-search diagnostic); do not touch
+        the admission/lease machinery; do not ADD runtime dependencies to cells (base deps
+        only — the embedder refactor must REMOVE a dependency, not add one); do not weaken any
+        existing named-absence path to make serving pass.
+
+        ACCEPTANCE: (a) the five declared suites green in-cell on the FINAL commit
+        (tests/test_workflow_runner.py, tests/test_prompt_constructor.py,
+        tests/test_retrieval.py, tests/test_doc_lifecycle.py,
+        tests/test_dependency_direction.py); (b) `python3 -m ruff check` green on touched
+        python paths; (c) the new/updated tests prove: the constructor model id is the live
+        volume model (pinned); the embedder path constructs without any optional package and
+        fails ONLY with the named unreachable/absence diagnostics when no endpoint/module is
+        present (no import-time crash; a stub HTTP embedder path works end-to-end); the
+        serving-scope grants are explicit in the record; (d) the AIO may verify the dense leg
+        host-side against the real endpoint; the next live run's record is the final judge.
+
+        EXECUTION SHAPE: plan-units expansion (cap 8), one concern per unit, ONE gate per
+        unit, prefer MORE, SMALLER units; unit budgets must SUM to at most the spec's stop
+        budget (`stop.budget_usd` = **$8.00**).
+
+        RAILS: each slice implements ONLY its unit; keep the {unit_*} placeholders; a unit's
+        `tests` is a list of EXISTING cell-safe pytest TARGET PATHS ONLY; the verifier runs
+        with NO network/Redis/Neo4j and base deps only; run the full five declared suites
+        before every unit commit; never attempt to submit or launch any workflow from inside
+        the run (L53); write only inside the worktree (L46b); stage notes explicitly
+        (`git add -f notes/`); no long waits or sleeps (L46); a unit slice must ALWAYS deliver
+        a committed diff — "nothing to do" is NEVER valid (NO_CHANGES fails the run).
+    phases:
+      - name: prior
+        kind: agent
+        scope: proposal_write
+        timeout: 1800
+        requires_deliverable: true
+        prompt: |
+          Recon for RETRIEVAL SERVING. Read FAST, in this order: (1) the live record at
+          `experiments/results/workflows/minimal-agent-workflow/20260930T195030140315Z_run-20fead9fa6d8.json`
+          — the `context_route` block (the three named failures); (2) the embedder and the
+          seam — `src/agentic_dynamics/knowledge/embeddings.py` (EmbeddingClient: the ollama
+          import, the endpoint, the timeouts), `knowledge/retrieval.py` (the dense-leg build
+          around :2150-2250 and its named-absence path), `knowledge/prompt_constructor.py`
+          (DEFAULT_CONSTRUCTOR_MODEL and the `constructor_call_failed` path),
+          `knowledge/augment.py` (default_retrieve_fn / default_construct_fn and the seam's
+          fallback modes); (3) the promoted machinery — `knowledge/context_layers.py` (the
+          shared_scopes fields) and `runtime/workflow_runner.py`'s phase-route resolution +
+          record copy; (4) the register rows L39 (retired pins), L59 (cell-unsafe retrieval
+          tests), L60, and the spec `workflows/repository/context_layer_routing.yaml` for the
+          promoted behavior. SCOPE FENCE: you write ONLY `notes/` files
+          (`notes/retrieval_serving.md`, `notes/plan.md`, `notes/plan.units.json`,
+          `notes/sources.jsonl`) — never `src/`, `scripts/`, `tests/`, never another phase's
+          artifact; the UNITS own every repository change. WRITE `notes/retrieval_serving.md`
+          (`## Problem`, `## What Exists`, `## Gaps`, `## Sources`) with file:line anchors;
+          `notes/plan.md` (`## Files`, `## Tests`, `## Acceptance`, `## Risks`, `## Insight`)
+          — the Insight section must name, per root cause (retired pin / embedder path /
+          serving scopes), the exact surface and the assertion that will prove it; and
+          `notes/plan.units.json`: {"units": [{"id": "u1_...", "goal": "...", "files": [...],
+          "tests": [...], "acceptance": "...", "budget_usd": ..., "depends_on": [...]}]}. The
+          plan MUST cover: the constructor pin + its id-pinning test; the cell-viable embedder
+          path (stdlib-HTTP shape, optional transport, the named unreachable diagnostic);
+          the serving-scope policy (proposed explicitly) plus its first bounded grants,
+          recorded; a sweep for sibling retired pins in the touched modules. Declare ONLY
+          existing cell-safe targets (the five gate suites). Budgets must sum to at most
+          **$8.00**. Write `notes/sources.jsonl`. Commit early — `notes/` is gitignored, so
+          stage explicitly (`git add -f notes/`). NEVER run long waits or `sleep` (L46), and
+          NEVER attempt to submit/launch/re-run any workflow from inside this run (L53).
+      - name: execute
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        requires_files: [notes/plan.md, notes/sources.jsonl, notes/plan.units.json]
+        expand_from_plan: notes/plan.units.json
+        prompt: |
+          You are the EXECUTE phase for ONE unit of this workflow ({goal}). The runner has
+          expanded this phase into one bounded slice per unit in `notes/plan.units.json`; this
+          slice is unit `{unit_id}`.
+
+          THIS UNIT'S GOAL: {unit_goal}
+          DECLARED FILES (your entire write scope): {unit_files}
+          ACCEPTANCE: {unit_acceptance}
+
+          Implement ONLY this unit, against `notes/plan.md` and the spec context. Another
+          slice owns every other unit — do NOT read or implement their work, do not subsume a
+          sibling's scope, and do not edit files outside your declared list. The honesty
+          rules bind: a named diagnosis for every failure (module absent vs endpoint
+          unreachable vs clean empty are DISTINCT); never weaken an absence path to make a
+          test pass; never fabricate evidence ids or a served count.
+          Rules: run the five declared gate suites (`tests/test_workflow_runner.py`,
+          `tests/test_prompt_constructor.py`, `tests/test_retrieval.py`,
+          `tests/test_doc_lifecycle.py`, `tests/test_dependency_direction.py`) TO FULL GREEN
+          on your FINAL commit — if your unit changes an anchor a suite derives, update that
+          suite in the same commit. Run `python3 -m ruff check` on the python paths you
+          touch. A unit slice must ALWAYS deliver a committed diff: if the unit's work
+          already exists, make the smallest necessary change that PROVES the unit — add the
+          missing test/assertion/doc line — and commit; "nothing to do" is NEVER valid
+          (NO_CHANGES). Commit. NEVER run long waits or `sleep` (register L46). NEVER attempt
+          to submit or launch any workflow from inside the run (L53).
+      - name: g_test_gate
+        kind: test
+        scope: implementation
+        timeout: 1800
+        requires_files: [notes/plan.md]
+        tests:
+          - tests/test_workflow_runner.py
+          - tests/test_prompt_constructor.py
+          - tests/test_retrieval.py
+          - tests/test_doc_lifecycle.py
+          - tests/test_dependency_direction.py
+        prompt: |
+          The independent runner verifies the worktree against the declared suites.
+      - name: posterior
+        kind: agent
+        scope: proposal_write
+        timeout: 900
+        requires_files: [notes/retrieval_serving.md, notes/plan.md]
+        prompt: |
+          Diff the plan against what landed. WRITE `notes/posterior.md` (`## Violations`,
+          `## Unknowns`, `## UPDATES`): per root cause (retired pin / embedder path /
+          serving scopes), which unit closed it and the assertion that proves it; which
+          serving-scope grants are now explicit and recorded; what remains un-fixed and why
+          (named, never hidden); and the honest state of the seam after this run. Commit —
+          `notes/` is gitignored, so stage it explicitly (`git add -f notes/posterior.md`)
+          before committing. Keep every write inside the worktree.
+      - name: g_adversarial
+        kind: agent
+        scope: proposal_write
+        timeout: 1800
+        run_model: openai/gpt-6-astra
+        prompt: |
+          ADVERSARIAL REVIEW — a different model by design (2026-09-25: the adversary runs on
+          `openai/gpt-6-astra`; the authoring cells run on `deepseek/deepseek-flash`). Read
+          the notes, the diffs, the tests, and the seam. Attack: does the constructor-model
+          test actually pin the LIVE volume id (and would a retired id fail it)? Is the
+          embedder path import-safe with NO optional packages present (prove in-cell), and
+          are the failure modes DISTINCT and named — module-absent vs endpoint-unreachable vs
+          clean empty vs a genuinely capped search? Could the new serving-scope grants leak
+          private scope content (the two-channel rule: per-cell repository_id default; shared
+          only when explicit and recorded)? Is any "served>0" claim backed by real evidence
+          ids from the right scopes? Did the run regress any promoted behavior (scope
+          translation, unmapped-evidence withholding, both-diagnoses preservation, known-zero
+          cleanliness, the incomplete-search diagnostic)? Is any new runtime dependency added
+          to the cell path (base-deps rule)? Name at least one falsifier per major claim.
+          Write `notes/adversarial_review.md` with a final `## FINDING` paragraph and commit
+          it — `notes/` is gitignored, so stage the review explicitly
+          (`git add -f notes/adversarial_review.md`); the phase must record a commit whose
+          subject matches `[workflow] g_adversarial — <goal prefix>` exactly (the runner
+          matches the byte pattern; a different subject fails the phase). KEEP EVERY WRITE
+          INSIDE THE WORKTREE.

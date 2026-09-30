@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-25T01:33:56.692026+00:00",
-  "n_specs": 250,
+  "generated_at": "2026-09-30T20:05:49.639111+00:00",
+  "n_specs": 251,
   "specs": [
     {
       "name": "adapter_snapshot_guard",
@@ -2068,7 +2068,7 @@
       "latest_git_sha": null,
       "results_pointer": null,
       "n_runs": 0,
-      "workflow_revision_id": "6948ddb0653393706c84987abb42b0c845862f0eae43e40a7261672722db257b",
+      "workflow_revision_id": "46e75bed8a6813f374d037d1e3c0fa2cf558a71875065baf2af155c0776a6b7a",
       "authored_status": null
     },
     {
@@ -3631,6 +3631,26 @@
       "results_pointer": null,
       "n_runs": 0,
       "workflow_revision_id": "7f10b4a60cdf906c2e021bc4269dd58697af43486632bd37a80325d7c390004f",
+      "authored_status": null
+    },
+    {
+      "name": "retrieval_serving",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/retrieval_serving.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": true,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0,
+      "workflow_revision_id": "084fd046c21de89966b8174b06967e41d9b546112a954a2ff91b62f4b4a4f7a2",
       "authored_status": null
     },
     {
