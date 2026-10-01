@@ -145,9 +145,12 @@ from agentic_dynamics.knowledge.augment import (
 )
 from agentic_dynamics.knowledge.context_layers import (
     CONTEXT_ROUTE_SCHEMA,
+    SERVING_SCOPE_GRANTS_KEY,
     execution_scope_role,
+    explicit_run_wide_scopes,
+    phase_serving_scopes,
     resolve_phase_layers,
-    shared_history_scopes,
+    serving_scope_policy_table,
 )
 from agentic_dynamics.knowledge.context_layers import ROLE_UNKNOWN as CONTEXT_ROLE_UNKNOWN
 from agentic_dynamics.measurement.commit_analysis import _read_commit_files
@@ -1510,18 +1513,23 @@ def _resolve_rag_params(
     """
     resolved = dict(rag_params or spec.workflow.params.get("rag", {}) or {})
 
-    # F1/F2 (world models L60, unit 7): carry an EXPLICIT ``shared_history_scopes`` list into
-    # the resolved config. The explicit kwarg's list wins when declared (it already rode
-    # through the dict copy); otherwise the spec's ``workflow.params.rag`` value is carried;
-    # absent means the cell's OWN scope only. The key is ALWAYS present and normalized to one
-    # canonical list — an empty list never means global (the helper refuses the ``*`` /
-    # ``global`` / ``all`` wildcards and collapses the aliases ``shared_scopes`` /
-    # ``shared_repository_ids``). Normalizing here means the phase-route builder, the augment
-    # seam, and the retrieval filter all read the SAME list, so the union the dense
-    # where-expression and the hard scope pre-filter apply cannot disagree with the route. A
-    # routing/shared-scope failure therefore stays NAMED (or explicitly empty), never a
-    # silently widened scope.
-    resolved["shared_history_scopes"] = shared_history_scopes(resolved)
+    # F1/F2 (world models L60, unit 7) + u1 (retrieval_serving execution__u1): carry ONLY the
+    # role-INDEPENDENT explicit shared scopes into the resolved config. The explicit kwarg's
+    # list wins when declared (it already rode through the dict copy); otherwise the spec's
+    # ``workflow.params.rag`` value is carried; absent means the cell's OWN scope only. The key
+    # is ALWAYS present and normalized to one canonical list — an empty list never means global
+    # (the helper refuses the ``*`` / ``global`` / ``all`` wildcards and collapses the aliases
+    # ``shared_scopes`` / ``shared_repository_ids``).
+    #
+    # The ROLE-derived serving-policy grants are deliberately NOT resolved here: unioning every
+    # declared phase's grants run-wide was the R1 defect (a review phase inherited an
+    # implementation-only private scope). ``explicit_run_wide_scopes`` returns exactly the
+    # role-independent declarations — the canonical ``shared_history_scopes`` list plus any
+    # explicit ``serving_scope_grants`` list — so this run-wide value NEVER carries a role
+    # grant. The current phase's grants are resolved PER PHASE at the phase site by
+    # ``phase_serving_scopes``, AFTER execution-scope translation. DEFAULT-EMPTY: with no
+    # declaration the list is ``[]``, so the promoted behavior is byte-for-byte.
+    resolved["shared_history_scopes"] = list(explicit_run_wide_scopes(resolved))
 
     if rag_augment and not str(resolved.get("repository_id", "")).strip():
         scope = cell_scope(wd)
@@ -2323,13 +2331,165 @@ def _emit_self_finding(pr: PhaseResult, *, goal: str, scope: str) -> None:
         print(f"[warn] finding emit failed for phase '{pr.phase}': {type(exc).__name__}")
 
 
-def _phase_emit_scope(rag_params: dict[str, Any], wd: Path) -> str:
-    """The repository scope a phase's emissions land in: ``rag.emit_scope`` when declared,
-    else the cell's own scope (``self-<worktree>``). ONE precedence for BOTH emitters — the
-    metadata finding (``_emit_self_finding``) and the report variant — so a declared scope is
-    honored identically (L12: the report variant honored ``emit_scope`` while the metadata
-    finding silently used the cell scope)."""
-    return str(rag_params.get("emit_scope") or "").strip() or cell_scope(wd)
+def resolve_verified_run_findings_scope(run_identity: Mapping[str, Any] | None) -> str:
+    """Resolve a VERIFIED run/continuation identity into its run-findings repository scope.
+
+    R2 FINAL repair (retrieval_serving REPAIR ROUND 4), the composition-root half of the
+    verified channel. The control-db run row owns a genuine per-run/per-continuation identity:
+    a run's ``family_id`` is the family ROOT's run id (a fresh run is its own root,
+    ``family_id == run_id``; a ``--resume`` child inherits the parent's family — see
+    ``control_db.create_run``, ``src/agentic_dynamics/control/control_db.py``). That is the ONE
+    identity whose ownership the control plane actually guarantees, so it is the ONE identity the
+    runner may promote to a run-findings ownership proof.
+
+    Pure and deterministic — it reads ONLY the injected mapping, never the environment, so the
+    composition root (``scripts/run_workflow.py``) is the single caller and the single place the
+    decision is made. The mapping shape is the ``run_identity`` dict the composition root already
+    reads off the run row (``{"run_id", "parent_run_id", "family_id"}``).
+
+    Returns:
+        ``"self-run-<family_id>"`` when a non-empty ``family_id`` is present (the family root,
+        shared by every member of a lineage); ``"self-run-<run_id>"`` when only the run id is
+        present; or ``""`` (WITHHELD) when the mapping is missing/empty or carries neither field.
+        An empty result is the conservative answer: no shared or reused namespace is ever
+        granted under the label "own findings" without a verified identity.
+    """
+    if not run_identity:
+        return ""
+    family_id = str(run_identity.get("family_id") or "").strip()
+    if family_id:
+        return f"self-run-{family_id}"
+    run_id = str(run_identity.get("run_id") or "").strip()
+    if run_id:
+        return f"self-run-{run_id}"
+    return ""
+
+
+def _trusted_run_findings_scope(*, run_findings_scope: str | None, incoming_cell_id: str) -> str:
+    """The ONE trusted run/continuation identity, captured ONCE before the phase loop, or ``""``.
+
+    R2 FINAL repair (retrieval_serving REPAIR ROUND 4): the ``<run-findings>`` placeholder is an
+    OWNERSHIP claim ("serve this run's own findings"), so its value may come from EXACTLY ONE
+    source — an explicit ``run_findings_scope`` supplied to :func:`run_workflow` by the
+    COMPOSITION ROOT, whose ownership contract the control plane owns (the control-db run row's
+    ``family_id``/``run_id``, or equivalently the fleet parent's randomized job id). That seam is
+    the ONLY allow channel; it is used verbatim as a complete repository scope. The composition
+    root derives it with :func:`resolve_verified_run_findings_scope` (the pure resolver over the
+    control-db run identity).
+
+    The INCOMING ``FINOPS_CELL_ID`` is deliberately NOT an ownership proof and is NEVER promoted
+    to run identity. A cell id is just a launch-envelope label: fixed CAP-grid cell ids are
+    REUSED across re-executions, a ``--resume`` may reuse one, and the runner itself installs a
+    telemetry-derived ``self-wf_<spec>_<model>`` name during retrieval. None of those carries a
+    run nonce or continuation contract, so nonemptiness is not evidence that a namespace holds
+    ONLY this run's findings. The parameter is retained (accepted but ignored) so the call site
+    and the reused-ID falsifier keep a stable signature; it must never feed the return value.
+
+    When no explicit verified identity is supplied the result is ``""`` (WITHHELD): no shared or
+    reused namespace is ever granted under the label "own findings". Pure and deterministic (the
+    caller captures the inputs once; this helper reads no environment).
+
+    A genuine per-run/per-family namespace keyed by the control-db ``family_id`` is wired at the
+    composition root (``scripts/run_workflow.py``) through the explicit seam; the runner itself
+    implements only the bounded, honest withhold.
+    """
+    explicit = str(run_findings_scope or "").strip()
+    if explicit:
+        return explicit
+    # ``incoming_cell_id`` is intentionally ignored here: an incoming environment id (reused,
+    # fixed, or telemetry-derived) is not an ownership proof. See the docstring above.
+    return ""
+
+
+def _serving_family_scope_opted_in(rag_params: dict[str, Any]) -> bool:
+    """True iff the run opts into the ROLE-DERIVED serving-scope policy (the R5 alignment gate).
+
+    The composition root injects a VERIFIED run/continuation scope for EVERY DB-composed run
+    (``scripts/run_workflow.py`` resolves ``run_findings_scope=`` from the control-db identity).
+    Injecting is not honoring: the verified scope may only MIGRATE emission out of the default
+    reader's primary namespace when the run has the matching serving scope to read it back.
+    That read-back exists exactly when the role-derived policy is CONSULTED — i.e. when the run
+    declares a serving policy (:func:`serving_scope_policy_table` is not ``None``) AND has not
+    substituted the fully-explicit R4 list (``serving_scope_grants`` supplied, including ``[]``,
+    takes precedence and consults no policy; see :func:`phase_serving_scopes`).
+
+    The two conditions mirror the precedence in :func:`phase_serving_scopes`:
+
+    * **No declaration** (``rag = {}`` or only ``emit_self``/``emit_report``): ``False``.
+      Emission stays ``cell_scope(wd)`` — the default reader's primary repository/ACL — so a
+      later phase in the SAME worktree retrieves its own progressive finding, and the automatic
+      unverified placeholder is still withheld (no grant is added).
+    * **Declared policy** (``serving_scope_policy: default``): ``True``. The verified
+      ``trusted_scope`` becomes the emission destination, and the phase's role grant substitutes
+      the ``<run-findings>`` token to the SAME string — emission and retrieval agree.
+    * **Explicit R4 list** (``serving_scope_grants`` supplied): ``False``. The policy is not
+      consulted, so the run-wide-only grant cannot read a family-namespaced emission; keeping
+      emission cell-scoped preserves the default alignment.
+
+    Pure and deterministic (reads only ``rag_params``; no clock, store, model, or environment).
+    """
+    return (
+        serving_scope_policy_table(rag_params) is not None
+        and rag_params.get(SERVING_SCOPE_GRANTS_KEY) is None
+    )
+
+
+def _phase_emit_scope(rag_params: dict[str, Any], wd: Path, *, trusted_scope: str = "") -> str:
+    """The repository scope a phase's emissions land in.
+
+    Precedence, ONE for BOTH emitters — the metadata finding (``_emit_self_finding``) and the
+    report variant (``_emit_research_report``):
+
+    * a DECLARED ``rag.emit_scope`` wins (byte-identical to the historical behavior);
+    * else, ONLY when the run opts into a serving policy
+      (:func:`_serving_family_scope_opted_in`), the TRUSTED run/continuation scope — so emission
+      and the ``<run-findings>`` retrieval grant can never disagree (the R2 consistency rule);
+    * else the cell's own scope (``self-<worktree>``) — the DEFAULT reader's primary repository/
+      ACL. This is the R5 alignment rule: without a declared serving policy there is no family
+      grant to read a migrated namespace back, so emission must stay where default retrieval
+      looks, or the run's own progressive findings become invisible to its later phases.
+
+    A declared scope is honored identically by both emitters (L12: the report variant honored
+    ``emit_scope`` while the metadata finding silently used the cell scope).
+    """
+    declared = str(rag_params.get("emit_scope") or "").strip()
+    if declared:
+        return declared
+    if _serving_family_scope_opted_in(rag_params):
+        return str(trusted_scope or "").strip() or cell_scope(wd)
+    return cell_scope(wd)
+
+
+def _run_lineage_scope(rag_params: dict[str, Any], *, trusted_scope: str = "") -> str:
+    """The run-findings scope substituted for ``<run-findings>``, or ``""`` (WITHHELD).
+
+    The placeholder the serving-scope policy substitutes is an OWNERSHIP claim, so its value is
+    the caller-supplied ``trusted_scope`` (:func:`_trusted_run_findings_scope`, captured once
+    before the phase loop) — never an environment-derived name and never a worktree basename.
+
+    * a DECLARED ``emit_scope`` (project-wide ``agentic-dynamics``, a custom ``team-findings``,
+      or even a ``self-``-looking name) is an emission DESTINATION, not proof that it holds only
+      this run's findings. A shared/reused destination may hold other runs' findings, so the
+      token is WITHHELD (``""``) — a declared destination is reached only through an EXPLICIT
+      named grant (the project-knowledge entry for planning/implementation), never under the
+      label "own findings";
+    * without the serving-policy opt-in (:func:`_serving_family_scope_opted_in`), the verified
+      scope is not the emission destination either (``_phase_emit_scope`` keeps the cell scope),
+      so granting it here would let a phase read a FAMILY namespace nothing wrote to while its
+      own cell-scoped findings stay unreachable. The grant is WITHHELD (``""``) so emission and
+      default retrieval stay aligned;
+    * with no trusted identity the token is WITHHELD (``""``), closing the measured falsifier —
+      the runner's own ``self-wf_<spec>_<model>`` telemetry namespace is NEVER granted.
+
+    When a trusted identity IS supplied and ``emit_scope`` is undeclared AND the run opted into a
+    serving policy, the SAME scope is returned here and used for emission
+    (``_phase_emit_scope``), so the two can never disagree. Pure and deterministic.
+    """
+    if str(rag_params.get("emit_scope") or "").strip():
+        return ""
+    if not _serving_family_scope_opted_in(rag_params):
+        return ""
+    return str(trusted_scope or "").strip()
 
 
 def _capture_session_report(session_id: str) -> str:
@@ -2389,7 +2549,13 @@ def _capture_session_report(session_id: str) -> str:
 
 
 def _emit_research_report(
-    pr: PhaseResult, *, goal: str, spec_name: str, wd: Path, rag_params: dict[str, Any]
+    pr: PhaseResult,
+    *,
+    goal: str,
+    spec_name: str,
+    wd: Path,
+    rag_params: dict[str, Any],
+    trusted_scope: str = "",
 ) -> None:
     """Persist a research phase's FULL report + emit a retrievable finding (Astra acceptance).
 
@@ -2421,7 +2587,7 @@ def _emit_research_report(
         # is the fallback when the store is unavailable.
         report_text = _capture_session_report(str(pr.session_id or "")) or pr.final_response
         path.write_text(report_text, encoding="utf-8")
-        scope = _phase_emit_scope(rag_params, wd)
+        scope = _phase_emit_scope(rag_params, wd, trusted_scope=trusted_scope)
         emit_phase_finding(
             pr,
             goal=goal,
@@ -4799,6 +4965,7 @@ def run_workflow(
     retrieve_fn: Callable[..., Any] | None = None,
     construct_fn: Callable[..., Any] | None = None,
     rag_params: dict[str, Any] | None = None,
+    run_findings_scope: str | None = None,
     domain_context: str | None = None,
     change_analyzer: ChangeAnalyzer | None = None,
     change_analysis_legs: bool = True,
@@ -4851,6 +5018,18 @@ def run_workflow(
     ``cell_scope(wd)`` (never global) and keyed by ``f(goal, phase, commit, scope, extractor)``,
     so re-emitting is a no-op. Best-effort by construction — a downed knowledge stream never
     fails the phase.
+
+    Run-findings identity (``run_findings_scope``, retrieval_serving REPAIR ROUND 4, the final R2
+    repair): the ``<run-findings>`` serving-scope token is an OWNERSHIP claim, so the runner
+    resolves ONE trusted run/continuation scope ONCE before the phase loop and uses it for BOTH
+    emission and the retrieval grant. The ONLY allow channel is the explicit ``run_findings_scope``
+    supplied by the COMPOSITION ROOT from a verified run/continuation identity (the control-db
+    ``family_id``/``run_id``, or the fleet parent's randomized job id). The INCOMING
+    ``FINOPS_CELL_ID`` is captured for status/telemetry only and is NEVER promoted to ownership:
+    a reused/fixed CAP-grid cell id, and the runner's own spec/model telemetry fallback
+    (``_cell_id``), are SHARED namespaces, not proofs. When no verified identity is supplied, and
+    for any declared ``emit_scope``, the token is WITHHELD (``""``) and emission falls back to the
+    private worktree scope (``self-<worktree>``).
 
     Per-step routing (``docs/routing_design.md``): when the spec declares
     ``workflow.params.model_pool``, each agent phase's model is chosen by the injected
@@ -5064,7 +5243,26 @@ def run_workflow(
     # Prefer the launch envelope's cell id (set by the Control Room via
     # ``FINOPS_CELL_ID``) so status, phase, and events land on the single cell the
     # operator is watching; fall back to the deterministic per-spec id for CLI runs.
-    cell_id = os.environ.get("FINOPS_CELL_ID", "").strip() or _cell_id(spec.name, model)
+    #
+    # The INCOMING value is captured HERE, ONCE, before the phase loop: the agent branch
+    # temporarily installs the runner's OWN telemetry id into ``FINOPS_CELL_ID`` and restores
+    # it after, so reading the env later would mistake that telemetry id for the control-plane
+    # identity. This value is for STATUS/TELEMETRY only (``cell_id`` below) — it is NOT a run
+    # ownership proof: fixed CAP-grid cell ids are reused across re-executions and carry no run
+    # nonce or continuation contract. R2 final repair: it must never feed the run-findings scope.
+    incoming_cell_id = os.environ.get("FINOPS_CELL_ID", "").strip()
+    cell_id = incoming_cell_id or _cell_id(spec.name, model)
+    # Resolve the ONE trusted run-findings identity used CONSISTENTLY for BOTH emission
+    # (``_phase_emit_scope``) and the retrieval grant (``_run_lineage_scope``), so the two can
+    # never disagree. The ONLY allow channel is an explicit ``run_findings_scope`` supplied by
+    # the composition root from a verified run/continuation identity; the incoming cell id is
+    # captured for telemetry above but is deliberately NOT passed as an ownership proof. Absent
+    # the verified identity this is ``""`` — the ``<run-findings>`` token is WITHHELD (never the
+    # shared ``self-wf_<spec>_<model>`` telemetry namespace, never a reused cell id).
+    trusted_run_scope = _trusted_run_findings_scope(
+        run_findings_scope=run_findings_scope,
+        incoming_cell_id=incoming_cell_id,
+    )
     # Telemetry is injected, not imported (Debt-2): the composition root supplies the
     # control-plane publisher factory; without one, the run simply does not publish.
     publisher = publisher_factory(cell_id) if (publish and publisher_factory) else None
@@ -5672,7 +5870,39 @@ def run_workflow(
                             phase_hints.pop("role", None)
                             phase_hints.pop("phase_role", None)
                         phase_route = resolve_phase_layers(name, kind, hints=phase_hints)
-                        phase_shared_scopes = shared_history_scopes(rag_params)
+                        # u1 (retrieval_serving execution__u1): resolve the CURRENT phase's
+                        # serving scopes from its OWN translated role, AFTER the
+                        # execution-scope translation above — never the run-wide union of every
+                        # declared role's grants (the R1 defect). ``phase_serving_scopes``
+                        # merges the phase's role-derived policy grants with the
+                        # role-INDEPENDENT run-wide declarations (``explicit_run_wide_scopes``),
+                        # so a review phase can never inherit an implementation-only scope.
+                        #
+                        # u1 (retrieval_serving REPAIR ROUND 4, the final R2 repair): the
+                        # run-findings placeholder is substituted from ``_run_lineage_scope`` —
+                        # the ONE scope captured BEFORE the phase loop from a VERIFIED
+                        # run/continuation identity supplied EXPLICITLY by the composition root
+                        # (an explicit ``run_findings_scope``). The incoming ``FINOPS_CELL_ID``
+                        # is telemetry only and is NEVER promoted: a reused/fixed cell id and the
+                        # runner's own ``_cell_id`` fallback are SHARED namespaces, not ownership
+                        # proofs, and a spec-declared destination NAME is not either. A
+                        # DECLARED ``emit_scope`` (project-wide, custom ``team-findings``, or even
+                        # a ``self-``-looking name) is an emission destination, not an ownership
+                        # proof, so the token is WITHHELD (``""``): the review-only phase cannot
+                        # receive a shared/reused destination's foreign-run findings under the
+                        # label "own findings", and the explicit project-knowledge grant stays a
+                        # SEPARATE, named role entry. With NO trusted identity the token is also
+                        # WITHHELD — closing the measured falsifier (the shared
+                        # ``self-wf_<spec>_<model>`` telemetry namespace is never granted).
+                        # ``resolve_phase_layers`` itself stays policy-free, so the no-hint route
+                        # default remains ``()``.
+                        phase_shared_scopes = phase_serving_scopes(
+                            rag_params,
+                            role=phase_route.role,
+                            lineage_scope=_run_lineage_scope(
+                                rag_params, trusted_scope=trusted_run_scope
+                            ),
+                        )
                         outcome = augment_prompt(
                             base_prompt=prompt,
                             goal=goal,
@@ -6147,7 +6377,11 @@ def run_workflow(
         # ``if commit ...``.
         if _finding_emit_enabled(rag_params, phase_def) and kind != "test" and pr.status == "ok":
             if pr.commit_hash:
-                _emit_self_finding(pr, goal=goal, scope=_phase_emit_scope(rag_params, wd))
+                _emit_self_finding(
+                    pr,
+                    goal=goal,
+                    scope=_phase_emit_scope(rag_params, wd, trusted_scope=trusted_run_scope),
+                )
                 # Report variant for a COMMITTED phase (world-model loop v1, 2026-09-21):
                 # code phases keep the metadata finding above; a run that opts in
                 # (``rag.emit_report: true``) also gets the FULL captured turn as a
@@ -6155,11 +6389,21 @@ def run_workflow(
                 # knowledge, not only git files.
                 if rag_params.get("emit_report") and pr.final_response:
                     _emit_research_report(
-                        pr, goal=goal, spec_name=spec.name, wd=wd, rag_params=rag_params
+                        pr,
+                        goal=goal,
+                        spec_name=spec.name,
+                        wd=wd,
+                        rag_params=rag_params,
+                        trusted_scope=trusted_run_scope,
                     )
             elif pr.final_response:
                 _emit_research_report(
-                    pr, goal=goal, spec_name=spec.name, wd=wd, rag_params=rag_params
+                    pr,
+                    goal=goal,
+                    spec_name=spec.name,
+                    wd=wd,
+                    rag_params=rag_params,
+                    trusted_scope=trusted_run_scope,
                 )
 
         # Relabel tree-identity gate (cap_runner_hardening2 §Gap 2) — post-phase, agent phases

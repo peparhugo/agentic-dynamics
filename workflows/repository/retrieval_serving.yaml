@@ -38,6 +38,56 @@ workflow:
       emit_self: true
       emit_report: true
       emit_scope: agentic-dynamics
+      # ROUND 5 — THE R5 DEFAULT-IDENTITY ALIGNMENT RULE. The composition root INJECTS the
+      # verified run/continuation scope for EVERY DB-composed run, but the runner HONORS it for
+      # emission and for the `<run-findings>` grant ONLY when the run opts into a serving policy.
+      #   * NO serving policy declared (and no explicit `serving_scope_grants` override): emission
+      #     stays in `cell_scope(wd)` — the DEFAULT reader's primary repository/ACL — so the run's
+      #     own progressive findings stay visible to its later phases, and the placeholder grant is
+      #     WITHHELD (no shared scope is added). Emission and default retrieval stay ALIGNED.
+      #   * A DECLARED serving policy (as in this spec) MIGRATES emission to the verified family
+      #     namespace (`self-run-<family_id>`) AND grants the matching `<run-findings>` token, so
+      #     emission and retrieval agree BY CONSTRUCTION (the same resolved string for both).
+      #   * A supplied `serving_scope_grants` (the R4 explicit list, including `[]`) takes
+      #     precedence, SUPPRESSING the policy: emission stays cell-scoped and aligned with the
+      #     run-wide-only grant. The opt-in gate is precisely "policy present AND no explicit list".
+      # The gate lives in `_serving_family_scope_opted_in`; it is what keeps a migrated emission
+      # from becoming invisible to the run's own default reader.
+      #
+      # The first BOUNDED serving-scope grant, resolved PER PHASE (R1/R2 repair; ROUND 4
+      # derive-or-withhold). Opting into the per-role policy in knowledge/context_layers.py does
+      # NOT union the declared phases' role grants into the run: `phase_serving_scopes` resolves
+      # each phase's shared scopes SEPARATELY at the phase site, keyed on that phase's own
+      # translated role — no phase inherits another role's grant. The `<run-findings>` token is
+      # an OWNERSHIP claim, so it is substituted ONLY from ONE run/continuation identity that the
+      # control plane has VERIFIED AT THE COMPOSITION ROOT; an environment-derived name is NEVER
+      # an ownership proof. Concretely:
+      #   * a DECLARED `emit_scope` is an emission DESTINATION, not proof that it holds only
+      #     THIS run's findings, so the token is WITHHELD (`_run_lineage_scope` returns "");
+      #   * an UNDECLARED `emit_scope` whose ONLY identity is the environment-derived spec/model
+      #     telemetry namespace (`self-wf_<spec>_<model>`) also WITHHOLDS: that namespace is
+      #     SHARED across unrelated runs of the same spec/model, so it is not an ownership proof,
+      #     and no phase's `context-route/v1` record carries it under `shared_scopes`;
+      #   * an incoming `FINOPS_CELL_ID` is WITHHELD and NEVER PROMOTED to run identity: fixed
+      #     and reused CAP-grid cell ids name a launch envelope, not a run nonce or continuation
+      #     contract (and the spec/model telemetry name is not an ownership proof either), so
+      #     two unrelated same-namespace findings must not reach review construction. The runner
+      #     accepts the incoming-cell-id parameter only so the reused-ID falsifier keeps a stable
+      #     signature; it is IGNORED for the resolved scope.
+      #   * the ONLY ALLOW CHANNEL is an EXPLICIT `run_findings_scope` seam VERIFIED AT THE
+      #     COMPOSITION ROOT: the control-db run row's `family_id` (a root run is its own
+      #     family; a `--resume` child inherits the parent's family — `self-run-<family_id>`),
+      #     or equivalently the fleet parent's randomized job id. When that verified identity is
+      #     supplied and `emit_scope` is undeclared, the SAME identity is used for BOTH emission
+      #     and the retrieval grant, so the two can never disagree.
+      # What remains is the explicit, named project-knowledge grant — planning and
+      # implementation may read read-only project-level `agentic-dynamics` material;
+      # verification, review, and unknown phases receive nothing. This is never silent global
+      # visibility: the policy names no wildcard, and each phase's `context-route/v1` record's
+      # `shared_scopes` carries exactly that phase's resolved scopes (withheld vs granted). Any
+      # project-history grant to review/verification remains a NAMED controller follow-up, never
+      # a silent default. The record schema stays `context-route/v1` — same fields, same honesty.
+      serving_scope_policy: default
     context:
       domain_context: >-
         THE EVIDENCE (the first live record, ledger 20260930T195030140315Z_run-20fead9fa6d8,

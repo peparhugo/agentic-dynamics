@@ -93,6 +93,20 @@ class Neo4jVectorStoreError(RuntimeError):
     """Raised when the vector store cannot serve a request."""
 
 
+def _default_embedder() -> EmbeddingClient:
+    """Construct the default embedder at USE time, resolving the CURRENT module attribute.
+
+    Resolving ``embeddings.EmbeddingClient`` lazily (rather than a module-load-bound name)
+    keeps a swapped transport/double effective and avoids an import-order coupling: importing
+    this module while ``embeddings.EmbeddingClient`` is patched would otherwise freeze the
+    patched class for every later construction. The embedder has NO import-time optional
+    dependency (embeddings u3), so this is pure construction with no I/O.
+    """
+    from agentic_dynamics.knowledge import embeddings
+
+    return embeddings.EmbeddingClient()
+
+
 def _predicate(where: dict[str, Any] | None, params: dict[str, Any], start: int = 0) -> str:
     """Translate the constrained Chroma-style ``where`` dict into a Cypher predicate.
 
@@ -146,7 +160,7 @@ class Neo4jVectorStore:
         ensure_index: bool = True,
     ):
         self._client = client or Neo4jClient()
-        self._embedder = embedder or EmbeddingClient()
+        self._embedder = embedder or _default_embedder()
         self.dimensions = int(dimensions)
         self.timeout_s = (
             float(timeout_s)
@@ -163,6 +177,19 @@ class Neo4jVectorStore:
             self.ensure_index()
 
     # ── lifecycle ───────────────────────────────────────────────────────────────────────────
+
+    def _embed_query(self, text: str) -> list[float]:
+        """Embed one text, propagating the TYPED embedder failure UNCHANGED.
+
+        The dense leg's query embedding is a dense-leg failure, but it is ALSO an embedder
+        failure: the retrieval seam reads ``exc.token`` to name the state distinctly
+        (``embedder-unreachable`` when no endpoint answers vs ``embedder-module-absent`` when
+        the explicitly-selected optional transport is missing). Wrapping the failure here —
+        e.g. in :class:`Neo4jVectorStoreError` — would COLLAPSE those states into one dense
+        string (the pre-u4 defect). So this shared call site's only job is to make the
+        contract explicit: let the typed error through as-is.
+        """
+        return self._embedder.embed(text)
 
     def ensure_index(self) -> None:
         """Create the vector index if absent (idempotent, once per process)."""
@@ -231,7 +258,7 @@ class Neo4jVectorStore:
         if not ids:
             return 0
         docs = list(documents or ["" for _ in ids])
-        vectors = embeddings if embeddings is not None else [self._embedder.embed(d) for d in docs]
+        vectors = embeddings if embeddings is not None else [self._embed_query(d) for d in docs]
         if len(vectors) != len(ids):
             raise Neo4jVectorStoreError(f"embedding count {len(vectors)} != id count {len(ids)}")
         rows = []
@@ -316,7 +343,7 @@ class Neo4jVectorStore:
             merged["model"] = filter_model
         if filter_strategy:
             merged["strategy"] = filter_strategy
-        vector = self._embedder.embed(query)
+        vector = self._embed_query(query)
         params: dict[str, Any] = {"index": VECTOR_INDEX, "vec": vector, "limit": int(top_k)}
         pred = _predicate(merged, params)
         cypher = self._search_cypher(pred)

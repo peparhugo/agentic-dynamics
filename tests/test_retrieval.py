@@ -6,8 +6,12 @@ derivation — all without requiring Chroma/Neo4j/Ollama (the store-dependent
 orchestration is exercised only through its pure helpers).
 """
 
+import ast
 import json
+import sys
+import urllib.error
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 
@@ -21,6 +25,10 @@ from agentic_dynamics.knowledge.context_layers import (
     LAYER_STATUS_NAMED_ABSENT,
     LAYER_STATUS_SET,
     LAYER_STATUS_UNKNOWN,
+    PROJECT_KNOWLEDGE_SCOPE,
+    ROLE_IMPLEMENTATION,
+    ROLE_REVIEW,
+    SERVING_SCOPE_POLICY,
     UNRESOLVED_UNCLASSIFIED_MIXED_REASON,
     UNRESOLVED_UNCLASSIFIED_WITHHELD_ONLY_REASON,
     UNRESOLVED_WITHHELD_REASON,
@@ -29,6 +37,7 @@ from agentic_dynamics.knowledge.context_layers import (
     classify_phase_role,
     layer_source_types,
     resolve_phase_layers,
+    serving_scope_grants,
     shared_history_scopes,
 )
 from agentic_dynamics.knowledge.knowledge import SOURCE_TYPES, Authority
@@ -39,6 +48,8 @@ from agentic_dynamics.knowledge.retrieval import (
     CODE_QUERY_TYPE_PRIORS,
     CONFLICT_MULTIPLIER,
     DENSE_SEARCH_INCOMPLETE_KEY,
+    EMBEDDER_MODULE_ABSENT_TOKEN,
+    EMBEDDER_UNREACHABLE_TOKEN,
     EXACT_COMMIT_MULTIPLIER,
     FINDINGS_QUERY_TYPE_PRIORS,
     RELATIONSHIP_WEIGHTS,
@@ -3182,6 +3193,462 @@ def test_retrieve_authorized_shared_acl_decision_reaches_evidence():
     assert {c.id for c in attempt.selected_evidence} == {"k-req-decision", "k-shared-decision"}
 
 
+# ── u7: the serving-scope grants do NOT leak private scope (the two-channel rule) ─────
+#
+# Granting a phase the read-only project-level scope (``agentic-dynamics``) authorizes that
+# scope's OWN ACL namespace — the cell convention sets ``repository_id == acl_scope`` — but it
+# must never become a wildcard. Three records are repository-eligible; only ONE may be served:
+#
+#   * the granted project finding (repository=agentic-dynamics, acl=agentic-dynamics)  -> served
+#   * a foreign cell              (repository=self-other-cell, acl=self-other-cell)    -> excluded
+#   * an AIO org-root record      (repository=agentic-dynamics, acl=org:agentic-dynamics) -> excluded
+#
+# The org-root row is the subtle case: its ``repository_id`` MATCHES the grant, so a
+# repository-only filter would leak it — but its ACL namespace is the org root, which the
+# grant does not name. The store-side authorized-ACL union (and the lexical leg's
+# ``acl_excluded``) must keep it out; retrieve's local hard filter is the complementary
+# REPOSITORY-dimension arm. The served set must count only the granted finding. This is the
+# falsifier for the "grant the project scope, accidentally serve the AIO's org-root records"
+# failure mode the plan names, and it refuses a wildcard/global scope in the grant path itself.
+
+
+def test_serving_scope_grant_serves_granted_and_excludes_foreign_and_org_root():
+    """u7: the granted project scope serves its OWN finding while a foreign ``self-*`` cell
+    AND an org-root (``acl_scope=org:agentic-dynamics``) record stay excluded — the
+    two-channel bound made falsifiable."""
+    granted = _dense_hit("k-granted", "websocket reload finding from the granted project scope")
+    granted["metadata"].update(
+        {
+            "repository_id": "agentic-dynamics",
+            "acl_scope": "agentic-dynamics",
+            "source_type": "finding",
+            "authority": "measured",
+        }
+    )
+    # A foreign cell's private record: neither the requested scope nor the granted scope.
+    foreign = _dense_hit("k-foreign", "websocket reload finding from another cell")
+    foreign["metadata"].update(
+        {
+            "repository_id": "self-other-cell",
+            "acl_scope": "self-other-cell",
+            "source_type": "finding",
+            "authority": "measured",
+        }
+    )
+    # The AIO org-root record: the SAME repository_id as the grant, but the org ACL namespace.
+    org_root = _dense_hit("k-org-root", "websocket reload decision from the org root")
+    org_root["metadata"].update(
+        {
+            "repository_id": "agentic-dynamics",
+            "acl_scope": "org:agentic-dynamics",
+            "source_type": "decision",
+            "authority": "measured",
+        }
+    )
+
+    requested = "self-my-cell"  # the cell's private scope (the requested arm)
+    grant = "agentic-dynamics"  # the explicit serving-scope grant (the shared arm)
+
+    # (1) The store is handed the repository union (requested ∪ grant) AND the AUTHORIZED-ACL
+    # union (requested ∪ grant). The org-root ACL is outside both, so the where-clause alone
+    # already hides it: a regression to a repository-only clause would leak the org row.
+    aware = _WhereAwareDenseStore([org_root, foreign, granted])
+    attempt = retrieve(
+        "websocket reload",
+        dense_store=aware,
+        repository_id=requested,
+        acl_scope=requested,
+        shared_repository_ids=[grant],
+        source_types=["finding", "decision"],
+    )
+    assert aware.where == {
+        "$and": [
+            {"$or": [{"repository_id": requested}, {"repository_id": grant}]},
+            {"$or": [{"acl_scope": requested}, {"acl_scope": grant}]},
+        ]
+    }
+    aware_ids = {c.id for c in attempt.candidates}
+    assert "k-granted" in aware_ids  # positive: the granted finding is served
+    assert "k-foreign" not in aware_ids  # negative: another cell's private record
+    assert "k-org-root" not in aware_ids  # negative: the org root, despite the grant repository
+    assert {c.id for c in attempt.selected_evidence} == {"k-granted"}
+
+    # (2) The explicit authorized-ACL controls: the org-root namespace is NOT the grant, so it
+    # is excluded; the granted scope's own ACL namespace IS authorized. This is the exact rule
+    # the store-side ACL union and the lexical leg both apply.
+    assert acl_excluded("org:agentic-dynamics", requested, shared_acl_scopes=[grant]) is True
+    assert acl_excluded(grant, requested, shared_acl_scopes=[grant]) is False
+
+    # (3) The local repository pre-filter is the SECOND, independent arm — but only for the
+    # REPOSITORY dimension. A store that IGNORES its where clause cannot leak the foreign cell
+    # (a different repository) past the local filter; the org-root row deliberately does NOT
+    # survive that filter, because its repository_id IS the grant — which is precisely why the
+    # store-side authorized-ACL clause in (1) is load-bearing, not redundant. Neither arm
+    # alone suffices and together they close the leak.
+    local = retrieve(
+        "websocket reload",
+        dense_store=_FakeDenseStore([org_root, foreign, granted]),
+        repository_id=requested,
+        acl_scope=requested,
+        shared_repository_ids=[grant],
+        source_types=["finding", "decision"],
+    )
+    local_ids = {c.id for c in local.candidates}
+    assert "k-granted" in local_ids
+    assert "k-foreign" not in local_ids  # the local repository filter drops the foreign cell
+    # Honest: repository-only filtering cannot drop the org-root (same repository as the grant).
+    # The lexical leg applies ``acl_excluded`` (line 2096) and the dense leg's store clause does;
+    # a hypothetical store that ignores BOTH would be the only leak, and that is not a store
+    # shape retrieve can compensate for locally without a repository duplicate.
+    assert "k-org-root" in local_ids
+
+    # (4) The production-shaped pass (the store honours the clause it is handed) records and
+    # counts ONLY the granted evidence id: the L2 history disposition names it, ``served_count``
+    # equals the one served id — never the foreign or org-root rows. The record still NAMES the
+    # granted scope it honoured (never a silent global widening).
+    record = build_context_route_record(
+        "implement",
+        resolve_phase_layers("implement", "agent"),
+        attempt,
+        None,
+        shared_scopes=[grant],
+    )
+    assert record["shared_scopes"] == [grant]
+    assert record["served_count"] == 1
+    l2 = next(entry for entry in record["layers"] if entry["layer"] == "L2")
+    assert l2["status"] == "served"
+    assert l2["evidence_ids"] == ["k-granted"]
+    served_ids = {entry_id for entry in record["layers"] for entry_id in entry["evidence_ids"]}
+    assert served_ids == {"k-granted"}
+
+    # (5) The grant itself refuses wildcards: the project scope authorizes only its OWN
+    # namespace, never ``*``/``global``/``all``.
+    assert serving_scope_grants(
+        "implementation",
+        policy={"implementation": ["*", "global", "all", grant, grant]},
+    ) == (grant,)
+
+
+# ── u1/R2: the run-findings grant is PROOF-CARRYING (a run-derived lineage scope) ─────────
+#
+# ``<run-findings>`` promised "the run's OWN findings". The repair makes the substitution
+# PROOF-CARRYING: :func:`serving_scope_grants` substitutes the token ONLY from the caller's
+# run-derived ``lineage_scope`` and withholds it otherwise — the retired ``is_isolated_run_scope``
+# name denylist is no longer the ownership predicate, so a custom/reused emission destination
+# cannot smuggle a whole shared namespace in under "own findings". A broader project-history
+# grant stays the implementation role's EXPLICIT entry, exercised through the REAL ``retrieve``
+# path below (no injected route).
+
+
+def test_run_findings_grant_requires_a_lineage_scope_not_a_name():
+    """R2 (u1): the placeholder resolves ONLY from a caller-supplied run-derived lineage scope."""
+    # Every bare NAME offered via the retired ``run_scope`` argument is IGNORED...
+    for name in (PROJECT_KNOWLEDGE_SCOPE, "org:agentic-dynamics", "team-findings", "self-run", ""):
+        assert serving_scope_grants(ROLE_REVIEW, policy=SERVING_SCOPE_POLICY, run_scope=name) == ()
+    # ...the trusted run-derived lineage scope is the ONE substitution...
+    assert serving_scope_grants(
+        ROLE_REVIEW, policy=SERVING_SCOPE_POLICY, lineage_scope="self-this-run"
+    ) == ("self-this-run",)
+    # ...and the EXPLICIT project-knowledge grant on the implementation role stays untouched.
+    assert serving_scope_grants(
+        ROLE_IMPLEMENTATION, policy=SERVING_SCOPE_POLICY, run_scope=PROJECT_KNOWLEDGE_SCOPE
+    ) == (PROJECT_KNOWLEDGE_SCOPE,)
+
+
+def test_run_findings_grant_run_scope_boundary_real_retrieve_path():
+    """R2 (u1): a same-repository/different-run project finding is NOT served to a review role
+    (its retired ``run_scope`` name is not an ownership proof, so the token is withheld) but IS
+    served to an implementation role via its explicit project grant — through the real
+    ``retrieve`` path."""
+    project = _dense_hit("k-project", "websocket finding emitted by another run")
+    project["metadata"].update(
+        {
+            "repository_id": "agentic-dynamics",
+            "acl_scope": "agentic-dynamics",
+            "source_type": "finding",
+            "authority": "measured",
+        }
+    )
+    requested = "self-my-run"
+    store = _WhereAwareDenseStore([project])
+
+    # Review: the retired ``run_scope`` name does not substitute the token, so the review role
+    # gets NO shared scope and the same-repository/different-run finding is invisible.
+    review = retrieve(
+        "websocket finding",
+        dense_store=store,
+        repository_id=requested,
+        acl_scope=requested,
+        shared_repository_ids=list(
+            serving_scope_grants(
+                ROLE_REVIEW, policy=SERVING_SCOPE_POLICY, run_scope="agentic-dynamics"
+            )
+        ),
+        source_types=["finding"],
+    )
+    assert review.filters["shared_repository_ids"] == []
+    assert {c.id for c in review.candidates} == set()
+    assert review.selected_evidence == []
+
+    # Implementation: the EXPLICIT project grant stays, so the same finding IS served.
+    impl = retrieve(
+        "websocket finding",
+        dense_store=store,
+        repository_id=requested,
+        acl_scope=requested,
+        shared_repository_ids=list(
+            serving_scope_grants(
+                ROLE_IMPLEMENTATION, policy=SERVING_SCOPE_POLICY, run_scope="agentic-dynamics"
+            )
+        ),
+        source_types=["finding"],
+    )
+    assert impl.filters["shared_repository_ids"] == ["agentic-dynamics"]
+    assert {c.id for c in impl.candidates} == {"k-project"}
+    assert {c.id for c in impl.selected_evidence} == {"k-project"}
+
+
+def test_same_candidate_namespace_serves_neither_runs_findings_through_run_findings():
+    """R2 acceptance falsifier (u3): TWO unrelated runs in the SAME candidate namespace.
+
+    The adversarial review's measured falsifier placed a run-A finding and a run-B finding in
+    the SAME repository/ACL namespace (``team-findings``) and showed that a name-denylist repair
+    served BOTH to run-B's review under the ``<run-findings>`` label. The repaired contract makes
+    the token PROOF-CARRYING: a declared emission destination is not a run/lineage identity, so
+    the review grant is WITHHELD and neither run's finding is served.
+
+    This drives the REAL ``retrieve`` path with the existing where-aware store. The non-vacuous
+    control below substitutes the destination name the OLD denylist accepted (``team-findings``)
+    and shows BOTH unrelated runs' findings reach review — so the withheld assertion discriminates
+    the repair from a regression, rather than passing because the store happened to be empty.
+    """
+
+    def _run_finding(cid, run_label):
+        """A measured finding with a ``run_id`` marker that is DELIBERATELY non-authoritative.
+
+        Nothing in this code consults ``run_id``; the run label exists only to name the two
+        unrelated producing runs. Their repository/ACL is the one shared candidate namespace.
+        """
+        hit = _dense_hit(cid, f"websocket reload finding produced by {run_label}")
+        hit["metadata"].update(
+            {
+                "repository_id": "team-findings",
+                "acl_scope": "team-findings",
+                "source_type": "finding",
+                "authority": "measured",
+                "run_id": run_label,
+            }
+        )
+        return hit
+
+    run_a = _run_finding("k-finding-A", "run-A")
+    run_b = _run_finding("k-finding-B", "run-B")
+    requested = "self-run-B"  # run-B's own private cell scope
+    store = _WhereAwareDenseStore([run_a, run_b])
+
+    # The declared emission destination ``team-findings`` offered via the retired ``run_scope``
+    # argument is NOT an ownership proof: the review grant is WITHHELD.
+    assert (
+        serving_scope_grants(ROLE_REVIEW, policy=SERVING_SCOPE_POLICY, run_scope="team-findings")
+        == ()
+    )
+
+    review = retrieve(
+        "websocket reload finding",
+        dense_store=store,
+        repository_id=requested,
+        acl_scope=requested,
+        shared_repository_ids=[],
+        source_types=["finding"],
+    )
+    assert review.filters["shared_repository_ids"] == []
+    assert {c.id for c in review.candidates} == set()
+    assert review.selected_evidence == []
+
+    # NON-VACUOUS: a regression to the name denylist substitutes ``team-findings`` and serves
+    # BOTH unrelated runs' findings to run-B's review — the exact leak the repair removes.
+    regressed = retrieve(
+        "websocket reload finding",
+        dense_store=store,
+        repository_id=requested,
+        acl_scope=requested,
+        shared_repository_ids=["team-findings"],
+        source_types=["finding"],
+    )
+    assert {c.id for c in regressed.selected_evidence} == {"k-finding-A", "k-finding-B"}
+
+    # The trusted, run-DERIVED lineage scope is the ONE substitution: run-B's review retrieves
+    # run-B's own earlier-phase finding while another run's private scope stays excluded.
+    own = _run_finding("k-finding-B", "run-B")
+    own["metadata"].update({"repository_id": requested, "acl_scope": requested})
+    foreign_private = _run_finding("k-finding-A", "run-A")
+    foreign_private["metadata"].update({"repository_id": "self-run-A", "acl_scope": "self-run-A"})
+    lineage = serving_scope_grants(
+        ROLE_REVIEW, policy=SERVING_SCOPE_POLICY, lineage_scope=requested
+    )
+    assert lineage == (requested,)
+    positive = retrieve(
+        "websocket reload finding",
+        dense_store=_WhereAwareDenseStore([own, foreign_private]),
+        repository_id=requested,
+        acl_scope=requested,
+        shared_repository_ids=list(lineage),
+        source_types=["finding"],
+    )
+    assert {c.id for c in positive.selected_evidence} == {"k-finding-B"}
+    assert "k-finding-A" not in {c.id for c in positive.selected_evidence}
+
+
+def test_same_derived_telemetry_namespace_serves_neither_runs_findings():
+    """u3(b) (retrieval_serving REPAIR ROUND 3): the SAME-DERIVED-NAMESPACE falsifier at the
+    ``retrieve`` seam.
+
+    Unlike ``test_same_candidate_namespace_serves_neither_runs_findings_through_run_findings``
+    (a DECLARED destination ``team-findings``), this exercises the runner-derived telemetry
+    namespace ``self-wf_<spec>_<model>`` — the exact SHARED name the pre-repair derived-cell-scope
+    grant substituted, and the namespace two unrelated same-spec/model runs both derive. The
+    repaired contract substitutes the token ONLY from a caller-supplied ``lineage_scope``; the
+    same telemetry name offered through the retired ``run_scope`` channel is IGNORED, so review
+    serves neither run's finding.
+
+    The non-vacuous control substitutes the telemetry namespace through the TRUSTED
+    ``lineage_scope`` channel (the retired grant's own effect) and shows BOTH unrelated findings
+    are reachable — so the withheld assertion discriminates the repair rather than passing
+    because the store happened to be empty. This is the REAL ``retrieve`` path with the existing
+    where-aware store; no network/Redis/Neo4j.
+    """
+    # The shape the runner derives for a spec/model — SHARED across runs, so not an ownership
+    # proof. ``run_id`` is deliberately non-authoritative; nothing consults it.
+    telemetry_ns = "self-wf_retrieval_serving_m"
+
+    def _run_finding(cid, run_label):
+        hit = _dense_hit(cid, f"websocket reload finding produced by {run_label}")
+        hit["metadata"].update(
+            {
+                "repository_id": telemetry_ns,
+                "acl_scope": telemetry_ns,
+                "source_type": "finding",
+                "authority": "measured",
+                "run_id": run_label,
+            }
+        )
+        return hit
+
+    store = _WhereAwareDenseStore(
+        [_run_finding("k-finding-A", "run-A"), _run_finding("k-finding-B", "run-B")]
+    )
+    requested = "self-run-B"  # run-B's own private cell scope
+
+    # The bare telemetry NAME through the retired ``run_scope`` channel is not an ownership
+    # proof: the review grant is WITHHELD and neither run's finding is served.
+    assert (
+        serving_scope_grants(ROLE_REVIEW, policy=SERVING_SCOPE_POLICY, run_scope=telemetry_ns) == ()
+    )
+    review = retrieve(
+        "websocket reload finding",
+        dense_store=store,
+        repository_id=requested,
+        acl_scope=requested,
+        shared_repository_ids=list(
+            serving_scope_grants(ROLE_REVIEW, policy=SERVING_SCOPE_POLICY, run_scope=telemetry_ns)
+        ),
+        source_types=["finding"],
+    )
+    assert review.filters["shared_repository_ids"] == []
+    assert review.selected_evidence == []
+
+    # NON-VACUOUS: the SAME namespace through the TRUSTED ``lineage_scope`` channel resolves the
+    # token and serves BOTH unrelated findings — the exact leak the repair removes.
+    trusted = serving_scope_grants(
+        ROLE_REVIEW, policy=SERVING_SCOPE_POLICY, lineage_scope=telemetry_ns
+    )
+    assert trusted == (telemetry_ns,)
+    granted = retrieve(
+        "websocket reload finding",
+        dense_store=store,
+        repository_id=requested,
+        acl_scope=requested,
+        shared_repository_ids=list(trusted),
+        source_types=["finding"],
+    )
+    assert {c.id for c in granted.selected_evidence} == {"k-finding-A", "k-finding-B"}
+
+
+# ── u3/R1: per-role grants serve DISJOINT evidence, never the run-wide union ─────────────
+
+
+def test_per_phase_role_grants_serve_disjoint_evidence_not_the_run_wide_union():
+    """u3 (retrieval_serving R1): the per-role grants serve DISJOINT evidence, and the
+    run-wide UNION (the R1 defect) is strictly wider — so this is the falsifier for a
+    regression back to unioning every role's grant.
+
+    One where-aware store holds an implementation-scoped hit, a review-scoped hit, and a
+    foreign hit. Each role's OWN resolved grant is passed through the real ``retrieve`` path:
+    only that role's hit is served. The union of both grants serves BOTH role hits — the exact
+    over-serving the per-phase repair removed — so the disjointness assertion discriminates the
+    repaired resolution from the defect rather than passing vacuously. The unknown role grants
+    nothing and serves nothing.
+    """
+
+    def _scoped_hit(cid, scope):
+        hit = _dense_hit(cid, f"websocket finding in {scope}")
+        hit["metadata"].update(
+            {
+                "repository_id": scope,
+                "acl_scope": scope,
+                "source_type": "finding",
+                "authority": "measured",
+            }
+        )
+        return hit
+
+    store = _WhereAwareDenseStore(
+        [
+            _scoped_hit("k-impl", "impl-shared"),
+            _scoped_hit("k-review", "review-shared"),
+            _scoped_hit("k-foreign", "foreign-shared"),
+        ]
+    )
+    policy = {ROLE_IMPLEMENTATION: ("impl-shared",), ROLE_REVIEW: ("review-shared",)}
+    requested = "self-my-run"
+
+    def _run(role):
+        return retrieve(
+            "websocket finding",
+            dense_store=store,
+            repository_id=requested,
+            acl_scope=requested,
+            shared_repository_ids=list(serving_scope_grants(role, policy=policy)),
+            source_types=["finding"],
+        )
+
+    impl = _run(ROLE_IMPLEMENTATION)
+    assert impl.filters["shared_repository_ids"] == ["impl-shared"]
+    assert {c.id for c in impl.selected_evidence} == {"k-impl"}
+
+    review = _run(ROLE_REVIEW)
+    assert review.filters["shared_repository_ids"] == ["review-shared"]
+    assert {c.id for c in review.selected_evidence} == {"k-review"}
+
+    # Disjoint: the two roles' served evidence shares nothing. A role that inherited the
+    # other's grant (or a run-wide union) would serve the sibling hit here.
+    assert {c.id for c in impl.selected_evidence}.isdisjoint(
+        {c.id for c in review.selected_evidence}
+    )
+
+    # The run-wide UNION (the defect) is strictly wider: it serves BOTH role-scoped hits,
+    # which is why the per-phase separation is observable rather than cosmetic.
+    union = retrieve(
+        "websocket finding",
+        dense_store=store,
+        repository_id=requested,
+        acl_scope=requested,
+        shared_repository_ids=["impl-shared", "review-shared"],
+        source_types=["finding"],
+    )
+    assert {c.id for c in union.selected_evidence} == {"k-impl", "k-review"}
+
+
 # ── A10-R2: the dense store's KNOWN incomplete-search signal is a NAMED diagnostic ──────
 #
 # The production dense store expands candidates in bounded rounds and sets an explicit
@@ -3505,3 +3972,664 @@ def test_dense_known_zero_corpus_is_clean_empty_not_incomplete(monkeypatch):
     assert by_layer["L1"]["status"] != LAYER_STATUS_NAMED_ABSENT
     assert outcome.fallback is False
     assert outcome.prompt == "BASE PROMPT PRESERVED"
+
+
+# ── Embedder transport (u3): CELL-VIABLE by default, stdlib HTTP, typed failures ──
+
+
+class _FakeHTTPResponse:
+    """Minimal context-managed stand-in for the object ``urlopen`` yields.
+
+    ``urlopen`` is used as a context manager and only ``read()`` is called on the result,
+    so this double mirrors exactly that surface — no live socket, fully deterministic.
+    """
+
+    def __init__(self, payload: dict):
+        self._raw = json.dumps(payload).encode("utf-8")
+
+    def read(self) -> bytes:
+        return self._raw
+
+    def __enter__(self) -> "_FakeHTTPResponse":
+        return self
+
+    def __exit__(self, *exc: object) -> bool:
+        return False
+
+
+def test_embedding_client_constructs_without_the_optional_ollama_package(monkeypatch):
+    """Cell-viability: the DEFAULT transport imports ONLY the standard library.
+
+    ``sys.modules['ollama'] = None`` makes any ``import ollama`` raise ImportError, so a
+    construction that touched the optional package would fail loudly. The client must use
+    the stdlib HTTP transport and the documented localhost default when nothing overrides it.
+    """
+    from agentic_dynamics.knowledge import embeddings
+
+    monkeypatch.setitem(sys.modules, "ollama", None)
+    client = embeddings.EmbeddingClient()
+    assert client.transport == embeddings.TRANSPORT_HTTP
+    assert client.host == embeddings.DEFAULT_OLLAMA_HOST
+    # Construction performs NO I/O and never touches the optional client: it is built lazily
+    # only when the explicitly selected ollama transport is actually used.
+    assert client._ollama_client is None
+
+
+def test_embedding_client_stdlib_http_transport_end_to_end(monkeypatch):
+    """A monkeypatched stdlib HTTP transport embeds a text end-to-end.
+
+    Proves the default path POSTs to ``{OLLAMA_HOST}/api/embeddings`` with the Ollama REST
+    body ``{model, prompt}`` and parses ``{embedding: [...]}`` into a float vector — with no
+    optional package involved.
+    """
+    from agentic_dynamics.knowledge import embeddings
+
+    captured: dict = {}
+
+    def _fake_urlopen(request, timeout=None):
+        captured["url"] = request.full_url
+        captured["body"] = json.loads(request.data.decode("utf-8"))
+        captured["timeout"] = timeout
+        return _FakeHTTPResponse({"embedding": [0.5, -1.0, 2.0]})
+
+    monkeypatch.setattr(embeddings.urllib.request, "urlopen", _fake_urlopen)
+    client = embeddings.EmbeddingClient(
+        model="bge-m3:latest", host="http://embed.test:11434", timeout_s=3.5
+    )
+    vector = client.embed("hello world")
+
+    assert vector == [0.5, -1.0, 2.0]
+    assert captured["url"] == "http://embed.test:11434/api/embeddings"
+    assert captured["body"] == {"model": "bge-m3:latest", "prompt": "hello world"}
+    assert captured["timeout"] == 3.5
+
+
+def test_embedding_client_connection_refused_raises_typed_unreachable(monkeypatch):
+    """A refused endpoint is the TYPED ``EmbedderUnreachable`` — never a bare OSError.
+
+    This is the named ``embedder-unreachable`` state the retrieval seam must be able to record
+    (DISTINCT from module absence and from a clean empty pass).
+    """
+    from agentic_dynamics.knowledge import embeddings
+
+    def _refused(request, timeout=None):
+        raise urllib.error.URLError(ConnectionRefusedError(111, "Connection refused"))
+
+    monkeypatch.setattr(embeddings.urllib.request, "urlopen", _refused)
+    client = embeddings.EmbeddingClient(host="http://127.0.0.1:9")
+    with pytest.raises(embeddings.EmbedderUnreachable) as excinfo:
+        client.embed("anything")
+    assert excinfo.value.token == "embedder-unreachable"
+
+
+def test_embedding_client_honors_ollama_host_env(monkeypatch):
+    """``OLLAMA_HOST`` is honored; an explicit ``host`` wins over the env (trailing slash stripped)."""
+    from agentic_dynamics.knowledge import embeddings
+
+    monkeypatch.setenv("OLLAMA_HOST", "http://ollama.internal:11434/")
+    client = embeddings.EmbeddingClient()
+    assert client.host == "http://ollama.internal:11434"
+    explicit = embeddings.EmbeddingClient(host="http://explicit:1234")
+    assert explicit.host == "http://explicit:1234"
+
+
+def test_optional_ollama_transport_absent_is_named_module_absent(monkeypatch):
+    """The optional transport's absence is a NAMED state, DISTINCT from unreachable.
+
+    Selecting ``transport='ollama'`` with the package made unimportable must raise the typed
+    ``EmbedderModuleAbsent`` (token ``embedder-module-absent``), never a raw ImportError and
+    never the unreachable token.
+    """
+    from agentic_dynamics.knowledge import embeddings
+
+    monkeypatch.setitem(sys.modules, "ollama", None)
+    client = embeddings.EmbeddingClient(transport="ollama")
+    with pytest.raises(embeddings.EmbedderModuleAbsent) as excinfo:
+        client.embed("anything")
+    assert excinfo.value.token == "embedder-module-absent"
+    # The two failure states must never collapse into one diagnostic.
+    assert excinfo.value.token != embeddings.EmbedderUnreachable.token
+
+
+def test_resolve_ollama_host_normalizes_scheme_less_forms(monkeypatch):
+    """The conventional scheme-less ``OLLAMA_HOST`` forms gain the ``http://`` scheme (R3).
+
+    ``host:port`` / bare host / bracketed IPv6 are how an operator actually sets the env
+    (Ollama's own CLI accepts ``127.0.0.1:11434``); each must normalize to a usable base URL
+    rather than being handed to ``urlopen`` as an opaque string that fails as unreachable.
+    """
+    from agentic_dynamics.knowledge import embeddings
+
+    assert embeddings.resolve_ollama_host("ollama:11434") == "http://ollama:11434"
+    assert embeddings.resolve_ollama_host("127.0.0.1:11434") == "http://127.0.0.1:11434"
+    assert embeddings.resolve_ollama_host("localhost") == "http://localhost"
+    assert embeddings.resolve_ollama_host("[::1]:11434") == "http://[::1]:11434"
+    assert embeddings.resolve_ollama_host("[::1]") == "http://[::1]"
+    # The env is the same path (read at call time), and a trailing slash never doubles.
+    monkeypatch.setenv("OLLAMA_HOST", "ollama:11434/")
+    assert embeddings.resolve_ollama_host() == "http://ollama:11434"
+
+
+def test_resolve_ollama_host_preserves_declared_scheme_and_strips_trailing_slash():
+    """A declared ``http://`` / ``https://`` scheme is PRESERVED; a trailing slash stripped."""
+    from agentic_dynamics.knowledge import embeddings
+
+    assert embeddings.resolve_ollama_host("http://host:11434/") == "http://host:11434"
+    assert embeddings.resolve_ollama_host("http://host:11434") == "http://host:11434"
+    assert embeddings.resolve_ollama_host("https://host:11434/") == "https://host:11434"
+
+
+def test_resolve_ollama_host_unsupported_scheme_is_named_configuration_error(monkeypatch):
+    """An unsupported declared scheme is a TYPED config error, NEVER ``embedder-unreachable``.
+
+    R3's core requirement: a bad URL form must not be misreported as a network outage. The
+    error is an :class:`EmbedderError` carrying a distinct token, and it is raised at
+    construction time (before any I/O) so the seam can name the configuration fault.
+    """
+    from agentic_dynamics.knowledge import embeddings
+
+    with pytest.raises(embeddings.EmbedderConfigurationError) as excinfo:
+        embeddings.resolve_ollama_host("ftp://host:11434")
+    assert isinstance(excinfo.value, embeddings.EmbedderError)
+    assert excinfo.value.token == "embedder-config-error"
+    assert excinfo.value.token != embeddings.EmbedderUnreachable.token
+
+    # The client's construction runs the same resolver, so a misconfiguration refuses loudly
+    # rather than constructing a client that would later masquerade as unreachable.
+    monkeypatch.setenv("OLLAMA_HOST", "unix:///var/run/ollama.sock")
+    with pytest.raises(embeddings.EmbedderConfigurationError):
+        embeddings.EmbeddingClient()
+
+
+def test_embedding_client_scheme_less_ollama_host_posts_to_normalized_url(monkeypatch):
+    """``OLLAMA_HOST=ollama:11434`` POSTs to ``http://ollama:11434/api/embeddings``.
+
+    End-to-end through the stdlib transport with a stub ``urlopen``: the normalized scheme
+    is what the request URL actually carries, proving the normalization is on the request
+    path and not merely a resolver convenience.
+    """
+    from agentic_dynamics.knowledge import embeddings
+
+    captured: dict = {}
+
+    def _fake_urlopen(request, timeout=None):
+        captured["url"] = request.full_url
+        return _FakeHTTPResponse({"embedding": [1.0, 2.0]})
+
+    monkeypatch.setenv("OLLAMA_HOST", "ollama:11434")
+    monkeypatch.setattr(embeddings.urllib.request, "urlopen", _fake_urlopen)
+    client = embeddings.EmbeddingClient()
+    assert client.host == "http://ollama:11434"
+    assert client.embed("hello") == [1.0, 2.0]
+    assert captured["url"] == "http://ollama:11434/api/embeddings"
+
+
+def test_embedding_client_default_transport_end_to_end_without_optional_package(monkeypatch):
+    """The DEFAULT stdlib transport embeds end-to-end while the optional package is UNIMPORTABLE.
+
+    The acceptance asks for one pass in which a stub ``urlopen`` observes the normalized
+    ``http://<host>:11434/api/embeddings`` URL AND the parsed vector — with NO optional package
+    present (base deps only). The construction test proves only construction, and the other
+    end-to-end tests run against whatever the host happens to have installed; here
+    ``sys.modules['ollama'] = None`` forces an ImportError for ANY import attempt, so on a host
+    that DOES have the package, a hidden default-path dependency on it is still caught. This is
+    the cell-viability discriminator the earlier split tests could not give.
+
+    Falsifier: routing the default transport through the optional package, eagerly importing it
+    in ``__init__``/``_http_embed``, or selecting it by default raises ImportError or
+    :class:`EmbedderModuleAbsent` here instead of returning the vector — on every host.
+    """
+    from agentic_dynamics.knowledge import embeddings
+
+    captured: dict = {}
+
+    def _fake_urlopen(request, timeout=None):
+        captured["url"] = request.full_url
+        captured["body"] = json.loads(request.data.decode("utf-8"))
+        return _FakeHTTPResponse({"embedding": [0.25, -0.5, 0.75]})
+
+    # No optional package can be imported for the whole test.
+    monkeypatch.setitem(sys.modules, "ollama", None)
+    monkeypatch.setenv("OLLAMA_HOST", "127.0.0.1:11434")
+    monkeypatch.setattr(embeddings.urllib.request, "urlopen", _fake_urlopen)
+
+    client = embeddings.EmbeddingClient()
+    assert client.transport == embeddings.TRANSPORT_HTTP
+    vector = client.embed("cell-viable embedding path")
+
+    assert captured["url"] == "http://127.0.0.1:11434/api/embeddings"
+    assert captured["body"] == {
+        "model": "bge-m3:latest",
+        "prompt": "cell-viable embedding path",
+    }
+    assert vector == [0.25, -0.5, 0.75]
+
+
+@pytest.mark.parametrize(
+    ("host_env", "expected_host"),
+    [
+        ("ollama:11434", "http://ollama:11434"),
+        ("127.0.0.1:11434", "http://127.0.0.1:11434"),
+    ],
+)
+def test_default_stdlib_transport_ignores_an_importable_optional_package(
+    monkeypatch, host_env, expected_host
+):
+    """The CONVERSE of cell-viability: an INSTALLED optional package must not become the default.
+
+    The credited construction/end-to-end guards make ``ollama`` UNIMPORTABLE, proving the
+    stdlib path works on a base-deps host. This guard proves the other half of the contract on
+    a host where the package IS importable: a monkeypatched ``ollama`` whose ``Client`` counts
+    every use is placed in ``sys.modules``, and the DEFAULT ``EmbeddingClient()`` must still
+    select the stdlib HTTP transport, never build the optional client, and never call it. Both
+    conventional scheme-less ``OLLAMA_HOST`` forms are driven through the SAME stub, so the
+    outgoing URL proves normalization reaches the request path (R3's falsifier) rather than
+    only the resolver.
+
+    Falsifier: defaulting to the optional transport when the package is present, eagerly
+    building the optional client in ``__init__``/``embed``, or appending ``/api/embeddings`` to
+    an un-normalized host either trips ``calls['client_calls']``/``_ollama_client`` or fails the
+    exact-URL assertion — on a host that actually has ``ollama`` installed.
+    """
+    import types
+
+    from agentic_dynamics.knowledge import embeddings
+
+    calls = {"client_calls": 0}
+
+    class _SentinelOllamaClient:
+        """Sentinel optional client: any construction or call is counted (and fails the test)."""
+
+        def __init__(self, *args, **kwargs):
+            calls["client_calls"] += 1
+
+        def embeddings(self, *args, **kwargs):
+            calls["client_calls"] += 1
+            return {"embedding": [9.0, 9.0]}
+
+    # The optional package IS importable here — the default must still ignore it.
+    monkeypatch.setitem(sys.modules, "ollama", types.SimpleNamespace(Client=_SentinelOllamaClient))
+    monkeypatch.setenv("OLLAMA_HOST", host_env)
+    monkeypatch.delenv("FINOPS_EMBED_TRANSPORT", raising=False)
+
+    captured: dict = {}
+
+    def _fake_urlopen(request, timeout=None):
+        captured["url"] = request.full_url
+        captured["body"] = json.loads(request.data.decode("utf-8"))
+        return _FakeHTTPResponse({"embedding": [0.125, 0.25]})
+
+    monkeypatch.setattr(embeddings.urllib.request, "urlopen", _fake_urlopen)
+
+    client = embeddings.EmbeddingClient()
+    assert client.transport == embeddings.TRANSPORT_HTTP
+    assert client.host == expected_host
+    # Construction never touched the importable optional package.
+    assert client._ollama_client is None
+
+    assert client.embed("default stays stdlib") == [0.125, 0.25]
+    assert captured["url"] == f"{expected_host}/api/embeddings"
+    assert captured["body"] == {"model": "bge-m3:latest", "prompt": "default stays stdlib"}
+    # The optional client was neither built nor called on the default path.
+    assert calls["client_calls"] == 0
+
+
+# ── Embedding-leg named diagnostics (u4): THREE distinct states, never a collapsed traceback ──
+
+
+def test_retrieval_embedder_tokens_match_the_embedder_vocabulary():
+    """The seam's literals are pinned to the embedder's own class attributes.
+
+    If the embedder ever renames a token, this guard fails rather than letting the seam's
+    two literals drift away from the vocabulary the typed errors actually carry. Every typed
+    embedder failure is also proven PAIRWISE DISTINCT — unreachable, module-absent,
+    config-error and response-error never share a token and never fall back to the untyped
+    base. Collapsing two of them would let the seam record the wrong provisioning cause for a
+    real fault, which is exactly the distinction the spec requires (a dead network must not be
+    blamed on a missing package, and a bad URL must not be blamed on the network).
+    """
+    from agentic_dynamics.knowledge import embeddings
+
+    assert embeddings.EmbedderUnreachable.token == EMBEDDER_UNREACHABLE_TOKEN
+    assert embeddings.EmbedderModuleAbsent.token == EMBEDDER_MODULE_ABSENT_TOKEN
+    # And the failure states stay distinct: unreachable is NOT module absence.
+    assert EMBEDDER_UNREACHABLE_TOKEN != EMBEDDER_MODULE_ABSENT_TOKEN
+    # The full typed vocabulary is pairwise distinct and namespaced (never the untyped base
+    # ``embedder-error``), so no two failure classes can be confused at the seam.
+    failure_tokens = [
+        embeddings.EmbedderUnreachable.token,
+        embeddings.EmbedderModuleAbsent.token,
+        embeddings.EmbedderConfigurationError.token,
+        embeddings.EmbedderResponseError.token,
+    ]
+    assert len(set(failure_tokens)) == len(failure_tokens), (
+        f"embedder failure tokens collapsed into one: {failure_tokens}"
+    )
+    assert all(token.startswith("embedder-") for token in failure_tokens)
+    assert embeddings.EmbedderError.token == "embedder-error"
+    assert embeddings.EmbedderError.token not in failure_tokens
+
+
+def test_retrieve_records_named_embedder_unreachable_when_no_endpoint(monkeypatch):
+    """No live endpoint is the NAMED ``embedder-unreachable`` state at the seam.
+
+    The REAL stdlib transport is driven against a refused socket (monkeypatched ``urlopen``),
+    so the pass exercised the embedder path end-to-end and recorded the stable token under
+    ``leg_errors["embedding"]`` — never a raw class name and never a module-missing collapse.
+    """
+    from agentic_dynamics.knowledge import embeddings
+
+    def _refused(request, timeout=None):
+        raise urllib.error.URLError(ConnectionRefusedError(111, "Connection refused"))
+
+    monkeypatch.setattr(embeddings.urllib.request, "urlopen", _refused)
+    attempt = retrieve(
+        "websocket reload",
+        dense_store=_FakeDenseStore(
+            [_dense_hit("d1", "alpha text"), _dense_hit("d2", "beta text")]
+        ),
+    )
+    assert "embedding" in attempt.leg_errors
+    assert EMBEDDER_UNREACHABLE_TOKEN in attempt.leg_errors["embedding"]
+    assert EMBEDDER_MODULE_ABSENT_TOKEN not in attempt.leg_errors["embedding"]
+    assert "No module named" not in attempt.leg_errors["embedding"]
+    # The named state survives into the audit dict the ledger reads.
+    assert EMBEDDER_UNREACHABLE_TOKEN in attempt.to_dict()["leg_errors"]["embedding"]
+
+
+def test_retrieve_records_named_embedder_module_absent_distinct_from_unreachable(monkeypatch):
+    """An explicitly-selected-but-missing optional transport is the module-ABSENT state.
+
+    With the ollama transport selected (env) and the package made unimportable, the SAME seam
+    must record ``embedder-module-absent`` — DISTINCT from ``embedder-unreachable`` — proving
+    the two provisioning failures never collapse into one diagnostic.
+    """
+    monkeypatch.setenv("FINOPS_EMBED_TRANSPORT", "ollama")
+    monkeypatch.setitem(sys.modules, "ollama", None)
+    attempt = retrieve(
+        "websocket reload",
+        dense_store=_FakeDenseStore(
+            [_dense_hit("d1", "alpha text"), _dense_hit("d2", "beta text")]
+        ),
+    )
+    assert "embedding" in attempt.leg_errors
+    assert EMBEDDER_MODULE_ABSENT_TOKEN in attempt.leg_errors["embedding"]
+    assert EMBEDDER_UNREACHABLE_TOKEN not in attempt.leg_errors["embedding"]
+
+
+def test_retrieve_records_named_embedder_config_error_distinct_from_unreachable(monkeypatch):
+    """A misconfigured endpoint is the NAMED config-error state, proven at the seam.
+
+    The THIRD provisioning fault — an unsupported ``OLLAMA_HOST`` scheme — must never collapse
+    into ``embedder-unreachable`` (the network is fine; the value is wrong) or module absence.
+    Driving the REAL ``retrieve`` path with such a host makes ``EmbeddingClient()`` refuse at
+    CONSTRUCTION with the typed ``EmbedderConfigurationError``; the seam records its stable
+    token under ``leg_errors["embedding"]``. This is the end-to-end counterpart to
+    ``test_resolve_ollama_host_unsupported_scheme_is_named_configuration_error`` (the resolver
+    level), without which the config state was the only one never observed through the seam.
+
+    Falsifier: folding a bad scheme into ``EmbedderUnreachable`` records the wrong token here;
+    dropping the ``except`` around construction surfaces the traceback instead.
+    """
+    from agentic_dynamics.knowledge import embeddings
+
+    monkeypatch.setenv("OLLAMA_HOST", "ftp://embed.test:11434")
+    attempt = retrieve(
+        "websocket reload",
+        dense_store=_FakeDenseStore(
+            [_dense_hit("d1", "alpha text"), _dense_hit("d2", "beta text")]
+        ),
+    )
+    assert "embedding" in attempt.leg_errors
+    assert embeddings.EmbedderConfigurationError.token in attempt.leg_errors["embedding"]
+    # The other two states must not be the recorded diagnosis.
+    assert EMBEDDER_UNREACHABLE_TOKEN not in attempt.leg_errors["embedding"]
+    assert EMBEDDER_MODULE_ABSENT_TOKEN not in attempt.leg_errors["embedding"]
+    # The named state survives into the audit dict the ledger reads.
+    assert (
+        embeddings.EmbedderConfigurationError.token in attempt.to_dict()["leg_errors"]["embedding"]
+    )
+
+
+def test_retrieve_clean_empty_records_no_embedding_diagnostic(monkeypatch):
+    """A clean empty pass records NO ``embedding`` key — a failure must never be fabricated.
+
+    The embedder is healthy (a no-op double) and the pass returns no candidates, so the
+    collapse leg never runs. Silence here means "clean empty", never a collapsed error.
+    """
+    monkeypatch.setattr("agentic_dynamics.knowledge.embeddings.EmbeddingClient", _NoOpEmbedder)
+    attempt = retrieve(
+        "websocket reload",
+        dense_store=_FakeDenseStore([]),
+        graph_client=_FakeGraph(lexical_hits=[]),
+    )
+    assert "embedding" not in attempt.leg_errors
+    assert attempt.fallback_mode == FallbackMode.FULL.value
+
+
+def test_embedder_four_states_are_pairwise_distinct_at_the_seam(monkeypatch):
+    """The four embedder states never collapse into one another at the retrieval seam (u4).
+
+    The acceptance names FOUR distinct outcomes — ``embedder-unreachable`` (the endpoint is
+    configured but nothing answers), ``embedder-module-absent`` (the explicitly-selected
+    optional transport is not installed), ``embedder-config-error`` (a bad ``OLLAMA_HOST``
+    scheme refused before any I/O), and a CLEAN EMPTY pass that records NO embedding
+    diagnostic at all. Each state is proven in isolation elsewhere; this guard drives the
+    REAL ``retrieve`` path under all four in one place and asserts the recorded footprints
+    are PAIRWISE DISTINCT — the property no single-state test can establish, because a
+    collapse is only visible when two states are compared against each other.
+
+    Falsifier: folding ``EmbedderConfigurationError`` into ``EmbedderUnreachable``, letting a
+    selected absent optional transport surface as a raw ``ModuleNotFoundError`` string, or
+    fabricating an ``embedding`` key on the clean-empty pass each collapses two footprints
+    (or manufactures a fourth) and trips the exactness/parity checks below — the distinct
+    diagnosis is the unit's whole point (a dead network must never be blamed on a missing
+    package, and a bad URL must never be blamed on the network).
+    """
+    from agentic_dynamics.knowledge import embeddings
+
+    def _footprint(*, dense_hits, graph_client=None) -> str | None:
+        # Capture ONLY the embedding leg's diagnostic — the other legs are irrelevant here.
+        attempt = retrieve(
+            "websocket reload",
+            dense_store=_FakeDenseStore(dense_hits),
+            graph_client=graph_client,
+        )
+        return attempt.leg_errors.get("embedding")
+
+    hits = [_dense_hit("d1", "alpha text"), _dense_hit("d2", "beta text")]
+
+    # (1) unreachable — a refused socket on the REAL stdlib transport (base deps only).
+    monkeypatch.delenv("FINOPS_EMBED_TRANSPORT", raising=False)
+    monkeypatch.delenv("OLLAMA_HOST", raising=False)
+
+    def _refused(request, timeout=None):
+        raise urllib.error.URLError(ConnectionRefusedError(111, "Connection refused"))
+
+    monkeypatch.setattr(embeddings.urllib.request, "urlopen", _refused)
+    unreachable = _footprint(dense_hits=hits)
+
+    # (2) module-absent — the explicitly-selected optional transport cannot import.
+    monkeypatch.setenv("FINOPS_EMBED_TRANSPORT", "ollama")
+    monkeypatch.setitem(sys.modules, "ollama", None)
+    module_absent = _footprint(dense_hits=hits)
+
+    # (3) config-error — an unsupported scheme refuses at CONSTRUCTION, before any I/O.
+    monkeypatch.delenv("FINOPS_EMBED_TRANSPORT", raising=False)
+    monkeypatch.setenv("OLLAMA_HOST", "ftp://embed.test:11434")
+    config_error = _footprint(dense_hits=hits)
+
+    # (4) clean-empty — a healthy embedder and no candidates records NO diagnostic.
+    monkeypatch.delenv("OLLAMA_HOST", raising=False)
+    monkeypatch.setattr("agentic_dynamics.knowledge.embeddings.EmbeddingClient", _NoOpEmbedder)
+    clean_empty = _footprint(dense_hits=[], graph_client=_FakeGraph(lexical_hits=[]))
+
+    config_token = embeddings.EmbedderConfigurationError.token
+    # The clean-empty pass is silent — a failure must never be fabricated.
+    assert clean_empty is None
+    # Each state records its OWN named token...
+    assert unreachable is not None and EMBEDDER_UNREACHABLE_TOKEN in unreachable
+    assert module_absent is not None and EMBEDDER_MODULE_ABSENT_TOKEN in module_absent
+    assert config_error is not None and config_token in config_error
+    # ...and NEVER a neighbour's: no two provisioning causes get confused.
+    assert EMBEDDER_MODULE_ABSENT_TOKEN not in unreachable
+    assert config_token not in unreachable
+    assert EMBEDDER_UNREACHABLE_TOKEN not in module_absent
+    assert config_token not in module_absent
+    assert EMBEDDER_UNREACHABLE_TOKEN not in config_error
+    assert EMBEDDER_MODULE_ABSENT_TOKEN not in config_error
+    # The four footprints are pairwise distinct (``None`` is the clean-empty footprint).
+    footprints = {unreachable, module_absent, config_error, clean_empty}
+    assert len(footprints) == 4, f"embedder states collapsed into one: {footprints}"
+
+
+def test_dense_vector_store_constructs_without_the_optional_ollama_package(monkeypatch):
+    """Dense store construction no longer imports the optional ``ollama`` package.
+
+    With the package made unimportable, the REAL ``Neo4jVectorStore`` must still construct
+    (no DB I/O: a shim client + ``ensure_index=False``) and its embedder must be the default
+    stdlib HTTP transport. This is the exact construction failure the live evidence recorded.
+    """
+    import types
+
+    from agentic_dynamics.knowledge import embeddings
+    from agentic_dynamics.knowledge.neo4j_vectors import Neo4jVectorStore
+
+    monkeypatch.setitem(sys.modules, "ollama", None)
+    store = Neo4jVectorStore(client=types.SimpleNamespace(close=lambda: None), ensure_index=False)
+    assert store._embedder.transport == embeddings.TRANSPORT_HTTP
+
+
+def test_dense_store_search_propagates_typed_embedder_token(monkeypatch):
+    """The dense store's query-embed call site does not collapse the typed failure.
+
+    ``search_with_stats`` embeds its query before any DB call; a typed ``EmbedderUnreachable``
+    must propagate UNCHANGED (not wrapped into ``Neo4jVectorStoreError``), so the retrieval
+    seam can read ``.token`` and name the state.
+    """
+    from agentic_dynamics.knowledge import embeddings
+    from agentic_dynamics.knowledge.neo4j_vectors import Neo4jVectorStore
+
+    class _RefusingEmbedder:
+        def embed(self, text):
+            raise embeddings.EmbedderUnreachable("no endpoint")
+
+    store = Neo4jVectorStore.__new__(Neo4jVectorStore)
+    store._embedder = _RefusingEmbedder()
+    store._corpus_count = -1
+    with pytest.raises(embeddings.EmbedderUnreachable) as excinfo:
+        store.search_with_stats("query", top_k=5, where={"repository_id": "agentic-dynamics"})
+    assert excinfo.value.token == EMBEDDER_UNREACHABLE_TOKEN
+
+
+def test_both_dense_and_embedding_diagnoses_are_preserved(monkeypatch):
+    """A failing dense leg must not suppress the separate embedding-leg diagnosis.
+
+    Both failures are the same NAMED state (unreachable) but they are DIFFERENT legs: the
+    attempt must carry BOTH keys, each with the token, never a single collapsed string.
+    """
+    from agentic_dynamics.knowledge import embeddings
+
+    class _RaisingEmbedder:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def embed(self, text):
+            raise embeddings.EmbedderUnreachable("endpoint down")
+
+        def cosine_distance(self, a, b):
+            return 0.5
+
+    monkeypatch.setattr("agentic_dynamics.knowledge.embeddings.EmbeddingClient", _RaisingEmbedder)
+    attempt = retrieve(
+        "websocket reload",
+        dense_store=_FakeDenseStore(
+            [], error=embeddings.EmbedderUnreachable("dense query embed failed")
+        ),
+        graph_client=_FakeGraph(
+            lexical_hits=[
+                _knowledge_lexical_hit("a", "alpha unique text"),
+                _knowledge_lexical_hit("b", "beta unique text"),
+            ]
+        ),
+    )
+    assert "dense" in attempt.leg_errors
+    assert "embedding" in attempt.leg_errors
+    assert EMBEDDER_UNREACHABLE_TOKEN in attempt.leg_errors["dense"]
+    assert EMBEDDER_UNREACHABLE_TOKEN in attempt.leg_errors["embedding"]
+    assert {"dense", "embedding"} <= set(attempt.to_dict()["leg_errors"])
+
+
+def test_unavailable_dense_store_chains_typed_embedder_token(monkeypatch):
+    """A construction-time typed embedder failure still names its token through the wrap.
+
+    ``augment._UnavailableDenseStore`` raises a ``RuntimeError`` for the recorded cause but
+    chains the original typed exception, and the retrieval seam's one-level ``__cause__``
+    lookup recovers ``embedder-unreachable`` — the pre-u4 evidence had a collapsed
+    ``ModuleNotFoundError`` string here instead.
+    """
+    from agentic_dynamics.knowledge import augment as aug
+    from agentic_dynamics.knowledge import embeddings
+
+    store = aug._UnavailableDenseStore(
+        "dense store construction failed: boom",
+        cause_exc=embeddings.EmbedderUnreachable("no endpoint"),
+    )
+    attempt = retrieve(
+        "websocket reload", dense_store=store, graph_client=_FakeGraph(lexical_hits=[])
+    )
+    assert "dense" in attempt.leg_errors
+    assert EMBEDDER_UNREACHABLE_TOKEN in attempt.leg_errors["dense"]
+    assert "No module named" not in attempt.leg_errors["dense"]
+
+
+# ── u6: the embedder module is cell-viable by CONSTRUCTION (AST guard, not a live import) ──
+
+
+def test_embeddings_module_has_no_module_level_optional_import():
+    """AST guard: no optional package is imported at ``embeddings.py`` module scope (u6).
+
+    Cell viability is a STRUCTURAL contract: a base-deps cell must be able to IMPORT this
+    module, so the optional ``ollama`` package may be imported only inside a function (the
+    explicitly selected transport), never at module scope. Parsing the module's AST — rather
+    than inspecting an imported object — makes the guard hold even on a host where ``ollama``
+    happens to be installed, so the mutation it catches is the import MOVING to module scope.
+    The same scan asserts every module-level import is stdlib, proving the refactor REMOVED a
+    runtime dependency rather than swapping in another. Finally it proves the optional
+    transport's import still EXISTS, but only function-locally (a genuinely lazy optional).
+
+    Falsifier: adding a top-level ``import ollama`` (or any third-party module) to
+    ``embeddings.py`` fails this gate; removing the lazy import entirely also fails it.
+    """
+    from agentic_dynamics.knowledge import embeddings
+
+    source = Path(embeddings.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source, filename=str(embeddings.__file__))
+
+    module_level: set[str] = set()
+    for node in tree.body:
+        if isinstance(node, ast.Import):
+            module_level.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            module_level.add(node.module.split(".")[0])
+
+    assert "ollama" not in module_level, (
+        f"embeddings.py imports the optional 'ollama' package at module scope: {module_level}"
+    )
+    non_stdlib = module_level - set(sys.stdlib_module_names)
+    assert not non_stdlib, (
+        f"embeddings.py gained a non-stdlib module-level dependency: {sorted(non_stdlib)}"
+    )
+
+    # The optional package stays reachable — but ONLY as a function-local, lazy import.
+    nested_ollama_imports = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        and any(alias.name.split(".")[0] == "ollama" for alias in node.names)
+    ]
+    assert nested_ollama_imports, "the lazily imported optional ollama transport disappeared"
+    direct_children = {id(node) for node in tree.body}
+    assert all(id(node) not in direct_children for node in nested_ollama_imports), (
+        "an 'import ollama' statement is a module-level statement"
+    )

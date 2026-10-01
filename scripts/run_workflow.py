@@ -76,6 +76,7 @@ from agentic_dynamics.runtime.workflow_runner import (  # noqa: E402
     INHERITED_PHASE_STATUSES,
     ResumeState,
     cell_scope,
+    resolve_verified_run_findings_scope,
     run_concrete_step,
     run_workflow,
 )
@@ -785,7 +786,6 @@ def _run_prepared_child(prepared: dict[str, Any], args: argparse.Namespace) -> N
     raise SystemExit(exit_code_for_result(result))
 
 
-
 def _parent_watchdog_min(orchestrator: bool, cli_value: int) -> int:
     """The PARENT's per-phase stall threshold: 0 (disabled) in ``--orchestrator`` mode.
 
@@ -801,6 +801,7 @@ def _parent_watchdog_min(orchestrator: bool, cli_value: int) -> int:
     value unchanged.
     """
     return 0 if orchestrator else cli_value
+
 
 def _run_workflow_cli(
     spec: ExperimentSpec, args: argparse.Namespace, *, step_executor=None, verifier_executor=None
@@ -986,6 +987,27 @@ def _run_workflow_cli(
                 file=sys.stderr,
             )
 
+    # R2 FINAL repair (retrieval_serving REPAIR ROUND 4): the COMPOSITION ROOT is the ONE place
+    # a VERIFIED run/continuation identity exists, so it is the ONE place allowed to promote that
+    # identity to a run-findings ownership proof. The control-db run row's family_id/run_id is a
+    # genuine per-run/per-continuation identity (a fresh run's family_id == run_id; a --resume
+    # child inherits the parent's family). Resolve it HERE, explicitly, and pass it to the runner
+    # as ``run_findings_scope=``; the runner itself NEVER promotes an incoming FINOPS_CELL_ID.
+    # When there is no run row (control db down / no run minted) this is ``""`` → ``None``, so
+    # the runner WITHHOLDS the ``<run-findings>`` placeholder rather than granting a shared,
+    # reused, or telemetry-derived namespace under the label "own findings".
+    #
+    # R5 repair (retrieval_serving REPAIR ROUND 5): INJECT BUT HONOR ONLY ON OPT-IN. The verified
+    # scope is resolved and injected for EVERY DB-composed run from this ONE seam (the injection
+    # is unconditional), but the runner HONORS it for emission and for the run-findings grant
+    # ONLY when the run opts into a serving-scope policy (a declared ``serving_scope_policy``
+    # with no explicit ``serving_scope_grants`` override — the runner gates it). With no such
+    # declaration the runner leaves emission in ``cell_scope(wd)`` — the same namespace the
+    # default reader selects — so a run's own progressive findings stay visible to its later
+    # phases instead of migrating into a family namespace the default reader never reads. The
+    # withholding of the automatic unverified placeholder above is preserved either way.
+    verified_run_findings_scope = resolve_verified_run_findings_scope(run_identity) or None
+
     # The expected approval identity (Wave A4 follow-up): a --resume continues a specific
     # durable run, and the approval artifact for the checkpoint that run left awaiting must
     # name it — plus its gate context — or the checkpoint consumer refuses. Resolved HERE
@@ -1112,6 +1134,13 @@ def _run_workflow_cli(
             phase_evidence_recorder=phase_evidence_recorder,
             approval_run_id=approval_run_id,
             approval_gate_id=approval_gate_id,
+            # The ONLY run-findings allow channel: resolved above from the control-db run
+            # identity (family_id preferred, run_id fallback). R5: injected for EVERY
+            # DB-composed run, but the runner HONORS it for emission and the run-findings grant
+            # ONLY when the run opts into a serving-scope policy; without that opt-in emission
+            # stays in the default reader's ``cell_scope(wd)`` and the grant withholds. None
+            # withholds the placeholder.
+            run_findings_scope=verified_run_findings_scope,
         )
     finally:
         if run_heartbeat is not None:

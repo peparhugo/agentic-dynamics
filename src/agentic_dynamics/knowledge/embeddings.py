@@ -7,10 +7,14 @@ Replaces the trigram heuristic in trajectory.py with real cosine distance.
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import os
 import threading
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +45,26 @@ DEFAULT_EMBED_TIMEOUT_S = 15.0
 CHROMA_TIMEOUT_ENV = "FINOPS_CHROMA_TIMEOUT_S"
 DEFAULT_CHROMA_TIMEOUT_S = 10.0
 
+# ── Embedder transport (cell-viability: base deps only) ──
+# The embedder talks to an Ollama-compatible REST service. The DEFAULT transport is the
+# standard library (``urllib.request``), so a cell with base deps only can CONSTRUCT the
+# client — there is no import-time optional dependency. The ``ollama`` package is an
+# OPTIONAL transport, selected explicitly via ``transport="ollama"`` (or the env override);
+# it is imported only when that transport is actually used. A missing optional package is
+# a NAMED, TYPED failure (:class:`EmbedderModuleAbsent`), DISTINCT from an unreachable
+# endpoint and from a clean-empty result.
+OLLAMA_HOST_ENV = "OLLAMA_HOST"
+DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434"
+#: The only schemes an Ollama REST endpoint may declare. Anything else is a CONFIGURATION
+#: fault (a typed :class:`EmbedderConfigurationError`), never misreported as unreachable.
+SUPPORTED_OLLAMA_SCHEMES = ("http", "https")
+EMBED_TRANSPORT_ENV = "FINOPS_EMBED_TRANSPORT"
+#: The stdlib transport: ``POST {host}/api/embeddings`` ``{model, prompt}`` -> ``{embedding}``.
+TRANSPORT_HTTP = "http"
+#: The optional transport backed by the ``ollama`` package (imported only when selected).
+TRANSPORT_OLLAMA = "ollama"
+EMBED_TRANSPORTS = (TRANSPORT_HTTP, TRANSPORT_OLLAMA)
+
 
 def step_doc_id(session_id: str, step_index: int) -> str:
     """Return the canonical Chroma document id for one reasoning step.
@@ -54,8 +78,157 @@ def step_doc_id(session_id: str, step_index: int) -> str:
     return f"{session_id}_step_{step_index:04d}"
 
 
+class EmbedderError(RuntimeError):
+    """Base class for every typed embedder failure.
+
+    Every embedder failure carries a stable ``token`` so the retrieval seam can record a
+    NAMED diagnostic instead of a raw traceback — the three states the spec requires
+    (module absent, endpoint unreachable, clean empty) must stay DISTINCT.
+    """
+
+    #: Stable machine-readable token for the failure class (see the subclasses).
+    token = "embedder-error"
+
+
+class EmbedderUnreachable(EmbedderError):  # noqa: N818 — the spec pins this exact name
+    """The embedding endpoint could not be reached (refused, timed out, DNS, transport).
+
+    This is the transport-failure state: the service is configured but no live endpoint
+    answered. It is deliberately distinct from :class:`EmbedderModuleAbsent` (the
+    explicitly-selected optional package is not installed) and from a clean empty pass
+    (an endpoint answered and returned nothing to embed).
+    """
+
+    token = "embedder-unreachable"
+
+
+class EmbedderResponseError(EmbedderError):
+    """The endpoint answered but the payload was not a usable embedding vector."""
+
+    token = "embedder-response-error"
+
+
+class EmbedderModuleAbsent(EmbedderError):  # noqa: N818 — mirrors EmbedderUnreachable's family
+    """The explicitly-selected optional transport's package is not installed.
+
+    A cell-provisioning gap, not a network outage: the stdlib HTTP transport is the
+    default precisely so this state can never arise on the base-deps path.
+    """
+
+    token = "embedder-module-absent"
+
+
+class EmbedderConfigurationError(EmbedderError):
+    """The embedder endpoint is MISCONFIGURED (e.g. an unsupported URL scheme).
+
+    A configuration fault is neither a missing package nor an unreachable endpoint: folding
+    a bad ``OLLAMA_HOST`` form into :class:`EmbedderUnreachable` would tell an operator the
+    network is down when the truth is the value they set is wrong (the R3 repair). The
+    distinct token is what lets the retrieval seam name the real state.
+    """
+
+    token = "embedder-config-error"
+
+
+def normalize_ollama_host(value: str) -> str:
+    """Normalize an ``OLLAMA_HOST`` value to a scheme-qualified base URL.
+
+    ``OLLAMA_HOST`` is conventionally set like ``host:port`` (the Ollama CLI accepts
+    ``127.0.0.1:11434``, ``ollama:11434``) with no scheme. A scheme-less form is assumed
+    ``http`` — but ONLY when the value is not already a ``scheme://`` URL, and an UNSUPPORTED
+    declared scheme (:data:`SUPPORTED_OLLAMA_SCHEMES`) is refused with a typed
+    :class:`EmbedderConfigurationError` rather than being handed onward as an unreachable
+    endpoint. A trailing slash is stripped so ``{host}/api/embeddings`` never doubles it.
+
+    Handled forms::
+
+        "host:port"        -> "http://host:port"
+        "host"             -> "http://host"
+        "[::1]:port"       -> "http://[::1]:port"
+        "http://host:port/"-> "http://host:port"
+        "https://host"     -> "https://host"      (preserved)
+
+    Uses only :mod:`urllib.parse` (no new dependency).
+    """
+    text = value.strip()
+    if not text:
+        return DEFAULT_OLLAMA_HOST
+    if "://" in text:
+        parts = urllib.parse.urlsplit(text)
+        scheme = parts.scheme.lower()
+        if scheme not in SUPPORTED_OLLAMA_SCHEMES:
+            raise EmbedderConfigurationError(
+                f"unsupported OLLAMA_HOST scheme {parts.scheme!r} in {value!r}: "
+                f"expected one of {SUPPORTED_OLLAMA_SCHEMES}"
+            )
+        # urlunsplit drops a bare "/" path, so the base URL comes back without a trailing
+        # slash; rstrip defends against a doubled one.
+        normalized = urllib.parse.urlunsplit((scheme, parts.netloc, parts.path.rstrip("/"), "", ""))
+        return normalized.rstrip("/")
+    # Scheme-less: the conventional Ollama form. Assume http, never httpS (the CLI default).
+    return f"http://{text.rstrip('/')}"
+
+
+def resolve_ollama_host(host: str | None = None) -> str:
+    """Resolve the Ollama endpoint: explicit argument > ``OLLAMA_HOST`` > localhost default.
+
+    The chosen value is normalized by :func:`normalize_ollama_host` (scheme added where the
+    conventional ``host:port`` form omits it, an unsupported declared scheme refused with a
+    typed configuration error, a trailing slash stripped). The env is read at call time
+    (not import time) so a cell, test, or forked worker can override it.
+    """
+    value = host or os.environ.get(OLLAMA_HOST_ENV) or DEFAULT_OLLAMA_HOST
+    return normalize_ollama_host(str(value))
+
+
+def resolve_embed_transport(transport: str | None = None) -> str:
+    """Resolve the embed transport: explicit argument > ``FINOPS_EMBED_TRANSPORT`` > stdlib HTTP.
+
+    An unknown value is a LOUD refusal (never a silent fallback): a typo'd transport must not
+    quietly disable the embedder.
+    """
+    value = transport or os.environ.get(EMBED_TRANSPORT_ENV) or TRANSPORT_HTTP
+    normalized = str(value).strip().lower()
+    if normalized not in EMBED_TRANSPORTS:
+        raise ValueError(f"unknown embed transport {value!r}: expected one of {EMBED_TRANSPORTS}")
+    return normalized
+
+
+def _parse_embedding(body: Any, host: str) -> list[float]:
+    """Validate an Ollama embeddings payload and return its float vector.
+
+    Both the stdlib transport (a JSON dict) and the optional ``ollama`` transport (an
+    object with an ``embedding`` attribute) funnel through here so the response contract is
+    defined once. A malformed or empty payload is a named :class:`EmbedderResponseError`,
+    never a silent empty vector.
+    """
+    embedding = (
+        body.get("embedding") if isinstance(body, dict) else getattr(body, "embedding", None)
+    )
+    if not isinstance(embedding, list) or not embedding:
+        raise EmbedderResponseError(f"embedding endpoint {host} returned no 'embedding' vector")
+    try:
+        return [float(x) for x in embedding]
+    except (TypeError, ValueError) as exc:
+        raise EmbedderResponseError(
+            f"embedding endpoint {host} returned a non-numeric vector: {exc}"
+        ) from exc
+
+
 class EmbeddingClient:
-    """Generate text embeddings via local Ollama model."""
+    """Generate text embeddings via an Ollama-compatible REST service.
+
+    CELL-VIABLE by construction: the DEFAULT transport is the standard library
+    (``urllib.request``) against ``POST {OLLAMA_HOST}/api/embeddings``, so importing this
+    module and constructing the client never requires an optional package. The ``ollama``
+    package remains available as an OPTIONAL transport, selected explicitly with
+    ``transport="ollama"``; only that path touches the package, and if it is missing the
+    failure is the typed :class:`EmbedderModuleAbsent`.
+
+    A transport failure at ``embed()`` time raises the typed
+    :class:`EmbedderUnreachable` (endpoint refused/timed out), so the retrieval seam can
+    record a NAMED ``embedder-unreachable`` diagnostic rather than a module traceback.
+    """
 
     def __init__(
         self,
@@ -63,31 +236,104 @@ class EmbeddingClient:
         host: str | None = None,
         *,
         timeout_s: float | None = None,
+        transport: str | None = None,
     ):
-        import ollama
-
         self.model = model
         self.timeout_s = (
             float(timeout_s)
             if timeout_s is not None
             else float(os.environ.get(EMBED_TIMEOUT_ENV, DEFAULT_EMBED_TIMEOUT_S))
         )
-        # A dedicated client with an explicit deadline — the module-level default client
-        # inherits ollama's own ``timeout=None`` (wait forever), which is how a stalled
-        # embedding provider used to block retrieval and the chroma projector indefinitely.
-        self._client = ollama.Client(
-            host=host or os.environ.get("OLLAMA_HOST") or "http://127.0.0.1:11434",
-            timeout=self.timeout_s,
+        # Endpoint + transport are resolved ONCE here (env is read at construction, like
+        # live.py's FINOPS_REDIS_* pattern); construction performs NO I/O, so it can never
+        # hang or fail on a missing endpoint.
+        self.host = resolve_ollama_host(host)
+        self.transport = resolve_embed_transport(transport)
+        # The optional ollama client is built LAZILY on first use of the ollama transport —
+        # the default (stdlib HTTP) path never imports the package at all.
+        self._ollama_client: Any = None
+
+    # ── transports ──────────────────────────────────────────────────────────────
+
+    def _http_embed(self, text: str) -> list[float]:
+        """Embed via the stdlib HTTP transport against the Ollama REST API.
+
+        This is the default, dependency-free path: ``POST {host}/api/embeddings`` with
+        ``{"model": ..., "prompt": ...}`` returning ``{"embedding": [...]}``. The declared
+        ``timeout_s`` bounds ``urlopen``; a refused/timed-out/unreachable endpoint becomes
+        the typed :class:`EmbedderUnreachable`, and a malformed payload becomes the typed
+        :class:`EmbedderResponseError`. No exception is swallowed into an empty vector.
+        """
+        payload = json.dumps({"model": self.model, "prompt": text}).encode("utf-8")
+        request = urllib.request.Request(
+            f"{self.host}/api/embeddings",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
         )
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout_s) as response:
+                raw = response.read()
+        except urllib.error.HTTPError as exc:
+            # The endpoint answered but rejected the request — a response failure, not a
+            # transport outage. HTTPError subclasses URLError, so it MUST be caught first.
+            raise EmbedderResponseError(
+                f"embedding endpoint {self.host} answered HTTP {exc.code}"
+            ) from exc
+        except (urllib.error.URLError, OSError, TimeoutError) as exc:
+            # URLError wraps ConnectionRefusedError/DNS failures; OSError/TimeoutError cover
+            # a bare socket timeout. All are the SAME named state: the endpoint is unreachable.
+            raise EmbedderUnreachable(
+                f"embedding endpoint {self.host} unreachable: {type(exc).__name__}: {exc}"
+            ) from exc
+        try:
+            body = json.loads(raw.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise EmbedderResponseError(
+                f"embedding endpoint {self.host} returned a non-JSON payload: {exc}"
+            ) from exc
+        return _parse_embedding(body, self.host)
+
+    def _ensure_ollama_client(self) -> Any:
+        """Build (once) the optional ``ollama`` client, or raise the typed module-absent error.
+
+        The import lives HERE — never at module import and never on the default path — so
+        the optional dependency is genuinely optional.
+        """
+        try:
+            import ollama
+        except ImportError as exc:
+            raise EmbedderModuleAbsent(
+                "embed transport 'ollama' requires the optional 'ollama' package, which is "
+                f"not installed: {exc}"
+            ) from exc
+        if self._ollama_client is None:
+            self._ollama_client = ollama.Client(host=self.host, timeout=self.timeout_s)
+        return self._ollama_client
+
+    def _ollama_embed(self, text: str) -> list[float]:
+        """Embed via the OPTIONAL ``ollama`` package transport (explicitly selected only)."""
+        client = self._ensure_ollama_client()
+        try:
+            result = client.embeddings(model=self.model, prompt=text)
+        except EmbedderError:
+            raise
+        except Exception as exc:  # noqa: BLE001 — transport failures are typed below
+            raise EmbedderUnreachable(
+                f"ollama transport to {self.host} failed: {type(exc).__name__}: {exc}"
+            ) from exc
+        return _parse_embedding(result, self.host)
 
     def embed(self, text: str) -> list[float]:
-        r = self._client.embeddings(model=self.model, prompt=text)
-        return r.embedding
+        """Embed one text; raises a TYPED :class:`EmbedderError` on any failure."""
+        if self.transport == TRANSPORT_OLLAMA:
+            return self._ollama_embed(text)
+        return self._http_embed(text)
 
     def embed_batch(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
         embeddings: list[list[float]] = []
         for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
+            batch = texts[i : i + batch_size]
             for t in batch:
                 embeddings.append(self.embed(t))
         return embeddings
@@ -104,7 +350,9 @@ class EmbeddingClient:
         return (1.0 - cos_sim) / 2.0
 
     def embedding_distance(
-        self, baseline_texts: list[str], perturbed_texts: list[str],
+        self,
+        baseline_texts: list[str],
+        perturbed_texts: list[str],
     ) -> float:
         n = min(len(baseline_texts), len(perturbed_texts))
         if n == 0:
@@ -143,9 +391,7 @@ class ChromaStoreError(RuntimeError):
     """
 
 
-def resolve_chroma_endpoint(
-    host: str | None = None, port: int | None = None
-) -> tuple[str, int]:
+def resolve_chroma_endpoint(host: str | None = None, port: int | None = None) -> tuple[str, int]:
     """Resolve the chroma endpoint for THIS environment — explicitly, never by implication.
 
     Precedence: explicit arguments > environment (``CHROMA_HOST``/``CHROMA_PORT``) > the host
@@ -154,9 +400,7 @@ def resolve_chroma_endpoint(
     publishes a different one, so defaulting the port for a named host silently targets the
     wrong endpoint (review finding P1). One resolver — the store and its tests share it.
     """
-    resolved_host = (
-        str(host) if host is not None else os.environ.get("CHROMA_HOST", CHROMA_HOST)
-    )
+    resolved_host = str(host) if host is not None else os.environ.get("CHROMA_HOST", CHROMA_HOST)
     if port is not None:
         return resolved_host, int(port)
     env_port = os.environ.get("CHROMA_PORT")
@@ -196,9 +440,7 @@ def _bounded_get(url: str, deadline: float) -> int:
             status = response.status_code
             for _chunk in response.iter_bytes():
                 if time.monotonic() > deadline:
-                    raise ChromaStoreError(
-                        f"GET {url} exceeded the chroma initialization deadline"
-                    )
+                    raise ChromaStoreError(f"GET {url} exceeded the chroma initialization deadline")
             return status
     except ChromaStoreError:
         raise
@@ -317,9 +559,7 @@ def _initialize_chroma(host: str, port: int, timeout_s: float) -> Any:
     if error is not None:
         if isinstance(error, ChromaStoreError):
             raise error
-        raise ChromaStoreError(
-            f"chromadb initialization failed at {host}:{port}: {error!r}"
-        )
+        raise ChromaStoreError(f"chromadb initialization failed at {host}:{port}: {error!r}")
     return result["client"]
 
 
@@ -462,13 +702,15 @@ class ChromaStore:
             step_idx = step.get("step_index", 0)
             docs.append(text)
             ids.append(step_doc_id(session_id, step_idx))
-            metas.append({
-                **meta,
-                "embedding_source": "reasoning_step",
-                "step_index": step_idx,
-                "tool_after": step.get("tool_after", ""),
-                "tool_input_summary": step.get("tool_input_summary", "")[:200],
-            })
+            metas.append(
+                {
+                    **meta,
+                    "embedding_source": "reasoning_step",
+                    "step_index": step_idx,
+                    "tool_after": step.get("tool_after", ""),
+                    "tool_input_summary": step.get("tool_input_summary", "")[:200],
+                }
+            )
 
         if not docs:
             return 0
@@ -512,12 +754,14 @@ class ChromaStore:
         hits: list[dict[str, Any]] = []
         if results["ids"] and results["ids"][0]:
             for i, doc_id in enumerate(results["ids"][0]):
-                hits.append({
-                    "id": doc_id,
-                    "document": results["documents"][0][i] if results["documents"] else "",
-                    "metadata": results["metadatas"][0][i] if results["metadatas"] else {},
-                    "distance": results["distances"][0][i] if results["distances"] else 0.0,
-                })
+                hits.append(
+                    {
+                        "id": doc_id,
+                        "document": results["documents"][0][i] if results["documents"] else "",
+                        "metadata": results["metadatas"][0][i] if results["metadatas"] else {},
+                        "distance": results["distances"][0][i] if results["distances"] else 0.0,
+                    }
+                )
         return hits
 
     def inventory(self) -> dict[str, Any]:
@@ -610,12 +854,14 @@ def extract_session_steps(session_path: Path) -> list[dict[str, Any]]:
             if event.get("type") == "reasoning":
                 text = event.get("text", "").strip()
                 if text and len(text) > 20:
-                    steps.append({
-                        "text": text,
-                        "step_index": step_idx,
-                        "tool_after": last_tool,
-                        "tool_input_summary": last_tool_input,
-                    })
+                    steps.append(
+                        {
+                            "text": text,
+                            "step_index": step_idx,
+                            "tool_after": last_tool,
+                            "tool_input_summary": last_tool_input,
+                        }
+                    )
                     step_idx += 1
                     last_tool = ""
                     last_tool_input = ""
@@ -626,12 +872,14 @@ def extract_session_steps(session_path: Path) -> list[dict[str, Any]]:
                     continue
                 text = event.get("text", "").strip()
                 if text and len(text) > 20:
-                    steps.append({
-                        "text": text,
-                        "step_index": step_idx,
-                        "tool_after": last_tool,
-                        "tool_input_summary": last_tool_input,
-                    })
+                    steps.append(
+                        {
+                            "text": text,
+                            "step_index": step_idx,
+                            "tool_after": last_tool,
+                            "tool_input_summary": last_tool_input,
+                        }
+                    )
                     step_idx += 1
                     last_tool = ""
                     last_tool_input = ""
@@ -640,7 +888,9 @@ def extract_session_steps(session_path: Path) -> list[dict[str, Any]]:
                 last_tool = event.get("tool", "")
                 inp = event.get("state", {}).get("input", {})
                 if isinstance(inp, dict):
-                    content = inp.get("content", "") or inp.get("command", "") or inp.get("pattern", "")
+                    content = (
+                        inp.get("content", "") or inp.get("command", "") or inp.get("pattern", "")
+                    )
                     last_tool_input = str(content)[:200]
 
     return steps

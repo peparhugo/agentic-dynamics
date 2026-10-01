@@ -1,5 +1,6 @@
 """Tests for the execute runner — run_workflow drives agent_task phases in a worktree."""
 
+import ast
 import json
 import shutil
 import subprocess
@@ -4285,6 +4286,2207 @@ def test_resolve_rag_params_carries_explicit_shared_history_scopes(tmp_path):
     # Absent -> [] (the key is present and non-global, never omitted).
     defaulted = _resolve_rag_params(spec, None, wd=tmp_path, rag_augment=True)
     assert defaulted["shared_history_scopes"] == []
+
+
+# ── u6: serving-scope grants wired + recorded ────────────────────────────────────
+
+
+def _serving_grant_synth_spec(rag: dict) -> ExperimentSpec:
+    """A minimal ``agent_task`` spec with one implementation phase and an explicit ``rag`` block.
+
+    In-memory (no live spec file), so the grant wiring is proven independently of the spec the
+    run executes from — the mid-run-edit risk the plan names.
+    """
+    phases = [{"name": "implement", "kind": "agent", "scope": "implementation", "prompt": "p"}]
+    return ExperimentSpec(
+        name="u6_serving_grant_synth",
+        question="q",
+        version="1",
+        workflow=Workflow(
+            kind="agent_task", params={"language": "python", "phases": phases, "rag": rag}
+        ),
+        factors=[Factor("model", ["m"])],
+        design="factorial",
+    )
+
+
+def _mixed_role_synth_spec(rag: dict) -> ExperimentSpec:
+    """A minimal three-phase spec with ONE implementation, ONE review, and ONE unknown phase.
+
+    The phases carry DISJOINT routing roles so a per-phase grant resolution can be
+    distinguished from a run-wide union (u1). ``implement`` translates via its declared
+    ``scope``; ``g_adversarial_review`` translates ``review_readonly`` -> review; ``notes``
+    declares no scope and its name classifies as ``unknown`` (no marker matches). In-memory,
+    so the per-phase contract is proven independently of the spec the run executes from.
+    """
+    phases = [
+        {"name": "implement", "kind": "agent", "scope": "implementation", "prompt": "p"},
+        {
+            "name": "g_adversarial_review",
+            "kind": "agent",
+            "scope": "review_readonly",
+            "prompt": "p",
+        },
+        {"name": "notes", "kind": "agent", "prompt": "p"},
+    ]
+    return ExperimentSpec(
+        name="u1_per_phase_mixed_role",
+        question="q",
+        version="1",
+        workflow=Workflow(
+            kind="agent_task", params={"language": "python", "phases": phases, "rag": rag}
+        ),
+        factors=[Factor("model", ["m"])],
+        design="factorial",
+    )
+
+
+def test_resolve_rag_params_carries_only_run_wide_scopes_not_role_grants(tmp_path):
+    """u1 (retrieval_serving R1): ``_resolve_rag_params`` carries ONLY the role-INDEPENDENT
+    run-wide declarations — never the UNION of the declared phases' role grants.
+
+    The R1 defect was that the run-wide config unioned every declared phase's policy grants,
+    so a review phase inherited an implementation-only scope. Here the policy opt-in alone
+    contributes NOTHING to the run-wide list (role grants are resolved PER PHASE, at the phase
+    site); a fully-explicit ``serving_scope_grants`` list and a canonical
+    ``shared_history_scopes`` list DO ride run-wide (they are role-independent). ``phase_serving_scopes``
+    resolves ONE role at a time, merging those run-wide scopes with that role's bounded grants.
+    """
+    from agentic_dynamics.knowledge.context_layers import (
+        ROLE_IMPLEMENTATION,
+        ROLE_REVIEW,
+        ROLE_UNKNOWN,
+        SERVING_SCOPE_POLICY,
+        explicit_run_wide_scopes,
+        phase_serving_scopes,
+        serving_scope_policy_table,
+    )
+    from agentic_dynamics.runtime.workflow_runner import _resolve_rag_params
+
+    wd = tmp_path / "wt"
+
+    # (a) The policy opt-in alone grants NOTHING run-wide: role grants are per-phase. This is
+    # the R1 repair — the run-wide list must not carry the implementation's project scope.
+    policy = _resolve_rag_params(
+        _serving_grant_synth_spec(
+            {"emit_scope": "agentic-dynamics", "serving_scope_policy": "default"}
+        ),
+        None,
+        wd=wd,
+        rag_augment=True,
+    )
+    assert policy["shared_history_scopes"] == []
+
+    # (b) The fully-explicit ``serving_scope_grants`` list IS role-independent and rides
+    # run-wide: normalized (duplicate/empty drop) and the global wildcard is refused.
+    explicit = _resolve_rag_params(
+        _serving_grant_synth_spec(
+            {"serving_scope_grants": [" agentic-dynamics ", "agentic-dynamics", "*", ""]}
+        ),
+        None,
+        wd=wd,
+        rag_augment=True,
+    )
+    assert explicit["shared_history_scopes"] == ["agentic-dynamics"]
+
+    # (b2) The canonical ``shared_history_scopes`` list rides run-wide too (wildcard refused).
+    canonical = _resolve_rag_params(
+        _serving_grant_synth_spec({"shared_history_scopes": ["shared-x", "shared-x", "global"]}),
+        None,
+        wd=wd,
+        rag_augment=True,
+    )
+    assert canonical["shared_history_scopes"] == ["shared-x"]
+
+    # (c) NO declaration -> [] (the key is present and non-global, never omitted).
+    defaulted = _resolve_rag_params(_serving_grant_synth_spec({}), None, wd=wd, rag_augment=True)
+    assert defaulted["shared_history_scopes"] == []
+
+    # (d) The helpers split the two shapes. ``explicit_run_wide_scopes`` reads ONLY the
+    # role-independent declarations and is default-empty.
+    assert explicit_run_wide_scopes({}) == ()
+    assert explicit_run_wide_scopes({"serving_scope_policy": "default"}) == ()
+    assert explicit_run_wide_scopes({"shared_history_scopes": ["a", "*", "a"]}) == ("a",)
+    assert explicit_run_wide_scopes({"serving_scope_grants": ["b", "b"]}) == ("b",)
+    assert explicit_run_wide_scopes(
+        {"shared_history_scopes": ["a"], "serving_scope_grants": ["b", "a"]}
+    ) == ("a", "b")
+    # ``serving_scope_policy_table`` reads ONLY the policy key.
+    assert serving_scope_policy_table({}) is None
+    assert serving_scope_policy_table({"serving_scope_grants": ["a"]}) is None
+    assert serving_scope_policy_table({"serving_scope_policy": "nope"}) is None
+    assert serving_scope_policy_table({"serving_scope_policy": "default"}) is SERVING_SCOPE_POLICY
+    inline = {ROLE_IMPLEMENTATION: ("a",)}
+    assert serving_scope_policy_table({"serving_scope_policy": inline}) is inline
+
+    # (e) PER-PHASE: the SAME rag_params resolves each role's bounded grants independently.
+    # u1 (R2): the run-findings token substitutes from the caller's run-derived ``lineage_scope``;
+    # the retired ``run_scope`` name is ignored, so the per-phase grant is proven with the
+    # trusted lineage identity.
+    mixed = {"emit_scope": "self-this-run", "serving_scope_policy": "default"}
+    assert phase_serving_scopes(mixed, role=ROLE_IMPLEMENTATION, lineage_scope="self-this-run") == (
+        "self-this-run",
+        "agentic-dynamics",
+    )
+    assert phase_serving_scopes(mixed, role=ROLE_REVIEW, lineage_scope="self-this-run") == (
+        "self-this-run",
+    )
+    assert phase_serving_scopes(mixed, role=ROLE_UNKNOWN, lineage_scope="self-this-run") == ()
+    # The retired ``run_scope`` argument is IGNORED: a bare destination name never substitutes.
+    assert phase_serving_scopes(mixed, role=ROLE_REVIEW, run_scope="self-this-run") == ()
+    # An explicit run-wide declaration appears for EVERY role (role-independent).
+    mixed_wide = dict(mixed, shared_history_scopes=["shared-x"])
+    for role in (ROLE_IMPLEMENTATION, ROLE_REVIEW, ROLE_UNKNOWN):
+        assert "shared-x" in phase_serving_scopes(
+            mixed_wide, role=role, lineage_scope="self-this-run"
+        )
+
+    # u2: the run-wide helper ``_declared_phase_roles`` was RETIRED (a union of every declared
+    # phase's roles was the R1 defect); the per-phase assertions above are the live contract.
+
+
+def test_phase_serving_scopes_resolve_per_phase_end_to_end(tmp_path):
+    """u1 (retrieval_serving R1): a mixed implementation/review/unknown spec records DISJOINT
+    per-phase serving scopes — no phase inherits another role's grant.
+
+    The runner resolves each phase's grants from ITS OWN translated role at the phase site, so
+    the implementation phase (policy: run-findings ∪ project knowledge) and the review phase
+    (policy: run-findings only) receive different scopes, and the unknown phase receives none.
+    An explicit run-wide ``shared_history_scopes`` rides into EVERY phase (role-independent).
+    Assertions cover the retrieval input (``shared_repository_ids``) and the recorded
+    ``context_route['shared_scopes']``; the no-declaration case is the private-scope negative
+    control (every phase empty).
+    """
+
+    def _run(rag: dict):
+        seen: list[dict] = []
+
+        def retrieve_fn(**kwargs):
+            seen.append(kwargs)
+            return _FakeAttempt([_ScopeTypedEvidence("k-code", "code evidence", "code")])
+
+        result = run_workflow(
+            _mixed_role_synth_spec(rag),
+            goal="g",
+            model="m",
+            workdir=tmp_path,
+            commit=False,
+            rag_augment=True,
+            retrieve_fn=retrieve_fn,
+            construct_fn=lambda request: _FakeAugmented("AUG"),
+            run_agentic_fn=lambda *a, **k: _fake_agent(),
+        )
+        records = {p.phase: p.to_dict()["context_route"] for p in result.phases}
+        return seen, records
+
+    # u1/u2 (R2): the run-findings token is PROOF-CARRYING — the runner passes the DERIVED
+    # ``lineage_scope`` (``_run_lineage_scope``) and it substitutes ONLY from that. Here the spec
+    # DECLARES ``emit_scope: self-this-run``, an emission destination that is NOT proof of run
+    # ownership, so the runner WITHHOLDS the token (``""``) and each role keeps only its
+    # ACTIONABLE explicit grant: implementation gets the project-knowledge entry, review and
+    # unknown get nothing. Per-phase resolution (R1) still holds: no phase inherits another
+    # role's grant.
+    seen, records = _run({"emit_scope": "self-this-run", "serving_scope_policy": "default"})
+    assert seen[0]["shared_repository_ids"] == ("agentic-dynamics",)
+    assert seen[1]["shared_repository_ids"] == ()
+    assert seen[2]["shared_repository_ids"] == ()
+    assert records["implement"]["shared_scopes"] == ["agentic-dynamics"]
+    assert records["g_adversarial_review"]["shared_scopes"] == []
+    assert records["notes"]["shared_scopes"] == []
+
+    # An EXPLICIT run-wide shared scope appears in EVERY phase (role-independent)...
+    seen_wide, records_wide = _run(
+        {
+            "emit_scope": "self-this-run",
+            "serving_scope_policy": "default",
+            "shared_history_scopes": ["shared-x"],
+        }
+    )
+    for phase_seen in seen_wide:
+        assert "shared-x" in phase_seen["shared_repository_ids"]
+    for record in records_wide.values():
+        assert "shared-x" in record["shared_scopes"]
+
+    # ...and the private-scope negative control: NO declaration serves zero shared scopes.
+    seen_private, records_private = _run({})
+    assert all(phase_seen["shared_repository_ids"] == () for phase_seen in seen_private)
+    assert all(record["shared_scopes"] == [] for record in records_private.values())
+
+
+def test_explicit_serving_grants_override_policy_end_to_end(tmp_path):
+    """u4 (retrieval_serving R4): an explicit ``serving_scope_grants`` list overrides the policy.
+
+    Through the REAL runner+augment site: with ``serving_scope_policy: default`` AND an explicit
+    (empty or restrictive) ``serving_scope_grants`` list, every phase records EXACTLY the explicit
+    list — the policy's role grants (the run-findings token and the project-knowledge scope) are
+    NOT merged in. Without the explicit key the policy still applies (the implementation phase
+    receives the project-knowledge grant). This is the end-to-end proof of the restored
+    precedence the plan's R4 requires.
+    """
+
+    def _run(rag: dict):
+        seen: list[dict] = []
+
+        def retrieve_fn(**kwargs):
+            seen.append(kwargs)
+            return _FakeAttempt([_ScopeTypedEvidence("k-code", "code evidence", "code")])
+
+        result = run_workflow(
+            _mixed_role_synth_spec(rag),
+            goal="g",
+            model="m",
+            workdir=tmp_path,
+            commit=False,
+            rag_augment=True,
+            retrieve_fn=retrieve_fn,
+            construct_fn=lambda request: _FakeAugmented("AUG"),
+            run_agentic_fn=lambda *a, **k: _fake_agent(),
+        )
+        records = {p.phase: p.to_dict()["context_route"] for p in result.phases}
+        return seen, records
+
+    # (a) An explicit EMPTY list overrides the policy: NO phase records a shared scope, even
+    # though ``serving_scope_policy: default`` would otherwise grant implementation the project
+    # scope and planning/implementation the run-findings token.
+    seen_empty, records_empty = _run(
+        {"serving_scope_policy": "default", "serving_scope_grants": []}
+    )
+    assert all(phase_seen["shared_repository_ids"] == () for phase_seen in seen_empty)
+    assert all(record["shared_scopes"] == [] for record in records_empty.values())
+
+    # (b) A restrictive explicit list wins over the policy for EVERY phase — never the policy
+    # union, never the project scope, never the run-findings token.
+    seen_restrictive, records_restrictive = _run(
+        {"serving_scope_policy": "default", "serving_scope_grants": ["impl-private"]}
+    )
+    assert all(
+        phase_seen["shared_repository_ids"] == ("impl-private",) for phase_seen in seen_restrictive
+    )
+    assert all(
+        record["shared_scopes"] == ["impl-private"] for record in records_restrictive.values()
+    )
+
+    # (c) WITHOUT the explicit key the policy still applies (presence-keyed override): the
+    # implementation phase gets the project-knowledge grant, the review phase does not.
+    _, records_policy = _run({"serving_scope_policy": "default"})
+    assert "agentic-dynamics" in records_policy["implement"]["shared_scopes"]
+    assert "agentic-dynamics" not in records_policy["g_adversarial_review"]["shared_scopes"]
+
+
+def test_run_findings_grant_requires_a_lineage_scope_not_a_name(tmp_path):
+    """u1 (retrieval_serving R2): ``<run-findings>`` substitutes ONLY from a run-derived
+    ``lineage_scope``; the retired name denylist (``is_isolated_run_scope``) is no longer the
+    ownership predicate, so a bare destination name — the project-wide ``agentic-dynamics``, a
+    custom ``team-findings``, or even a ``self-``-looking name — never substitutes it. The
+    named project-knowledge grant stays a SEPARATE, explicit role entry.
+    """
+    from agentic_dynamics.knowledge.context_layers import (
+        PROJECT_KNOWLEDGE_SCOPE,
+        ROLE_IMPLEMENTATION,
+        ROLE_REVIEW,
+        SERVING_SCOPE_POLICY,
+        serving_scope_grants,
+    )
+
+    # Any bare NAME offered via the retired ``run_scope`` argument is IGNORED, so review (whose
+    # policy is the token alone) gets nothing — regardless of the name's shape.
+    for name in (PROJECT_KNOWLEDGE_SCOPE, "team-findings", "self-this-run", "org:x", ""):
+        assert serving_scope_grants(ROLE_REVIEW, policy=SERVING_SCOPE_POLICY, run_scope=name) == ()
+    # A run-derived ``lineage_scope`` is the ONE trusted substitution.
+    assert serving_scope_grants(
+        ROLE_REVIEW, policy=SERVING_SCOPE_POLICY, lineage_scope="self-this-run"
+    ) == ("self-this-run",)
+    # The explicit project-knowledge grant on implementation stays regardless of the run scope.
+    assert serving_scope_grants(
+        ROLE_IMPLEMENTATION, policy=SERVING_SCOPE_POLICY, run_scope=PROJECT_KNOWLEDGE_SCOPE
+    ) == (PROJECT_KNOWLEDGE_SCOPE,)
+
+
+def _run_project_scope_boundary(
+    rag: dict, store, workdir, *, run_findings_scope=None, emit_capture=None
+):
+    """Run the mixed-role spec through the REAL retrieve path; capture per-phase inputs + served.
+
+    No route is injected: the runner resolves each phase's route (and its serving scopes) from
+    the phase's own semantics. ``store`` is a where-aware dense store, so the phase's shared
+    scopes must thread all the way to the store clause for a hit to reach the constructor.
+
+    ``run_findings_scope`` is the TRUSTED run/continuation identity seam (u1): passing it makes
+    the ``<run-findings>`` grant deterministic and independent of the ambient ``FINOPS_CELL_ID``,
+    which is what the u3 controls need. Omitting it keeps the historical ambient behavior.
+
+    ``emit_capture`` (u2, R5) is the OPTIONAL emission probe. When supplied the phases COMMIT
+    (the spec is git-initialised and each agent writes + commits a marker), so the runner's real
+    self-emission site fires; ``workflow_runner._emit_self_finding`` is temporarily replaced by a
+    recorder appending ``(phase, scope)`` to ``emit_capture``. This is what proves the EMISSION
+    destination decision belongs to the same run the retrieval boundary is driven through — the
+    R5 alignment defect is precisely an emission/retrieval namespace MISMATCH, so the two must be
+    observed together. When omitted, the historical commit-less path runs unchanged.
+    """
+    from agentic_dynamics.knowledge.retrieval import retrieve
+
+    seen: list[dict] = []
+    served: list[list[str]] = []
+
+    class _Capturing(_FakeAugmented):
+        """A constructor that emits EXACTLY the evidence ids it received (the served input)."""
+
+        def __init__(self, prompt, evidence_ids):
+            super().__init__(prompt)
+            self.evidence_ids = list(evidence_ids)
+
+    def construct_fn(request):
+        ids = [unit.knowledge_id for unit in request.evidence]
+        served.append(ids)
+        return _Capturing("AUG", ids)
+
+    def retrieve_fn(**kwargs):
+        seen.append(kwargs)
+        return retrieve(dense_store=store, graph_client=None, **kwargs)
+
+    run_kwargs = dict(
+        goal="g",
+        model="m",
+        workdir=workdir,
+        rag_augment=True,
+        run_findings_scope=run_findings_scope,
+        retrieve_fn=retrieve_fn,
+        construct_fn=construct_fn,
+    )
+    if emit_capture is None:
+        # The historical commit-less shape: the store is pre-seeded and no emission can fire.
+        result = run_workflow(
+            _mixed_role_synth_spec(rag),
+            **run_kwargs,
+            commit=False,
+            run_agentic_fn=lambda *a, **k: _fake_agent(),
+        )
+    else:
+        # Commit shape (R5): real ``_emit_self_finding`` calls, captured by scope. Phases commit a
+        # marker so the metadata-finding emitter (not the report fallback) fires — the destination
+        # the R5 alignment rule is about.
+        _git_init(workdir)
+        real_emit = workflow_runner._emit_self_finding
+
+        def _record_emit(pr, *, goal, scope):
+            emit_capture.append((pr.phase, scope))
+
+        workflow_runner._emit_self_finding = _record_emit
+        try:
+            result = run_workflow(
+                _mixed_role_synth_spec(rag),
+                **run_kwargs,
+                run_agentic_fn=_agent_writes_marker([]),
+            )
+        finally:
+            workflow_runner._emit_self_finding = real_emit
+    records = {p.phase: p.to_dict()["context_route"] for p in result.phases}
+    return seen, served, records
+
+
+def test_project_wide_emit_scope_withholds_run_findings_from_review(tmp_path):
+    """u2 (R2): with a PROJECT-WIDE emit scope, a review phase's run-findings grant is WITHHELD,
+    so a same-repository/different-run project finding is NOT served to review — but IS served
+    to implementation via the explicit project grant. Real retrieve path + where-aware store."""
+    project = _scope_dense_hit(
+        "k-project",
+        "websocket reload finding emitted by another run",
+        repository_id="agentic-dynamics",
+        acl_scope="agentic-dynamics",
+        source_type="finding",
+        authority="measured",
+    )
+    store = _WhereAwareDenseStore([project])
+    seen, served, records = _run_project_scope_boundary(
+        {"emit_scope": "agentic-dynamics", "serving_scope_policy": "default"}, store, tmp_path
+    )
+
+    # implement (0) gets the explicit project grant; review (1) is withheld; unknown (2) none.
+    assert seen[0]["shared_repository_ids"] == ("agentic-dynamics",)
+    assert seen[1]["shared_repository_ids"] == ()
+    assert seen[2]["shared_repository_ids"] == ()
+    assert records["implement"]["shared_scopes"] == ["agentic-dynamics"]
+    assert records["g_adversarial_review"]["shared_scopes"] == []
+    assert records["notes"]["shared_scopes"] == []
+
+    # The same-repository/different-run finding reaches implementation, never review.
+    assert served[0] == ["k-project"]
+    assert served[1] == []
+    assert served[2] == []
+    assert records["implement"]["served_count"] == 1
+    assert records["g_adversarial_review"]["served_count"] == 0
+    assert records["notes"]["served_count"] == 0
+
+
+def test_serving_policy_recorded_on_spec_and_context_route(tmp_path, monkeypatch):
+    """u7 (retrieval_serving): the recorded serving policy agrees with the code on BOTH surfaces.
+
+    Two acceptance anchors, one test:
+
+    * the SPEC surface — ``workflows/repository/retrieval_serving.yaml`` no longer claims
+      ``_resolve_rag_params`` UNIONS the declared phases' role grants (the stale pre-R1 shape);
+      it states the repaired per-phase resolution and the token WITHHELD for a declared
+      ``emit_scope``. The regression guard is a raw-text check, so prose drift fails loudly.
+    * the RECORD surface — driving the spec's exact live ``rag`` block through the runner, each
+      phase's ``context-route/v1`` record carries its OWN resolved ``shared_scopes``: the
+      implementation phase records the explicit project-knowledge grant while the review and
+      unknown phases record the WITHHELD token (``[]``).
+
+    Round 3 (final R2 repair): the UNDECLARED-emit_scope path is repaired to WITHHOLD when the
+    only identity is the environment-derived telemetry namespace — so the control drives it with
+    ``FINOPS_CELL_ID`` deleted and proves the withheld record is stable regardless of the ambient
+    environment. The trusted positive control supplies an explicit ``run_findings_scope`` and
+    shows the SAME path GRANTS that scope, so an always-withholding runner still fails.
+    """
+    from agentic_dynamics.knowledge.context_layers import (
+        CONTEXT_ROUTE_RECORD_KEYS,
+        PROJECT_KNOWLEDGE_SCOPE,
+        RUN_FINDINGS_SCOPE_TOKEN,
+    )
+
+    spec_path = (
+        Path(__file__).resolve().parent.parent
+        / "workflows"
+        / "repository"
+        / "retrieval_serving.yaml"
+    )
+    raw = spec_path.read_text(encoding="utf-8")
+    # Flatten the folded YAML comment (drop the line-leading ``#`` markers, collapse the
+    # whitespace) so a phrase split across physical comment lines still matches as raw prose.
+    # Backticks are stripped so a phrase spanning a code-span boundary still matches.
+    flat = (
+        " ".join(" ".join(line.strip().lstrip("#").strip().split()) for line in raw.splitlines())
+    ).replace("`", "")
+    low = flat.lower()
+    # (1) The STALE union claim is gone; the repaired per-phase + withhold wording is present.
+    assert "_resolve_rag_params unions the declared phases' role" not in flat
+    assert "unions the declared phases" not in low  # no affirmative union claim, on any line
+    assert "does not union" in low  # the comment EXPLICITLY denies the union
+    assert "per phase" in low
+    assert "withheld" in low
+    # (1b) ROUND 4 (the R2 FINAL repair): the comment names the incoming-id WITHHOLD rule and the
+    # composition-root-VERIFIED explicit allow channel, and the stale wording that named an
+    # incoming FINOPS_CELL_ID as a trusted identity is GONE. The retained UNDECLARED +
+    # environment-derived telemetry withhold case, the consistent emission/retrieval identity, and
+    # the named controller follow-up stay.
+    assert "environment-derived" in low
+    assert "telemetry" in low
+    assert "withholds" in low
+    assert "control plane" in low
+    assert "emission and the retrieval grant" in low
+    assert "controller follow-up" in low
+    assert "denylist" not in low
+    # (i) the incoming-id WITHHOLD rule: FINOPS_CELL_ID is named and never promoted.
+    assert "incoming finops_cell_id" in low
+    assert "never promoted" in low
+    # (ii) the composition-root-verified explicit ALLOW channel.
+    assert "the only allow channel" in low
+    assert "verified at the composition root" in low
+    assert "run_findings_scope" in low
+    assert "family_id" in low
+    assert "fleet parent's randomized job id" in low
+    # The stale "trusted incoming id" claim must not survive as prose.
+    assert "trusted identity (an explicit" not in low
+    assert "or an incoming finops_cell_id captured before" not in low
+
+    # The spec's RECORDED policy is the repaired declaration this unit documents.
+    live = load_spec(spec_path)
+    rag = dict(live.workflow.params["rag"])
+    assert rag["emit_scope"] == "agentic-dynamics"
+    assert rag["serving_scope_policy"] == "default"
+
+    def _records(rag_block: dict, *, run_findings_scope=None) -> dict[str, dict]:
+        result = run_workflow(
+            _mixed_role_synth_spec(rag_block),
+            goal="g",
+            model="m",
+            workdir=tmp_path,
+            commit=False,
+            rag_augment=True,
+            run_findings_scope=run_findings_scope,
+            retrieve_fn=lambda **kw: _FakeAttempt(
+                [_ScopeTypedEvidence("k-code", "code evidence", "code")]
+            ),
+            construct_fn=lambda request: _FakeAugmented("AUG"),
+            run_agentic_fn=lambda *a, **k: _fake_agent(),
+        )
+        return {p.phase: p.to_dict()["context_route"] for p in result.phases}
+
+    records = _records(rag)
+    # (2) Every phase's record is the SAME schema with the stable shared_scopes key, and the
+    # withheld token never leaks in as a literal scope.
+    for phase, record in records.items():
+        assert record["schema"] == "context-route/v1", phase
+        assert set(CONTEXT_ROUTE_RECORD_KEYS).issubset(record), phase
+        assert RUN_FINDINGS_SCOPE_TOKEN not in record["shared_scopes"], phase
+
+    # The disjoint per-phase boundary ON THE RECORD (withheld vs granted): the declared
+    # emit_scope withholds the run-findings token, so only the explicit project-knowledge grant
+    # survives — and only on implementation.
+    assert records["implement"]["shared_scopes"] == [PROJECT_KNOWLEDGE_SCOPE]
+    assert records["g_adversarial_review"]["shared_scopes"] == []
+    assert records["notes"]["shared_scopes"] == []
+
+    # The undeclared-emit_scope control, round 3: with NO incoming FINOPS_CELL_ID the only
+    # identity is the environment-derived telemetry namespace, which is NOT an ownership proof —
+    # so the token is WITHHELD and review records [] (deterministic, independent of the ambient
+    # environment). The trusted positive control below passes an explicit ``run_findings_scope``
+    # and shows the SAME path grants it, so an always-withholding runner fails.
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+    telemetry_ns = f"self-{workflow_runner._cell_id('u1_per_phase_mixed_role', 'm')}"
+    records_derived = _records({"serving_scope_policy": "default"})
+    assert records_derived["implement"]["shared_scopes"] == [PROJECT_KNOWLEDGE_SCOPE]
+    assert records_derived["g_adversarial_review"]["shared_scopes"] == []
+    assert records_derived["notes"]["shared_scopes"] == []
+    for phase, record in records_derived.items():
+        assert telemetry_ns not in record["shared_scopes"], phase
+
+    # The trusted positive control: an explicit run/continuation identity is used for the grant,
+    # so the record distinguishes withheld from granted on the SAME undeclared-emit_scope path.
+    records_trusted = _records(
+        {"serving_scope_policy": "default"}, run_findings_scope="self-trusted-run"
+    )
+    assert records_trusted["implement"]["shared_scopes"] == [
+        "self-trusted-run",
+        PROJECT_KNOWLEDGE_SCOPE,
+    ]
+    assert records_trusted["g_adversarial_review"]["shared_scopes"] == ["self-trusted-run"]
+    assert records_trusted["notes"]["shared_scopes"] == []
+
+
+def test_serving_policy_spec_records_withheld_incoming_id_and_verified_channel(
+    tmp_path, monkeypatch
+):
+    """u5 (retrieval_serving REPAIR ROUND 4): the SPEC prose and the RECORD agree on the rule.
+
+    Two surfaces, one test, both bound to the round-4 R2 final fix:
+
+    * the SPEC surface — ``workflows/repository/retrieval_serving.yaml`` names (i) the incoming
+      ``FINOPS_CELL_ID`` WITHHOLD rule and (ii) the composition-root-VERIFIED explicit
+      ``run_findings_scope`` ALLOW channel, and no longer calls an incoming cell id a trusted
+      identity. The check is raw prose, so drift fails loudly.
+    * the RECORD surface — driving the live ``rag`` block through the runner with a fixed/reused
+      incoming ``FINOPS_CELL_ID`` (the CAP-grid reuse shape) still records ``shared_scopes == []``
+      for the review/unknown phases and the project-knowledge grant alone for implementation; the
+      reused namespace appears in NO phase's ``context-route/v1`` record. The trusted positive
+      control proves the SAME path GRANTS a composition-root-verified identity, so an
+      always-withholding runner fails this test.
+    """
+    from agentic_dynamics.knowledge.context_layers import (
+        CONTEXT_ROUTE_RECORD_KEYS,
+        PROJECT_KNOWLEDGE_SCOPE,
+        RUN_FINDINGS_SCOPE_TOKEN,
+    )
+
+    spec_path = (
+        Path(__file__).resolve().parent.parent
+        / "workflows"
+        / "repository"
+        / "retrieval_serving.yaml"
+    )
+    raw = spec_path.read_text(encoding="utf-8")
+    flat = (
+        " ".join(" ".join(line.strip().lstrip("#").strip().split()) for line in raw.splitlines())
+    ).replace("`", "")
+    low = flat.lower()
+    # The spec names the withhold rule for an incoming cell id...
+    assert "incoming finops_cell_id" in low
+    assert "withheld and never promoted" in low
+    # ...the stale "trusted incoming id" wording is gone...
+    assert "or an incoming finops_cell_id captured before" not in low
+    # ...and the ONLY allow channel is the composition-root-verified explicit seam.
+    assert "the only allow channel" in low
+    assert "verified at the composition root" in low
+    assert "run_findings_scope" in low
+
+    # The live spec's recorded policy is the declaration this unit documents (schema unchanged).
+    live = load_spec(spec_path)
+    rag = dict(live.workflow.params["rag"])
+    assert rag["emit_scope"] == "agentic-dynamics"
+    assert rag["serving_scope_policy"] == "default"
+
+    def _records(rag_block: dict, *, run_findings_scope=None) -> dict[str, dict]:
+        result = run_workflow(
+            _mixed_role_synth_spec(rag_block),
+            goal="g",
+            model="m",
+            workdir=tmp_path,
+            commit=False,
+            rag_augment=True,
+            run_findings_scope=run_findings_scope,
+            retrieve_fn=lambda **kw: _FakeAttempt(
+                [_ScopeTypedEvidence("k-code", "code evidence", "code")]
+            ),
+            construct_fn=lambda request: _FakeAugmented("AUG"),
+            run_agentic_fn=lambda *a, **k: _fake_agent(),
+        )
+        return {p.phase: p.to_dict()["context_route"] for p in result.phases}
+
+    # The R2 leak scenario: a FIXED/reused incoming CAP-grid cell id is present in the
+    # environment, but it is NOT an ownership proof — the record must show the withheld path.
+    # Both the DECLARED-emit_scope (the live spec) and the UNDECLARED-emit_scope path withhold.
+    reused_incoming_id = "cap2c_correct_adaptive_r1"
+    monkeypatch.setenv("FINOPS_CELL_ID", reused_incoming_id)
+    for rag_block in (rag, {"serving_scope_policy": "default"}):
+        records = _records(rag_block)
+        for phase, record in records.items():
+            assert record["schema"] == "context-route/v1", phase
+            assert set(CONTEXT_ROUTE_RECORD_KEYS).issubset(record), phase
+            # The ownership placeholder never leaks in as a literal, and the reused incoming
+            # namespace is never recorded under ``shared_scopes``.
+            assert RUN_FINDINGS_SCOPE_TOKEN not in record["shared_scopes"], phase
+            assert f"self-{reused_incoming_id}" not in record["shared_scopes"], phase
+        assert records["implement"]["shared_scopes"] == [PROJECT_KNOWLEDGE_SCOPE]
+        assert records["g_adversarial_review"]["shared_scopes"] == []
+        assert records["notes"]["shared_scopes"] == []
+
+    # Trusted positive control: a composition-root-verified identity on the SAME
+    # undeclared-emit_scope path GRANTS it, so the record distinguishes withheld from granted.
+    records_verified = _records(
+        {"serving_scope_policy": "default"}, run_findings_scope="self-run-F"
+    )
+    assert records_verified["g_adversarial_review"]["shared_scopes"] == ["self-run-F"]
+    assert records_verified["implement"]["shared_scopes"] == [
+        "self-run-F",
+        PROJECT_KNOWLEDGE_SCOPE,
+    ]
+
+
+def test_self_looking_declared_emit_scope_is_not_an_ownership_proof(tmp_path):
+    """u1/u2 (R2): a spec-DECLARED emission destination is NOT an ownership proof, even when it
+    looks per-run. The runner WITHHOLDS the run-findings token for a declared ``emit_scope``
+    (u2's ``_run_lineage_scope`` returns ``""``), so the run's ``self-this-run`` finding is NOT
+    served to review — and only implementation keeps the explicit project-knowledge grant. The
+    UNDECLARED case (derived cell scope) is proven by
+    ``test_isolated_emit_scope_serves_own_run_findings_not_project``."""
+    own = _scope_dense_hit(
+        "k-own",
+        "websocket reload finding emitted by THIS run",
+        repository_id="self-this-run",
+        acl_scope="self-this-run",
+        source_type="finding",
+        authority="measured",
+    )
+    project = _scope_dense_hit(
+        "k-project",
+        "websocket reload finding from the shared project history",
+        repository_id="agentic-dynamics",
+        acl_scope="agentic-dynamics",
+        source_type="finding",
+        authority="measured",
+    )
+    store = _WhereAwareDenseStore([own, project])
+    seen, served, records = _run_project_scope_boundary(
+        {"emit_scope": "self-this-run", "serving_scope_policy": "default"}, store, tmp_path
+    )
+
+    # A declared emit scope withholds the token: implementation keeps only the explicit project
+    # grant, review and unknown get nothing.
+    assert seen[0]["shared_repository_ids"] == ("agentic-dynamics",)
+    assert seen[1]["shared_repository_ids"] == ()
+    assert seen[2]["shared_repository_ids"] == ()
+    assert records["g_adversarial_review"]["shared_scopes"] == []
+
+    # Review serves NOTHING: neither the self-looking declared finding nor the project one.
+    assert served[1] == []
+    assert records["g_adversarial_review"]["served_count"] == 0
+
+
+def test_isolated_emit_scope_serves_own_run_findings_not_project(tmp_path, monkeypatch):
+    """u1/u2 (R2, round 4; R5 alignment round 5): with a VERIFIED run/continuation identity
+    supplied EXPLICITLY via ``run_findings_scope``, an UNDECLARED ``emit_scope``, AND the run
+    opted into a serving policy, the run's OWN trusted scope is granted to later phases under
+    ``<run-findings>`` — while the project history is reached ONLY by the explicit
+    project-knowledge grant on implementation. Without the opt-in the verified scope is NOT
+    harnessed: emission stays the default reader's cell scope and the grant withholds (R5).
+
+    Round 4 (the final R2 repair): the runner resolves ONE trusted run/continuation scope BEFORE
+    the phase loop from the explicit ``run_findings_scope`` seam ONLY and uses it for BOTH emission
+    and the retrieval grant, so they can never disagree. An incoming ``FINOPS_CELL_ID`` is
+    TELEMETRY ONLY and is NEVER promoted to an ownership proof: a reused/fixed cell id and the
+    runner's own ``self-wf_<spec>_<model>`` telemetry fallback are SHARED namespaces, not lineage.
+    The same-repository/different-run falsifier through the real retrieve path is unit u3; here
+    the discriminator is verified-vs-declared, driven through the REAL retrieve/augment route.
+
+    Falsifiers (mutation-sensitive):
+    * regressing the runner to grant the declared ``emit_scope`` (or reinstating the incoming-cell
+      promotion) would serve ``k-team`` / the reused id to review — the withheld assertions fail;
+    * withholding always would leave the verified positive control empty — its assertions fail.
+    """
+    from agentic_dynamics.knowledge.context_layers import PROJECT_KNOWLEDGE_SCOPE
+    from agentic_dynamics.runtime.workflow_runner import (
+        _phase_emit_scope,
+        _run_lineage_scope,
+        _trusted_run_findings_scope,
+    )
+
+    # The incoming cell id is present in the environment but is NOT an ownership proof, and it is
+    # NOT the verified channel. The VERIFIED run/continuation identity is supplied EXPLICITLY by
+    # the composition root as a literal independent of the ambient environment (round 4: an
+    # incoming ``FINOPS_CELL_ID`` is never promoted to run identity).
+    monkeypatch.setenv("FINOPS_CELL_ID", "wf_run_alpha")
+    ambient_cell_scope = cell_scope(tmp_path)  # self-wf_run_alpha — telemetry only
+    assert ambient_cell_scope == "self-wf_run_alpha"
+    own_scope = "self-verified-run"  # the explicit verified-channel identity (NOT the cell id)
+    assert own_scope != ambient_cell_scope
+    # Withheld when no verified identity is supplied; the explicit seam is returned; the incoming
+    # id is NEVER promoted, even when it is non-empty.
+    assert _trusted_run_findings_scope(run_findings_scope=None, incoming_cell_id="") == ""
+    assert (
+        _trusted_run_findings_scope(run_findings_scope="self-explicit-run", incoming_cell_id="")
+        == "self-explicit-run"
+    )
+    assert (
+        _trusted_run_findings_scope(run_findings_scope=None, incoming_cell_id="wf_run_alpha") == ""
+    )
+    assert _run_lineage_scope({}, trusted_scope="") == ""
+    assert _run_lineage_scope({"serving_scope_policy": "default"}, trusted_scope="") == ""
+    # R5 alignment (no serving-policy declaration): the verified scope is NOT granted — emission
+    # stays in the default reader's cell scope, so granting it here would read a family namespace
+    # nothing wrote to; the token withholds.
+    assert _run_lineage_scope({}, trusted_scope=own_scope) == ""
+    # R5: opting into a policy grants the verified scope (emission and grant then agree).
+    assert (
+        _run_lineage_scope({"serving_scope_policy": "default"}, trusted_scope=own_scope)
+        == own_scope
+    )
+    assert _run_lineage_scope({"emit_scope": "team-findings"}, trusted_scope=own_scope) == ""
+    assert (
+        _run_lineage_scope({"emit_scope": PROJECT_KNOWLEDGE_SCOPE}, trusted_scope=own_scope) == ""
+    )
+    # The SAME trusted scope drives emission ONCE the run opts in, so emission and grant can
+    # never disagree; WITHOUT the opt-in emission stays the default reader's cell scope.
+    assert _phase_emit_scope({}, tmp_path, trusted_scope=own_scope) == cell_scope(tmp_path)
+    assert (
+        _phase_emit_scope({"serving_scope_policy": "default"}, tmp_path, trusted_scope=own_scope)
+        == own_scope
+    )
+    assert _phase_emit_scope(
+        {"emit_scope": "team-findings"}, tmp_path, trusted_scope=own_scope
+    ) == ("team-findings")
+
+    # ── The VERIFIED case: NO emit_scope, and the identity supplied explicitly via the
+    # ``run_findings_scope`` seam → the verified identity is where the run emits, so the
+    # ``<run-findings>`` token resolves to it (emission and grant agree). The ambient incoming
+    # cell id is present but is NOT what grants the scope. ──
+    own = _scope_dense_hit(
+        "k-own",
+        "websocket reload finding emitted by THIS run's own cell scope",
+        repository_id=own_scope,
+        acl_scope=own_scope,
+        source_type="finding",
+        authority="measured",
+    )
+    project = _scope_dense_hit(
+        "k-project",
+        "websocket reload finding from the shared project history",
+        repository_id=PROJECT_KNOWLEDGE_SCOPE,
+        acl_scope=PROJECT_KNOWLEDGE_SCOPE,
+        source_type="finding",
+        authority="measured",
+    )
+    # The run's private repository/ACL scope is its own verified scope (distinct from the ambient
+    # reused cell id), so the unknown ``notes`` phase's private floor matches where the run's own
+    # finding was emitted — never the ambient cell id.
+    seen, served, records = _run_project_scope_boundary(
+        {"serving_scope_policy": "default", "repository_id": own_scope, "acl_scope": own_scope},
+        _WhereAwareDenseStore([own, project]),
+        tmp_path,
+        run_findings_scope=own_scope,
+    )
+
+    # Implement: run's own findings ∪ explicit project knowledge. Review: run's own findings ONLY.
+    assert seen[0]["shared_repository_ids"] == (own_scope, PROJECT_KNOWLEDGE_SCOPE)
+    assert seen[1]["shared_repository_ids"] == (own_scope,)
+    assert seen[2]["shared_repository_ids"] == ()
+    assert records["implement"]["shared_scopes"] == [own_scope, PROJECT_KNOWLEDGE_SCOPE]
+    assert records["g_adversarial_review"]["shared_scopes"] == [own_scope]
+    assert records["notes"]["shared_scopes"] == []
+
+    # The run's OWN finding reaches implementation AND review (same lineage). The project history
+    # reaches implementation only — NEVER review under "own findings". The unknown ``notes`` phase
+    # has no grant, so it sees the own finding only through the cell's PRIVATE floor, never the
+    # project history.
+    assert set(served[0]) == {"k-own", "k-project"}
+    assert served[1] == ["k-own"]
+    assert "k-project" not in served[1]
+    assert served[2] == ["k-own"]
+    assert records["g_adversarial_review"]["served_count"] == 1
+
+    # The constructor evidence ids AGREE, per phase, with the recorded evidence ids (no fabricated
+    # served count, no foreign id smuggled in).
+    for index, phase in enumerate(["implement", "g_adversarial_review", "notes"]):
+        recorded_ids = {eid for layer in records[phase]["layers"] for eid in layer["evidence_ids"]}
+        assert recorded_ids == set(served[index])
+
+    # ── The DECLARED case: emit_scope=team-findings → the run emits to a shared/reused
+    # destination that is NOT proof of ownership, so the token is WITHHELD. A finding in that
+    # destination is NOT served to review under "own findings" (the R2 boundary). ──
+    team = _scope_dense_hit(
+        "k-team",
+        "websocket reload finding emitted to a shared/reused team destination",
+        repository_id="team-findings",
+        acl_scope="team-findings",
+        source_type="finding",
+        authority="measured",
+    )
+    seen_d, served_d, records_d = _run_project_scope_boundary(
+        {"emit_scope": "team-findings", "serving_scope_policy": "default"},
+        _WhereAwareDenseStore([team, project]),
+        tmp_path,
+    )
+
+    # Implementation keeps only the explicit project grant; review is withheld; unknown gets none.
+    assert seen_d[0]["shared_repository_ids"] == (PROJECT_KNOWLEDGE_SCOPE,)
+    assert seen_d[1]["shared_repository_ids"] == ()
+    assert seen_d[2]["shared_repository_ids"] == ()
+    assert records_d["implement"]["shared_scopes"] == [PROJECT_KNOWLEDGE_SCOPE]
+    assert records_d["g_adversarial_review"]["shared_scopes"] == []
+    assert records_d["notes"]["shared_scopes"] == []
+
+    # The team-destination finding reaches NOBODY (not even implementation — the declared
+    # destination is reached only by an explicit named grant, never the withheld token); the
+    # project history reaches implementation alone.
+    assert served_d[0] == ["k-project"]
+    assert served_d[1] == []
+    assert served_d[2] == []
+    assert "k-team" not in served_d[0]
+    assert records_d["g_adversarial_review"]["served_count"] == 0
+
+
+def test_run_findings_scope_captured_once_withheld_without_trusted_identity(tmp_path, monkeypatch):
+    """u1 (retrieval_serving REPAIR ROUND 3, the final R2 repair): the ``<run-findings>``
+    identity is captured ONCE before the phase loop from a TRUSTED control-plane source and used
+    consistently for BOTH emission and the retrieval grant.
+
+    The measured falsifier this closes: with NO incoming ``FINOPS_CELL_ID`` the runner
+    temporarily installs its own spec/model telemetry id (``self-wf_<spec>_<model>``) into
+    ``FINOPS_CELL_ID`` during retrieval, so the old resolver granted that SHARED namespace —
+    different from where emission actually lands — and two unrelated runs' findings in it
+    reached review construction. Here:
+
+    (a) NO incoming id, no trusted ``run_findings_scope``, no ``emit_scope`` → the resolved
+        scope is ``""``: NO phase's ``context-route/v1`` record carries the telemetry namespace,
+        review is withheld, and implementation keeps ONLY the explicit project grant;
+    (b) an EXPLICIT trusted ``run_findings_scope`` → that scope is the emission destination AND
+        the retrieval grant (emission and grant AGREE — the R2 consistency rule);
+    (c) a DECLARED ``emit_scope`` still withholds (emission wins, byte-identical).
+    """
+    from agentic_dynamics.knowledge.context_layers import PROJECT_KNOWLEDGE_SCOPE
+
+    # The SHARED namespace the old resolver wrongly granted: spec/model telemetry, not lineage.
+    telemetry_ns = f"self-{workflow_runner._cell_id('u1_per_phase_mixed_role', 'm')}"
+
+    def _run(rag: dict, *, run_findings_scope=None):
+        seen: list[dict] = []
+
+        def retrieve_fn(**kwargs):
+            seen.append(kwargs)
+            return _FakeAttempt([_ScopeTypedEvidence("k-code", "code evidence", "code")])
+
+        result = run_workflow(
+            _mixed_role_synth_spec(rag),
+            goal="g",
+            model="m",
+            workdir=tmp_path,
+            commit=False,
+            rag_augment=True,
+            run_findings_scope=run_findings_scope,
+            retrieve_fn=retrieve_fn,
+            construct_fn=lambda request: _FakeAugmented("AUG"),
+            run_agentic_fn=lambda *a, **k: _fake_agent(),
+        )
+        return seen, {p.phase: p.to_dict()["context_route"] for p in result.phases}
+
+    # (a) No incoming control-plane identity, no trusted identity, no emit_scope → WITHHELD.
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+    seen_a, records_a = _run({"serving_scope_policy": "default"})
+    for phase, record in records_a.items():
+        assert record["schema"] == "context-route/v1", phase
+        assert telemetry_ns not in record["shared_scopes"], phase
+    assert seen_a[0]["shared_repository_ids"] == (PROJECT_KNOWLEDGE_SCOPE,)
+    assert seen_a[1]["shared_repository_ids"] == ()
+    assert records_a["implement"]["shared_scopes"] == [PROJECT_KNOWLEDGE_SCOPE]
+    assert records_a["g_adversarial_review"]["shared_scopes"] == []
+    assert records_a["g_adversarial_review"]["served_count"] == 0
+
+    # (b) An EXPLICIT trusted ``run_findings_scope`` is the retrieval grant...
+    seen_b, records_b = _run(
+        {"serving_scope_policy": "default"}, run_findings_scope="self-explicit-run"
+    )
+    assert seen_b[1]["shared_repository_ids"] == ("self-explicit-run",)
+    assert records_b["g_adversarial_review"]["shared_scopes"] == ["self-explicit-run"]
+    assert telemetry_ns not in records_b["g_adversarial_review"]["shared_scopes"]
+
+    # ...and the SAME scope is the emission destination: capture the emit call end-to-end.
+    monkeypatch.setenv("FINOPS_EMIT_SELF", "1")
+    emitted: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        workflow_runner,
+        "_emit_self_finding",
+        lambda pr, *, goal, scope: emitted.append((pr.phase, scope)),
+    )
+    emit_spec = ExperimentSpec(
+        name="u1_run_findings_emit",
+        question="q",
+        version="1",
+        workflow=Workflow(
+            kind="agent_task",
+            params={
+                "language": "python",
+                "phases": [
+                    {
+                        "name": "implement",
+                        "kind": "agent",
+                        "scope": "implementation",
+                        "prompt": "p",
+                    }
+                ],
+                "rag": {"serving_scope_policy": "default"},
+            },
+        ),
+        factors=[Factor("model", ["m"])],
+        design="factorial",
+    )
+    wt_b = tmp_path / "b"
+    wt_b.mkdir()
+    _git_init(wt_b)
+    result_emit = run_workflow(
+        emit_spec,
+        goal="g",
+        model="m",
+        workdir=wt_b,
+        run_findings_scope="self-explicit-run",
+        retrieve_fn=lambda **kw: _FakeAttempt(
+            [_ScopeTypedEvidence("k-code", "code evidence", "code")]
+        ),
+        construct_fn=lambda request: _FakeAugmented("AUG"),
+        run_agentic_fn=_agent_writes_marker([]),
+    )
+    assert [p.status for p in result_emit.phases] == ["ok"]
+    assert emitted == [("implement", "self-explicit-run")]
+    record_emit = result_emit.phases[0].to_dict()["context_route"]
+    assert "self-explicit-run" in record_emit["shared_scopes"]
+    assert telemetry_ns not in record_emit["shared_scopes"]
+
+    # (c) A DECLARED ``emit_scope`` wins for emission and still WITHHOLDS the token.
+    emitted.clear()
+    wt_c = tmp_path / "c"
+    wt_c.mkdir()
+    _git_init(wt_c)
+    declared = run_workflow(
+        emit_spec,
+        goal="g",
+        model="m",
+        workdir=wt_c,
+        rag_params={"emit_scope": "team-findings", "serving_scope_policy": "default"},
+        run_findings_scope="self-explicit-run",
+        retrieve_fn=lambda **kw: _FakeAttempt(
+            [_ScopeTypedEvidence("k-code", "code evidence", "code")]
+        ),
+        construct_fn=lambda request: _FakeAugmented("AUG"),
+        run_agentic_fn=_agent_writes_marker([]),
+    )
+    assert [p.status for p in declared.phases] == ["ok"]
+    assert emitted == [("implement", "team-findings")]
+    declared_record = declared.phases[0].to_dict()["context_route"]
+    assert declared_record["shared_scopes"] == [PROJECT_KNOWLEDGE_SCOPE]
+    assert telemetry_ns not in declared_record["shared_scopes"]
+
+
+def test_resolve_verified_run_findings_scope_prefers_family_falls_back_withholds():
+    """u2 (retrieval_serving REPAIR ROUND 4): the PURE composition-root resolver.
+
+    The control-db run row is the ONE identity whose ownership the control plane guarantees
+    (``control_db.create_run``): a fresh run's ``family_id == run_id``, and a ``--resume`` child
+    inherits the parent's family. The resolver is the composition root's half of the verified
+    channel — it turns that identity into the ``self-run-<family_id>`` repository scope the
+    runner accepts through its explicit ``run_findings_scope=`` seam.
+
+    Discriminators (mutation-sensitive):
+    * ``family_id`` PREFERRED over ``run_id`` (a lineage shares the family root, so a continuation
+      must retrieve the family's findings, not only its own run's);
+    * ``run_id`` fallback when no family id is present;
+    * an empty/missing mapping — or one carrying only unrelated fields — withholds (``""``), the
+      conservative answer that never grants a shared/reused namespace under "own findings".
+    """
+    from agentic_dynamics.runtime.workflow_runner import resolve_verified_run_findings_scope
+
+    # family_id is preferred: the family root, shared by every member of a --resume lineage.
+    assert resolve_verified_run_findings_scope({"family_id": "F", "run_id": "R"}) == "self-run-F"
+    # run_id is the fallback when the family id is absent or blank/whitespace-only.
+    assert resolve_verified_run_findings_scope({"run_id": "R"}) == "self-run-R"
+    assert resolve_verified_run_findings_scope({"family_id": "", "run_id": "R"}) == "self-run-R"
+    assert resolve_verified_run_findings_scope({"family_id": "   ", "run_id": "R"}) == "self-run-R"
+    # Withheld: no mapping, empty mapping, both fields blank, or only unrelated fields.
+    assert resolve_verified_run_findings_scope(None) == ""
+    assert resolve_verified_run_findings_scope({}) == ""
+    assert resolve_verified_run_findings_scope({"family_id": "", "run_id": ""}) == ""
+    assert resolve_verified_run_findings_scope({"parent_run_id": "P"}) == ""
+    # Deterministic and environment-free: the same mapping always yields the same scope.
+    assert resolve_verified_run_findings_scope({"family_id": "F"}) == "self-run-F"
+
+
+def test_verified_channel_positive_and_emission_retrieval_consistency(tmp_path, monkeypatch):
+    """u4 (retrieval_serving REPAIR ROUND 4): the verified channel POSITIVELY + R2 consistency.
+
+    The R2 repair makes a run-findings ownership claim rest on a composition-root-verified
+    identity, resolved ONCE into ``self-run-<family_id>``. This proves the POSITIVE half (the
+    channel grants when verified) and the CONSISTENCY half (the SAME string is both the emission
+    destination and the retrieval grant), so the withheld-vs-granted state is observable on the
+    phase's ``context-route/v1`` record. A spec-declared ``emit_scope`` is an emission
+    DESTINATION, not an ownership proof, so it withholds the token instead.
+
+    Driven through the REAL runner/retrieve/augment route with the where-aware dense store and a
+    deterministic constructor (no network/Redis/Neo4j). Mutation-sensitive: an always-withholding
+    runner fails the positive case (the review grant is empty); reinstating a declared-destination
+    or trusted-scope grant fails the withheld case (the same-namespace team finding, or the own
+    finding, would then reach review construction under the label "own findings").
+    """
+    from agentic_dynamics.knowledge.context_layers import PROJECT_KNOWLEDGE_SCOPE
+    from agentic_dynamics.runtime.workflow_runner import (
+        _phase_emit_scope,
+        _run_lineage_scope,
+        resolve_verified_run_findings_scope,
+    )
+
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+
+    # The composition root's resolver turns the control-db family identity into the verified
+    # scope; the runner accepts it verbatim through the explicit ``run_findings_scope`` seam.
+    verified = resolve_verified_run_findings_scope({"family_id": "F", "run_id": "R"})
+    assert verified == "self-run-F"
+
+    # R5 ALIGNMENT (no serving-policy declaration): the verified scope is NOT harnessed for
+    # emission — the finding must land in the DEFAULT reader's primary namespace
+    # (``cell_scope(wd)``) and the grant withholds, so emission and default retrieval agree.
+    # This is the flipped R5-bug assertion: an unconditional migration would emit into
+    # ``self-run-F`` while default retrieval still reads ``cell_scope(wd)``, hiding the run's own
+    # progressive findings from its later phases.
+    assert _phase_emit_scope({}, tmp_path, trusted_scope=verified) == cell_scope(tmp_path)
+    assert _run_lineage_scope({}, trusted_scope=verified) == ""
+
+    # CONSISTENCY under the OPT-IN (R2): a declared serving-scope policy harnesses the ONE
+    # verified identity as BOTH the emission destination and the retrieval grant — byte-for-byte.
+    rag_optin = {"serving_scope_policy": "default"}
+    assert _phase_emit_scope(rag_optin, tmp_path, trusted_scope=verified) == verified
+    assert _run_lineage_scope(rag_optin, trusted_scope=verified) == verified
+    assert _phase_emit_scope(rag_optin, tmp_path, trusted_scope=verified) == _run_lineage_scope(
+        rag_optin, trusted_scope=verified
+    )
+
+    # The run's OWN finding (in the verified scope) vs a FOREIGN run's finding (a DIFFERENT
+    # verified scope) — distinguishable at retrieval only by the grant.
+    own = _scope_dense_hit(
+        "k-own-F",
+        "websocket reload finding emitted by THIS lineage's own run F",
+        repository_id=verified,
+        acl_scope=verified,
+        source_type="finding",
+        authority="measured",
+    )
+    foreign = _scope_dense_hit(
+        "k-foreign-G",
+        "websocket reload finding emitted by an unrelated run G",
+        repository_id="self-run-G",
+        acl_scope="self-run-G",
+        source_type="finding",
+        authority="measured",
+    )
+    store = _WhereAwareDenseStore([own, foreign])
+    rag_open = {"serving_scope_policy": "default"}  # emit_scope deliberately UNDECLARED
+    seen, served, records = _run_project_scope_boundary(
+        rag_open, store, tmp_path, run_findings_scope=verified
+    )
+
+    # POSITIVE: review (phase 1) records the verified grant and serves ONLY the own finding.
+    assert seen[1]["shared_repository_ids"] == (verified,)
+    assert records["g_adversarial_review"]["shared_scopes"] == ["self-run-F"]
+    assert served[1] == ["k-own-F"]
+    assert "k-foreign-G" not in served[1]
+    assert records["g_adversarial_review"]["served_count"] == 1
+    # Implementation gets the verified grant UNION the explicit project grant; the foreign run's
+    # finding reaches NOBODY under "own findings".
+    assert records["implement"]["shared_scopes"] == [verified, PROJECT_KNOWLEDGE_SCOPE]
+    assert "k-foreign-G" not in served[0]
+    # Constructor evidence ids AGREE, per phase, with the recorded ids (no fabricated served
+    # count, no foreign id smuggled in) and no record carries the foreign run's scope.
+    for index, phase in enumerate(["implement", "g_adversarial_review", "notes"]):
+        recorded_ids = {eid for layer in records[phase]["layers"] for eid in layer["evidence_ids"]}
+        assert recorded_ids == set(served[index])
+        assert "self-run-G" not in records[phase]["shared_scopes"], phase
+
+    # WITHHELD on the SAME path/rag: no verified identity → the token is withheld and review
+    # records the observably empty grant. This keeps the positive case mutation-sensitive.
+    _, served_withheld, records_withheld = _run_project_scope_boundary(rag_open, store, tmp_path)
+    assert records_withheld["g_adversarial_review"]["shared_scopes"] == []
+    assert records_withheld["g_adversarial_review"]["served_count"] == 0
+    assert served_withheld[1] == []
+
+    # DECLARED destination: a declared emit_scope withholds the token EVEN with a verified
+    # identity. Emission resolves to the declared destination; the grant resolves to "" (they
+    # intentionally differ: a destination is not proof the namespace holds only this run).
+    declared_rag = {"emit_scope": "team-findings", "serving_scope_policy": "default"}
+    assert _phase_emit_scope(declared_rag, tmp_path, trusted_scope=verified) == "team-findings"
+    assert _run_lineage_scope(declared_rag, trusted_scope=verified) == ""
+    team = _scope_dense_hit(
+        "k-team-foreign",
+        "websocket reload finding emitted to a shared/reused team destination",
+        repository_id="team-findings",
+        acl_scope="team-findings",
+        source_type="finding",
+        authority="measured",
+    )
+    seen_d, served_d, records_d = _run_project_scope_boundary(
+        declared_rag,
+        _WhereAwareDenseStore([team, own, foreign]),
+        tmp_path,
+        run_findings_scope=verified,
+    )
+
+    # Review is withheld: the declared destination and both runs' private scopes reach NO review
+    # evidence under "own findings".
+    assert seen_d[1]["shared_repository_ids"] == ()
+    assert records_d["g_adversarial_review"]["shared_scopes"] == []
+    assert served_d[1] == []
+    assert records_d["g_adversarial_review"]["served_count"] == 0
+    # The declared destination is reached ONLY by an explicit named grant — and there is none
+    # here, so the team finding reaches NOBODY (implementation keeps only the project grant).
+    assert seen_d[0]["shared_repository_ids"] == (PROJECT_KNOWLEDGE_SCOPE,)
+    assert "k-team-foreign" not in served_d[0]
+    assert "k-own-F" not in served_d[0]
+
+
+def test_r5_default_emission_retrieval_alignment_optin(tmp_path):
+    """u1 (retrieval_serving REPAIR ROUND 5): default emission and default retrieval stay ALIGNED.
+
+    The R5 [P2] defect: the composition root injects a VERIFIED run scope for EVERY DB-composed
+    run, and ``_phase_emit_scope`` preferred it even with NO serving policy declared — while
+    default retrieval still selects ``cell_scope(wd)``. A run's own progressive findings were
+    therefore emitted into a family namespace its own later phases never read.
+
+    The repair gates the migration on :func:`_serving_family_scope_opted_in`: only a run that
+    declares a serving policy (and does NOT substitute the explicit R4 list) harnesses the
+    verified scope for BOTH emission and the ``<run-findings>`` grant. This is the pure two-case
+    probe; the sibling case suite drives the same rule through the real runner/retrieve/augment
+    path.
+
+    Mutation-sensitive:
+    * an UNCONDITIONAL migration (ignore the opt-in) fails the no-declaration case below;
+    * an ALWAYS-cell-scope emission (drop the opt-in branch) fails the declared-policy case.
+    """
+    from agentic_dynamics.runtime.workflow_runner import (
+        _phase_emit_scope,
+        _run_lineage_scope,
+        _serving_family_scope_opted_in,
+    )
+
+    verified = "self-run-F"
+
+    # Case A — NO serving policy declared: the verified scope must NOT migrate emission. Emission
+    # stays in the DEFAULT reader's primary repository/ACL (cell_scope) and the grant withholds,
+    # so a later phase in the same worktree still serves its own progressive finding.
+    assert _serving_family_scope_opted_in({}) is False
+    assert _phase_emit_scope({}, tmp_path, trusted_scope=verified) == cell_scope(tmp_path)
+    assert _run_lineage_scope({}, trusted_scope=verified) == ""
+
+    # The self-emit flags alone do NOT opt in (they toggle emission, not the serving policy).
+    self_emit = {"emit_self": True, "emit_report": True}
+    assert _serving_family_scope_opted_in(self_emit) is False
+    assert _phase_emit_scope(self_emit, tmp_path, trusted_scope=verified) == cell_scope(tmp_path)
+
+    # Case B — a declared serving policy opts in: the verified scope is BOTH the emission
+    # destination and the retrieval grant, byte-for-byte.
+    declared = {"serving_scope_policy": "default"}
+    assert _serving_family_scope_opted_in(declared) is True
+    assert _phase_emit_scope(declared, tmp_path, trusted_scope=verified) == verified
+    assert _run_lineage_scope(declared, trusted_scope=verified) == verified
+    assert _phase_emit_scope(declared, tmp_path, trusted_scope=verified) == _run_lineage_scope(
+        declared, trusted_scope=verified
+    )
+
+    # A DECLARED emit_scope still wins for emission, and withholds the grant (a destination is
+    # not an ownership proof) — unchanged from round 4.
+    assert (
+        _phase_emit_scope({"emit_scope": "team-findings"}, tmp_path, trusted_scope=verified)
+        == "team-findings"
+    )
+    assert _run_lineage_scope({"emit_scope": "team-findings"}, trusted_scope=verified) == ""
+
+    # The explicit R4 list (including []) takes precedence: the policy is NOT consulted, so the
+    # opt-in predicate is False and emission stays aligned with the cell scope.
+    explicit_list = {"serving_scope_policy": "default", "serving_scope_grants": []}
+    assert _serving_family_scope_opted_in(explicit_list) is False
+    assert _phase_emit_scope(explicit_list, tmp_path, trusted_scope=verified) == cell_scope(
+        tmp_path
+    )
+
+    # An EMPTY trusted identity with the opt-in falls back to the cell scope for emission (and
+    # withholds the grant) — never a shared namespace.
+    assert _phase_emit_scope(declared, tmp_path, trusted_scope="") == cell_scope(tmp_path)
+    assert _run_lineage_scope(declared, trusted_scope="") == ""
+
+
+def test_phase_serving_scopes_r5_default_identity_alignment(tmp_path):
+    """u5 (retrieval_serving REPAIR ROUND 5): the GRANT resolver stays aligned with the R5
+    emission rule — the run's own progressive finding is readable wherever it was emitted.
+
+    ``_phase_emit_scope`` decides WHERE a phase writes; ``phase_serving_scopes`` decides WHAT
+    the phase (and its later siblings) may read. The R5 defect was these two disagreeing when no
+    serving policy was declared: emission migrated to the verified family namespace while the
+    default reader still selected ``cell_scope(wd)``. This test pins the resolver side of the R5
+    opt-in gate, so the emission test above cannot pass while the grant silently diverges.
+
+    The three R5 cases, keyed to the SAME ``rag_params`` shape the runner resolves:
+    * NO declaration -> ``phase_serving_scopes`` grants nothing, so retrieval reads exactly
+      ``cell_scope(wd)`` — the SAME namespace emission stays in (alignment).
+    * DECLARED policy + lineage -> the resolver substitutes the token to the SAME verified
+      string emission migrated to (``self-run-F``), so the later phase reads the own finding.
+    * R4 explicit list (incl. ``[]``) -> the policy is NOT consulted (``serving_scope_policy_table``
+      is bypassed), so emission stays cell-scoped and the grant is the explicit list alone.
+    """
+    from agentic_dynamics.knowledge.context_layers import (
+        ROLE_IMPLEMENTATION,
+        phase_serving_scopes,
+        serving_scope_policy_table,
+    )
+    from agentic_dynamics.runtime.workflow_runner import (
+        _phase_emit_scope,
+        _run_lineage_scope,
+        _serving_family_scope_opted_in,
+    )
+
+    verified = "self-run-F"
+
+    # Case A — NO declaration: emission stays cell-scoped and the grant resolver adds NOTHING, so
+    # default retrieval's primary scope (cell_scope) is exactly where the finding was written.
+    assert _phase_emit_scope({}, tmp_path, trusted_scope=verified) == cell_scope(tmp_path)
+    assert phase_serving_scopes({}, role=ROLE_IMPLEMENTATION, lineage_scope=verified) == ()
+    assert _serving_family_scope_opted_in({}) is False
+
+    # Case B — DECLARED policy: the grant resolver substitutes the token to the SAME verified
+    # string emission migrated to; emission and retrieval agree by construction.
+    declared = {"serving_scope_policy": "default"}
+    family = _run_lineage_scope(declared, trusted_scope=verified)
+    assert family == verified
+    assert _phase_emit_scope(declared, tmp_path, trusted_scope=verified) == family
+    assert family in phase_serving_scopes(
+        declared, role=ROLE_IMPLEMENTATION, lineage_scope=verified
+    )
+    assert _serving_family_scope_opted_in(declared) is True
+
+    # Case C — the R4 explicit-list override (including []) suppresses the policy, so the grant
+    # resolver never adds the family scope; emission therefore stays cell-scoped (aligned).
+    for explicit in ([], ["impl-private"]):
+        override = {"serving_scope_policy": "default", "serving_scope_grants": explicit}
+        assert serving_scope_policy_table(override) is not None  # the policy selector is present...
+        assert _serving_family_scope_opted_in(override) is False  # ...but the R4 list wins.
+        assert _phase_emit_scope(override, tmp_path, trusted_scope=verified) == cell_scope(tmp_path)
+        assert phase_serving_scopes(
+            override, role=ROLE_IMPLEMENTATION, lineage_scope=verified
+        ) == tuple(explicit)
+
+
+class _EmissionTrackingDenseStore(_WhereAwareDenseStore):
+    """A where-aware store whose OWN hit lives where the run ACTUALLY emitted it.
+
+    The real knowledge base receives the run's progressive finding at the EMISSION destination.
+    Seeding that fact at a fixed namespace would let a retrieval assertion pass even while
+    emission migrated elsewhere — masking the R5 mismatch. This store instead re-derives its own
+    hit's scope from the observed emission (the same ``emit_capture`` list the emission probe
+    appends to), so the SERVED count is a CONSEQUENCE of the emission decision: if emission
+    leaves ``cell_scope(wd)`` while default retrieval stays there, the own finding is no longer
+    served. It subclasses :class:`_WhereAwareDenseStore`, so the store-side where-clause still
+    governs eligibility exactly as in every other boundary probe.
+    """
+
+    def __init__(self, emitted, fallback_scope, foreign_hits, *, own_text):
+        # ``fallback_scope`` is where the finding sits BEFORE the first phase emits (the
+        # private/default scope); after that the latest emission scope wins.
+        self._foreign_hits = list(foreign_hits)
+        self._emitted = emitted
+        self._fallback = fallback_scope
+        self._own_text = own_text
+        super().__init__(list(foreign_hits))
+
+    def search(self, query, *, top_k=40, where=None):
+        scope = self._emitted[-1][1] if self._emitted else self._fallback
+        own = _scope_dense_hit(
+            "k-own",
+            self._own_text,
+            repository_id=scope,
+            acl_scope=scope,
+            source_type="finding",
+            authority="MEASURED",
+        )
+        self._hits = [own, *self._foreign_hits]
+        return super().search(query, top_k=top_k, where=where)
+
+
+def test_r5_two_case_real_path_emission_alignment_and_next_phase_serving(tmp_path, monkeypatch):
+    """u2 (retrieval_serving REPAIR ROUND 5): the reviewer's REQUIRED two-case discriminating
+    probe through the REAL runner/retrieve/augment path (``_run_project_scope_boundary`` +
+    ``_WhereAwareDenseStore`` + the capturing constructor).
+
+    The R5 [P2] defect was an EMISSION/RETRIEVAL identity MISMATCH: the composition root injects
+    a VERIFIED run scope for every DB-composed run, and the runner migrated emission into the
+    family namespace ``self-run-F`` even with no serving policy declared — while default
+    retrieval still selected ``cell_scope(wd)``. The run's own progressive finding therefore
+    became invisible to its own later phases. This probe drives BOTH decisions in one run so the
+    two namespaces can be compared directly (a pure helper assertion cannot show the retrieval
+    half, and a retrieval-only assertion cannot show where emission went).
+
+    The own finding's location is NOT a fixed seed: ``_EmissionTrackingDenseStore`` places it
+    where the run ACTUALLY emitted (as the real KB would), so the SERVED count is a consequence
+    of the emission decision — exactly the quantity the R5 defect corrupts.
+
+    Case A — NO serving policy declared, self-emission enabled (``emit_self: True``), a
+    composition-root-verified ``run_findings_scope='self-run-F'`` supplied:
+      * emission stays in the DEFAULT reader's primary repository/ACL (``cell_scope(wd)``);
+      * the REVIEW phase records ``shared_scopes == []`` (no shared grant — the verified scope is
+        NOT harnessed), yet serves its OWN finding (``served_count > 0``) through the cell's
+        private floor, and records exactly the own evidence id, never the foreign run's.
+
+    Case B — ``serving_scope_policy: 'default'``: the verified scope is BOTH the emission
+    destination and the review grant (``shared_scopes == ['self-run-F']``), which still serves the
+    own finding; the explicit project-knowledge grant appears ONLY on implementation.
+
+    Falsifiers (mutation-sensitive):
+      * an UNCONDITIONAL migration makes Case A emit into ``self-run-F`` while default retrieval
+        reads ``cell_scope(wd)``: the own finding moves with emission, so the review phase serves
+        NOTHING (``served_count == 0``) — the loss the R5 defect caused — and the emission
+        assertion fails too;
+      * an always-cell-scope emission (dropping the opt-in) makes Case B emit into the cell scope
+        while the review grant is ``self-run-F`` — the own finding lands at the cell scope and the
+        emission assertion fails Case B.
+    """
+    from agentic_dynamics.knowledge.context_layers import PROJECT_KNOWLEDGE_SCOPE
+
+    # conftest disarms emission globally (``FINOPS_EMIT_SELF=0``) so synthetic worktrees never
+    # litter the live KB; this probe MUST observe the real emit decision, so it arms emission for
+    # its duration. The policy opt-in (Case B) is independent of this switch.
+    monkeypatch.setenv("FINOPS_EMIT_SELF", "1")
+
+    verified = "self-run-F"  # composition-root-verified family identity, injected via the seam
+
+    def _foreign():
+        """A finding from an UNRELATED run G — reachable only by a grant to ``self-run-G``."""
+        return _scope_dense_hit(
+            "k-foreign",
+            "websocket reload finding emitted by an unrelated run G",
+            repository_id="self-run-G",
+            acl_scope="self-run-G",
+            source_type="finding",
+            authority="MEASURED",
+        )
+
+    # ── Case A: no serving policy; emission must stay where default retrieval reads. ──
+    wd_a = tmp_path / "case_a"
+    wd_a.mkdir()
+    own_scope_a = cell_scope(wd_a)  # the DEFAULT reader's primary repository/ACL
+    emitted_a: list[tuple[str, str]] = []
+    # The own finding tracks the OBSERVED emission destination (the real KB's behavior), so a
+    # migration is observable BOTH as an emission-scope change AND as a lost served hit.
+    store_a = _EmissionTrackingDenseStore(
+        emitted_a,
+        own_scope_a,
+        [_foreign()],
+        own_text="websocket reload finding emitted by THIS run into its own cell scope",
+    )
+    seen_a, served_a, records_a = _run_project_scope_boundary(
+        {"emit_self": True},
+        store_a,
+        wd_a,
+        run_findings_scope=verified,
+        emit_capture=emitted_a,
+    )
+
+    # (A0) The emission probe is not vacuous: every agent phase emitted (the store tracks where).
+    assert emitted_a, "no phase emitted a finding — the emission capture is vacuous"
+    assert [phase for phase, _ in emitted_a] == [
+        "implement",
+        "g_adversarial_review",
+        "notes",
+    ]
+
+    # (A1) NO shared grant was added: every phase records [] and no project grant leaks in.
+    assert all(record["shared_scopes"] == [] for record in records_a.values())
+    assert all(seen["shared_repository_ids"] == () for seen in seen_a)
+
+    # (A2) The NEXT phase (review) still serves its OWN finding through the cell's private floor
+    # — the R5 alignment: emission and default retrieval point at the SAME namespace. Under a
+    # reinstated unconditional migration the own finding moves with emission into the family
+    # scope while review still reads cell_scope with NO grant, so this is `served_count == 0`.
+    assert seen_a[1]["shared_repository_ids"] == ()
+    assert records_a["g_adversarial_review"]["shared_scopes"] == []
+    assert served_a[1] == ["k-own"]
+    assert records_a["g_adversarial_review"]["served_count"] == 1
+    reviewed_a = {
+        eid
+        for layer in records_a["g_adversarial_review"]["layers"]
+        for eid in layer["evidence_ids"]
+    }
+    assert reviewed_a == set(served_a[1]) == {"k-own"}
+    assert "k-foreign" not in reviewed_a
+    for phase_served in served_a:
+        assert "k-foreign" not in phase_served  # the foreign run's finding reaches NOBODY
+
+    # (A3) Emission stayed in the default reader — the verified family scope was NOT harnessed
+    # for ANY phase, even though a verified identity was supplied.
+    assert all(scope == own_scope_a for _, scope in emitted_a), emitted_a
+    assert verified not in {scope for _, scope in emitted_a}
+
+    # (A4) The private floor default retrieval reads IS the emission scope — the binding that
+    # makes the served hit unambiguous. A regression that ALSO migrated the primary
+    # repository_id off the cell scope would be caught here, not only by the emission capture.
+    assert seen_a[1]["repository_id"] == own_scope_a
+    assert seen_a[1]["acl_scope"] == own_scope_a
+
+    # ── Case B: a declared serving policy; emission and the grant agree on the family scope. ──
+    wd_b = tmp_path / "case_b"
+    wd_b.mkdir()
+    emitted_b: list[tuple[str, str]] = []
+    # The same emission-tracking store: under the opt-in the own finding follows emission into
+    # the family namespace and is served through the matching grant.
+    store_b = _EmissionTrackingDenseStore(
+        emitted_b,
+        cell_scope(wd_b),
+        [_foreign()],
+        own_text="websocket reload finding emitted by THIS run into its family namespace",
+    )
+    seen_b, served_b, records_b = _run_project_scope_boundary(
+        {"serving_scope_policy": "default"},
+        store_b,
+        wd_b,
+        run_findings_scope=verified,
+        emit_capture=emitted_b,
+    )
+
+    # (B1) Emission migrated to the family scope for every phase (the opt-in honored).
+    assert emitted_b, "no phase emitted a finding — the emission capture is vacuous"
+    assert all(scope == verified for _, scope in emitted_b), emitted_b
+
+    # (B2) The review grant IS the verified scope, and the own finding is served. The primary
+    # floor remains the cell scope (the opt-in widens with an explicit shared grant; it does not
+    # silently replace the private floor).
+    assert seen_b[1]["shared_repository_ids"] == (verified,)
+    assert seen_b[1]["repository_id"] == cell_scope(wd_b)
+    assert records_b["g_adversarial_review"]["shared_scopes"] == [verified]
+    assert served_b[1] == ["k-own"]
+    assert records_b["g_adversarial_review"]["served_count"] == 1
+    assert "k-foreign" not in served_b[1]
+    reviewed_b = {
+        eid
+        for layer in records_b["g_adversarial_review"]["layers"]
+        for eid in layer["evidence_ids"]
+    }
+    assert reviewed_b == set(served_b[1]) == {"k-own"}
+
+    # (B3) The project-knowledge grant appears ONLY on implementation — never on review/unknown.
+    assert records_b["implement"]["shared_scopes"] == [verified, PROJECT_KNOWLEDGE_SCOPE]
+    assert records_b["g_adversarial_review"]["shared_scopes"] == [verified]
+    assert PROJECT_KNOWLEDGE_SCOPE not in records_b["g_adversarial_review"]["shared_scopes"]
+    assert records_b["notes"]["shared_scopes"] == []
+    for phase_served in served_b:
+        assert "k-foreign" not in phase_served
+
+
+def test_run_workflow_cli_passes_resolver_output_as_run_findings_scope():
+    """u2: the composition root is the ONLY allow channel for the verified run identity.
+
+    ``scripts/run_workflow.py`` reads the control-db run identity and must pass the resolver's
+    output — never an incoming ``FINOPS_CELL_ID`` — to ``run_workflow(...)`` as the explicit
+    ``run_findings_scope=`` argument. This is the source/AST pin: if the seam is dropped, or the
+    argument is sourced from anywhere but :func:`resolve_verified_run_findings_scope` over the
+    ``run_identity`` mapping, the run-findings grant silently disappears (or is forged) and this
+    test fails.
+    """
+    source_path = Path(__file__).resolve().parent.parent / "scripts" / "run_workflow.py"
+    tree = ast.parse(source_path.read_text(encoding="utf-8"))
+
+    # (1) The resolver is imported into the composition root.
+    imported_names = {
+        alias.asname or alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        for alias in node.names
+    }
+    assert "resolve_verified_run_findings_scope" in imported_names
+
+    # (2) The run_workflow(...) call passes run_findings_scope= as a keyword.
+    run_workflow_calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "run_workflow"
+    ]
+    assert run_workflow_calls, "no run_workflow(...) call found in scripts/run_workflow.py"
+    call = run_workflow_calls[0]
+    keywords = {kw.arg: kw.value for kw in call.keywords if kw.arg is not None}
+    assert "run_findings_scope" in keywords, (
+        "scripts/run_workflow.py must pass run_findings_scope= to run_workflow(...)"
+    )
+    seam_value = keywords["run_findings_scope"]
+    assert isinstance(seam_value, ast.Name), "run_findings_scope must be a resolved local name"
+    seam_name = seam_value.id
+
+    # (3) That local name is assigned from a resolver call over the run_identity mapping.
+    assignments = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == seam_name for target in node.targets)
+    ]
+    assert assignments, f"no assignment to {seam_name!r} in scripts/run_workflow.py"
+    assigned_value = assignments[0].value
+    # Unwrap the ``... or None`` normalization (the withheld "" → None conversion).
+    resolver_expr = (
+        assigned_value.values[0] if isinstance(assigned_value, ast.BoolOp) else assigned_value
+    )
+    assert isinstance(resolver_expr, ast.Call), f"{seam_name!r} must be assigned a resolver call"
+    assert isinstance(resolver_expr.func, ast.Name)
+    assert resolver_expr.func.id == "resolve_verified_run_findings_scope", (
+        "run_findings_scope must be sourced from resolve_verified_run_findings_scope"
+    )
+    assert resolver_expr.args, "the resolver must receive the run identity mapping"
+    assert isinstance(resolver_expr.args[0], ast.Name)
+    assert resolver_expr.args[0].id == "run_identity"
+
+
+def test_same_candidate_namespace_never_serves_a_foreign_runs_findings(tmp_path):
+    """u3 (retrieval_serving R2 acceptance falsifier): TWO unrelated runs inside the SAME
+    candidate namespace.
+
+    The adversarial review's measured falsifier put a run-A finding and a run-B finding in the
+    SAME repository/ACL namespace (``team-findings``) and showed a name-denylist repair served
+    BOTH to run-B's review under the ``<run-findings>`` label. This drives run-B's review phase
+    through the REAL retrieve/augment route with a where-aware store: because BOTH runs declare
+    the SAME emission destination (``emit_scope: team-findings``), the destination is not a run
+    ownership proof and the ``<run-findings>`` grant is WITHHELD — run-B's review serves NEITHER
+    id (``served_count == 0``, ``shared_scopes == []``).
+
+    The falsifier is not vacuous: the regression that substituted the destination name (the
+    retired denylist, which accepted ``team-findings``) would hand BOTH ids to run-B's review.
+    The positive control then shows a TRUSTED explicit run/continuation scope serves ONLY run-B's
+    own finding and still excludes run-A's. The constructor evidence ids and the recorded
+    ``shared_scopes`` must AGREE and contain no foreign-run id.
+    """
+    from agentic_dynamics.knowledge.context_layers import PROJECT_KNOWLEDGE_SCOPE
+
+    def _finding(cid, run_label, scope):
+        """A measured finding; the ``run_id`` marker is deliberately non-authoritative."""
+        return _scope_dense_hit(
+            cid,
+            f"websocket reload finding produced by {run_label}",
+            repository_id=scope,
+            acl_scope=scope,
+            source_type="finding",
+            authority="measured",
+        )
+
+    # Run-A and run-B both redirect emission to the SAME shared/reused destination. Their
+    # findings therefore carry the SAME repository/ACL namespace, ``team-findings``.
+    run_a = _finding("k-finding-A", "run-A", "team-findings")
+    run_b = _finding("k-finding-B", "run-B", "team-findings")
+    seen, served, records = _run_project_scope_boundary(
+        {"emit_scope": "team-findings", "serving_scope_policy": "default"},
+        _WhereAwareDenseStore([run_a, run_b]),
+        tmp_path,
+    )
+
+    # review (phase index 1) is WITHHELD: no shared scope, no served evidence, and the record
+    # names the (empty) grant rather than claiming an ownership it cannot prove.
+    assert seen[1]["shared_repository_ids"] == ()
+    assert records["g_adversarial_review"]["shared_scopes"] == []
+    assert records["g_adversarial_review"]["served_count"] == 0
+    assert served[1] == []
+    # The constructor evidence ids AGREE with the recorded evidence ids and hold no run's id.
+    recorded_review_ids = {
+        eid for layer in records["g_adversarial_review"]["layers"] for eid in layer["evidence_ids"]
+    }
+    assert recorded_review_ids == set(served[1])
+    assert recorded_review_ids.isdisjoint({"k-finding-A", "k-finding-B"})
+
+    # The implementation phase keeps ONLY its ACTIONABLE explicit grant (project knowledge, a
+    # separate named entry), never the withheld token — so the shared destination reaches nobody.
+    assert seen[0]["shared_repository_ids"] == (PROJECT_KNOWLEDGE_SCOPE,)
+    assert "k-finding-A" not in served[0]
+    assert "k-finding-B" not in served[0]
+
+    # ── Positive control: a TRUSTED explicit run/continuation scope serves ONLY its OWN
+    # finding. The scope is supplied through the ``run_findings_scope`` seam, NOT the ambient
+    # environment, so the control is deterministic and never relies on a derived name as proof.
+    own_scope = "self-run-B"  # run-B's trusted control-plane identity
+    own_b = _finding("k-finding-B", "run-B", own_scope)
+    foreign_a = _finding("k-finding-A", "run-A", "self-run-A")  # run-A's own private scope
+    seen_c, served_c, records_c = _run_project_scope_boundary(
+        {"serving_scope_policy": "default"},
+        _WhereAwareDenseStore([own_b, foreign_a]),
+        tmp_path,
+        run_findings_scope=own_scope,
+    )
+    assert seen_c[1]["shared_repository_ids"] == (own_scope,)
+    assert records_c["g_adversarial_review"]["shared_scopes"] == [own_scope]
+    assert served_c[1] == ["k-finding-B"]
+    assert "k-finding-A" not in served_c[1]
+    assert records_c["g_adversarial_review"]["served_count"] == 1
+    recorded_own_ids = {
+        eid
+        for layer in records_c["g_adversarial_review"]["layers"]
+        for eid in layer["evidence_ids"]
+    }
+    assert recorded_own_ids == set(served_c[1]) == {"k-finding-B"}
+    assert "k-finding-A" not in recorded_own_ids
+
+
+def test_reused_incoming_cell_id_is_never_promoted_to_run_findings(tmp_path, monkeypatch):
+    """u3 (retrieval_serving REPAIR ROUND 4, the R2 final fix): the REQUIRED REUSED-ID falsifier.
+
+    The round-3 review's open defect: the runner promoted an arbitrary incoming ``FINOPS_CELL_ID``
+    to trusted run identity by NONEMPTINESS alone. Fixed/reused CAP-grid cell ids
+    (``cap2c_correct_adaptive_r1``) are re-executed with the SAME id and carry no run nonce or
+    continuation contract, so two UNRELATED runs in the same namespace could still reach review
+    construction under the label "own findings". Round 4 closes it: the generic runner does NOT
+    promote an incoming cell id; the ``<run-findings>`` placeholder is WITHHELD unless a verified
+    run/continuation identity is supplied EXPLICITLY by the composition root.
+
+    This drives the REAL runner/retrieve/augment path with the where-aware dense store and a
+    deterministic constructor (no network/Redis/Neo4j). The incoming cell id is a valid launch
+    envelope for telemetry, the primary repository/ACL is the distinct ``self-review-private``,
+    and TWO synthetic ``MEASURED`` findings produced by unrelated runs sit in the REUSED
+    namespace ``self-cap2c_correct_adaptive_r1``. Withheld, the review phase receives NEITHER id.
+
+    Falsifier (mutation-sensitive): reinstating the incoming-cell promotion (or any nonemptiness
+    branch) promotes ``self-cap2c_correct_adaptive_r1`` to the run-findings grant, so review
+    serves BOTH foreign ids and ``shared_scopes`` is no longer ``[]`` — the assertions below fail.
+
+    Non-vacuous: the SAME reused namespace through the explicit verified ``run_findings_scope``
+    seam serves BOTH findings, so the store is provably not empty and the withheld assertions
+    discriminate the repair rather than passing vacuously.
+    """
+    from agentic_dynamics.knowledge.context_layers import PROJECT_KNOWLEDGE_SCOPE
+
+    # A REUSED CAP-grid cell id: fixed across re-executions, no run nonce / continuation contract.
+    monkeypatch.setenv("FINOPS_CELL_ID", "cap2c_correct_adaptive_r1")
+    reused_ns = cell_scope(tmp_path)
+    assert reused_ns == "self-cap2c_correct_adaptive_r1"
+
+    # The primary repository/ACL is EXPLICIT and distinct from the ambient cell scope, so a served
+    # row can only come from the reused namespace if it were granted — never from the private floor.
+    private_scope = "self-review-private"
+    rag = {
+        "serving_scope_policy": "default",
+        "repository_id": private_scope,
+        "acl_scope": private_scope,
+        # ``emit_scope`` and ``run_findings_scope`` are DELIBERATELY omitted.
+    }
+
+    # TWO unrelated runs produced MEASURED findings under the SAME reused namespace.
+    run_a = _scope_dense_hit(
+        "k-reused-A",
+        "websocket reload finding produced by unrelated run A under the reused cell id",
+        repository_id=reused_ns,
+        acl_scope=reused_ns,
+        source_type="finding",
+        authority="measured",
+    )
+    run_b = _scope_dense_hit(
+        "k-reused-B",
+        "websocket reload finding produced by unrelated run B under the reused cell id",
+        repository_id=reused_ns,
+        acl_scope=reused_ns,
+        source_type="finding",
+        authority="measured",
+    )
+    store = _WhereAwareDenseStore([run_a, run_b])
+
+    seen, served, records = _run_project_scope_boundary(rag, store, tmp_path)
+
+    # The reused namespace is NEVER a grant: it appears in NO phase's retrieval input...
+    for entry in seen:
+        assert reused_ns not in entry["shared_repository_ids"]
+    # ...and in NO phase's ``context-route/v1`` record.
+    for phase, record in records.items():
+        assert record["schema"] == "context-route/v1", phase
+        assert reused_ns not in record["shared_scopes"], phase
+
+    # Review is WITHHELD: no shared scope, neither reused id served, served_count zero.
+    assert seen[1]["shared_repository_ids"] == ()
+    assert records["g_adversarial_review"]["shared_scopes"] == []
+    assert records["g_adversarial_review"]["served_count"] == 0
+    assert served[1] == []
+
+    # Implementation keeps ONLY its explicit project-knowledge grant: neither reused id is an
+    # implementation grant, so nothing from the reused namespace is served anywhere.
+    assert seen[0]["shared_repository_ids"] == (PROJECT_KNOWLEDGE_SCOPE,)
+    assert records["implement"]["shared_scopes"] == [PROJECT_KNOWLEDGE_SCOPE]
+    assert set(served[0]).isdisjoint({"k-reused-A", "k-reused-B"})
+    assert set(served[2]).isdisjoint({"k-reused-A", "k-reused-B"})
+
+    # Constructor evidence ids AGREE, per phase, with the recorded ids and hold no reused id.
+    for index, phase in enumerate(["implement", "g_adversarial_review", "notes"]):
+        recorded_ids = {eid for layer in records[phase]["layers"] for eid in layer["evidence_ids"]}
+        assert recorded_ids == set(served[index])
+        assert recorded_ids.isdisjoint({"k-reused-A", "k-reused-B"})
+
+    # NON-VACUOUS: the SAME reused namespace offered through the explicit VERIFIED
+    # ``run_findings_scope`` seam (the effect the retired incoming-cell promotion had) serves BOTH
+    # unrelated findings — proving the store is not empty and the withheld assertions discriminate.
+    _, served_granted, records_granted = _run_project_scope_boundary(
+        rag, store, tmp_path, run_findings_scope=reused_ns
+    )
+    assert set(served_granted[1]) == {"k-reused-A", "k-reused-B"}
+    assert records_granted["g_adversarial_review"]["shared_scopes"] == [reused_ns]
+    assert records_granted["g_adversarial_review"]["served_count"] == 2
+
+
+def test_no_incoming_id_withholds_derived_telemetry_namespace(tmp_path, monkeypatch):
+    """u3(a) (retrieval_serving REPAIR ROUND 3, final R2 repair): the NO-INCOMING-ID control.
+
+    With NO incoming ``FINOPS_CELL_ID``, NO ``emit_scope``, and ``serving_scope_policy: default``,
+    the runner derives only its own spec/model telemetry namespace
+    (``self-wf_<spec>_<model>``) — a SHARED name that every same-spec/model run also derives, and
+    therefore NOT an ownership proof — so the ``<run-findings>`` placeholder is WITHHELD. TWO
+    synthetic measured findings seeded in that exact namespace are served to NO phase: the review
+    phase records ``shared_scopes == []`` and ``served_count == 0``, the constructor receives
+    neither id, and the telemetry namespace appears in NO phase's ``context-route/v1`` record.
+
+    Driven through the REAL runner/retrieve/augment path with the where-aware dense store and a
+    deterministic constructor (no network/Redis/Neo4j). The constructor evidence ids and the
+    recorded evidence ids AGREE (no fabricated served count, no foreign id smuggled in).
+    """
+    from agentic_dynamics.knowledge.context_layers import PROJECT_KNOWLEDGE_SCOPE
+
+    # The environment supplies NO trusted control-plane identity for this run.
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+
+    # The exact SHARED namespace the old derived-cell-scope grant wrongly substituted: the
+    # runner's spec/model telemetry id, which every same-spec/model run derives.
+    telemetry_ns = f"self-{workflow_runner._cell_id('u1_per_phase_mixed_role', 'm')}"
+    assert telemetry_ns == "self-wf_u1_per_phase_mixed_role_m"
+
+    # TWO synthetic measured findings in that shared namespace — one from THIS run, one from an
+    # unrelated run; the withheld placeholder must serve NEITHER.
+    here = _scope_dense_hit(
+        "k-telemetry-here",
+        "websocket reload finding emitted by this run in the shared telemetry namespace",
+        repository_id=telemetry_ns,
+        acl_scope=telemetry_ns,
+        source_type="finding",
+        authority="measured",
+    )
+    foreign = _scope_dense_hit(
+        "k-telemetry-foreign",
+        "websocket reload finding emitted by an unrelated run in the same shared namespace",
+        repository_id=telemetry_ns,
+        acl_scope=telemetry_ns,
+        source_type="finding",
+        authority="measured",
+    )
+    store = _WhereAwareDenseStore([here, foreign])
+    seen, served, records = _run_project_scope_boundary(
+        {"serving_scope_policy": "default"},
+        store,
+        tmp_path,
+    )
+
+    # NO phase is even handed the telemetry namespace as a shared scope...
+    for entry in seen:
+        assert telemetry_ns not in entry["shared_repository_ids"]
+    # ...and NO phase's ``context-route/v1`` record carries it.
+    for phase, record in records.items():
+        assert record["schema"] == "context-route/v1", phase
+        assert telemetry_ns not in record["shared_scopes"], phase
+
+    # Implementation keeps ONLY the explicit project-knowledge grant: neither telemetry id is
+    # an implementation grant, so nothing from the shared namespace is served anywhere.
+    assert seen[0]["shared_repository_ids"] == (PROJECT_KNOWLEDGE_SCOPE,)
+    assert records["implement"]["shared_scopes"] == [PROJECT_KNOWLEDGE_SCOPE]
+
+    # Review is WITHHELD: no shared scope, NEITHER id served, served_count zero.
+    assert seen[1]["shared_repository_ids"] == ()
+    assert records["g_adversarial_review"]["shared_scopes"] == []
+    assert records["g_adversarial_review"]["served_count"] == 0
+    assert served[1] == []
+
+    # Constructor evidence ids AGREE, per phase, with the recorded ids and hold no namespace id.
+    for index, phase in enumerate(["implement", "g_adversarial_review", "notes"]):
+        recorded_ids = {eid for layer in records[phase]["layers"] for eid in layer["evidence_ids"]}
+        assert recorded_ids == set(served[index])
+        assert recorded_ids.isdisjoint({"k-telemetry-here", "k-telemetry-foreign"})
+
+    # u6 (R5 credit retention): the NO-INCOMING-ID fallback control is NON-VACUOUS. The SAME
+    # shared telemetry namespace offered through the explicit VERIFIED ``run_findings_scope``
+    # seam (exactly the effect the retired derived-cell-scope grant had) serves BOTH synthetic
+    # findings to review — proving the store is not empty and the withheld assertions above
+    # discriminate the R2 repair from a regression rather than passing because nothing was
+    # retrievable. A hardcoded-empty store, or a broken where-aware filter, would fail here,
+    # so the withheld result cannot be a vacuous pass.
+    _, served_granted, records_granted = _run_project_scope_boundary(
+        {"serving_scope_policy": "default"},
+        store,
+        tmp_path,
+        run_findings_scope=telemetry_ns,
+    )
+    assert set(served_granted[1]) == {"k-telemetry-here", "k-telemetry-foreign"}
+    assert records_granted["g_adversarial_review"]["shared_scopes"] == [telemetry_ns]
+    assert records_granted["g_adversarial_review"]["served_count"] == 2
+
+
+def test_same_derived_namespace_runs_do_not_see_each_others_findings(tmp_path, monkeypatch):
+    """u3(b) (retrieval_serving REPAIR ROUND 3, final R2 repair): the SAME-DERIVED-NAMESPACE
+    control.
+
+    TWO unrelated runs (DISTINCT workdirs) with the SAME spec/model and NO incoming
+    ``FINOPS_CELL_ID`` both derive the SAME telemetry namespace ``self-wf_<spec>_<model>``. Under
+    the repaired semantics that namespace is the runner's own fallback — a SHARED name, not an
+    ownership proof — so the ``<run-findings>`` token is WITHHELD and neither run's review can
+    see the other's finding (nor its own) through the placeholder.
+
+    The control is NON-VACUOUS: passing that exact namespace through the TRUSTED
+    ``run_findings_scope`` seam (the effect the retired derived-cell-scope grant had) serves BOTH
+    findings, so the withheld assertion discriminates the repair from a regression rather than
+    passing because the store happened to be empty.
+    """
+    from agentic_dynamics.knowledge.context_layers import PROJECT_KNOWLEDGE_SCOPE
+
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+    # Derivation is workdir-INDEPENDENT: both runs derive this shared telemetry namespace.
+    telemetry_ns = f"self-{workflow_runner._cell_id('u1_per_phase_mixed_role', 'm')}"
+
+    run_a_finding = _scope_dense_hit(
+        "k-finding-A",
+        "websocket reload finding produced by unrelated run A",
+        repository_id=telemetry_ns,
+        acl_scope=telemetry_ns,
+        source_type="finding",
+        authority="measured",
+    )
+    run_b_finding = _scope_dense_hit(
+        "k-finding-B",
+        "websocket reload finding produced by unrelated run B",
+        repository_id=telemetry_ns,
+        acl_scope=telemetry_ns,
+        source_type="finding",
+        authority="measured",
+    )
+    store = _WhereAwareDenseStore([run_a_finding, run_b_finding])
+
+    wd_a = tmp_path / "run_a"
+    wd_b = tmp_path / "run_b"
+    wd_a.mkdir()
+    wd_b.mkdir()
+
+    # Run A derives the telemetry namespace; its own fallback is still not proof, so review is
+    # withheld. (Run A's finding is in the store, so a leak would surface.)
+    seen_a, served_a, records_a = _run_project_scope_boundary(
+        {"serving_scope_policy": "default"}, store, wd_a
+    )
+    assert seen_a[1]["shared_repository_ids"] == ()
+    assert records_a["g_adversarial_review"]["shared_scopes"] == []
+    assert records_a["g_adversarial_review"]["served_count"] == 0
+    assert served_a[1] == []
+
+    # Run B (a DIFFERENT workdir) derives the SAME namespace; it must not see run A's finding.
+    seen_b, served_b, records_b = _run_project_scope_boundary(
+        {"serving_scope_policy": "default"}, store, wd_b
+    )
+    assert seen_b[1]["shared_repository_ids"] == ()
+    assert records_b["g_adversarial_review"]["shared_scopes"] == []
+    assert records_b["g_adversarial_review"]["served_count"] == 0
+    assert served_b[1] == []
+    recorded_review_ids = {
+        eid
+        for layer in records_b["g_adversarial_review"]["layers"]
+        for eid in layer["evidence_ids"]
+    }
+    assert recorded_review_ids == set(served_b[1])
+    assert recorded_review_ids.isdisjoint({"k-finding-A", "k-finding-B"})
+
+    # The implementation phase keeps only its explicit project grant (the shared namespace is
+    # not a project grant), so neither run's telemetry finding reaches it.
+    assert seen_a[0]["shared_repository_ids"] == (PROJECT_KNOWLEDGE_SCOPE,)
+    assert seen_b[0]["shared_repository_ids"] == (PROJECT_KNOWLEDGE_SCOPE,)
+    assert set(served_a[0]).isdisjoint({"k-finding-A", "k-finding-B"})
+    assert set(served_b[0]).isdisjoint({"k-finding-A", "k-finding-B"})
+
+    # NON-VACUOUS: the SAME namespace through the TRUSTED seam (the retired derived grant's own
+    # effect) serves BOTH unrelated findings — proving the store is not empty and the withheld
+    # assertions above discriminate.
+    _, served_granted, records_granted = _run_project_scope_boundary(
+        {"serving_scope_policy": "default"},
+        store,
+        wd_b,
+        run_findings_scope=telemetry_ns,
+    )
+    assert set(served_granted[1]) == {"k-finding-A", "k-finding-B"}
+    assert records_granted["g_adversarial_review"]["shared_scopes"] == [telemetry_ns]
+    assert records_granted["g_adversarial_review"]["served_count"] == 2
+
+
+def test_mixed_role_per_phase_scopes_are_disjoint_and_private_control_serves_zero(tmp_path):
+    """u3 (retrieval_serving R1+R2 acceptance falsifier): a mixed
+    implementation/review/unknown spec resolves DISJOINT per-role grants, and for EVERY phase
+    the three observable surfaces AGREE — the retrieval input (``shared_repository_ids`` handed
+    to ``retrieve``), the constructor's evidence ids (what the phase actually served), and the
+    recorded ``context_route['shared_scopes']`` / ``served_count``.
+
+    The policy is an INLINE mapping with literally disjoint grants. The falsifiers are exact:
+
+    * a run-wide UNION of every role's grants (the R1 defect) would give every phase the union
+      and serve all three hits — so the per-phase assertions below would see sibling evidence;
+    * a role that inherited a sibling's private scope would serve its sibling's hit — so the
+      cross-phase ``isdisjoint`` assertions would fail.
+
+    No hit lives in the cell's private scope, so a served row can only come from a granted
+    shared scope. The negative control (the SAME spec and store with NO declaration) serves
+    zero for every phase — the declaration is the only thing that widened visibility.
+    """
+    from agentic_dynamics.knowledge.context_layers import ROLE_IMPLEMENTATION, ROLE_REVIEW
+
+    policy = {
+        ROLE_IMPLEMENTATION: ("impl-shared",),
+        ROLE_REVIEW: ("review-shared",),
+    }
+    # Disjoint by construction: neither role's grant can appear in the other's served set.
+    assert set(policy[ROLE_IMPLEMENTATION]).isdisjoint(policy[ROLE_REVIEW])
+
+    def _hit(cid, scope):
+        return _scope_dense_hit(
+            cid,
+            f"websocket finding in {scope}",
+            repository_id=scope,
+            acl_scope=scope,
+            source_type="finding",
+            authority="measured",
+        )
+
+    store = _WhereAwareDenseStore(
+        [
+            _hit("k-impl", "impl-shared"),
+            _hit("k-review", "review-shared"),
+            _hit("k-foreign", "foreign-shared"),
+        ]
+    )
+
+    seen, served, records = _run_project_scope_boundary(
+        {"serving_scope_policy": dict(policy)}, store, tmp_path
+    )
+
+    # Implementation: only its OWN grant reaches retrieve; only its OWN evidence is served;
+    # the record names the grant verbatim.
+    assert seen[0]["shared_repository_ids"] == ("impl-shared",)
+    assert served[0] == ["k-impl"]
+    assert records["implement"]["shared_scopes"] == ["impl-shared"]
+    assert records["implement"]["served_count"] == 1
+
+    # Review: only its OWN (disjoint) grant; only its OWN evidence — never the impl hit.
+    assert seen[1]["shared_repository_ids"] == ("review-shared",)
+    assert served[1] == ["k-review"]
+    assert records["g_adversarial_review"]["shared_scopes"] == ["review-shared"]
+    assert records["g_adversarial_review"]["served_count"] == 1
+
+    # Unknown: no role grant -> no shared scope -> nothing served, even though the store holds
+    # foreign material and a sibling phase served.
+    assert seen[2]["shared_repository_ids"] == ()
+    assert served[2] == []
+    assert records["notes"]["shared_scopes"] == []
+    assert records["notes"]["served_count"] == 0
+
+    # DISJOINT ACROSS ROLES: no phase inherited another role's private grant or scope.
+    assert set(served[0]).isdisjoint(served[1])
+    assert "review-shared" not in seen[0]["shared_repository_ids"]
+    assert "impl-shared" not in seen[1]["shared_repository_ids"]
+
+    # The constructor evidence ids AGREE, per phase, with the recorded evidence ids.
+    for index, phase in enumerate(["implement", "g_adversarial_review", "notes"]):
+        recorded_ids = {eid for layer in records[phase]["layers"] for eid in layer["evidence_ids"]}
+        assert recorded_ids == set(served[index])
+
+    # NEGATIVE CONTROL: the identical spec + store with NO declaration serves zero for every
+    # phase; the explicit grant was the only thing that widened visibility.
+    seen_private, served_private, records_private = _run_project_scope_boundary({}, store, tmp_path)
+    assert all(entry["shared_repository_ids"] == () for entry in seen_private)
+    assert all(entry == [] for entry in served_private)
+    assert all(record["shared_scopes"] == [] for record in records_private.values())
+    assert all(record["served_count"] == 0 for record in records_private.values())
+
+
+def test_declared_serving_scope_reaches_phase_context_route(tmp_path):
+    """u6 (retrieval_serving): the declared grant threads into the ONE retrieve path and the
+    phase's ``context_route['shared_scopes']`` RECORDS it — proven in-memory, no live spec.
+
+    A spec that opts into the policy yields an implementation phase whose route carries the
+    granted ``agentic-dynamics`` scope: the augment seam hands it to ``retrieve`` as a shared
+    repository id AND the ``context-route/v1`` record names it. The negative control is the SAME
+    spec with no declaration: the route stays private (empty shared scopes), so the grant is the
+    only thing that widened visibility.
+    """
+    from agentic_dynamics.runtime.workflow_runner import _resolve_rag_params
+
+    def _run(rag: dict):
+        seen: list[dict] = []
+
+        def retrieve_fn(**kwargs):
+            seen.append(kwargs)
+            return _FakeAttempt([_ScopeTypedEvidence("k-code", "code evidence", "code")])
+
+        result = run_workflow(
+            _serving_grant_synth_spec(rag),
+            goal="g",
+            model="m",
+            workdir=tmp_path,
+            commit=False,
+            rag_augment=True,
+            retrieve_fn=retrieve_fn,
+            construct_fn=lambda request: _FakeAugmented("AUG"),
+            run_agentic_fn=lambda *a, **k: _fake_agent(),
+        )
+        record = next(p for p in result.phases if p.phase == "implement").to_dict()["context_route"]
+        return seen[0], record
+
+    # u1 (R1): the RESOLVED CONFIG carries no role grant (role grants are per-phase); the
+    # grant is resolved at the phase site from the implementation phase's own role. The
+    # end-to-end assertions below prove it reaches retrieve + the record.
+    resolved = _resolve_rag_params(
+        _serving_grant_synth_spec(
+            {"emit_scope": "agentic-dynamics", "serving_scope_policy": "default"}
+        ),
+        None,
+        wd=tmp_path,
+        rag_augment=True,
+    )
+    assert resolved["shared_history_scopes"] == []
+
+    granted_seen, granted_record = _run(
+        {"emit_scope": "agentic-dynamics", "serving_scope_policy": "default"}
+    )
+    # The ONE retrieve path received the granted scope as a shared repository id...
+    assert "agentic-dynamics" in granted_seen["shared_repository_ids"]
+    # ...and the ledger record names it on the phase's route.
+    assert granted_record["route_status"] == "resolved"
+    assert "agentic-dynamics" in granted_record["shared_scopes"]
+
+    # Negative control: the identical spec with NO declaration stays private.
+    private_seen, private_record = _run({})
+    assert private_seen["shared_repository_ids"] == ()
+    assert private_record["shared_scopes"] == []
+
+
+def test_serving_scope_grant_excludes_foreign_and_org_root_end_to_end(tmp_path):
+    """u7 (retrieval_serving): under the granted policy the phase SERVES the project finding,
+    EXCLUDES a foreign ``self-*`` cell AND an org-root AIO record (``acl_scope=org:agentic-dynamics``),
+    and ``served_count`` counts ONLY the granted evidence id.
+
+    Three records are repository-eligible once ``agentic-dynamics`` is granted; the runner's
+    REAL ``retrieve`` path (no injected route) must serve exactly one. The subtle row is the
+    org-root: its ``repository_id`` matches the grant, so only the authorized-ACL union keeps it
+    out. The negative control — the SAME spec/store with NO declaration — serves zero, proving
+    the explicit grant is the only thing that widened visibility (never silent global).
+    """
+    from agentic_dynamics.knowledge.retrieval import retrieve
+
+    requested = cell_scope(tmp_path)  # the runner defaults repository_id + acl_scope to this
+
+    granted = _scope_dense_hit(
+        "k-granted",
+        "websocket reload finding from the granted project scope",
+        repository_id="agentic-dynamics",
+        acl_scope="agentic-dynamics",
+        source_type="finding",
+        authority="measured",
+    )
+    # A foreign cell carrying its OWN private scope + ACL — must never surface.
+    foreign = _scope_dense_hit(
+        "k-foreign",
+        "websocket reload finding from another cell",
+        repository_id="self-other-cell",
+        acl_scope="self-other-cell",
+        source_type="finding",
+        authority="measured",
+    )
+    # The org-root record: the SAME repository_id as the grant, but the org ACL namespace.
+    org_root = _scope_dense_hit(
+        "k-org-root",
+        "websocket reload decision from the org root",
+        repository_id="agentic-dynamics",
+        acl_scope="org:agentic-dynamics",
+        source_type="decision",
+        authority="measured",
+    )
+    store = _WhereAwareDenseStore([org_root, foreign, granted])
+
+    served: list[list[str]] = []
+
+    class _Capturing(_FakeAugmented):
+        """A constructor that emits EXACTLY the evidence ids it received (served_count input)."""
+
+        def __init__(self, prompt, evidence_ids):
+            super().__init__(prompt)
+            self.evidence_ids = list(evidence_ids)
+
+    def construct_fn(request):
+        ids = [unit.knowledge_id for unit in request.evidence]
+        served.append(ids)
+        return _Capturing("AUG", ids)
+
+    def _run(rag: dict):
+        served.clear()
+        seen: list[dict] = []
+
+        def retrieve_fn(**kwargs):
+            seen.append(kwargs)
+            return retrieve(dense_store=store, graph_client=None, **kwargs)
+
+        result = run_workflow(
+            _serving_grant_synth_spec(rag),
+            goal="g",
+            model="m",
+            workdir=tmp_path,
+            commit=False,
+            rag_augment=True,
+            retrieve_fn=retrieve_fn,
+            construct_fn=construct_fn,
+            run_agentic_fn=lambda *a, **k: _fake_agent(),
+        )
+        record = next(p for p in result.phases if p.phase == "implement").to_dict()["context_route"]
+        return seen[0], list(served[0]) if served else [], record
+
+    # Grant the run's emitted-findings scope ``agentic-dynamics`` (both policy entries collapse).
+    seen, served_ids, record = _run(
+        {"emit_scope": "agentic-dynamics", "serving_scope_policy": "default"}
+    )
+
+    # The ONE retrieve path received the granted scope, and the dense clause is the requested ∪
+    # grant REPOSITORY union AND the requested-ACL ∪ grant-ACL union: the org-root ACL is outside
+    # the second, so the store boundary hides it even though its repository matches the grant.
+    assert "agentic-dynamics" in seen["shared_repository_ids"]
+    assert seen["shared_repository_ids"] == ("agentic-dynamics",)
+    assert store.where == {
+        "$and": [
+            {"$or": [{"repository_id": requested}, {"repository_id": "agentic-dynamics"}]},
+            {"$or": [{"acl_scope": requested}, {"acl_scope": "agentic-dynamics"}]},
+        ]
+    }
+
+    assert served_ids == ["k-granted"]  # only the granted finding reached the constructor
+    assert record["route_status"] == "resolved"
+    assert "agentic-dynamics" in record["shared_scopes"]  # the grant is RECORDED, never silent
+    assert record["served_count"] == 1  # never the foreign or org-root rows
+    l2 = next(entry for entry in record["layers"] if entry["layer"] == "L2")
+    assert l2["status"] == "served"
+    assert l2["evidence_ids"] == ["k-granted"]
+    all_served = {i for entry in record["layers"] for i in entry["evidence_ids"]}
+    assert all_served == {"k-granted"}
+
+    # Negative control: the SAME store + spec with NO declaration grants nothing, so the granted
+    # material is unreachable (a different repository) and the pass serves ZERO. The explicit
+    # grant — not the private floor — is the only thing that widened visibility.
+    _, private_ids, private_record = _run({})
+    assert private_ids == []
+    assert private_record["shared_scopes"] == []
+    assert private_record["served_count"] == 0
 
 
 def test_shared_scope_union_reaches_dense_filter_end_to_end(tmp_path):
