@@ -243,6 +243,48 @@ SOURCE_TYPE_METADATA_ERROR_KEY = "source_type_metadata"
 #: the pre-refactor production shape is not re-lost. [M]
 DENSE_SEARCH_INCOMPLETE_KEY = "dense_search_incomplete"
 
+# ── The embedder leg's named diagnostics (retrieval-serving u4) ──
+# The dense leg embeds its QUERY (neo4j_vectors.search_with_stats) and the redundancy-collapse
+# leg embeds candidate texts; both can fail on the embedder. The embedder declares a stable
+# ``token`` on its typed failures so the seam records NAMED states rather than a collapsed
+# traceback. These two literals are the seam's vocabulary; a guard test pins them to the
+# embedder's own class attributes, so the words cannot drift apart.
+#: A configured-but-unreachable endpoint (refused / timed out / DNS / transport).
+EMBEDDER_UNREACHABLE_TOKEN = "embedder-unreachable"
+#: An explicitly-selected optional transport whose package is not installed.
+EMBEDDER_MODULE_ABSENT_TOKEN = "embedder-module-absent"
+
+
+def _embedder_failure_token(exc: BaseException) -> str:
+    """Return the stable named token for a TYPED embedder failure, else ``""``.
+
+    Duck-types a ``token`` attribute and walks ONE ``__cause__`` level, so a wrapper that
+    re-raises a typed embedder failure (e.g. the dense store's construction stand-in) still
+    yields the token instead of collapsing the three distinct states — module absent vs
+    endpoint unreachable vs clean empty — into one string. A generic failure (a plain
+    ``RuntimeError`` from a non-embedder leg) returns ``""`` and keeps its own message: the
+    seam never fabricates an embedder token for an unrelated failure.
+    """
+    for candidate in (exc, getattr(exc, "__cause__", None)):
+        token = getattr(candidate, "token", "")
+        if isinstance(token, str) and token.startswith("embedder-"):
+            return token
+    return ""
+
+
+def _named_leg_error(exc: BaseException) -> str:
+    """Format a leg failure, PREFIXING the stable token when the cause is a typed embedder failure.
+
+    The token prefix is what makes ``leg_errors["embedding"]`` (and a dense leg whose query
+    embedding failed) machine-distinguishable: ``embedder-unreachable`` (no endpoint),
+    ``embedder-module-absent`` (optional transport package missing), and
+    ``embedder-response-error`` (bad payload) stay SEPARATE, and a clean empty pass records
+    NO ``embedding`` key at all. A non-embedder failure formats exactly as before.
+    """
+    token = _embedder_failure_token(exc)
+    detail = f"{type(exc).__name__}: {exc}"
+    return f"{token}: {detail}" if token else detail
+
 
 class QueryShape(str, Enum):
     """The deterministic query-intent shape that conditions the source-type ordering signal.
@@ -1163,10 +1205,12 @@ def _pairwise_similarities(
                 sims[(embedded[i].id, embedded[j].id)] = 1.0 - dist
         return sims, "embedding", ""
     except Exception as exc:
-        # Embedding infra unavailable (Ollama down, embedder missing, etc.) — the
+        # Embedding infra unavailable (Ollama down, embedder module absent, etc.) — the
         # collapse must degrade to a no-op, never crash the phase; the cause is returned
         # for the caller to record (a failure state must never be readable as success).
-        return {}, "none", f"{type(exc).__name__}: {exc}"
+        # A TYPED embedder failure is returned with its stable token so the named state
+        # survives (embedder-unreachable vs embedder-module-absent vs a clean empty).
+        return {}, "none", _named_leg_error(exc)
 
 
 def compute_token_budget(
@@ -1789,7 +1833,10 @@ def _await_leg(handle: dict[str, Any], deadline: float) -> tuple[bool, str]:
         completed = bool(handle["done"].wait(remaining))
     if completed:
         if handle["error"] is not None:
-            return False, f"{type(handle['error']).__name__}: {handle['error']}"
+            # Prefix the stable token for a typed embedder failure, so the dense leg (which
+            # embeds its query) and the embedding collapse leg both name the SAME distinct
+            # state instead of a collapsed class-name traceback.
+            return False, _named_leg_error(handle["error"])
         return True, ""
     return False, (
         f"{handle['name']} leg did not return within the remaining {max(remaining, 0.0):.2f}s "
@@ -2176,7 +2223,7 @@ def retrieve(
         embedder = EmbeddingClient()
     except Exception as exc:  # optional dep missing → collapse degrades to a no-op
         embedder = None
-        leg_errors["embedding"] = f"embedder unavailable: {type(exc).__name__}: {exc}"
+        leg_errors["embedding"] = f"embedder unavailable: {_named_leg_error(exc)}"
 
     similarities, dedup_path, embed_error = _pairwise_similarities(
         fused, embedder, timeout_s=max(0.0, budget_s - (time.monotonic() - t0))

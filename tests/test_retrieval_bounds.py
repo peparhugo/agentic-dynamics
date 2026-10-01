@@ -80,7 +80,9 @@ class _GraphStub:
 
 
 class _DenseStub:
-    def __init__(self, hits: list[dict] | None = None, *, block: threading.Event | None = None, exc=None):
+    def __init__(
+        self, hits: list[dict] | None = None, *, block: threading.Event | None = None, exc=None
+    ):
         self._hits = list(hits or [])
         self._block = block
         self._exc = exc
@@ -148,9 +150,7 @@ def test_embedding_stall_records_cause_within_budget(monkeypatch):
     graph = _GraphStub([])
     started = time.monotonic()
     try:
-        attempt = retrieve(
-            "alpha", dense_store=dense, graph_client=graph, deadline_s=0.5
-        )
+        attempt = retrieve("alpha", dense_store=dense, graph_client=graph, deadline_s=0.5)
         elapsed = time.monotonic() - started
     finally:
         stub.gate.set()
@@ -293,6 +293,22 @@ def test_embedding_client_declares_a_timeout():
     assert explicit.timeout_s == 1.25
 
 
+def test_embedding_client_defaults_to_the_stdlib_transport_without_optional_packages(monkeypatch):
+    """Cell-viability at the host boundary: the default transport imports no optional package.
+
+    The embedder refactor REMOVES a cell dependency — with ``ollama`` made unimportable the
+    default client still constructs, selects the stdlib HTTP transport, and honors OLLAMA_HOST.
+    No socket is touched.
+    """
+    import sys
+
+    monkeypatch.setitem(sys.modules, "ollama", None)
+    monkeypatch.setenv("OLLAMA_HOST", "http://host.test:11434")
+    client = emb.EmbeddingClient()
+    assert client.transport == emb.TRANSPORT_HTTP
+    assert client.host == "http://host.test:11434"
+
+
 # ── review fix P1: expansion is part of the budget ──────────────
 
 
@@ -331,9 +347,7 @@ def test_stalled_dense_never_starves_healthy_lexical():
         for i in range(5):
             dense = _DenseStub(block=gates[i])
             graph = _GraphStub([_lex_hit("k1", "approved lexical finding")])
-            attempts.append(
-                retrieve("q", dense_store=dense, graph_client=graph, deadline_s=0.15)
-            )
+            attempts.append(retrieve("q", dense_store=dense, graph_client=graph, deadline_s=0.15))
         elapsed = time.monotonic() - started
         growth = threading.active_count() - base_threads
     finally:
@@ -439,7 +453,7 @@ print("returned", round(time.monotonic() - started, 2), "legs", attempt.leg_erro
 
 def test_process_exits_with_a_stuck_leg():
     src = str(_ROOT / "src")
-    script = f'''
+    script = f"""
 import sys, threading, time
 sys.path.insert(0, {src!r})
 from agentic_dynamics.knowledge.retrieval import retrieve
@@ -456,7 +470,7 @@ class Graph:
 started = time.monotonic()
 attempt = retrieve("q", dense_store=Blocking(), graph_client=Graph(), deadline_s=0.2)
 print("returned", round(time.monotonic() - started, 2), flush=True)
-'''
+"""
     completed = subprocess.run(
         [sys.executable, "-c", script],
         capture_output=True,

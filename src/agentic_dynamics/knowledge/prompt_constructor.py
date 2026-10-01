@@ -42,9 +42,17 @@ from typing import Any, Protocol
 
 SCHEMA_VERSION = "prompt-plan/v1"
 
-#: Cheapest constructor model in ``efficiency.PROVIDER_PRICING`` ($0.22 input) — a
-#: prior, not a conclusion: constructor model is a tunable parameter.
-DEFAULT_CONSTRUCTOR_MODEL = "deepseek/deepseek-v4-flash"
+#: The LIVE volume model (``deepseek/deepseek-flash``) — the L39 sweep direction. The
+#: cheapest constructor model in ``efficiency.PROVIDER_PRICING`` ($0.22 input), and a
+#: fresh provider process ACCEPTS the id. It previously named the RETIRED
+#: ``deepseek/deepseek-v4-flash``, which a fresh process refuses, so every augmented
+#: phase fell back to ``constructor_call_failed``. The id is pinned by
+#: ``tests/test_prompt_constructor.py::test_default_model_is_cheapest_flash``; the
+#: constructor model remains a tunable parameter, a prior rather than a conclusion.
+#: An explicit ``constructor_model`` override naming the retired family is refused by
+#: ``augment.resolve_constructor_model`` with a named error at wiring time, so the pin
+#: cannot be bypassed silently.
+DEFAULT_CONSTRUCTOR_MODEL = "deepseek/deepseek-flash"
 
 DEFAULT_INPUT_BUDGET_TOKENS = 8000
 DEFAULT_OUTPUT_BUDGET_TOKENS = 1500

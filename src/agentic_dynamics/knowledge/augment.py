@@ -35,6 +35,42 @@ from typing import Any
 #: *reduce* this set, never add to it.
 DEFAULT_INHERITED_TOOLS = ("read", "write", "edit", "bash", "grep", "glob", "list")
 
+#: The RETIRED constructor model FAMILY (register L39): a fresh provider process refuses the
+#: retired id, so an explicit ``constructor_model`` override naming this family is refused by
+#: :func:`resolve_constructor_model` — LOUDLY, at WIRING time, instead of silently degrading to
+#: a generic ``constructor_call_failed`` at call time (the exact defect this guard closes).
+#:
+#: The family token is deliberately held WITHOUT the ``provider/`` prefix (never the full
+#: ``provider/id`` selection literal), so the bounded AST sweep in
+#: ``tests/test_prompt_constructor.py`` still finds the retired id only as prose in the touched
+#: modules — while the guard below still refuses the retired family for ANY provider namespace.
+RETIRED_CONSTRUCTOR_MODEL_FAMILY = "deepseek-v4-flash"
+
+
+class RetiredConstructorModelError(ValueError):
+    """An explicit ``constructor_model`` named a RETIRED id (register L39); refuse loudly."""
+
+
+def resolve_constructor_model(model: str | None = None) -> str:
+    """Resolve a constructor model id, refusing the retired family with a NAMED cause.
+
+    ``None``/empty resolves to the pinned live volume id (``DEFAULT_CONSTRUCTOR_MODEL``). Any
+    explicit id whose routing family is :data:`RETIRED_CONSTRUCTOR_MODEL_FAMILY` raises
+    :class:`RetiredConstructorModelError` at WIRING time, so the caller sees the retired id and
+    its live replacement instead of a silent generic constructor fallback. The guard is
+    family-keyed (not one literal), so a re-providered retired id cannot slip through.
+    """
+    from agentic_dynamics.knowledge.prompt_constructor import DEFAULT_CONSTRUCTOR_MODEL
+
+    resolved = str(model) if model else DEFAULT_CONSTRUCTOR_MODEL
+    if resolved.rsplit("/", 1)[-1] == RETIRED_CONSTRUCTOR_MODEL_FAMILY:
+        raise RetiredConstructorModelError(
+            f"constructor_model {resolved!r} is RETIRED (family "
+            f"{RETIRED_CONSTRUCTOR_MODEL_FAMILY!r}, register L39): a fresh provider process "
+            f"refuses it. Use the live volume model {DEFAULT_CONSTRUCTOR_MODEL!r}."
+        )
+    return resolved
+
 
 def _attempt_id(kind: str, *parts: str) -> str:
     """Deterministic attempt id for retrieval/construction tracing.
@@ -179,7 +215,6 @@ def augment_prompt(
         self_layer_prohibited,
     )
     from agentic_dynamics.knowledge.prompt_constructor import (
-        DEFAULT_CONSTRUCTOR_MODEL,
         ConstructionRequest,
         hash_work_item,
     )
@@ -274,7 +309,11 @@ def augment_prompt(
                     continue
                 kept_typed.append(unit)
             evidence = kept_typed
-        constructor_model = str(rag_params.get("constructor_model", DEFAULT_CONSTRUCTOR_MODEL))
+        # u5: a retired ``constructor_model`` override is REFUSED by name here (inside the seam's
+        # guarded step, so the phase still records a NAMED cause and preserves the base prompt
+        # rather than proceeding on a model a fresh process refuses). Non-retired overrides —
+        # including no override — resolve unchanged to the live volume id.
+        constructor_model = resolve_constructor_model(rag_params.get("constructor_model"))
         request = ConstructionRequest(
             raw_work_item=base_prompt,
             phase_objective=goal,
@@ -545,13 +584,21 @@ class _UnavailableDenseStore:
     A construction failure must surface in ``leg_errors`` with its cause, not vanish into a
     silent ``None`` — which reads identically to "no store configured" (diagnostic acceptance
     gap). ``retrieve`` catches the raise per leg and names it, so the pass still degrades.
+    When the cause is a TYPED embedder failure the original exception is CHAINED onto the
+    raised ``RuntimeError`` (``raise ... from cause``), so the retrieval seam's one-level
+    ``__cause__`` token lookup still names ``embedder-unreachable`` / ``embedder-module-absent``
+    distinctly instead of collapsing to a module-missing traceback.
     """
 
-    def __init__(self, cause: str) -> None:
+    def __init__(self, cause: str, *, cause_exc: BaseException | None = None) -> None:
         self._cause = cause
+        self._cause_exc = cause_exc
 
     def search(self, *args: Any, **kwargs: Any) -> list[Any]:
-        raise RuntimeError(f"dense store construction failed: {self._cause}")
+        error = RuntimeError(f"dense store construction failed: {self._cause}")
+        if self._cause_exc is not None:
+            raise error from self._cause_exc
+        raise error
 
 
 class _UnavailableGraphClient:
@@ -591,30 +638,40 @@ def default_retrieve_fn() -> Callable[..., Any]:
     # Graph leg: lexical (full-text) search + bounded expansion over the knowledge graph.
     graph_client: Any = None
     graph_cause = ""
+    graph_exc: BaseException | None = None
     try:
         graph_client = Neo4jClient()
     except Exception as exc:  # noqa: BLE001 — the cause is REPORTED through the leg
         graph_client = None
         graph_cause = f"{type(exc).__name__}: {exc}"
+        graph_exc = exc
 
     # Dense leg: embeddings ride the SAME Knowledge nodes the lexical leg reads (operator
     # decision 2026-09-19 — the Chroma service is retired; one store, one client lifecycle).
     dense_store: Any = None
     dense_cause = ""
+    dense_cause_exc: BaseException | None = None
     if graph_client is None:
         # One client serves both legs; its failure IS the dense leg's cause too.
         dense_cause = graph_cause or "the Neo4j client is unavailable"
+        dense_cause_exc = graph_exc
     else:
         try:
             dense_store = Neo4jVectorStore(client=graph_client)
         except Exception as exc:  # noqa: BLE001 — the cause is REPORTED through the leg
             dense_store = None
             dense_cause = f"{type(exc).__name__}: {exc}"
+            # Chain the typed cause so a construction-time embedder failure keeps its stable
+            # token (retrieval reads ``__cause__``); the embedded default transport means this
+            # path no longer imports the optional ``ollama`` package at all.
+            dense_cause_exc = exc
 
     dense_leg = (
         dense_store
         if dense_store is not None
-        else (_UnavailableDenseStore(dense_cause) if dense_cause else None)
+        else (
+            _UnavailableDenseStore(dense_cause, cause_exc=dense_cause_exc) if dense_cause else None
+        )
     )
     lexical_leg = (
         graph_client
@@ -646,13 +703,17 @@ def default_construct_fn(
 
     The constructor runs on ``DEFAULT_CONSTRUCTOR_MODEL`` (cheapest), so the wiring has
     a real end-to-end path when ``rag_augment`` is enabled without explicit injection.
+    The id is resolved from that pinned live constant — never a module-literal id — so the
+    retired ``deepseek/deepseek-v4-flash`` can never be selected here. An explicit override
+    pointing at the retired family is REFUSED by :func:`resolve_constructor_model` BEFORE any
+    executor call (a typed, named refusal — never a silent generic constructor fallback). The
+    consumer path is guarded by
+    ``tests/test_prompt_constructor.py::test_default_construct_fn_resolves_live_model_id`` and
+    the retired-override refusal test.
     """
-    from agentic_dynamics.knowledge.prompt_constructor import (
-        DEFAULT_CONSTRUCTOR_MODEL,
-        ModelPromptConstructor,
-    )
+    from agentic_dynamics.knowledge.prompt_constructor import ModelPromptConstructor
 
-    constructor_model = str(rag_params.get("constructor_model", DEFAULT_CONSTRUCTOR_MODEL))
+    constructor_model = resolve_constructor_model(rag_params.get("constructor_model"))
 
     def run_constructor(prompt: str) -> str:
         ar = run_agent(

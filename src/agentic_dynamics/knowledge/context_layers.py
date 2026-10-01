@@ -98,6 +98,71 @@ ROLE_VALUES: tuple[str, ...] = (
     ROLE_UNKNOWN,
 )
 
+# ── Serving-scope policy: the first explicit, default-empty grants ──────────────
+
+#: The read-only project-level knowledge scope: the repository id under which the
+#: agentic-dynamics project's own measured findings, decisions, sessions, and register
+#: rows are emitted. A phase GRANTED this scope may retrieve that shared material as extra
+#: evidence; a phase without the grant never consults it — the private cell scope is the
+#: floor and ``empty`` never means ``global``. [P]
+PROJECT_KNOWLEDGE_SCOPE = "agentic-dynamics"
+
+#: A PLACEHOLDER for the run's OWN emitted-findings scope (the scope this run's phases write
+#: into). It is resolved by the CALLER, never a literal repository id and never a wildcard:
+#: :func:`serving_scope_grants` substitutes it with the caller-supplied, RUN-DERIVED
+#: ``lineage_scope`` and DROPS it when none is supplied. ``lineage_scope`` is an ownership
+#: PROOF (a run/continuation-lineage identity the caller derives), NOT a bare destination name
+#: — so a caller that forgets to resolve it cannot accidentally grant a foreign or global
+#: scope, and a custom emission destination is never smuggled in under "own findings". [P]
+#:
+#: **Round 3→4 derive-or-withhold (the R2 FINAL repair).** An *environment-derived* name —
+#: and in particular the incoming ``FINOPS_CELL_ID`` — is NOT a verified identity and is not an
+#: ownership proof. The runner's own spec/model telemetry fallback (``self-wf_<spec>_<model>``)
+#: is a SHARED namespace that two unrelated runs can collide on, so a caller must never pass it
+#: (or any likewise-derived destination string) as ``lineage_scope``. When no trusted
+#: run/continuation identity is cleanly derivable the caller WITHHOLDS (passes ``""``) and
+#: the token is dropped; deriving that identity at the composition root is a named controller
+#: follow-up. Ownership is the CHANNEL, never the name: only a caller-supplied verified identity
+#: may substitute the token.
+RUN_FINDINGS_SCOPE_TOKEN = "<run-findings>"
+
+#: The DEFAULT serving-scope policy: deliberately EMPTY. No routing role is granted any
+#: shared scope unless a caller EXPLICITLY selects a policy (see :data:`SERVING_SCOPE_POLICY`).
+#: This is the no-grant default the promoted route already keeps, so context-layer routing
+#: behavior is unchanged and visibility is never silently widened. [P]
+DEFAULT_SERVING_SCOPE_POLICY: dict[str, tuple[str, ...]] = {}
+
+#: The first EXPLICIT bounded serving-scope policy (this wave). It maps a routing role to the
+#: bounded shared-scope grants a phase in that role may retrieve BEYOND its private scope:
+#: planning/implementation may read the run's own emitted findings (the placeholder above)
+#: plus the read-only project-level ``agentic-dynamics`` material; verification/review read
+#: the run's own findings only; every other role gets nothing (default-empty). The table is
+#: BOUNDED — it never names a wildcard, and :func:`serving_scope_grants` refuses wildcards
+#: even if one is added here by mistake. Anything broader than these grants is the
+#: controller's call (a named follow-up), never a silent default. [P]
+SERVING_SCOPE_POLICY: dict[str, tuple[str, ...]] = {
+    ROLE_PLANNING: (RUN_FINDINGS_SCOPE_TOKEN, PROJECT_KNOWLEDGE_SCOPE),
+    ROLE_IMPLEMENTATION: (RUN_FINDINGS_SCOPE_TOKEN, PROJECT_KNOWLEDGE_SCOPE),
+    ROLE_VERIFICATION: (RUN_FINDINGS_SCOPE_TOKEN,),
+    ROLE_REVIEW: (RUN_FINDINGS_SCOPE_TOKEN,),
+    ROLE_UNKNOWN: (),
+}
+
+#: The spec/``workflow.params.rag`` key that opts a run into the bounded serving-scope POLICY.
+#: Its value is the literal :data:`SERVING_SCOPE_POLICY_DEFAULT` (select
+#: :data:`SERVING_SCOPE_POLICY`) or an inline policy mapping. Without the key the run grants
+#: nothing (the promoted default). [P]
+SERVING_SCOPE_POLICY_KEY = "serving_scope_policy"
+
+#: The spec/``workflow.params.rag`` key that carries an EXPLICIT list of granted shared
+#: scopes. It is the fully-explicit form (no role interpretation): each entry is normalized
+#: by :func:`shared_history_scopes`, so wildcards are refused, empties dropped, duplicates
+#: collapsed. [P]
+SERVING_SCOPE_GRANTS_KEY = "serving_scope_grants"
+
+#: The policy-selector value that names the module's :data:`SERVING_SCOPE_POLICY` table.
+SERVING_SCOPE_POLICY_DEFAULT = "default"
+
 # ── Execution-scope -> routing-role translation (A11-R1) ────────
 
 #: The declared execution scopes (``experiment_spec.SCOPE_VOCABULARY``) that carry a routing
@@ -470,6 +535,199 @@ def shared_history_scopes(rag_params: Any) -> list[str]:
         seen.add(scope)
         out.append(scope)
     return out
+
+
+def serving_scope_grants(
+    role: str,
+    *,
+    policy: Mapping[str, Any] | None = None,
+    lineage_scope: str = "",
+    run_scope: str = "",
+) -> tuple[str, ...]:
+    """Return the BOUNDED shared-scope grants for a routing role (default-empty).
+
+    The serving-scope policy answers ONE question: which shared scopes may a phase in
+    ``role`` retrieve BEYOND its private cell scope? The answer is EXPLICIT and bounded,
+    never silent global visibility (design §6, the two-channel rule):
+
+    * **Default-empty.** With no ``policy`` argument the function returns ``()`` — the
+      no-grant default. Routing never widens visibility on its own, and
+      :func:`resolve_phase_layers` never consults this function, so the promoted no-hint
+      route stays byte-identical.
+    * **Explicit grants.** Passing a policy table (the module's :data:`SERVING_SCOPE_POLICY`,
+      or a caller's own bounded mapping) returns that role's declared grants. A role absent
+      from the table, or the :data:`ROLE_UNKNOWN` role, gets ``()`.
+    * **Run-findings substitution is PROOF-CARRYING (R2 FINAL repair, round 4).**
+      :data:`RUN_FINDINGS_SCOPE_TOKEN` in a policy entry is replaced by the caller-supplied
+      ``lineage_scope`` ONLY when that scope is non-empty. ``lineage_scope`` is a TRUSTED,
+      run/continuation-lineage identity the caller owns: the caller that knows the run
+      derives it (or withholds it), so this function never INFERS ownership from a NAME. The
+      token is WITHHELD whenever ``lineage_scope`` is empty — no destination name is an
+      ownership proof, so the project-wide :data:`PROJECT_KNOWLEDGE_SCOPE`
+      (``agentic-dynamics``), an ``org:`` root, a wildcard, a custom ``team-findings``, even
+      a ``self-``-looking name, and especially the runner's environment-derived telemetry
+      fallback (``self-wf_<spec>_<model>``) are all equally insufficient — the last is a
+      SHARED namespace two unrelated runs can collide on, which is exactly the R2 [P1] leak.
+      The ownership predicate is the CHANNEL (a caller-supplied trusted identity), never the
+      name's shape: an incoming environment-derived id (the runner's ``FINOPS_CELL_ID``, a
+      worktree basename, or the telemetry fallback) is NOT a verified identity and is never a
+      grant. A broader project-history
+      grant stays the EXPLICIT role entry (e.g. ``PROJECT_KNOWLEDGE_SCOPE`` in
+      :data:`SERVING_SCOPE_POLICY`), never the run-findings token. The retired ``run_scope``
+      argument (kept so a not-yet-migrated caller fails SAFE — its offer is IGNORED — rather
+      than raising) is never consulted.
+    * **No wildcards.** The result is parsed through :func:`shared_history_scopes`, which
+      drops empty entries, de-duplicates in first-seen order, and REFUSES the global
+      wildcards ``*`` / ``global`` / ``all`` — so even a mistyped policy cannot widen a cell
+      into the whole KB.
+
+    Pure and deterministic (no clock, no store, no model).
+    """
+    table: Mapping[str, Any] = DEFAULT_SERVING_SCOPE_POLICY if policy is None else policy
+    if not isinstance(table, Mapping):
+        return ()
+    key = str(role or "").strip().lower()
+    raw: Any = table.get(key, ())
+    if isinstance(raw, str):
+        raw = (raw,)
+    if not isinstance(raw, (list, tuple, set, frozenset)):
+        return ()
+    # The ONLY trusted source of the run-findings substitution: the caller's run-derived
+    # lineage scope. ``run_scope`` is intentionally NOT consulted (the retired name denylist).
+    lineage = str(lineage_scope or "").strip()
+    resolved: list[str] = []
+    for grant in raw:
+        token = str(grant or "").strip()
+        if not token:
+            continue
+        if token == RUN_FINDINGS_SCOPE_TOKEN:
+            if lineage:
+                resolved.append(lineage)
+            continue
+        resolved.append(token)
+    return tuple(shared_history_scopes({"shared_history_scopes": resolved}))
+
+
+def explicit_run_wide_scopes(rag_params: Any) -> tuple[str, ...]:
+    """The role-INDEPENDENT run-wide shared scopes a run declares EXPLICITLY.
+
+    Two shapes, both role-independent (they apply to every phase of the run, never to one
+    role) and both normalized through :func:`shared_history_scopes` — the global wildcards
+    ``*`` / ``global`` / ``all`` are refused, empties dropped, duplicates collapsed in
+    first-seen order:
+
+    * the canonical ``shared_history_scopes`` list (and its aliases ``shared_scopes`` /
+      ``shared_repository_ids``); and
+    * the fully-explicit :data:`SERVING_SCOPE_GRANTS_KEY` (``serving_scope_grants``) list.
+
+    This is what ``_resolve_rag_params`` stores as the run's resolved ``shared_history_scopes``
+    — the declarations that are NOT role-derived. The ROLE-DERIVED policy grants are resolved
+    separately, PER PHASE, by :func:`phase_serving_scopes`, so a run-wide helper can never
+    union another role's grants into a phase. With neither shape the result is ``()`` — the
+    promoted default-empty behavior, so visibility is never widened implicitly. Pure and
+    deterministic (no clock, no store, no model).
+    """
+    if not isinstance(rag_params, Mapping):
+        return ()
+    scopes: list[str] = list(shared_history_scopes(rag_params))
+    explicit = rag_params.get(SERVING_SCOPE_GRANTS_KEY)
+    if explicit is not None:
+        for scope in shared_history_scopes({"shared_history_scopes": explicit}):
+            if scope not in scopes:
+                scopes.append(scope)
+    return tuple(scopes)
+
+
+def serving_scope_policy_table(
+    rag_params: Any,
+    default_policy: Mapping[str, Any] | None = None,
+) -> Mapping[str, Any] | None:
+    """Resolve the serving-scope POLICY TABLE a run declares, or ``None`` when it declares none.
+
+    The declaration lives on the run's resolved ``rag_params`` under
+    :data:`SERVING_SCOPE_POLICY_KEY` (``serving_scope_policy``). Three shapes:
+
+    * absent / ``None`` → ``None`` (no policy; the caller grants nothing role-derived);
+    * the literal :data:`SERVING_SCOPE_POLICY_DEFAULT` (``"default"``) → ``default_policy``
+      when the caller supplies one, else the module's :data:`SERVING_SCOPE_POLICY`;
+    * an inline mapping → that mapping, used verbatim as the table.
+
+    Any other string or a non-mapping, non-string value → ``None`` (an unrecognised selector
+    grants nothing rather than guessing). This helper reads ONLY the policy key: the
+    role-independent explicit declarations are :func:`explicit_run_wide_scopes`'s job, kept
+    SEPARATE so a run-wide list can never be mistaken for a role grant. Pure and deterministic.
+    """
+    if not isinstance(rag_params, Mapping):
+        return None
+    declaration = rag_params.get(SERVING_SCOPE_POLICY_KEY)
+    if declaration is None:
+        return None
+    if isinstance(declaration, str):
+        if declaration.strip().lower() != SERVING_SCOPE_POLICY_DEFAULT:
+            return None
+        return default_policy if default_policy is not None else SERVING_SCOPE_POLICY
+    if isinstance(declaration, Mapping):
+        return declaration
+    return None
+
+
+def phase_serving_scopes(
+    rag_params: Any,
+    *,
+    role: str = "",
+    lineage_scope: str = "",
+    run_scope: str = "",
+    default_policy: Mapping[str, Any] | None = None,
+) -> tuple[str, ...]:
+    """The shared scopes ONE phase may retrieve: its run-wide declarations ∪ its role grants.
+
+    This is the PER-PHASE resolution (R1 repair). The role-independent declarations
+    (:func:`explicit_run_wide_scopes`) always apply; the policy table
+    (:func:`serving_scope_policy_table`) is then consulted for the caller's CURRENT ``role``
+    ONLY and its bounded :func:`serving_scope_grants` are merged in. The caller passes the
+    phase's OWN translated role (the runner passes ``route.role`` after execution-scope
+    translation), so a phase never inherits another role's grant.
+
+    Default-empty: with no policy declaration the result is exactly the run-wide list (itself
+    empty by default), so the promoted no-grant behavior is unchanged; :func:`resolve_phase_layers`
+    never consults this function, so the no-hint route default stays ``()``.
+
+    **Explicit-list override (R4 repair).** :data:`SERVING_SCOPE_GRANTS_KEY`
+    (``serving_scope_grants``) is the fully-explicit, role-independent form. When it is
+    SUPPLIED — including the empty list, which is a deliberate no-grant declaration — it
+    TAKES PRECEDENCE over the policy selector: the role policy table is NOT consulted at all
+    and the result is exactly the explicit list plus the separate
+    ``shared_history_scopes``/alias channel (which is its own role-independent channel and is
+    never dropped). The policy grant stays ADDITIVE only when the explicit list is ABSENT.
+    Restoring this precedence is the R4 repair: the R1 per-phase refactor had made the policy
+    grants unconditional, so a restrictive explicit list could not override a broad policy —
+    changing that contract would require a named controller decision.
+
+    ``lineage_scope`` (the run/continuation-derived identity the caller owns) is FORWARDED to
+    :func:`serving_scope_grants` to substitute :data:`RUN_FINDINGS_SCOPE_TOKEN` inside the
+    policy table; it is WITHHELD when empty (the round-4 derive-or-withhold rule, the R2 FINAL
+    repair: an incoming environment-derived id — such as the runner's ``FINOPS_CELL_ID`` or its
+    ``self-wf_<spec>_<model>`` telemetry fallback — is NOT a verified identity, is not an
+    ownership proof, and must not be passed). The legacy ``run_scope`` argument is
+    accepted but **retired** — it is IGNORED, never treated as an ownership proof, so a bare
+    destination name cannot leak a whole-project namespace in under "own findings". The whole
+    result is normalized through :func:`shared_history_scopes`, so no wildcard survives. Pure
+    and deterministic (no clock, no store, no model).
+    """
+    if not isinstance(rag_params, Mapping):
+        return ()
+    scopes: list[str] = list(explicit_run_wide_scopes(rag_params))
+    # R4: the fully-explicit ``serving_scope_grants`` list is AUTHORITATIVE. When the key is
+    # supplied (INCLUDING ``[]``), return the explicit run-wide scopes alone and never consult
+    # the policy selector. The policy is additive ONLY when the explicit list is absent.
+    if rag_params.get(SERVING_SCOPE_GRANTS_KEY) is not None:
+        return tuple(shared_history_scopes({"shared_history_scopes": scopes}))
+    table = serving_scope_policy_table(rag_params, default_policy)
+    if table is not None:
+        for scope in serving_scope_grants(role, policy=table, lineage_scope=lineage_scope):
+            if scope not in scopes:
+                scopes.append(scope)
+    return tuple(shared_history_scopes({"shared_history_scopes": scopes}))
 
 
 def classify_phase_role(phase_name: str, phase_kind: str = "") -> str:
@@ -1007,6 +1265,7 @@ __all__ = [
     "CONTEXT_ROUTE_RECORD_KEYS",
     "CONTEXT_ROUTE_SCHEMA",
     "CONTEXT_ROUTE_UNCLASSIFIED_KEYS",
+    "DEFAULT_SERVING_SCOPE_POLICY",
     "EXECUTION_SCOPE_ROLES",
     "LAYERS",
     "LAYER_HISTORY",
@@ -1022,12 +1281,18 @@ __all__ = [
     "LAYER_STATUS_UNKNOWN",
     "LAYER_STRUCTURE",
     "LAYER_TASK",
+    "PROJECT_KNOWLEDGE_SCOPE",
     "ROLE_IMPLEMENTATION",
     "ROLE_PLANNING",
     "ROLE_REVIEW",
     "ROLE_UNKNOWN",
     "ROLE_VALUES",
     "ROLE_VERIFICATION",
+    "RUN_FINDINGS_SCOPE_TOKEN",
+    "SERVING_SCOPE_GRANTS_KEY",
+    "SERVING_SCOPE_POLICY",
+    "SERVING_SCOPE_POLICY_DEFAULT",
+    "SERVING_SCOPE_POLICY_KEY",
     "UNRESOLVED_UNCLASSIFIED_MIXED_REASON",
     "UNRESOLVED_UNCLASSIFIED_SERVED_REASON",
     "UNRESOLVED_UNCLASSIFIED_WITHHELD_ONLY_REASON",
@@ -1037,12 +1302,16 @@ __all__ = [
     "build_context_route_record",
     "classify_phase_role",
     "execution_scope_role",
+    "explicit_run_wide_scopes",
     "layer_for_source_type",
     "layer_source_types",
     "normalize_shared_scopes",
+    "phase_serving_scopes",
     "resolve_layer_route",
     "resolve_phase_layers",
     "route_resolved",
     "self_layer_prohibited",
+    "serving_scope_grants",
+    "serving_scope_policy_table",
     "shared_history_scopes",
 ]
