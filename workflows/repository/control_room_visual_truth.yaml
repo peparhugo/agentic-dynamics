@@ -9,6 +9,11 @@ question: >-
   TREND CHARTS are DEFERRED to a stage-2 spec — their full data-provenance chain (writer →
   storage → service → renderer → gate) is its own unit of work; stage 1 UNSERVES the chart
   mounts and retires their gate classes from the acceptance roster, keeping their code intact.
+  STAGE 1.5 (controller decision 2026-10-01): the room makes NO measurement-complete money
+  claims — cost/token figures display explicit "unverified — provenance pending" labels
+  (always-true) until the measurement-provenance chain is hardened; that chain hardening
+  (invocation identity, correction accounting, coverage reconciliation, end-to-end cost
+  classification) is DEFERRED to a dedicated named program, not part of this stage.
 version: "0.1"
 artifact_kind: workflow
 intent: mutate
@@ -47,18 +52,26 @@ workflow:
         question is the operator's call" — THIS directive answers the charts/workbench question:
         charts AND visuals, for the SERVED room). This spec is that wave, resumed.
 
-        STAGED DELIVERY (controller, 2026-09-30): the wave is SPLIT. STAGE 1 (this spec)
-        delivers the visual language + the two visuals + the served-room gate classes + the
-        provenance and gate-soundness repairs. The four production TREND CHARTS are DEFERRED:
-        their chain-level audit (cost/token/retry provenance through writer → parser →
-        executor → DB → service → renderer, panel/scale semantics, history sequences, gate
-        geometry soundness) becomes its own stage-2 spec. In stage 1 the charts are UNSERVED
-        (mounts removed from the served shell; modules kept in-tree for stage 2), their gate
-        classes retired from the active acceptance roster, and the remaining attempt-6 review
-        items that belong to stage 1 (the F8 provenance family: per-field cost/token/retry
-        measurement provenance through the writers and every served total consumer; the
-        Console scoping: the expected-500 allowance bound to the injected request) are the
-        REQUIRED repairs — with every credited repair preserved.
+        STAGED DELIVERY (controller, 2026-09-30 + 2026-10-01): the wave is SPLIT. STAGE 1
+        delivers the visual language + the two visuals + the served-room gate classes. STAGE
+        1.5 (2026-10-01): the measurement-provenance chain proved deeper than one stage — five
+        adversarial rounds kept closing the named seams while the reviewer proved the next
+        real seam — so the room's MONEY DISPLAYS now carry explicit "unverified — provenance
+        pending" labels (always-true: no measured/complete claim anywhere), and the chain
+        hardening (invocation identity at admission and retry boundaries, correction
+        accounting, coverage reconciliation, end-to-end conservative cost classification) is
+        DEFERRED to a dedicated named program with its own spec and bar. The four production
+        TREND CHARTS are DEFERRED: their chain-level audit (cost/token/retry provenance
+        through writer → parser → executor → DB → service → renderer, panel/scale semantics,
+        history sequences, gate geometry soundness) becomes its own stage-2 spec. In stage 1
+        the charts are UNSERVED (mounts removed from the served shell; modules kept in-tree
+        for stage 2), their gate classes retired from the active acceptance roster. The
+        stage-1.5 REQUIRED repairs are: the unverified money-display contract, the Console
+        scoping (the expected-500 allowance bound to the injected request identity with an
+        exact one-event budget; unrelated console errors and page exceptions must still
+        fail), the dishonest-displayed-fact and render-target gate mutations, and the
+        conservative no-crash classification of malformed inputs — with every credited
+        repair preserved.
 
         THE FINDINGS (the served room's own captures, reviewed 2026-09-24/25 — all real, quoted
         from the close): giant empty cards; no state-color language; truncation mid-token; no
@@ -132,6 +145,12 @@ workflow:
         1).
         (5) FIXTURE ADDITIONS that make each new class assertable — including the empty /
         error / unknown / gap cases, so the honesty rules are PROVEN, not assumed.
+        (6) THE UNVERIFIED MONEY CONTRACT: every cost/token/spend/burn figure the served room
+        displays — the header, the ladder rungs, the attempt rows, the totals — carries an
+        explicit "unverified — provenance pending" treatment (or is removed); NO measured or
+        complete money claim may appear anywhere in the served shell while the deferred
+        provenance chain is unhardened. This is always true, so it cannot be falsified by any
+        data state.
 
         ACCEPTANCE: (a) the HOST render gate `python3 scripts/verify_control_room_rendering.py
         --profile acceptance --candidate <sha>` PASSES with ZERO failures on the FINAL commit,
@@ -142,13 +161,17 @@ workflow:
         FINAL commit; (c) `python3 -m ruff check` green on touched python paths; (d) every
         unit's goal NAMES the assertion that would fail if its claim were false; (e) the AIO
         runs the host gate against this run's candidate BEFORE any promote, and the controller
-        reviews the captures. The stage-1 REQUIRED repairs are the attempt-6 review's F8 family
-        (per-field measurement provenance for cost, tokens, and retries from the actual writers,
-        through the runtime evidence seam and EVERY served total consumer — a genuinely measured
-        zero distinguishable from an unmeasured default, and cumulative totals carrying their
-        coverage) and the Console scoping (the expected-500 allowance bound to the injected
-        request/endpoint/time window; unrelated console errors and page exceptions must still
-        fail).
+        reviews the captures. The stage-1.5 REQUIRED repairs: (i) the unverified money-display
+        contract (no measured/complete money claim anywhere; the gate must REJECT any render
+        that emits one); (ii) Console scoping — the expected-500 allowance bound to the
+        injected request identity with an exact one-event budget, unrelated console errors and
+        page exceptions still failing; (iii) dishonest displayed-fact mutations (summary /
+        warning / hidden text) and unrelated render-target mutations must FAIL the gate; (iv)
+        malformed inputs never crash and classify conservatively (no measured/complete
+        certification from invalid data). DEFERRED (not part of this stage's acceptance): the
+        measurement-provenance chain hardening — invocation identity at admission/retry
+        boundaries, correction accounting, coverage reconciliation, end-to-end cost
+        classification — named as its own program, tracked in the register.
 
         EXECUTION SHAPE: plan-units expansion (cap 8), one concern per unit, a handful of
         files, ONE gate per unit; prefer MORE, SMALLER units; ~4 files or two concerns →
